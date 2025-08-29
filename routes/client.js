@@ -83,15 +83,22 @@ router.patch('/', async (req, res) => {
     const updatedClientDetails = req.body;
     try {
         await client.beginTransaction();
-        const [clientDetails] = await client.execute(`SELECT clientId,clientName,address,location FROM client WHERE id=?`, [updatedClientDetails.id]);
+        const [clientDetails] = await client.execute(`SELECT clientId,clientName,address,location FROM client WHERE clientId=?`, [updatedClientDetails.id]);
         if (clientDetails.length === 0) {
             return res.status(400).json({ message: `Client details do not exist for id ${updatedClientDetails.id}` });
         }
-        const name = req.body.name || clientDetails.name;
-        const address = req.body.address || clientDetails.address;
-
+        const existingClient = clientDetails[0];
+        const name = req.body.name || existingClient.name;
+        const address = req.body.address || existingClient.address;
+        const location = await geocodeAddress(address);
+        const point = `POINT(${location.lat} ${location.lon})`;
+        await client.execute(`UPDATE client SET clientName = ?, address=?,location=ST_GeomFromText(?, 4326),updated_at=NOW() WHERE clientId=?`, [name, address, point, updatedClientDetails.id]);
+        await client.commit();
+        res.status(204).json({ message: "CLient Details Updated Successfully" });
     } catch (error) {
-
+        console.error("Error Updating Client Details", error.stack);
+        await client.rollback();
+        res.status(500).json({ message: "Internal server error during Client updation" });
     } finally {
         client.release();
     }
