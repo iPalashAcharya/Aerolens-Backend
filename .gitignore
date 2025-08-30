@@ -1,2 +1,68 @@
+# Node.js
+node_modules/
+npm-debug.log
+.DS_Store
 .env
-node_modules
+
+# Yarn
+yarn-error.log
+.pnp/
+.pnp.js
+
+# IDEs and Editors
+.vscode/        # VS Code
+.idea/          # WebStorm/IntelliJ
+*.sublime-project # Sublime Text
+*.sublime-workspace
+*.code-workspace
+*.tmproj
+*.esproj
+
+# macOS
+.DS_Store
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Build artifacts
+dist/
+build/
+coverage/
+
+# Logs
+logs/
+*.log
+
+# Environment variables
+.env
+.env.*
+!.env.example # Keep an example file for collaborators
+
+# Test files
+*.test.js
+*.spec.js
+
+# Uploads
+uploads/ # If you have a directory for user uploads
+
+# Dependencies for production builds (if you're bundling client-side code)
+/public/build/
+/public/dist/
+
+# Configuration files
+# config/*.local.js # If you have local config overrides
+# config/*.dev.js
+# config/*.prod.js
+
+# Other common ignored files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+# pnpm-debug.log*
+
+# OS generated files
+.DS_Store
+.Spotlight-V100
+.Trashes
+Icon?
+secret/
