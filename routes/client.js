@@ -2,6 +2,13 @@ const express = require('express');
 const db = require('../db');
 const axios = require('axios');
 const { decode, isValid } = require('open-location-code');
+const cors = require('cors');
+
+const corsOptions = {
+    origin: 'http://localhost:5173',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+};
 
 const router = express.Router();
 
@@ -251,7 +258,7 @@ router.post('/', async (req, res) => {
     }
 });*/
 
-router.patch('/', async (req, res) => {
+router.patch('/', cors(corsOptions), async (req, res) => {
     const client = await db.getConnection();
     const updatedClientDetails = req.body;
 
