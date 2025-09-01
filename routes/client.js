@@ -6,17 +6,34 @@ const router = express.Router();
 
 async function geocodeAddress(address) {
     const url = 'https://nominatim.openstreetmap.org/search';
-    const response = await axios.get(url, {
-        params: {
-            q: address,
-            format: 'json',
-            addressdetails: 1,
-            limit: 1
+
+    try {
+        const response = await axios.get(url, {
+            params: {
+                q: address,
+                format: 'json',
+                addressdetails: 1,
+                limit: 1
+            },
+            headers: {
+                'User-Agent': 'YourAppName/1.0' // Nominatim requires this
+            },
+            timeout: 10000 // 10 second timeout
+        });
+
+        if (response.data.length === 0) {
+            throw new Error('No results found for address: ' + address);
         }
-    });
-    if (response.data.length === 0) throw new Error('No results found');
-    const place = response.data[0];
-    return { lat: place.lat, lon: place.lon };
+
+        const place = response.data[0];
+        return {
+            lat: parseFloat(place.lat),
+            lon: parseFloat(place.lon)
+        };
+    } catch (error) {
+        console.error('Geocoding error:', error.message);
+        throw error;
+    }
 }
 
 router.get('/', async (req, res) => {
@@ -64,9 +81,13 @@ router.post('/', async (req, res) => {
     const clientDetails = req.body;
     try {
         await client.beginTransaction();
+        console.log('Client details:', clientDetails); // Debug log
+        console.log('Address to geocode:', clientDetails.address);
         const location = await geocodeAddress(clientDetails.address);
-        const point = `POINT(${location.lon} ${location.lat})`;
-        await db.execute(`INSERT INTO client(clientName,address,location,created_at,updated_at) VALUES(?,?,ST_GeomFromText(?, 4326),NOW(),NOW())`, [clientDetails.name, clientDetails.address, point]);
+        const point = `POINT(${location.lat} ${location.lon})`;
+        console.log('Geocoded location:', location);
+        console.log(point);
+        await client.execute(`INSERT INTO client(clientName,address,location,created_at,updated_at) VALUES(?,?,ST_GeomFromText(?, 4326),NOW(),NOW())`, [clientDetails.name, clientDetails.address, point]);
         await client.commit();
         res.status(201).json({ message: "client details posted successfully" });
     } catch (error) {
@@ -88,7 +109,7 @@ router.patch('/', async (req, res) => {
             return res.status(400).json({ message: `Client details do not exist for id ${updatedClientDetails.id}` });
         }
         const existingClient = clientDetails[0];
-        const name = req.body.name || existingClient.name;
+        const name = req.body.name || existingClient.clientName;
         const address = req.body.address || existingClient.address;
         const location = await geocodeAddress(address);
         const point = `POINT(${location.lat} ${location.lon})`;
