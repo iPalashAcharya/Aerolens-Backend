@@ -99,7 +99,7 @@ router.post('/', async (req, res) => {
     }
 });
 
-router.patch('/', async (req, res) => {
+/*router.patch('/', async (req, res) => {
     const client = await db.getConnection();
     const updatedClientDetails = req.body;
     try {
@@ -116,6 +116,51 @@ router.patch('/', async (req, res) => {
         await client.execute(`UPDATE client SET clientName = ?, address=?,location=ST_GeomFromText(?, 4326),updated_at=NOW() WHERE clientId=?`, [name, address, point, updatedClientDetails.id]);
         await client.commit();
         res.status(204).json({ message: "CLient Details Updated Successfully" });
+    } catch (error) {
+        console.error("Error Updating Client Details", error.stack);
+        await client.rollback();
+        res.status(500).json({ message: "Internal server error during Client updation" });
+    } finally {
+        client.release();
+    }
+});*/
+
+router.patch('/', async (req, res) => {
+    const client = await db.getConnection();
+    const updatedClientDetails = req.body;
+
+    try {
+        await client.beginTransaction();
+
+        const [clientDetails] = await client.execute(`SELECT clientId,clientName,address,location FROM client WHERE clientId=?`, [updatedClientDetails.id]);
+
+        if (clientDetails.length === 0) {
+            return res.status(400).json({ message: `Client details do not exist for id ${updatedClientDetails.id}` });
+        }
+
+        const existingClient = clientDetails[0];
+        const name = req.body.name || existingClient.clientName;
+        const address = req.body.address || existingClient.address;
+
+        let updateQuery, updateParams;
+
+        if (req.body.address && req.body.address !== existingClient.address) {
+            console.log('Address changed, geocoding new address:', req.body.address);
+            const location = await geocodeAddress(address);
+            const point = `POINT(${location.lat} ${location.lon})`;
+
+            updateQuery = `UPDATE client SET clientName = ?, address = ?, location = ST_GeomFromText(?, 4326), updated_at = NOW() WHERE clientId = ?`;
+            updateParams = [name, address, point, updatedClientDetails.id];
+        } else {
+            console.log('Address unchanged, keeping existing location');
+            updateQuery = `UPDATE client SET clientName = ?, address = ?, updated_at = NOW() WHERE clientId = ?`;
+            updateParams = [name, address, updatedClientDetails.id];
+        }
+
+        await client.execute(updateQuery, updateParams);
+        await client.commit();
+        res.status(200).json({ message: "Client Details Updated Successfully" });
+
     } catch (error) {
         console.error("Error Updating Client Details", error.stack);
         await client.rollback();
