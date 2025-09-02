@@ -140,4 +140,188 @@ DELETE /client/3
 
 ---
 
+## Get Client Details
+
+**Endpoint:** `GET /:id`
+
+Retrieve detailed information about a client, including departments and client contacts.
+
+### Request
+
+Path Parameters:
+
+| Parameter | Type   | Required | Description                         |
+| --------- | ------ | -------- | ----------------------------------- |
+| `id`      | Number | Yes      | The unique numeric ID of the client |
+
+### Response
+
+- **Success (200 OK)**
+  {
+  "success": true,
+  "data": {
+  "clientId": 123,
+  "clientName": "Client Name",
+  "address": "Client address",
+  "location": {
+  "type": "Point",
+  "coordinates": [longitude, latitude]
+  },
+  "departments": [
+  {
+  "departmentId": 1,
+  "departmentName": "HR",
+  "departmentDescription": "Human Resources"
+  }
+  ],
+  "clientContacts": [
+  {
+  "clientContactId": 1,
+  "contactPersonName": "Jane Doe",
+  "designation": "Manager",
+  "phone": "1234567890",
+  "email": "jane@example.com"
+  }
+  ],
+  "meta": {
+  "departmentCount": 1,
+  "contactCount": 1,
+  "retrievedAt": "2025-09-02T12:34:56.789Z"
+  }
+  }
+  }
+
+- **Validation Errors (400 Bad Request)**
+
+  - Missing `id`:
+
+{
+"success": false,
+"error": "VALIDATION_ERROR",
+"message": "Client ID is required",
+"details": {
+"parameter": "id",
+"location": "path"
+}
+}
+
+- Invalid `id` format:
+
+{
+"success": false,
+"error": "VALIDATION_ERROR",
+"message": "Invalid client ID format",
+"details": {
+"providedId": "abc",
+"expectedFormat": "numeric",
+"example": "/api/client/123"
+}
+}
+
+- **Not Found (404 Not Found)**
+
+{
+"success": false,
+"error": "CLIENT_NOT_FOUND",
+"message": "Client with ID 123 not found",
+"details": {
+"clientId": "123",
+"suggestion": "Please verify the client ID and try again",
+"searchHint": "You can search for clients using the list endpoint"
+}
+}
+
+- **Server Errors (500, 503)**
+
+Detailed error responses for database or unexpected errors.
+
+---
+
+## Create Department
+
+**Endpoint:** `POST /`
+
+Creates a new department for a client.
+
+### Request
+
+JSON Body:
+
+| Field                   | Type   | Required | Description                   |
+| ----------------------- | ------ | -------- | ----------------------------- |
+| `clientId`              | Number | Yes      | The client's ID               |
+| `departmentName`        | String | Yes      | Name of the department        |
+| `departmentDescription` | String | Yes      | Description of the department |
+
+Example:
+
+{
+"clientId": 123,
+"departmentName": "Finance",
+"departmentDescription": "Handles financial matters"
+}
+
+### Response
+
+- **Success (201 Created)**
+
+{
+"success": true,
+"message": "Department details posted successfully",
+"data": {
+"departmentName": "Finance",
+"departmentDescription": "Handles financial matters",
+"clientId": 123
+}
+}
+
+- **Validation Error (400 Bad Request)**
+
+{
+"success": false,
+"error": "VALIDATION_ERROR",
+"message": "departmentName, departmentDescription and clientId are required fields",
+"details": {
+"missingFields": ["clientId", "departmentDescription"]
+}
+}
+
+- **Duplicate Entry (409 Conflict)**
+
+{
+"success": false,
+"error": "DUPLICATE_ENTRY",
+"message": "A department with this information already exists",
+"details": {
+"duplicateField": "unknown"
+}
+}
+
+- **Data Too Long (400 Bad Request)**
+
+{
+"success": false,
+"error": "DATA_TOO_LONG",
+"message": "One or more fields exceed the maximum allowed length",
+"details": {
+"field": "..."
+}
+}
+
+- **Server Errors (500)**
+
+General database or internal server errors.
+
+---
+
+## Notes
+
+- All responses are in JSON format.
+- Input validation is strict for required fields.
+- Errors provide detailed information for easier troubleshooting.
+- Database connection handling includes transactions for the POST endpoint.
+- The `id` must be numeric and valid for GET requests.
+
+---
+
 This README provides a comprehensive overview for developers to use the client API endpoints effectively.

@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const clientRoutes = require('./routes/client');
+const departmentRoutes = require('./routes/department');
 
 const app = express();
 const PORT = process.env.PORT || 3000;;
@@ -16,6 +17,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use('/client', clientRoutes);
+app.use('/department', departmentRoutes);
 
 app.listen(PORT, () => {
     console.log(`Server started on port ${PORT}`);
