@@ -202,6 +202,196 @@ router.get('/', async (req, res) => {
     }
 });
 
+router.get('/:id', async (req, res) => {
+    const client = await db.getConnection();
+    const clientId = req.params.id;
+    try {
+        if (!clientId) {
+            return res.status(400).json({
+                success: false,
+                error: "VALIDATION_ERROR",
+                message: "Client ID is required",
+                details: {
+                    parameter: "id",
+                    location: "path"
+                }
+            });
+        }
+
+        if (isNaN(parseInt(clientId))) {
+            return res.status(400).json({
+                success: false,
+                error: "VALIDATION_ERROR",
+                message: "Invalid client ID format",
+                details: {
+                    providedId: clientId,
+                    expectedFormat: "numeric",
+                    example: "/api/client/123"
+                }
+            });
+        }
+        let clientDetails;
+        try {
+            [clientDetails] = await client.execute(`SELECT c.clientId,c.clientName,c.address,c.location,COALESCE(JSON_ARRAYAGG(JSON_OBJECT('departmentId',d.departmentId,'departmentName',d.departmentName,'departmentDescription',d.departmentDescription)),JSON_ARRAY()) AS departments, COALESCE(JSON_ARRAYAGG(JSON_OBJECT('clientContactId',con.clientContactId,'contactPersonName',con.contactPersonName,'designation',con.designation,'phone',con.phone,'email',con.emailAddress)), JSON_ARRAY()) AS clientContact FROM client c LEFT JOIN department d ON c.clientId=d.clientId LEFT JOIN clientContact con ON c.clientId=con.clientId WHERE c.clientId=? GROUP BY c.clientId`, [clientId]);
+        } catch (dbError) {
+            console.error("Database error during client lookup:", dbError);
+
+            if (dbError.code === 'ER_BAD_FIELD_ERROR') {
+                return res.status(500).json({
+                    success: false,
+                    error: "DATABASE_SCHEMA_ERROR",
+                    message: "Database schema error - invalid field reference",
+                    details: {
+                        operation: "SELECT",
+                        hint: "Database schema may have changed"
+                    }
+                });
+            }
+
+            if (dbError.code === 'ER_NO_SUCH_TABLE') {
+                return res.status(500).json({
+                    success: false,
+                    error: "DATABASE_SCHEMA_ERROR",
+                    message: "Required database table not found",
+                    details: {
+                        operation: "SELECT",
+                        hint: "Database migration may be required"
+                    }
+                });
+            }
+
+            if (dbError.code === 'ER_ACCESS_DENIED_ERROR') {
+                return res.status(500).json({
+                    success: false,
+                    error: "DATABASE_ACCESS_ERROR",
+                    message: "Database access denied",
+                    details: {
+                        operation: "SELECT",
+                        hint: "Check database permissions"
+                    }
+                });
+            }
+
+            if (dbError.code === 'ETIMEDOUT' || dbError.code === 'ECONNRESET') {
+                return res.status(503).json({
+                    success: false,
+                    error: "DATABASE_CONNECTION_ERROR",
+                    message: "Database connection timeout",
+                    details: {
+                        operation: "SELECT",
+                        suggestion: "Please try again in a moment"
+                    }
+                });
+            }
+
+            return res.status(500).json({
+                success: false,
+                error: "DATABASE_ERROR",
+                message: "Failed to retrieve client information",
+                details: {
+                    operation: "SELECT",
+                    code: dbError.code,
+                    sqlState: dbError.sqlState
+                }
+            });
+        }
+        if (!clientDetails || clientDetails.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: "CLIENT_NOT_FOUND",
+                message: `Client with ID ${clientId} not found`,
+                details: {
+                    clientId: clientId,
+                    suggestion: "Please verify the client ID and try again",
+                    searchHint: "You can search for clients using the list endpoint"
+                }
+            });
+        }
+        const clientData = clientDetails[0];
+        try {
+            let departments = [];
+            if (clientData.departments) {
+                if (typeof clientData.departments === 'string') {
+                    departments = JSON.parse(clientData.departments).filter(dept => dept !== null);
+                } else if (typeof clientData.departments === 'object') {
+                    departments = clientData.departments.filter(dept => dept !== null);
+                }
+            }
+
+            let clientContacts = [];
+            if (clientData.clientContact) {
+                if (typeof clientData.clientContact === 'string') {
+                    clientContacts = JSON.parse(clientData.clientContact).filter(contact => contact !== null);
+                } else if (typeof clientData.clientContact === 'object') {
+                    clientContacts = clientData.clientContact.filter(contact => contact !== null);
+                }
+            }
+
+            let locationData = null;
+            if (clientData.location) {
+                try {
+                    locationData = {
+                        type: "Point",
+                        coordinates: clientData.location
+                    };
+                } catch (locationError) {
+                    console.warn("Warning: Could not parse location data:", locationError);
+                    locationData = clientData.location;
+                }
+            }
+
+            const responseData = {
+                success: true,
+                data: {
+                    clientId: clientData.clientId,
+                    clientName: clientData.clientName,
+                    address: clientData.address,
+                    location: locationData,
+                    departments: departments,
+                    clientContacts: clientContacts,
+                    meta: {
+                        departmentCount: departments.length,
+                        contactCount: clientContacts.length,
+                        retrievedAt: new Date().toISOString()
+                    }
+                }
+            };
+            res.json(responseData);
+        } catch (dataProcessingError) {
+            console.error("Error processing client data:", dataProcessingError);
+            return res.status(500).json({
+                success: false,
+                error: "DATA_PROCESSING_ERROR",
+                message: "Failed to process client data",
+                details: {
+                    clientId: clientId,
+                    stage: "response_formatting",
+                    error: dataProcessingError.message
+                }
+            });
+        }
+    } catch (error) {
+        console.error("Unexpected error during client retrieval:", error.stack);
+
+        res.status(500).json({
+            success: false,
+            error: "INTERNAL_SERVER_ERROR",
+            message: "An unexpected error occurred while retrieving client details",
+            details: {
+                timestamp: new Date().toISOString(),
+                clientId: clientId,
+                requestId: req.headers['x-request-id'] || 'unknown'
+            }
+        });
+    } finally {
+        try {
+            client.release();
+        } catch (releaseError) {
+            console.error("Error releasing database connection:", releaseError);
+        }
+    }
+});
+
 /*router.post('/', async (req, res) => {
     const client = await db.getConnection();
     const clientDetails = req.body;
