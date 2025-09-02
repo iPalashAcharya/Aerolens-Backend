@@ -95,7 +95,6 @@ async function geocodeWithNominatim(address) {
         if (!addr || addr.trim().length === 0) continue;
 
         try {
-            console.log(`Trying address variation: "${addr}"`);
 
             const response = await axios.get(url, {
                 params: {
@@ -113,12 +112,6 @@ async function geocodeWithNominatim(address) {
 
             if (response.data && response.data.length > 0) {
                 const place = response.data[0];
-                console.log(`Found location for: "${addr}"`);
-                console.log('Place details:', {
-                    display_name: place.display_name,
-                    lat: place.lat,
-                    lon: place.lon
-                });
 
                 return {
                     lat: parseFloat(place.lat),
@@ -209,7 +202,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-router.post('/', async (req, res) => {
+/*router.post('/', async (req, res) => {
     const client = await db.getConnection();
     const clientDetails = req.body;
     try {
@@ -230,35 +223,387 @@ router.post('/', async (req, res) => {
     } finally {
         client.release();
     }
-});
+});*/
 
-/*router.patch('/', async (req, res) => {
+router.post('/', async (req, res) => {
     const client = await db.getConnection();
-    const updatedClientDetails = req.body;
+    const clientDetails = req.body;
     try {
         await client.beginTransaction();
-        const [clientDetails] = await client.execute(`SELECT clientId,clientName,address,location FROM client WHERE clientId=?`, [updatedClientDetails.id]);
-        if (clientDetails.length === 0) {
-            return res.status(400).json({ message: `Client details do not exist for id ${updatedClientDetails.id}` });
+        if (!clientDetails.name || !clientDetails.address) {
+            return res.status(400).json({
+                success: false,
+                error: "VALIDATION_ERROR",
+                message: "Name and address are required fields",
+                details: {
+                    missingFields: [
+                        ...(!clientDetails.name ? ['name'] : []),
+                        ...(!clientDetails.address ? ['address'] : [])
+                    ]
+                }
+            });
         }
+
+        let location;
+        try {
+            location = await geocodeAddressWithFallback(clientDetails.address);
+            console.log('Geocoded location:', location);
+        } catch (geocodeError) {
+            console.error('Geocoding failed:', geocodeError.message);
+            return res.status(422).json({
+                success: false,
+                error: "GEOCODING_ERROR",
+                message: "Unable to find location for the provided address",
+                details: {
+                    address: clientDetails.address,
+                    geocodeError: geocodeError.message,
+                    suggestion: "Please verify the address format and try again"
+                }
+            });
+        }
+
+        const point = `POINT(${location.lat} ${location.lon})`;
+        try {
+            await client.execute(
+                `INSERT INTO client(clientName, address, location, created_at, updated_at) 
+                 VALUES(?, ?, ST_GeomFromText(?, 4326), NOW(), NOW())`,
+                [clientDetails.name, clientDetails.address, point]
+            );
+
+            await client.commit();
+
+            res.status(201).json({
+                success: true,
+                message: "Client details posted successfully",
+                data: {
+                    clientName: clientDetails.name,
+                    address: clientDetails.address,
+                    location: {
+                        lat: location.lat,
+                        lon: location.lon,
+                        source: location.source
+                    }
+                }
+            });
+
+        } catch (dbError) {
+            console.error("Database error:", dbError);
+            await client.rollback();
+
+            if (dbError.code === 'ER_DUP_ENTRY') {
+                return res.status(409).json({
+                    success: false,
+                    error: "DUPLICATE_ENTRY",
+                    message: "A client with this information already exists",
+                    details: {
+                        duplicateField: dbError.message.includes('clientName') ? 'name' : 'unknown'
+                    }
+                });
+            }
+
+            if (dbError.code === 'ER_DATA_TOO_LONG') {
+                return res.status(400).json({
+                    success: false,
+                    error: "DATA_TOO_LONG",
+                    message: "One or more fields exceed the maximum allowed length",
+                    details: {
+                        field: dbError.message
+                    }
+                });
+            }
+
+            return res.status(500).json({
+                success: false,
+                error: "DATABASE_ERROR",
+                message: "Database operation failed",
+                details: {
+                    code: dbError.code,
+                    sqlState: dbError.sqlState
+                }
+            });
+        }
+
+    } catch (error) {
+        console.error("Unexpected error:", error.stack);
+
+        try {
+            await client.rollback();
+        } catch (rollbackError) {
+            console.error("Rollback failed:", rollbackError);
+        }
+
+        res.status(500).json({
+            success: false,
+            error: "INTERNAL_SERVER_ERROR",
+            message: "An unexpected error occurred while processing your request",
+            details: {
+                timestamp: new Date().toISOString(),
+                requestId: req.headers['x-request-id'] || 'unknown'
+            }
+        });
+
+    } finally {
+        try {
+            client.release();
+        } catch (releaseError) {
+            console.error("Error releasing database connection:", releaseError);
+        }
+    }
+});
+
+router.patch('/', cors(corsOptions), async (req, res) => {
+    const client = await db.getConnection();
+    const updatedClientDetails = req.body;
+
+    try {
+        await client.beginTransaction();
+
+        if (!updatedClientDetails.id) {
+            return res.status(400).json({
+                success: false,
+                error: "VALIDATION_ERROR",
+                message: "Client ID is required for update operation",
+                details: {
+                    missingFields: ['id']
+                }
+            });
+        }
+
+        if (isNaN(parseInt(updatedClientDetails.id))) {
+            return res.status(400).json({
+                success: false,
+                error: "VALIDATION_ERROR",
+                message: "Invalid client ID format",
+                details: {
+                    providedId: updatedClientDetails.id,
+                    expectedFormat: "numeric"
+                }
+            });
+        }
+
+        if (!req.body.name && !req.body.address) {
+            return res.status(400).json({
+                success: false,
+                error: "VALIDATION_ERROR",
+                message: "At least one field (name or address) must be provided for update",
+                details: {
+                    allowedFields: ['name', 'address']
+                }
+            });
+        }
+
+        let clientDetails;
+        try {
+            [clientDetails] = await client.execute(
+                `SELECT clientId, clientName, address, location FROM client WHERE clientId = ?`,
+                [updatedClientDetails.id]
+            );
+        } catch (dbError) {
+            console.error("Database error during client lookup:", dbError);
+            await client.rollback();
+            return res.status(500).json({
+                success: false,
+                error: "DATABASE_ERROR",
+                message: "Failed to retrieve client information",
+                details: {
+                    operation: "SELECT",
+                    code: dbError.code
+                }
+            });
+        }
+
+        if (clientDetails.length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: "CLIENT_NOT_FOUND",
+                message: `Client with ID ${updatedClientDetails.id} does not exist`,
+                details: {
+                    clientId: updatedClientDetails.id,
+                    suggestion: "Please verify the client ID and try again"
+                }
+            });
+        }
+
         const existingClient = clientDetails[0];
         const name = req.body.name || existingClient.clientName;
         const address = req.body.address || existingClient.address;
-        const location = await geocodeAddress(address);
-        const point = `POINT(${location.lat} ${location.lon})`;
-        await client.execute(`UPDATE client SET clientName = ?, address=?,location=ST_GeomFromText(?, 4326),updated_at=NOW() WHERE clientId=?`, [name, address, point, updatedClientDetails.id]);
-        await client.commit();
-        res.status(204).json({ message: "CLient Details Updated Successfully" });
-    } catch (error) {
-        console.error("Error Updating Client Details", error.stack);
-        await client.rollback();
-        res.status(500).json({ message: "Internal server error during Client updation" });
-    } finally {
-        client.release();
-    }
-});*/
 
-router.patch('/', cors(corsOptions), async (req, res) => {
+        if (name && name.length > 255) {
+            return res.status(400).json({
+                success: false,
+                error: "VALIDATION_ERROR",
+                message: "Client name exceeds maximum allowed length",
+                details: {
+                    field: "name",
+                    maxLength: 255,
+                    providedLength: name.length
+                }
+            });
+        }
+
+        if (address && address.length > 500) {
+            return res.status(400).json({
+                success: false,
+                error: "VALIDATION_ERROR",
+                message: "Address exceeds maximum allowed length",
+                details: {
+                    field: "address",
+                    maxLength: 500,
+                    providedLength: address.length
+                }
+            });
+        }
+
+        let updateQuery, updateParams, location = null;
+
+        if (req.body.address && req.body.address !== existingClient.address) {
+            console.log('Address changed, geocoding new address:', req.body.address);
+
+            try {
+                location = await geocodeAddressWithFallback(address);
+                console.log('Geocoded location:', location);
+
+                const point = `POINT(${location.lat} ${location.lon})`;
+                updateQuery = `UPDATE client SET clientName = ?, address = ?, location = ST_GeomFromText(?, 4326), updated_at = NOW() WHERE clientId = ?`;
+                updateParams = [name, address, point, updatedClientDetails.id];
+
+            } catch (geocodeError) {
+                console.error('Geocoding failed for updated address:', geocodeError.message);
+                return res.status(422).json({
+                    success: false,
+                    error: "GEOCODING_ERROR",
+                    message: "Unable to find location for the new address",
+                    details: {
+                        newAddress: address,
+                        oldAddress: existingClient.address,
+                        geocodeError: geocodeError.message,
+                        suggestion: "Please verify the new address format or keep the existing address"
+                    }
+                });
+            }
+        } else {
+            console.log('Address unchanged, keeping existing location');
+            updateQuery = `UPDATE client SET clientName = ?, address = ?, updated_at = NOW() WHERE clientId = ?`;
+            updateParams = [name, address, updatedClientDetails.id];
+        }
+
+        try {
+            const [result] = await client.execute(updateQuery, updateParams);
+
+            if (result.affectedRows === 0) {
+                return res.status(404).json({
+                    success: false,
+                    error: "UPDATE_FAILED",
+                    message: "No changes were made to the client record",
+                    details: {
+                        clientId: updatedClientDetails.id,
+                        reason: "Client may have been deleted by another process"
+                    }
+                });
+            }
+
+            await client.commit();
+
+            res.status(200).json({
+                success: true,
+                message: "Client details updated successfully",
+                data: {
+                    clientId: updatedClientDetails.id,
+                    updatedFields: {
+                        name: req.body.name ? name : undefined,
+                        address: req.body.address ? address : undefined,
+                        ...(location && {
+                            location: {
+                                lat: location.lat,
+                                lon: location.lon,
+                                source: location.source
+                            }
+                        })
+                    },
+                    previousValues: {
+                        name: existingClient.clientName,
+                        address: existingClient.address
+                    }
+                }
+            });
+
+        } catch (dbError) {
+            console.error("Database error during update:", dbError);
+            await client.rollback();
+
+            if (dbError.code === 'ER_DUP_ENTRY') {
+                return res.status(409).json({
+                    success: false,
+                    error: "DUPLICATE_ENTRY",
+                    message: "A client with this information already exists",
+                    details: {
+                        conflictingField: dbError.message.includes('clientName') ? 'name' : 'unknown',
+                        suggestion: "Please use a different name or check for existing clients"
+                    }
+                });
+            }
+
+            if (dbError.code === 'ER_DATA_TOO_LONG') {
+                return res.status(400).json({
+                    success: false,
+                    error: "DATA_TOO_LONG",
+                    message: "One or more fields exceed the maximum allowed length",
+                    details: {
+                        error: dbError.message
+                    }
+                });
+            }
+
+            if (dbError.code === 'ER_BAD_NULL_ERROR') {
+                return res.status(400).json({
+                    success: false,
+                    error: "NULL_CONSTRAINT_VIOLATION",
+                    message: "Required field cannot be null",
+                    details: {
+                        field: dbError.message
+                    }
+                });
+            }
+
+            return res.status(500).json({
+                success: false,
+                error: "DATABASE_ERROR",
+                message: "Failed to update client details",
+                details: {
+                    operation: "UPDATE",
+                    code: dbError.code,
+                    sqlState: dbError.sqlState
+                }
+            });
+        }
+
+    } catch (error) {
+        console.error("Unexpected error during client update:", error.stack);
+        try {
+            await client.rollback();
+        } catch (rollbackError) {
+            console.error("Rollback failed:", rollbackError);
+        }
+        res.status(500).json({
+            success: false,
+            error: "INTERNAL_SERVER_ERROR",
+            message: "An unexpected error occurred while updating client details",
+            details: {
+                timestamp: new Date().toISOString(),
+                clientId: updatedClientDetails.id,
+                requestId: req.headers['x-request-id'] || 'unknown'
+            }
+        });
+    } finally {
+        try {
+            client.release();
+        } catch (releaseError) {
+            console.error("Error releasing database connection:", releaseError);
+        }
+    }
+});
+
+/*router.patch('/', cors(corsOptions), async (req, res) => {
     const client = await db.getConnection();
     const updatedClientDetails = req.body;
 
@@ -301,7 +646,7 @@ router.patch('/', cors(corsOptions), async (req, res) => {
     } finally {
         client.release();
     }
-});
+});*/
 
 router.delete('/:id', async (req, res) => {
     const client = await db.getConnection();
