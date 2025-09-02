@@ -265,7 +265,7 @@ router.post('/', async (req, res) => {
         const point = `POINT(${location.lat} ${location.lon})`;
         try {
             await client.execute(
-                `INSERT INTO client(clientName, address, location, created_at, updated_at) 
+                `INSERT INTO client(clientName, address, location, createdAt, updatedAt) 
                  VALUES(?, ?, ST_GeomFromText(?, 4326), NOW(), NOW())`,
                 [clientDetails.name, clientDetails.address, point]
             );
@@ -464,7 +464,7 @@ router.patch('/', cors(corsOptions), async (req, res) => {
                 console.log('Geocoded location:', location);
 
                 const point = `POINT(${location.lat} ${location.lon})`;
-                updateQuery = `UPDATE client SET clientName = ?, address = ?, location = ST_GeomFromText(?, 4326), updated_at = NOW() WHERE clientId = ?`;
+                updateQuery = `UPDATE client SET clientName = ?, address = ?, location = ST_GeomFromText(?, 4326), updatedAt = NOW() WHERE clientId = ?`;
                 updateParams = [name, address, point, updatedClientDetails.id];
 
             } catch (geocodeError) {
@@ -483,7 +483,7 @@ router.patch('/', cors(corsOptions), async (req, res) => {
             }
         } else {
             console.log('Address unchanged, keeping existing location');
-            updateQuery = `UPDATE client SET clientName = ?, address = ?, updated_at = NOW() WHERE clientId = ?`;
+            updateQuery = `UPDATE client SET clientName = ?, address = ?, updatedAt = NOW() WHERE clientId = ?`;
             updateParams = [name, address, updatedClientDetails.id];
         }
 
