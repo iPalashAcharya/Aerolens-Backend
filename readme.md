@@ -239,7 +239,7 @@ Detailed error responses for database or unexpected errors.
 
 ## Create Department
 
-**Endpoint:** `POST /`
+**Endpoint:** `POST /department`
 
 Creates a new department for a client.
 
@@ -325,3 +325,225 @@ General database or internal server errors.
 ---
 
 This README provides a comprehensive overview for developers to use the client API endpoints effectively.
+
+# Contact API
+
+API endpoints for managing client contacts.
+
+---
+
+## Create Contact
+
+**Endpoint:** `POST /contact`
+
+Creates a new contact for an existing client.
+
+### Request
+
+JSON body:
+
+| Field               | Type   | Required | Description                  |
+| ------------------- | ------ | -------- | ---------------------------- |
+| `clientId`          | Number | Yes      | The client's ID              |
+| `contactPersonName` | String | Yes      | Contact person's name        |
+| `designation`       | String | Yes      | Contact person's designation |
+| `phone`             | String | Yes      | Contact person's phone       |
+| `email`             | String | Yes      | Contact person's email       |
+
+**Example:**
+
+{
+"clientId": 123,
+"contactPersonName": "John Doe",
+"designation": "Manager",
+"phone": "9876543210",
+"email": "john@example.com"
+}
+
+### Response
+
+- **Success (201 Created):**
+
+{
+"success": true,
+"message": "client contact details posted successfully",
+"data": {
+"contactPersonName": "John Doe",
+"designation": "Manager",
+"phone": "9876543210",
+"email": "john@example.com",
+"clientId": 123
+}
+}
+
+- **Validation Error (400 Bad Request):**
+
+{
+"success": false,
+"error": "VALIDATION_ERROR",
+"message": "contactPersonName, designation, phone, email and clientId are required fields",
+"details": {
+"missingFields": ["clientId"]
+}
+}
+
+- **Duplicate Entry (409 Conflict):**
+
+{
+"success": false,
+"error": "DUPLICATE_ENTRY",
+"message": "A client contact with this information already exists",
+"details": {
+"duplicateField": "unknown"
+}
+}
+
+- **Data Too Long (400 Bad Request):**
+
+{
+"success": false,
+"error": "DATA_TOO_LONG",
+"message": "One or more fields exceed the maximum allowed length",
+"details": {
+"field": "..."
+}
+}
+
+- **Database/Internal Errors (500):**
+
+General database or internal server errors with detailed information.
+
+---
+
+## Update Contact
+
+**Endpoint:** `PATCH /contact`
+
+Update details of an existing client contact.
+
+### Request
+
+JSON body:
+
+| Field               | Type   | Required | Description                          |
+| ------------------- | ------ | -------- | ------------------------------------ |
+| `contactId`         | Number | Yes      | The ID of the contact to update      |
+| `contactPersonName` | String | No       | Updated contact person's name        |
+| `designation`       | String | No       | Updated contact person's designation |
+| `phone`             | String | No       | Updated contact person's phone       |
+| `email`             | String | No       | Updated contact person's email       |
+
+**At least one of** `contactPersonName`, `designation`, `phone`, or `email` must be provided for updates.
+
+**Example:**
+
+{
+"contactId": 42,
+"phone": "9998887776"
+}
+
+### Response
+
+- **Success (200 OK):**
+
+{
+"success": true,
+"message": "clientContact details updated successfully",
+"data": {
+"clientId": 42,
+"updatedFields": {
+"phone": "9998887776"
+},
+"previousValues": {
+"phone": "9876543210"
+}
+}
+}
+
+- **Validation Error (400 Bad Request):**
+
+  - Missing contactId:
+
+{
+"success": false,
+"error": "VALIDATION_ERROR",
+"message": "contact ID is required for update operation",
+"details": {
+"missingFields": ["contactId"]
+}
+}
+
+- Invalid contactId format:
+
+{
+"success": false,
+"error": "VALIDATION_ERROR",
+"message": "Invalid contact ID format",
+"details": {
+"providedId": "abc",
+"expectedFormat": "numeric"
+}
+}
+
+- No fields for update:
+
+{
+"success": false,
+"error": "VALIDATION_ERROR",
+"message": "At least one field (contactPersonName, designation, phone, or email) must be provided for update",
+"details": {
+"allowedFields": ["contactPersonName", "designation", "phone", "email"]
+}
+}
+
+- Field length errors:
+
+{
+"success": false,
+"error": "VALIDATION_ERROR",
+"message": "Contact name exceeds maximum allowed length",
+"details": {
+"field": "contactPersonName",
+"maxLength": 100,
+"providedLength": 120
+}
+}
+
+- **Contact Not Found (404 Not Found):**
+
+{
+"success": false,
+"error": "CONTACT_NOT_FOUND",
+"message": "Contact with ID 42 does not exist",
+"details": {
+"clientId": 42,
+"suggestion": "Please verify the contact ID and try again"
+}
+}
+
+- **Duplicate Entry (409 Conflict):**
+
+{
+"success": false,
+"error": "DUPLICATE_ENTRY",
+"message": "A clientContact with this information already exists",
+"details": {
+"conflictingField": "contactPersonName",
+"suggestion": "Please use a different name or check for existing client contacts"
+}
+}
+
+- **Other Database/Internal Errors (500):**
+
+General database or internal server errors with details.
+
+---
+
+## Notes
+
+- All responses are in JSON format.
+- All fields are strictly validated.
+- Error messages are descriptive for troubleshooting.
+- Transactions and database connection handling are robust.
+
+---
