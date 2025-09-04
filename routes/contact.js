@@ -344,5 +344,29 @@ router.patch('/', async (req, res) => {
     }
 });
 
+router.delete('/:id', async (req, res) => {
+    const client = await db.getConnection();
+    const contactId = parseInt(req.params.id);
+    if (!contactId) {
+        res.status(400).json({ message: "Invalid Contact Person ID" });
+    }
+    try {
+        await client.beginTransaction();
+        const [result] = await client.execute(`DELETE FROM clientContact WHERE clientContactId=?`, [contactId]);
+        if (result.affectedRows === 0) {
+            await client.rollback();
+            return res.status(404).json({ message: "client contact not found" });
+        }
+        await client.commit();
+        res.status(200).json({ message: "client contact deleted successfully" });
+    } catch (error) {
+        console.error("Error deleting Department", error.stack);
+        await client.rollback();
+        res.status(500).json({ message: "Internal server error during client contact deletion" });
+    } finally {
+        client.release();
+    }
+});
+
 
 module.exports = router;

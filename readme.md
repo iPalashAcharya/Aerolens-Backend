@@ -584,6 +584,51 @@ General database or internal server errors with details.
 
 ---
 
+## Delete client contact
+
+**Endpoint:** `DELETE /contact/:id`
+
+Deletes a department by its unique ID.
+
+### Request
+
+Path Parameters:
+
+| Parameter | Type   | Required | Description                         |
+| --------- | ------ | -------- | ----------------------------------- |
+| `id`      | Number | Yes      | The unique ID of the contact person |
+
+### Response
+
+- **Success (200 OK):**
+  {
+  "message": "client contact deleted successfully"
+  }
+
+- **Validation Error (400 Bad Request):**
+
+When the provided contact person ID is missing or invalid:
+
+{
+"message": "Invalid Contact Person ID"
+}
+
+- **Not Found (404 Not Found):**
+
+If no contact person exists for the given ID:
+
+{
+"message": "client contact not found"
+}
+
+- **Internal Server Error (500):**
+
+If a server/database error occurs during deletion:
+
+{
+"message": "Internal server error during client contact deletion"
+}
+
 ## Notes
 
 - All responses are in JSON format.
