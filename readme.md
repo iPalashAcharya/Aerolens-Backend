@@ -314,6 +314,51 @@ General database or internal server errors.
 
 ---
 
+## Delete Department
+
+**Endpoint:** `DELETE /department/:id`
+
+Deletes a department by its unique ID.
+
+### Request
+
+Path Parameters:
+
+| Parameter | Type   | Required | Description                     |
+| --------- | ------ | -------- | ------------------------------- |
+| `id`      | Number | Yes      | The unique ID of the department |
+
+### Response
+
+- **Success (200 OK):**
+  {
+  "message": "department deleted successfully"
+  }
+
+- **Validation Error (400 Bad Request):**
+
+When the provided department ID is missing or invalid:
+
+{
+"message": "Invalid Department ID"
+}
+
+- **Not Found (404 Not Found):**
+
+If no department exists for the given ID:
+
+{
+"message": "department not found"
+}
+
+- **Internal Server Error (500):**
+
+If a server/database error occurs during deletion:
+
+{
+"message": "Internal server error during Department deletion"
+}
+
 ## Notes
 
 - All responses are in JSON format.

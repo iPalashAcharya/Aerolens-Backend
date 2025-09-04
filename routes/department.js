@@ -97,4 +97,28 @@ router.post('/', async (req, res) => {
     }
 });
 
+router.delete('/:id', async (req, res) => {
+    const client = await db.getConnection();
+    const departmentId = parseInt(req.params.id);
+    if (!departmentId) {
+        res.status(400).json({ message: "Invalid Department ID" });
+    }
+    try {
+        await client.beginTransaction();
+        const [result] = await client.execute(`DELETE FROM department WHERE departmentid=?`, [departmentId]);
+        if (result.affectedRows === 0) {
+            await client.rollback();
+            return res.status(404).json({ message: "department not found" });
+        }
+        await client.commit();
+        res.status(200).json({ message: "department deleted successfully" });
+    } catch (error) {
+        console.error("Error deleting Department", error.stack);
+        await client.rollback();
+        res.status(500).json({ message: "Internal server error during Department deletion" });
+    } finally {
+        client.release();
+    }
+});
+
 module.exports = router;
