@@ -232,7 +232,32 @@ router.get('/:id', async (req, res) => {
         }
         let clientDetails;
         try {
-            [clientDetails] = await client.execute(`SELECT c.clientId,c.clientName,c.address,c.location,COALESCE(JSON_ARRAYAGG(JSON_OBJECT('departmentId',d.departmentId,'departmentName',d.departmentName,'departmentDescription',d.departmentDescription)),JSON_ARRAY()) AS departments, COALESCE(JSON_ARRAYAGG(JSON_OBJECT('clientContactId',con.clientContactId,'contactPersonName',con.contactPersonName,'designation',con.designation,'phone',con.phone,'email',con.emailAddress)), JSON_ARRAY()) AS clientContact FROM client c LEFT JOIN department d ON c.clientId=d.clientId LEFT JOIN clientContact con ON c.clientId=con.clientId WHERE c.clientId=? GROUP BY c.clientId`, [clientId]);
+            [clientDetails] = await client.execute(`SELECT 
+            c.clientId,
+            c.clientName,
+            c.address,
+            c.location,
+            COALESCE(d.departments, JSON_ARRAY()) AS departments,
+            COALESCE(con.contacts, JSON_ARRAY()) AS clientContact
+            FROM 
+            client c
+            LEFT JOIN (
+            SELECT clientId, JSON_ARRAYAGG(
+                JSON_OBJECT('departmentId', departmentId, 'departmentName', departmentName, 'departmentDescription', departmentDescription)
+            ) AS departments
+            FROM department
+            GROUP BY clientId
+            ) d ON c.clientId = d.clientId
+            LEFT JOIN (
+            SELECT clientId, JSON_ARRAYAGG(
+                JSON_OBJECT('clientContactId', clientContactId, 'contactPersonName', contactPersonName, 'designation', designation, 'phone', phone, 'email', emailAddress)
+            ) AS contacts
+            FROM clientContact
+            GROUP BY clientId
+            ) con ON c.clientId = con.clientId
+            WHERE 
+            c.clientId = ?;
+            `, [clientId]);
         } catch (dbError) {
             console.error("Database error during client lookup:", dbError);
 
