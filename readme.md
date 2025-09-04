@@ -314,6 +314,171 @@ General database or internal server errors.
 
 ---
 
+## Update Department Details
+
+**Endpoint:** `PATCH /department`
+
+Update information for an existing department.
+
+### Request
+
+JSON Body:
+
+| Field                   | Type   | Required | Description                                  |
+| ----------------------- | ------ | -------- | -------------------------------------------- |
+| `departmentId`          | Number | Yes      | The unique ID of the department to update    |
+| `departmentName`        | String | No       | New name of the department (max length: 100) |
+| `departmentDescription` | String | No       | New description of the department            |
+
+At least one of `departmentName` or `departmentDescription` must be provided.
+
+**Example Request:**
+{
+"departmentId": 101,
+"departmentName": "Technology",
+"departmentDescription": "Handles all tech-related operations"
+}
+
+### Response
+
+- **Success (200 OK):**
+
+{
+"success": true,
+"message": "department details updated successfully",
+"data": {
+"departmentId": 101,
+"updatedFields": {
+"departmentName": "Technology",
+"departmentDescription": "Handles all tech-related operations"
+},
+"previousValues": {
+"departmentName": "IT",
+"description": "Information Technology department"
+}
+}
+}
+
+- **Validation Errors (400 Bad Request):**
+
+  - Missing `departmentId`:
+
+{
+"success": false,
+"error": "VALIDATION_ERROR",
+"message": "department ID is required for update operation",
+"details": {
+"missingFields": ["departmentId"]
+}
+}
+
+- Invalid `departmentId` format:
+
+{
+"success": false,
+"error": "VALIDATION_ERROR",
+"message": "Invalid Department ID format",
+"details": {
+"providedId": "abc",
+"expectedFormat": "numeric"
+}
+}
+
+- No fields provided for update:
+
+{
+"success": false,
+"error": "VALIDATION_ERROR",
+"message": "At least one field (departmentName or departmentDescription) must be provided for update",
+"details": {
+"allowedFields": ["departmentName", "departmentDescription"]
+}
+}
+
+- Department name too long:
+
+{
+"success": false,
+"error": "VALIDATION_ERROR",
+"message": "Department name exceeds maximum allowed length",
+"details": {
+"field": "departmentName",
+"maxLength": 100,
+"providedLength": 120
+}
+}
+
+- **Not Found (404 Not Found):**
+
+{
+"success": false,
+"error": "CONTACT_NOT_FOUND",
+"message": "Contact with ID 101 does not exist",
+"details": {
+"departmentId": 101,
+"suggestion": "Please verify the department ID and try again"
+}
+}
+
+- **Conflict (409 Conflict):**
+
+{
+"success": false,
+"error": "DUPLICATE_ENTRY",
+"message": "A department with this information already exists",
+"details": {
+"conflictingField": "departmentName",
+"suggestion": "Please use a different department name or check for existing departments"
+}
+}
+
+- **Data Too Long (400 Bad Request):**
+
+{
+"success": false,
+"error": "DATA_TOO_LONG",
+"message": "One or more fields exceed the maximum allowed length",
+"details": {
+"error": "Detailed error message"
+}
+}
+
+- **Null Constraint Violation (400 Bad Request):**
+
+{
+"success": false,
+"error": "NULL_CONSTRAINT_VIOLATION",
+"message": "Required field cannot be null",
+"details": {
+"field": "departmentDescription"
+}
+}
+
+- **Update Failed (404 Not Found):**
+
+{
+"success": false,
+"error": "UPDATE_FAILED",
+"message": "No changes were made to the department record",
+"details": {
+"departmentId": 101,
+"reason": "department may have been deleted by another process"
+}
+}
+
+- **Internal Server Error (500):**
+
+{
+"success": false,
+"error": "DATABASE_ERROR",
+"message": "Failed to update department details",
+"details": {
+"operation": "UPDATE",
+"code": "ER_CODE",
+"sqlState": "SQL_STATE"
+}
+}
+
 ## Delete Department
 
 **Endpoint:** `DELETE /department/:id`
