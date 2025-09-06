@@ -566,14 +566,14 @@ router.post('/', async (req, res) => {
     }
 });
 
-router.patch('/', cors(corsOptions), async (req, res) => {
+router.patch('/:id', cors(corsOptions), async (req, res) => {
     const client = await db.getConnection();
     const updatedClientDetails = req.body;
 
     try {
         await client.beginTransaction();
 
-        if (!updatedClientDetails.id) {
+        if (!req.params.id) {
             return res.status(400).json({
                 success: false,
                 error: "VALIDATION_ERROR",
@@ -584,13 +584,13 @@ router.patch('/', cors(corsOptions), async (req, res) => {
             });
         }
 
-        if (isNaN(parseInt(updatedClientDetails.id))) {
+        if (isNaN(parseInt(req.params.id))) {
             return res.status(400).json({
                 success: false,
                 error: "VALIDATION_ERROR",
                 message: "Invalid client ID format",
                 details: {
-                    providedId: updatedClientDetails.id,
+                    providedId: req.params.id,
                     expectedFormat: "numeric"
                 }
             });
@@ -611,7 +611,7 @@ router.patch('/', cors(corsOptions), async (req, res) => {
         try {
             [clientDetails] = await client.execute(
                 `SELECT clientId, clientName, address, location FROM client WHERE clientId = ?`,
-                [updatedClientDetails.id]
+                [req.params.id]
             );
         } catch (dbError) {
             console.error("Database error during client lookup:", dbError);
@@ -631,9 +631,9 @@ router.patch('/', cors(corsOptions), async (req, res) => {
             return res.status(404).json({
                 success: false,
                 error: "CLIENT_NOT_FOUND",
-                message: `Client with ID ${updatedClientDetails.id} does not exist`,
+                message: `Client with ID ${req.params.id} does not exist`,
                 details: {
-                    clientId: updatedClientDetails.id,
+                    clientId: req.params.id,
                     suggestion: "Please verify the client ID and try again"
                 }
             });
@@ -680,7 +680,7 @@ router.patch('/', cors(corsOptions), async (req, res) => {
 
                 const point = `POINT(${location.lat} ${location.lon})`;
                 updateQuery = `UPDATE client SET clientName = ?, address = ?, location = ST_GeomFromText(?, 4326), updatedAt = NOW() WHERE clientId = ?`;
-                updateParams = [name, address, point, updatedClientDetails.id];
+                updateParams = [name, address, point, req.params.id];
 
             } catch (geocodeError) {
                 console.error('Geocoding failed for updated address:', geocodeError.message);
@@ -699,7 +699,7 @@ router.patch('/', cors(corsOptions), async (req, res) => {
         } else {
             console.log('Address unchanged, keeping existing location');
             updateQuery = `UPDATE client SET clientName = ?, address = ?, updatedAt = NOW() WHERE clientId = ?`;
-            updateParams = [name, address, updatedClientDetails.id];
+            updateParams = [name, address, req.params.id];
         }
 
         try {
@@ -711,7 +711,7 @@ router.patch('/', cors(corsOptions), async (req, res) => {
                     error: "UPDATE_FAILED",
                     message: "No changes were made to the client record",
                     details: {
-                        clientId: updatedClientDetails.id,
+                        clientId: req.params.id,
                         reason: "Client may have been deleted by another process"
                     }
                 });
@@ -723,7 +723,7 @@ router.patch('/', cors(corsOptions), async (req, res) => {
                 success: true,
                 message: "Client details updated successfully",
                 data: {
-                    clientId: updatedClientDetails.id,
+                    clientId: req.params.id,
                     updatedFields: {
                         name: req.body.name ? name : undefined,
                         address: req.body.address ? address : undefined,
@@ -805,7 +805,7 @@ router.patch('/', cors(corsOptions), async (req, res) => {
             message: "An unexpected error occurred while updating client details",
             details: {
                 timestamp: new Date().toISOString(),
-                clientId: updatedClientDetails.id,
+                clientId: req.params.id,
                 requestId: req.headers['x-request-id'] || 'unknown'
             }
         });
@@ -817,51 +817,6 @@ router.patch('/', cors(corsOptions), async (req, res) => {
         }
     }
 });
-
-/*router.patch('/', cors(corsOptions), async (req, res) => {
-    const client = await db.getConnection();
-    const updatedClientDetails = req.body;
-
-    try {
-        await client.beginTransaction();
-
-        const [clientDetails] = await client.execute(`SELECT clientId,clientName,address,location FROM client WHERE clientId=?`, [updatedClientDetails.id]);
-
-        if (clientDetails.length === 0) {
-            return res.status(400).json({ message: `Client details do not exist for id ${updatedClientDetails.id}` });
-        }
-
-        const existingClient = clientDetails[0];
-        const name = req.body.name || existingClient.clientName;
-        const address = req.body.address || existingClient.address;
-
-        let updateQuery, updateParams;
-
-        if (req.body.address && req.body.address !== existingClient.address) {
-            console.log('Address changed, geocoding new address:', req.body.address);
-            const location = await geocodeAddressWithFallback(address);
-            const point = `POINT(${location.lat} ${location.lon})`;
-
-            updateQuery = `UPDATE client SET clientName = ?, address = ?, location = ST_GeomFromText(?, 4326), updated_at = NOW() WHERE clientId = ?`;
-            updateParams = [name, address, point, updatedClientDetails.id];
-        } else {
-            console.log('Address unchanged, keeping existing location');
-            updateQuery = `UPDATE client SET clientName = ?, address = ?, updated_at = NOW() WHERE clientId = ?`;
-            updateParams = [name, address, updatedClientDetails.id];
-        }
-
-        await client.execute(updateQuery, updateParams);
-        await client.commit();
-        res.status(200).json({ message: "Client Details Updated Successfully" });
-
-    } catch (error) {
-        console.error("Error Updating Client Details", error.stack);
-        await client.rollback();
-        res.status(500).json({ message: "Internal server error during Client updation" });
-    } finally {
-        client.release();
-    }
-});*/
 
 router.delete('/:id', async (req, res) => {
     const client = await db.getConnection();

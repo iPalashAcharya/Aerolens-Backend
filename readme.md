@@ -38,64 +38,288 @@ GET /?page=1&limit=10
 
 ---
 
-### POST `/client`
+## Create Client
 
-Create a new client entry.
+**Endpoint:** `POST /client`
 
-#### Request Body
+Create a new client record with geocoded location.
 
-- `name` (string, required) - Client name.
-- `address` (string, required) - Client address; will be geocoded.
+### Request
 
-#### Behavior
+JSON Body:
 
-- Converts the provided `address` into geospatial coordinates.
-- Stores client details along with location as a POINT in the database.
-- Sets `created_at` and `updated_at` timestamps.
+| Field     | Type   | Required | Description                            |
+| --------- | ------ | -------- | -------------------------------------- |
+| `name`    | String | Yes      | The client's name (max length: 255)    |
+| `address` | String | Yes      | The client's address (max length: 500) |
 
-#### Response
+**Example:**
+{
+"name": "Acme Corp",
+"address": "123 Main St, Springfield"
+}
 
-- HTTP 201 Created with success message.
+### Response
 
-#### Example Request Body
+- **Success (201 Created):**
 
 {
-"name": "Client A",
-"address": "123 Main St, City, Country"
+"success": true,
+"message": "Client details posted successfully",
+"data": {
+"clientName": "Acme Corp",
+"address": "123 Main St, Springfield",
+"location": {
+"lat": 32.7767,
+"lon": -96.7970,
+"source": "geocoding_api"
 }
+}
+}
+
+- **Validation Error (400 Bad Request):**
+
+{
+"success": false,
+"error": "VALIDATION_ERROR",
+"message": "Name and address are required fields",
+"details": {
+"missingFields": ["name"]
+}
+}
+
+- **Geocoding Error (422 Unprocessable Entity):**
+
+{
+"success": false,
+"error": "GEOCODING_ERROR",
+"message": "Unable to find location for the provided address",
+"details": {
+"address": "123 Main St, Springfield",
+"geocodeError": "No results found",
+"suggestion": "Please verify the address format and try again"
+}
+}
+
+- **Duplicate Entry (409 Conflict):**
+
+{
+"success": false,
+"error": "DUPLICATE_ENTRY",
+"message": "A client with this information already exists",
+"details": {
+"duplicateField": "name"
+}
+}
+
+- **Data Too Long (400 Bad Request):**
+
+{
+"success": false,
+"error": "DATA_TOO_LONG",
+"message": "One or more fields exceed the maximum allowed length",
+"details": {
+"field": "address"
+}
+}
+
+- **Internal/Database Error (500):**
+
+General database or server errors with details.
 
 ---
 
-### PATCH `/client`
+## Update Client
 
-Update an existing client's details.
+**Endpoint:** `PATCH /client/:id`
 
-#### Request Body
+Update an existing client's name or address. If the address changes, its location will be re-geocoded.
 
-- `id` (integer, required) - Client ID to update.
-- `name` (string, optional) - New client name.
-- `address` (string, optional) - New client address; will be geocoded if updated.
+### Request
 
-#### Behavior
+Path Parameters:
 
-- Fetches existing client by `id`.
-- If found, updates the name and/or address.
-- Updates location with geocoded coordinates for new address.
-- Updates `updated_at` timestamp.
-- Returns error if client does not exist.
+| Parameter | Type   | Required | Description      |
+| --------- | ------ | -------- | ---------------- |
+| `id`      | Number | Yes      | Unique client ID |
 
-#### Response
+JSON Body:
 
-- HTTP 204 No Content on success.
-- HTTP 400 Bad Request if client not found.
+| Field     | Type   | Required | Description                                  |
+| --------- | ------ | -------- | -------------------------------------------- |
+| `name`    | String | No       | New name for the client (max length: 255)    |
+| `address` | String | No       | New address for the client (max length: 500) |
 
-#### Example Request Body
+**At least one of** `name` or `address` must be provided.
+
+**Example:**
 
 {
-"id": 1,
-"name": "Updated Client Name",
-"address": "456 New Address, City, Country"
+"name": "Acme Corp International",
+"address": "456 Market St, Springfield"
 }
+
+### Response
+
+- **Success (200 OK):**
+
+{
+"success": true,
+"message": "Client details updated successfully",
+"data": {
+"clientId": 9,
+"updatedFields": {
+"name": "Acme Corp International",
+"address": "456 Market St, Springfield",
+"location": {
+"lat": 32.7788,
+"lon": -96.7999,
+"source": "geocoding_api"
+}
+},
+"previousValues": {
+"name": "Acme Corp",
+"address": "123 Main St, Springfield"
+}
+}
+}
+
+- **Validation Error (400 Bad Request):**
+
+  - Missing client ID:
+
+{
+"success": false,
+"error": "VALIDATION_ERROR",
+"message": "Client ID is required for update operation",
+"details": {
+"missingFields": ["id"]
+}
+}
+
+- Invalid client ID format:
+
+{
+"success": false,
+"error": "VALIDATION_ERROR",
+"message": "Invalid client ID format",
+"details": {
+"providedId": "abc",
+"expectedFormat": "numeric"
+}
+}
+
+- No fields for update:
+
+{
+"success": false,
+"error": "VALIDATION_ERROR",
+"message": "At least one field (name or address) must be provided for update",
+"details": {
+"allowedFields": ["name", "address"]
+}
+}
+
+- Name too long:
+
+{
+"success": false,
+"error": "VALIDATION_ERROR",
+"message": "Client name exceeds maximum allowed length",
+"details": {
+"field": "name",
+"maxLength": 255,
+"providedLength": 300
+}
+}
+
+- Address too long:
+
+{
+"success": false,
+"error": "VALIDATION_ERROR",
+"message": "Address exceeds maximum allowed length",
+"details": {
+"field": "address",
+"maxLength": 500,
+"providedLength": 800
+}
+}
+
+- **Geocoding Error (422 Unprocessable Entity):**
+
+{
+"success": false,
+"error": "GEOCODING_ERROR",
+"message": "Unable to find location for the new address",
+"details": {
+"newAddress": "456 Market St, Springfield",
+"oldAddress": "123 Main St, Springfield",
+"geocodeError": "Bad address",
+"suggestion": "Please verify the new address format or keep the existing address"
+}
+}
+
+- **Client Not Found (404 Not Found):**
+
+{
+"success": false,
+"error": "CLIENT_NOT_FOUND",
+"message": "Client with ID 9 does not exist",
+"details": {
+"clientId": 9,
+"suggestion": "Please verify the client ID and try again"
+}
+}
+
+- **Update Failed (404 Not Found):**
+
+{
+"success": false,
+"error": "UPDATE_FAILED",
+"message": "No changes were made to the client record",
+"details": {
+"clientId": 9,
+"reason": "Client may have been deleted by another process"
+}
+}
+
+- **Duplicate Entry (409 Conflict):**
+
+{
+"success": false,
+"error": "DUPLICATE_ENTRY",
+"message": "A client with this information already exists",
+"details": {
+"conflictingField": "name"
+}
+}
+
+- **Data Too Long (400 Bad Request):**
+
+{
+"success": false,
+"error": "DATA_TOO_LONG",
+"message": "One or more fields exceed the maximum allowed length",
+"details": {
+"error": "Detailed error message"
+}
+}
+
+- **Null Constraint Violation (400 Bad Request):**
+
+{
+"success": false,
+"error": "NULL_CONSTRAINT_VIOLATION",
+"message": "Required field cannot be null",
+"details": {
+"field": "name"
+}
+}
+
+- **Database/Internal Error (500):**
+
+General database or server errors with details.
 
 ---
 
@@ -316,17 +540,22 @@ General database or internal server errors.
 
 ## Update Department Details
 
-**Endpoint:** `PATCH /department`
+**Endpoint:** `PATCH /department/:departmentId`
 
 Update information for an existing department.
 
 ### Request
 
+Path Parameters:
+
+| Parameter      | Type   | Required | Description          |
+| -------------- | ------ | -------- | -------------------- |
+| `departmentId` | Number | Yes      | Unique department ID |
+
 JSON Body:
 
 | Field                   | Type   | Required | Description                                  |
 | ----------------------- | ------ | -------- | -------------------------------------------- |
-| `departmentId`          | Number | Yes      | The unique ID of the department to update    |
 | `departmentName`        | String | No       | New name of the department (max length: 100) |
 | `departmentDescription` | String | No       | New description of the department            |
 
@@ -334,7 +563,6 @@ At least one of `departmentName` or `departmentDescription` must be provided.
 
 **Example Request:**
 {
-"departmentId": 101,
 "departmentName": "Technology",
 "departmentDescription": "Handles all tech-related operations"
 }
@@ -627,17 +855,22 @@ General database or internal server errors with detailed information.
 
 ## Update Contact
 
-**Endpoint:** `PATCH /contact`
+**Endpoint:** `PATCH /contact/:contactId`
 
 Update details of an existing client contact.
 
 ### Request
 
+Path Parameters:
+
+| Parameter   | Type   | Required | Description              |
+| ----------- | ------ | -------- | ------------------------ |
+| `contactId` | Number | Yes      | Unique contact person ID |
+
 JSON body:
 
 | Field               | Type   | Required | Description                          |
 | ------------------- | ------ | -------- | ------------------------------------ |
-| `contactId`         | Number | Yes      | The ID of the contact to update      |
 | `contactPersonName` | String | No       | Updated contact person's name        |
 | `designation`       | String | No       | Updated contact person's designation |
 | `phone`             | String | No       | Updated contact person's phone       |
@@ -648,7 +881,6 @@ JSON body:
 **Example:**
 
 {
-"contactId": 42,
 "phone": "9998887776"
 }
 

@@ -97,14 +97,14 @@ router.post('/', async (req, res) => {
     }
 });
 
-router.patch('/', async (req, res) => {
+router.patch('/:departmentId', async (req, res) => {
     const client = await db.getConnection();
     const updatedDepartmentDetails = req.body;
 
     try {
         await client.beginTransaction();
 
-        if (!updatedDepartmentDetails.departmentId) {
+        if (!req.params.departmentId) {
             return res.status(400).json({
                 success: false,
                 error: "VALIDATION_ERROR",
@@ -115,13 +115,13 @@ router.patch('/', async (req, res) => {
             });
         }
 
-        if (isNaN(parseInt(updatedDepartmentDetails.departmentId))) {
+        if (isNaN(parseInt(req.params.departmentId))) {
             return res.status(400).json({
                 success: false,
                 error: "VALIDATION_ERROR",
                 message: "Invalid Department ID format",
                 details: {
-                    providedId: updatedDepartmentDetails.departmentId,
+                    providedId: req.params.departmentId,
                     expectedFormat: "numeric"
                 }
             });
@@ -142,7 +142,7 @@ router.patch('/', async (req, res) => {
         try {
             [departmentDetails] = await client.execute(
                 `SELECT clientId, departmentName,departmentDescription FROM department WHERE departmentId = ?`,
-                [updatedDepartmentDetails.departmentId]
+                [req.params.departmentId]
             );
         } catch (dbError) {
             console.error("Database error during department lookup:", dbError);
@@ -162,9 +162,9 @@ router.patch('/', async (req, res) => {
             return res.status(404).json({
                 success: false,
                 error: "CONTACT_NOT_FOUND",
-                message: `Contact with ID ${updatedDepartmentDetails.departmentId} does not exist`,
+                message: `Contact with ID ${req.params.departmentId} does not exist`,
                 details: {
-                    departmentId: updatedDepartmentDetails.departmentId,
+                    departmentId: req.params.departmentId,
                     suggestion: "Please verify the department ID and try again"
                 }
             });
@@ -188,7 +188,7 @@ router.patch('/', async (req, res) => {
         }
 
         try {
-            const [result] = await client.execute(`UPDATE department SET departmentName=?,departmentDescription=? WHERE departmentId=?`, [name, description, updatedDepartmentDetails.departmentId]);
+            const [result] = await client.execute(`UPDATE department SET departmentName=?,departmentDescription=? WHERE departmentId=?`, [name, description, req.params.departmentId]);
 
             if (result.affectedRows === 0) {
                 return res.status(404).json({
@@ -196,7 +196,7 @@ router.patch('/', async (req, res) => {
                     error: "UPDATE_FAILED",
                     message: "No changes were made to the department record",
                     details: {
-                        departmentId: updatedDepartmentDetails.departmentId,
+                        departmentId: req.params.departmentId,
                         reason: "department may have been deleted by another process"
                     }
                 });
@@ -208,7 +208,7 @@ router.patch('/', async (req, res) => {
                 success: true,
                 message: "department details updated successfully",
                 data: {
-                    departmentId: updatedDepartmentDetails.departmentId,
+                    departmentId: req.params.departmentId,
                     updatedFields: {
                         departmentName: req.body.departmentName ? req.body.departmentName : undefined,
                         departmentDescription: req.body.departmentDescription ? req.body.departmentDescription : undefined

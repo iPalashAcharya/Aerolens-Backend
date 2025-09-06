@@ -101,14 +101,14 @@ router.post('/', async (req, res) => {
     }
 });
 
-router.patch('/', async (req, res) => {
+router.patch('/:contactId', async (req, res) => {
     const client = await db.getConnection();
     const updatedContactDetails = req.body;
 
     try {
         await client.beginTransaction();
 
-        if (!updatedContactDetails.contactId) {
+        if (!req.params.contactId) {
             return res.status(400).json({
                 success: false,
                 error: "VALIDATION_ERROR",
@@ -119,13 +119,13 @@ router.patch('/', async (req, res) => {
             });
         }
 
-        if (isNaN(parseInt(updatedContactDetails.contactId))) {
+        if (isNaN(parseInt(req.params.contactId))) {
             return res.status(400).json({
                 success: false,
                 error: "VALIDATION_ERROR",
                 message: "Invalid contact ID format",
                 details: {
-                    providedId: updatedContactDetails.contactId,
+                    providedId: req.params.contactId,
                     expectedFormat: "numeric"
                 }
             });
@@ -146,7 +146,7 @@ router.patch('/', async (req, res) => {
         try {
             [contactDetails] = await client.execute(
                 `SELECT clientId, contactPersonName,designation, phone,emailAddress FROM clientContact WHERE clientContactId = ?`,
-                [updatedContactDetails.contactId]
+                [req.params.contactId]
             );
         } catch (dbError) {
             console.error("Database error during client lookup:", dbError);
@@ -166,9 +166,9 @@ router.patch('/', async (req, res) => {
             return res.status(404).json({
                 success: false,
                 error: "CONTACT_NOT_FOUND",
-                message: `Contact with ID ${updatedContactDetails.contactId} does not exist`,
+                message: `Contact with ID ${req.params.contactId} does not exist`,
                 details: {
-                    clientId: updatedContactDetails.contactId,
+                    clientId: req.params.contactId,
                     suggestion: "Please verify the contact ID and try again"
                 }
             });
@@ -232,7 +232,7 @@ router.patch('/', async (req, res) => {
         }
 
         try {
-            const [result] = await client.execute(`UPDATE clientContact SET contactPersonName=?,designation=?,phone=?,emailAddress=? WHERE clientContactId=?`, [name, designation, phone, email, updatedContactDetails.contactId]);
+            const [result] = await client.execute(`UPDATE clientContact SET contactPersonName=?,designation=?,phone=?,emailAddress=? WHERE clientContactId=?`, [name, designation, phone, email, req.params.contactId]);
 
             if (result.affectedRows === 0) {
                 return res.status(404).json({
@@ -240,7 +240,7 @@ router.patch('/', async (req, res) => {
                     error: "UPDATE_FAILED",
                     message: "No changes were made to the clientContact record",
                     details: {
-                        clientId: updatedContactDetails.contactId,
+                        clientId: req.params.contactId,
                         reason: "clientContact may have been deleted by another process"
                     }
                 });
@@ -252,7 +252,7 @@ router.patch('/', async (req, res) => {
                 success: true,
                 message: "clientContact details updated successfully",
                 data: {
-                    clientId: updatedContactDetails.contactId,
+                    clientId: req.params.contactId,
                     updatedFields: {
                         name: req.body.contactPersonName ? name : undefined,
                         designation: req.body.designation ? designation : undefined,
