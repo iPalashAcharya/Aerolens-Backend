@@ -1,7 +1,8 @@
 const express = require('express');
 const db = require('../db');
 const axios = require('axios');
-const { decode, isValid } = require('open-location-code');
+const OpenLocationCode = require('open-location-code').OpenLocationCode;
+const olc = new OpenLocationCode();
 const cors = require('cors');
 
 const corsOptions = {
@@ -16,27 +17,58 @@ async function geocodeAddress(address) {
     console.log('Starting geocoding for:', address);
 
     // Step 1: Check for Plus Code first
-    const plusCodeRegex = /([A-Z0-9]{4}\+[A-Z0-9]{2,3})/;
+    const plusCodeRegex = /[23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,3}/
     const plusCodeMatch = address.match(plusCodeRegex);
 
     if (plusCodeMatch) {
-        const plusCode = plusCodeMatch[1];
+        const plusCode = plusCodeMatch[0].toUpperCase();
         console.log('Found Plus Code:', plusCode);
 
         try {
-            // Validate the Plus Code
-            if (isValid(plusCode)) {
-                console.log('Plus Code is valid, decoding...');
-                const decoded = decode(plusCode);
-                console.log('Decoded Plus Code result:', decoded);
+            if (!olc.isValid(plusCode)) {
+                console.log('Not a valid Open Location Code; falling back to normal geocode');
+                return await geocodeWithNominatim(address);
+            }
 
+            if (olc.isFull(plusCode)) {
+                console.log('Full OLC detected, decoding...');
+                const area = olc.decode(rawCode); // has latitudeCenter, longitudeCenter, lat/long lo/hi
                 return {
-                    lat: decoded.latitudeCenter,
-                    lon: decoded.longitudeCenter,
+                    lat: area.latitudeCenter,
+                    lon: area.longitudeCenter,
                     source: 'plus_code'
                 };
-            } else {
-                console.log('Plus Code is invalid, falling back to regular geocoding');
+            }
+            if (olc.isShort(plusCode)) {
+                console.log('Short OLC detected. Attempting to recover full code using locality from address...');
+
+                // Try to extract the locality text by removing the plus-code from the address
+                const localityText = address.replace(plusCodeRegex, '').trim()
+                    .replace(/^[,;\-]+|[,;\-]+$/g, '').trim();
+
+                let ref = null;
+                if (localityText) {
+                    console.log('Geocoding locality to get reference coords:', localityText);
+                    // geocodeWithNominatim should return { lat, lon } (your existing function)
+                    ref = await geocodeWithNominatim(localityText).catch(e => {
+                        console.log('Locality geocode failed:', e && e.message);
+                        return null;
+                    });
+                }
+                if (!ref) {
+                    console.log('No usable reference location for short code; falling back to regular geocoding of whole address');
+                    return await geocodeWithNominatim(address);
+                }
+
+                // Recover the nearest full code and decode it
+                const fullCode = olc.recoverNearest(plusCode, ref.lat, ref.lon);
+                console.log('Recovered full code:', fullCode);
+                const area = olc.decode(fullCode);
+                return {
+                    lat: area.latitudeCenter,
+                    lon: area.longitudeCenter,
+                    source: 'plus_code'
+                };
             }
         } catch (error) {
             console.log('Plus Code decode failed:', error.message);
@@ -55,10 +87,10 @@ async function geocodeWithNominatim(address) {
     let cleanAddress = address;
 
     // Remove Plus Code if present
-    cleanAddress = cleanAddress.replace(/[A-Z0-9]{4}\+[A-Z0-9]{2,3}[,\s]*/, '').trim();
+    cleanAddress = cleanAddress.replace(/[A-Z0-9]{4}\+[A-Z0-9]{2,3}[,\s]*/, '').trim(); //removes plus code and trailing comma and space if present
 
-    // Remove directional references and landmarks that might confuse geocoding
-    cleanAddress = cleanAddress.replace(/opp\.\s*to[^,]*,?\s*/gi, '');
+    // Remove directional references and landmarks 
+    cleanAddress = cleanAddress.replace(/opp\.\s*to[^,]*,?\s*/gi, ''); //deletes opp. to upto the next comma or space
     cleanAddress = cleanAddress.replace(/near[^,]*,?\s*/gi, '');
     cleanAddress = cleanAddress.replace(/opposite[^,]*,?\s*/gi, '');
 
@@ -69,7 +101,7 @@ async function geocodeWithNominatim(address) {
 
     if (isIndianAddress) {
         // Indian address variations
-        const parts = cleanAddress.split(',').map(part => part.trim()).filter(part => part);
+        const parts = cleanAddress.split(',').map(part => part.trim()).filter(part => part); //splits into an array on comma, trims white space and filters to ensure no empty strings
 
         addressVariations = [
             cleanAddress,
@@ -83,31 +115,88 @@ async function geocodeWithNominatim(address) {
         addressVariations = [
             cleanAddress,
             cleanAddress.replace(/,\s*USA$/, ''),
-            cleanAddress.replace(/,.*$/, ''),
-            cleanAddress.split(',').slice(0, 2).join(',')
+            cleanAddress.replace(/,.*$/, ''), //first part before the first comma
+            cleanAddress.split(',').slice(0, 2).join(',') //first two parts
         ];
     }
 
-    // Remove duplicates
-    addressVariations = [...new Set(addressVariations)];
-
-    for (const addr of addressVariations) {
-        if (!addr || addr.trim().length === 0) continue;
-
+    // Remove duplicates and empty elements
+    addressVariations = [...new Set(addressVariations)].filter((addr) => addr && addr.length > 0);
+    // Try first 3 variations in parallel for speed
+    const geocodingPromises = addressVariations.slice(0, 3).map(async (addr, index) => {
         try {
+            // Small staggered delay to avoid rate limits
+            if (index > 0) {
+                await new Promise(resolve => setTimeout(resolve, index * 200));
+            }
+
+            console.log(`Trying address variation: "${addr}"`);
 
             const response = await axios.get(url, {
                 params: {
                     q: addr,
                     format: 'json',
                     addressdetails: 1,
-                    limit: 3,
+                    limit: 1,
                     countrycodes: isIndianAddress ? 'in' : undefined
                 },
                 headers: {
                     'User-Agent': 'Aerolens/1.0'
                 },
-                timeout: 15000
+                timeout: 8000
+            });
+
+            if (response.data && response.data.length > 0) {
+                const place = response.data[0];
+                console.log(`Found location for: "${addr}"`);
+
+                return {
+                    lat: parseFloat(place.lat),
+                    lon: parseFloat(place.lon),
+                    source: 'nominatim',
+                    matched_address: place.display_name,
+                    variation_used: addr
+                };
+            }
+
+            throw new Error(`No results for: ${addr}`);
+
+        } catch (error) {
+            console.log(`Failed variation "${addr}":`, error.message);
+            throw error;
+        }
+    });
+
+    // Wait for first successful result
+    const results = await Promise.allSettled(geocodingPromises);
+
+    // Return the first successful result
+    for (const result of results) {
+        if (result.status === 'fulfilled') {
+            return result.value;
+        }
+    }
+
+    // If all parallel attempts failed, try remaining variations sequentially
+    console.log('All parallel attempts failed, trying sequential fallback');
+
+    for (const addr of addressVariations.slice(3)) {
+        if (!addr || addr.trim().length === 0) continue;
+
+        try {
+            console.log(`Sequential fallback for: "${addr}"`);
+            const response = await axios.get(url, {
+                params: {
+                    q: addr,
+                    format: 'json',
+                    addressdetails: 1,
+                    limit: 1,
+                    countrycodes: isIndianAddress ? 'in' : undefined
+                },
+                headers: {
+                    'User-Agent': 'Aerolens/1.0'
+                },
+                timeout: 5000
             });
 
             if (response.data && response.data.length > 0) {
@@ -117,13 +206,12 @@ async function geocodeWithNominatim(address) {
                     lat: parseFloat(place.lat),
                     lon: parseFloat(place.lon),
                     source: 'nominatim',
-                    matched_address: place.display_name
+                    matched_address: place.display_name //nominatim's human readable adddress that was returned
                 };
             }
 
             // Respect rate limits
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
+            //await new Promise(resolve => setTimeout(resolve, 1000)); //marking promise as finished(resolved) after 1 sec
         } catch (error) {
             console.log(`Failed variation "${addr}":`, error.message);
 
@@ -144,18 +232,25 @@ async function geocodeAddressWithFallback(address) {
         return await geocodeAddress(address);
     } catch (error) {
         console.log('Primary geocoding failed:', error.message);
+        const cityFallbacks = {
+            'ahmedabad': { lat: 23.0225, lon: 72.5714 },
+            'mumbai': { lat: 19.0760, lon: 72.8777 },
+            'delhi': { lat: 28.6139, lon: 77.2090 },
+            'bangalore': { lat: 12.9716, lon: 77.5946 },
+            'chennai': { lat: 13.0827, lon: 80.2707 },
+            'kolkata': { lat: 22.5726, lon: 88.3639 },
+            'hyderabad': { lat: 17.3850, lon: 78.4867 },
+            'pune': { lat: 18.5204, lon: 73.8567 }
+        };
 
-        // If everything fails, you could add more fallback methods here
-        // For example, a manual coordinate lookup for known areas
-
-        // For Ahmedabad, you could provide approximate coordinates as last resort
-        if (/ahmedabad/i.test(address)) {
-            console.log('Using approximate coordinates for Ahmedabad');
-            return {
-                lat: 23.0225,
-                lon: 72.5714,
-                source: 'approximate'
-            };
+        for (const [city, coords] of Object.entries(cityFallbacks)) {
+            if (address.toLowerCase().includes(city)) {
+                console.log(`Using approximate coordinates for ${city}`);
+                return {
+                    ...coords,
+                    source: 'approximate'
+                };
+            }
         }
 
         throw error;

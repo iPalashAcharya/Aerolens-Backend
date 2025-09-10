@@ -7,6 +7,11 @@ const contactRoutes = require('./routes/contact');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.disable('x-powered-by');
+app.use((req, res, next) => {
+    res.removeHeader('Server');
+    next();
+});
 
 app.use(cors({
     origin: 'http://localhost:5173',
