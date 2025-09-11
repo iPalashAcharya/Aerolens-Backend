@@ -32,7 +32,7 @@ async function geocodeAddress(address) {
 
             if (olc.isFull(plusCode)) {
                 console.log('Full OLC detected, decoding...');
-                const area = olc.decode(rawCode); // has latitudeCenter, longitudeCenter, lat/long lo/hi
+                const area = olc.decode(plusCode); // has latitudeCenter, longitudeCenter, lat/long lo/hi
                 return {
                     lat: area.latitudeCenter,
                     lon: area.longitudeCenter,
