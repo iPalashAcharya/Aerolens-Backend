@@ -1,5 +1,10 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const compression = require('compression');
+const globalErrorHandler = require('./middleware/errorHandler');
+const AppError = require('./utils/appError');
+const rateLimit = require('express-rate-limit');
 const clientRoutes = require('./routes/client');
 const departmentRoutes = require('./routes/department');
 const contactRoutes = require('./routes/contact');
@@ -7,25 +12,51 @@ const contactRoutes = require('./routes/contact');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.use(helmet());
+app.use(cors({
+    origin: 'http://localhost:5173',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+app.use(compression());
+
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // limit each IP to 100 requests per windowMs
+    message: {
+        success: false,
+        error: 'RATE_LIMIT_EXCEEDED',
+        message: 'Too many requests from this IP, please try again later.'
+    }
+});
+app.use(limiter);
+
 app.disable('x-powered-by');
 app.use((req, res, next) => {
     res.removeHeader('Server');
     next();
 });
 
-//app.options('*', cors());
-app.use(cors({
-    origin: 'http://localhost:5173',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-}));
-app.set('trust proxy', true);
+app.set('trust proxy', false);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use('/client', clientRoutes);
 app.use('/department', departmentRoutes);
 app.use('/contact', contactRoutes);
+
+/*app.all('/*', (req, res, next) => {
+    next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404, 'ROUTE_NOT_FOUND'));
+});*/
+app.use(globalErrorHandler);
+app.use((err, req, res, next) => {
+    console.error('Error:', err);
+    res.status(500).json({
+        success: false,
+        error: 'INTERNAL_SERVER_ERROR',
+        message: 'Something went wrong'
+    });
+});
 
 app.listen(PORT, () => {
     console.log(`Server started on port ${PORT}`);
