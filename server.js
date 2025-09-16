@@ -7,6 +7,7 @@ const AppError = require('./utils/appError');
 const rateLimit = require('express-rate-limit');
 const clientRoutes = require('./routes/client');
 const departmentRoutes = require('./routes/department');
+const jobProfileRoutes = require('./routes/jobProfileRoutes');
 const contactRoutes = require('./routes/contact');
 
 const app = express();
@@ -44,6 +45,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/client', clientRoutes);
 app.use('/department', departmentRoutes);
 app.use('/contact', contactRoutes);
+app.use('/jobProfile', jobProfileRoutes);
 
 /*app.all('/*', (req, res, next) => {
     next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404, 'ROUTE_NOT_FOUND'));

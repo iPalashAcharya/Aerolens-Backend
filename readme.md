@@ -1026,6 +1026,160 @@ If a server/database error occurs during deletion:
 "message": "Internal server error during client contact deletion"
 }
 
+# Job Profile API CRUD
+
+---
+
+## API Endpoints
+
+### Base URL
+
+/jobProfile
+
+### Endpoints
+
+#### 1. Create Job Profile
+
+**POST** `/jobProfile`
+
+**Request Body:**
+{
+"clientId": 1,
+"departmentId": 2,
+"jobProfileDescription": "Responsible for managing backend APIs",
+"jobRole": "Backend Engineer",
+"techSpecification": "Node.js, Express, SQL",
+"positions": 3,
+"estimatedCloseDate": "2025-12-31",
+"locationId": 5,
+"statusId": 1
+}
+
+**Response:**
+{
+"success": true,
+"message": "Job Profile created successfully",
+"data": {
+"jobProfileId": 10,
+"clientId": 1,
+"departmentId": 2,
+"jobProfileDescription": "Responsible for managing backend APIs",
+"jobRole": "Backend Engineer",
+"positions": 3,
+"locationId": 5,
+"statusId": 1
+}
+}
+
+---
+
+#### 2. Get All Job Profiles
+
+**GET** `/jobProfile`
+
+**Response:**
+{
+"success": true,
+"message": "Job Profiles retrieved successfully",
+"data": [
+{
+"jobProfileId": 1,
+"clientName": "Acme Corp",
+"departmentName": "Engineering",
+"jobRole": "Frontend Developer"
+}
+]
+}
+
+---
+
+#### 3. Get Job Profile by ID
+
+**GET** `/jobProfile/:id`
+
+**Response:**
+{
+"success": true,
+"message": "Department retrieved successfully",
+"data": {
+"jobProfileId": 1,
+"clientName": "Acme Corp",
+"departmentName": "Engineering",
+"jobRole": "Frontend Developer"
+}
+}
+
+---
+
+#### 4. Update Job Profile
+
+**PATCH** `/jobProfile/:id`
+
+**Request Body:**
+{
+"positions": 5,
+"statusId": 2
+}
+
+**Response:**
+{
+"success": true,
+"message": "Department updated successfully",
+"data": {
+"jobProfileId": 1,
+"positions": 5,
+"statusId": 2
+}
+}
+
+---
+
+#### 5. Delete Job Profile
+
+**DELETE** `/jobProfile/:id`
+
+**Response:**
+{
+"success": true,
+"message": "Department deleted successfully",
+"data": null
+}
+
+---
+
+## Validation Rules
+
+Handled via Joi:
+
+- `clientId`, `departmentId`, `locationId`, `positions`: positive integers
+- `jobProfileDescription`: minimum 10, maximum 500 characters
+- `jobRole`: 2–100 characters
+- `techSpecification`: comma-separated list, min 2 chars each
+- `estimatedCloseDate`: must be a valid date in the future
+
+**Example Error:**
+{
+"success": false,
+"error": "VALIDATION_ERROR",
+"message": "Validation failed",
+"details": [
+{ "field": "jobRole", "message": "Job role is required" }
+]
+}
+
+---
+
+## Error Handling
+
+Uses `AppError` with centralized response formatting.
+
+**Example Database Error:**
+{
+"success": false,
+"error": "FOREIGN_KEY_CONSTRAINT",
+"message": "Invalid foreign key provided - referenced record does not exist"
+}
+
 ## Notes
 
 - All responses are in JSON format.
