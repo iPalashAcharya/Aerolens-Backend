@@ -1051,8 +1051,8 @@ If a server/database error occurs during deletion:
 "techSpecification": "Node.js, Express, SQL",
 "positions": 3,
 "estimatedCloseDate": "2025-12-31",
-"locationId": 5,
-"statusId": 1
+"location": "US",
+"status": "In Progress"
 }
 
 **Response:**
@@ -1066,8 +1066,8 @@ If a server/database error occurs during deletion:
 "jobProfileDescription": "Responsible for managing backend APIs",
 "jobRole": "Backend Engineer",
 "positions": 3,
-"locationId": 5,
-"statusId": 1
+"location": "US",
+"status": "In Progress"
 }
 }
 
@@ -1118,7 +1118,7 @@ If a server/database error occurs during deletion:
 **Request Body:**
 {
 "positions": 5,
-"statusId": 2
+"status": "in progress"
 }
 
 **Response:**
@@ -1128,7 +1128,7 @@ If a server/database error occurs during deletion:
 "data": {
 "jobProfileId": 1,
 "positions": 5,
-"statusId": 2
+"status": "In progress"
 }
 }
 

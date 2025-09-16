@@ -67,6 +67,7 @@ class JobProfileService {
                     'JOB_PROFILE_NOT_FOUND'
                 );
             }
+            console.log(existingJobProfile);
 
             if (updateData.jobRole) {
                 const exists = await this.jobProfileRepository.existsByRole(

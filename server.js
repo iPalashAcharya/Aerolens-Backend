@@ -12,6 +12,7 @@ const contactRoutes = require('./routes/contact');
 const candidateRoutes = require('./routes/candidateRoutes');
 const CandidateValidator = require('./validators/candidateValidator');
 const db = require('./db');
+const JobProfileValidator = require('./validators/jobProfileValidator');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -48,6 +49,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/client', clientRoutes);
 app.use('/department', departmentRoutes);
 app.use('/contact', contactRoutes);
+JobProfileValidator.init(db);
 app.use('/jobProfile', jobProfileRoutes);
 CandidateValidator.init(db);
 app.use('/candidate', candidateRoutes);

@@ -50,7 +50,7 @@ class JobProfileRepository {
             }
 
             const query = `
-            SELECT jp.jobProfileId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
+            SELECT jp.jobProfileId, c.clientId,c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
                    jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,
                    jp.locationId, s.statusName
             FROM jobProfile jp
