@@ -25,7 +25,7 @@ class JobProfileController {
         return ApiResponse.success(
             res,
             jobProfile,
-            'Department retrieved successfully'
+            'Job Profile retrieved successfully'
         );
     });
 
@@ -47,7 +47,7 @@ class JobProfileController {
         return ApiResponse.success(
             res,
             updatedjobProfile,
-            'Department updated successfully'
+            'Job profile updated successfully'
         );
     });
 
@@ -57,7 +57,7 @@ class JobProfileController {
         return ApiResponse.success(
             res,
             null,
-            'Department deleted successfully'
+            'Job Profile deleted successfully'
         );
     });
 }

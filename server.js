@@ -9,6 +9,9 @@ const clientRoutes = require('./routes/client');
 const departmentRoutes = require('./routes/department');
 const jobProfileRoutes = require('./routes/jobProfileRoutes');
 const contactRoutes = require('./routes/contact');
+const candidateRoutes = require('./routes/candidateRoutes');
+const CandidateValidator = require('./validators/candidateValidator');
+const db = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -46,6 +49,8 @@ app.use('/client', clientRoutes);
 app.use('/department', departmentRoutes);
 app.use('/contact', contactRoutes);
 app.use('/jobProfile', jobProfileRoutes);
+CandidateValidator.init(db);
+app.use('/candidate', candidateRoutes);
 
 /*app.all('/*', (req, res, next) => {
     next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404, 'ROUTE_NOT_FOUND'));
