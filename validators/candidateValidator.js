@@ -143,6 +143,13 @@ const candidateSchemas = {
             .max(100)
             .pattern(/^[a-zA-Z\s.'-]+$/)
             .required()
+            .custom((value, helpers) => {
+                const validRecruiters = ['jayraj', 'khushi', 'yash'];
+                if (!validRecruiters.includes(value.toLowerCase())) {
+                    return helpers.error("any.invalid");
+                }
+                return value;
+            })
             .messages({
                 'string.empty': 'Recruiter name is required',
                 'string.min': 'Recruiter name must be at least 2 characters long',
@@ -164,7 +171,13 @@ const candidateSchemas = {
         preferredJobLocation: Joi.string()
             .trim()
             .lowercase()
-            .valid('ahmedabad', 'bangalore', 'bengaluru')
+            .custom((value, helpers) => {
+                const validLocation = ['ahmedabad', 'bengaluru', 'bangalore', 'san francisco'];
+                if (!validLocation.includes(value.toLowerCase())) {
+                    return helpers.error("any.invalid");
+                }
+                return value;
+            })
             .required()
             .messages({
                 'string.empty': 'Preferred job location is required',
@@ -241,12 +254,18 @@ const candidateSchemas = {
             .min(1)
             .max(50)
             .optional()
+            .custom((value, helpers) => {
+                const validStatuses = ['selected', 'rejected', 'interview pending'];
+                if (!validStatuses.includes(value.toLowerCase())) {
+                    return helpers.error("any.invalid");
+                }
+                return value;
+            })
             .messages({
                 'string.min': 'Status must be at least 1 character long',
                 'string.max': 'Status cannot exceed 50 characters'
             })
     }).custom((value, helpers) => {
-        // CTC validation
         if (value.expectedCTC < value.currentCTC) {
             return helpers.error('custom.ctcRange');
         }
@@ -312,7 +331,13 @@ const candidateSchemas = {
         preferredJobLocation: Joi.string()
             .trim()
             .lowercase()
-            .valid('ahmedabad', 'bangalore', 'bengaluru')
+            .custom((value, helpers) => {
+                const validLocation = ['ahmedabad', 'bengaluru', 'bangalore', 'san francisco'];
+                if (!validLocation.includes(value.toLowerCase())) {
+                    return helpers.error("any.invalid");
+                }
+                return value;
+            })
             .optional()
             .messages({
                 'any.only': 'Preferred job location must be either Ahmedabad or Bangalore'
@@ -387,6 +412,13 @@ const candidateSchemas = {
             .messages({
                 'string.min': 'Status must be at least 1 character long',
                 'string.max': 'Status cannot exceed 50 characters'
+            })
+            .custom((value, helpers) => {
+                const validStatuses = ['selected', 'rejected', 'interview pending'];
+                if (!validStatuses.includes(value.toLowerCase())) {
+                    return helpers.error("any.invalid");
+                }
+                return value;
             })
     }).min(1)
         .custom((value, helpers) => {

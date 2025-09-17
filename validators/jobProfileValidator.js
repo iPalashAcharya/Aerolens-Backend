@@ -314,6 +314,13 @@ const jobProfileSchemas = {
             .min(2)
             .max(100)
             .required()
+            .custom((value, helpers) => {
+                const validLocation = ['idc', 'us'];
+                if (!validLocation.includes(value.toLowerCase())) {
+                    return helpers.error("any.invalid");
+                }
+                return value;
+            })
             .messages({
                 "string.empty": "Location is required",
                 "string.min": "Location must be at least 2 characters long",
@@ -326,6 +333,13 @@ const jobProfileSchemas = {
             .min(2)
             .max(50)
             .optional()
+            .custom((value, helpers) => {
+                const validStatuses = ['cancelled', 'closed', 'in progress', 'pending'];
+                if (!validStatuses.includes(value.toLowerCase())) {
+                    return helpers.error("any.invalid");
+                }
+                return value;
+            })
             .messages({
                 "string.min": "Status must be at least 2 characters long",
                 "string.max": "Status cannot exceed 50 characters",
@@ -365,6 +379,13 @@ const jobProfileSchemas = {
             .min(2)
             .max(100)
             .optional()
+            .custom((value, helpers) => {
+                const validLocation = ['idc', 'us'];
+                if (!validLocation.includes(value.toLowerCase())) {
+                    return helpers.error("any.invalid");
+                }
+                return value;
+            })
             .messages({
                 "string.min": "Location must be at least 2 characters long",
                 "string.max": "Location cannot exceed 100 characters",
@@ -375,6 +396,13 @@ const jobProfileSchemas = {
             .min(2)
             .max(50)
             .optional()
+            .custom((value, helpers) => {
+                const validStatuses = ['cancelled', 'closed', 'in progress', 'pending'];
+                if (!validStatuses.includes(value.toLowerCase())) {
+                    return helpers.error("any.invalid");
+                }
+                return value;
+            })
             .messages({
                 "string.min": "Status must be at least 2 characters long",
                 "string.max": "Status cannot exceed 50 characters",
