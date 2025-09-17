@@ -22,7 +22,7 @@ class CandidateRepository {
                 candidateData.noticePeriod,
                 candidateData.experienceYears,
                 candidateData.linkedinProfileUrl,
-                candidateData.statusId || null
+                candidateData.statusId || 3
             ]);
 
             return {
