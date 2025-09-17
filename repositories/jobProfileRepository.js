@@ -310,10 +310,11 @@ class JobProfileRepository {
             let query = `
             SELECT jp.jobProfileId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
                    jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,
-                   jp.locationId, s.statusName
+                   l.locationName, s.statusName
             FROM jobProfile jp
             LEFT JOIN client c ON jp.clientId=c.clientId
             LEFT JOIN department d ON jp.departmentId = d.departmentId
+            LEFT JOIN location l ON jp.locationId = l.locationId
             LEFT JOIN profileStatus s on jp.statusId = s.statusId
             ORDER BY jp.receivedOn DESC
             `;
