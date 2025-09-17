@@ -1065,7 +1065,10 @@ If a server/database error occurs during deletion:
 "departmentId": 2,
 "jobProfileDescription": "Responsible for managing backend APIs",
 "jobRole": "Backend Engineer",
+"techSpecification": "Node.js, Express, SQL",
 "positions": 3,
+"estimatedCloseDate": "2025-12-31",
+"receivedOn":"2025-10-31"
 "location": "US",
 "status": "In Progress"
 }
@@ -1083,10 +1086,17 @@ If a server/database error occurs during deletion:
 "message": "Job Profiles retrieved successfully",
 "data": [
 {
-"jobProfileId": 1,
-"clientName": "Acme Corp",
-"departmentName": "Engineering",
-"jobRole": "Frontend Developer"
+"jobProfileId": 3,
+"clientName": "Intuit Banglore",
+"departmentName": "Finance/Budgeting1dfdfd",
+"jobProfileDescription": "Random description",
+"jobRole": "SDE",
+"techSpecification": "testing,quality assurance",
+"positions": 3,
+"receivedOn": "2025-09-16T13:16:07.000Z",
+"estimatedCloseDate": "2025-10-20T15:30:00.000Z",
+"locationId": 2,
+"statusName": "In Progress"
 }
 ]
 }
@@ -1102,10 +1112,18 @@ If a server/database error occurs during deletion:
 "success": true,
 "message": "Department retrieved successfully",
 "data": {
-"jobProfileId": 1,
-"clientName": "Acme Corp",
-"departmentName": "Engineering",
-"jobRole": "Frontend Developer"
+"jobProfileId": 3,
+"clientId": 2,
+"clientName": "Intuit Banglore",
+"departmentName": "Finance/Budgeting1dfdfd",
+"jobProfileDescription": "Random description",
+"jobRole": "SDE",
+"techSpecification": "testing,quality assurance",
+"positions": 3,
+"receivedOn": "2025-09-16T13:16:07.000Z",
+"estimatedCloseDate": "2025-10-20T15:30:00.000Z",
+"locationId": 2,
+"statusName": "In Progress"
 }
 }
 
@@ -1117,18 +1135,26 @@ If a server/database error occurs during deletion:
 
 **Request Body:**
 {
-"positions": 5,
-"status": "in progress"
+"jobRole":"SDE-2"
 }
 
 **Response:**
 {
 "success": true,
-"message": "Department updated successfully",
+"message": "Job profile updated successfully",
 "data": {
-"jobProfileId": 1,
-"positions": 5,
-"status": "In progress"
+"jobProfileId": 3,
+"clientId": 2,
+"clientName": "Intuit Banglore",
+"departmentName": "Finance/Budgeting1dfdfd",
+"jobProfileDescription": "Random description",
+"jobRole": "SDE-2",
+"techSpecification": "testing,quality assurance",
+"positions": 3,
+"receivedOn": "2025-09-16T13:16:07.000Z",
+"estimatedCloseDate": "2025-10-20T15:30:00.000Z",
+"locationId": 2,
+"statusName": "In Progress"
 }
 }
 
@@ -1141,7 +1167,7 @@ If a server/database error occurs during deletion:
 **Response:**
 {
 "success": true,
-"message": "Department deleted successfully",
+"message": "Job Profile deleted successfully",
 "data": null
 }
 
