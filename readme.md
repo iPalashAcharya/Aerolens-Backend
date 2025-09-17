@@ -1180,6 +1180,208 @@ Uses `AppError` with centralized response formatting.
 "message": "Invalid foreign key provided - referenced record does not exist"
 }
 
+# Candidate API CRUD
+
+A structured **Node.js + Express.js API** for managing candidates, with validation, error handling, pagination, searching, and database safety.
+
+---
+
+## Features
+
+- Full **CRUD operations** for candidates
+- **Input validation** using Joi
+- **Duplicate/constraint handling** and custom error codes
+- **Search & filter** with pagination
+- **Consistent API response structure**
+- **Transaction-safe** updates and deletions
+- **Comprehensive schema and data validation**
+
+---
+
+## API Endpoints
+
+### Base URL
+
+### Endpoints
+
+#### 1. Create Candidate
+
+**POST** `/candidate`
+
+**Request Body:**
+{
+"candidateName": "Alice Johnson",
+"contactNumber": "9876543210",
+"email": "alice@example.com",
+"recruiterName": "John Doe",
+"jobRole": "Backend Engineer",
+"preferredJobLocation": "bangalore",
+"currentCTC": 8,
+"expectedCTC": 10,
+"noticePeriod": 30,
+"experienceYears": 4,
+"linkedinProfileUrl": "https://www.linkedin.com/in/alice-johnson",
+"status": "Interview Pending"
+}
+
+**Example Success Response:**
+{
+"success": true,
+"message": "Candidate created successfully",
+"data": {
+"candidateId": 10,
+"candidateName": "Alice Johnson",
+"contactNumber": "9876543210",
+"email": "alice@example.com",
+"recruiterName": "John Doe",
+"jobRole": "Backend Engineer",
+"preferredJobLocation": "Bangalore",
+"currentCTC": 8,
+"expectedCTC": 10,
+"noticePeriod": 30,
+"experienceYears": 4,
+"linkedinProfileUrl": "https://www.linkedin.com/in/alice-johnson",
+"statusId": 1
+}
+}
+
+---
+
+#### 2. Get All Candidates
+
+**GET** `/candidate?page=1&pageSize=10`
+
+**Example Success Response:**
+{
+"success": true,
+"message": "Candidates retrieved successfully",
+"data": {
+"candidates": [
+{
+"candidateId": 1,
+"candidateName": "Alice Johnson",
+"jobRole": "Backend Engineer",
+"preferredJobLocation": "Bangalore"
+}
+],
+"pagination": {
+"currentPage": 1,
+"pageSize": 10,
+"totalCount": 42,
+"totalPages": 5,
+"hasNextPage": true,
+"hasPreviousPage": false
+}
+}
+}
+
+---
+
+#### 3. Get Candidate by ID
+
+**GET** `/candidate/:id`
+
+**Example Success Response:**
+{
+"success": true,
+"message": "Candidate retrieved successfully",
+"data": {
+"candidateId": 1,
+"candidateName": "Alice Johnson",
+"email": "alice@example.com",
+"jobRole": "Backend Engineer"
+}
+}
+
+---
+
+#### 4. Update Candidate
+
+**PATCH** `/candidate/:id`
+
+**Request Body:** (At least one field required)
+{
+"jobRole": "Senior Backend Engineer",
+"currentCTC": 9
+}
+
+**Example Success Response:**
+{
+"success": true,
+"message": "Candidate updated successfully",
+"data": {
+"candidateId": 1,
+"jobRole": "Senior Backend Engineer",
+"currentCTC": 9
+}
+}
+
+---
+
+#### 5. Delete Candidate
+
+**DELETE** `/candidate/:id`
+
+**Example Success Response:**
+{
+"success": true,
+"message": "Candidate deleted successfully",
+"data": null
+}
+
+---
+
+## Validation Rules
+
+Validation is handled with Joi. Highlights:
+
+- `candidateName`, `recruiterName`: 2–100 chars, only letters, spaces, periods, hyphens, apostrophes
+- `contactNumber`: 7–25 chars, valid phone number format
+- `email`: must be valid, max 255 chars, unique
+- `jobRole`: 2–100 chars
+- `preferredJobLocation`: must be either Ahmedabad or Bangalore
+- `currentCTC`, `expectedCTC`: positive integers, expected CTC must not be less than current CTC
+- `noticePeriod`: 0–365 days
+- `experienceYears`: 0–50 years
+- `linkedinProfileUrl`: valid linkedin profile URL, max 500 chars
+- `status`: current status of candidate, Should be Selected, Rejected, Interview pending
+
+**Example Validation Error:**
+{
+"success": false,
+"error": "VALIDATION_ERROR",
+"message": "Candidate name must be at least 2 characters long",
+"details": [
+{ "field": "candidateName", "message": "Candidate name must be at least 2 characters long" }
+]
+}
+
+---
+
+## Error Handling
+
+**Duplicate Error (409):**
+{
+"success": false,
+"error": "DUPLICATEEMAIL",
+"message": "A candidate with this email already exists",
+"details": { "field": "email" }
+}
+
+**Constraint/Database Error:**
+{
+"success": false,
+"error": "FOREIGN_KEY_CONSTRAINT",
+"message": "Invalid foreign key provided - referenced record does not exist"
+}
+
+**Not Found (404):**
+{
+"success": false,
+"error": "CANDIDATENOTFOUND",
+"message": "Candidate with ID 10 not found"
+}
+
 ## Notes
 
 - All responses are in JSON format.
