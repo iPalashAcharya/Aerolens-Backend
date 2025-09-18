@@ -257,6 +257,45 @@ async function geocodeAddressWithFallback(address) {
     }
 }
 
+router.get('/all', async (req, res) => {
+    const client = await db.getConnection();
+    try {
+        const [clientDetails] = await client.query(`
+            SELECT 
+              c.clientId, 
+              c.clientName, 
+              COALESCE(d.departments, JSON_ARRAY()) AS departments
+            FROM 
+              client c
+            LEFT JOIN (
+              SELECT 
+                clientId, 
+                JSON_ARRAYAGG(
+                  JSON_OBJECT('departmentId', departmentId, 'departmentName', departmentName)
+                ) AS departments
+              FROM department
+              GROUP BY clientId
+            ) d ON c.clientId = d.clientId;
+        `);
+
+        res.json({
+            success: true,
+            data: clientDetails,
+            count: clientDetails.length
+        });
+    } catch (error) {
+        console.error('Error fetching clients:', error.stack || error.message);
+        res.status(500).json({
+            success: false,
+            error: "SERVER_ERROR",
+            message: "Failed to fetch client details",
+            details: { error: error.message }
+        });
+    } finally {
+        client.release();
+    }
+});
+
 router.get('/', async (req, res) => {
     const client = await db.getConnection();
     try {
@@ -509,45 +548,6 @@ router.get('/:id', async (req, res) => {
         } catch (releaseError) {
             console.error("Error releasing database connection:", releaseError);
         }
-    }
-});
-
-router.get('/all', async (req, res) => {
-    const client = await db.getConnection();
-    try {
-        const [clientDetails] = await client.query(`
-            SELECT 
-              c.clientId, 
-              c.clientName, 
-              COALESCE(d.departments, JSON_ARRAY()) AS departments
-            FROM 
-              client c
-            LEFT JOIN (
-              SELECT 
-                clientId, 
-                JSON_ARRAYAGG(
-                  JSON_OBJECT('departmentId', departmentId, 'departmentName', departmentName)
-                ) AS departments
-              FROM department
-              GROUP BY clientId
-            ) d ON c.clientId = d.clientId;
-        `);
-
-        res.json({
-            success: true,
-            data: clientDetails,
-            count: clientDetails.length
-        });
-    } catch (error) {
-        console.error('Error fetching clients:', error.stack || error.message);
-        res.status(500).json({
-            success: false,
-            error: "SERVER_ERROR",
-            message: "Failed to fetch client details",
-            details: { error: error.message }
-        });
-    } finally {
-        client.release();
     }
 });
 
