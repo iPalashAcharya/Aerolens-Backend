@@ -52,11 +52,12 @@ class JobProfileRepository {
             const query = `
             SELECT jp.jobProfileId, c.clientId,c.clientName, d.departmentId, d.departmentName, jp.jobProfileDescription, jp.jobRole,
                    jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,
-                   jp.locationId, s.statusName
+                   l.locationName, s.statusName
             FROM jobProfile jp
             LEFT JOIN client c ON jp.clientId=c.clientId
             LEFT JOIN department d ON jp.departmentId = d.departmentId
-            LEFT JOIN profileStatus s on jp.statusId = s.statusId
+            LEFT JOIN profileStatus s ON jp.statusId = s.statusId
+            LEFT JOIN location l ON jp.locationId = l.locationId
             WHERE jp.jobProfileId = ?
             `;
 
