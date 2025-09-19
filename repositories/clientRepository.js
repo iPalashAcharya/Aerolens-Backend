@@ -8,9 +8,9 @@ class ClientRepository {
         const connection = client || await this.db.getConnection();
         try {
             const offset = (page - 1) * limit;
-            const countQuery = `SELECT COUNT(clientId) as total FROM client`;
+            /*const countQuery = `SELECT COUNT(clientId) as total FROM client`;
             const [countResult] = await connection.query(countQuery);
-            //const totalRecords = countResult[0].total;
+            //const totalRecords = countResult[0].total;*/
             const dataQuery = `
                 SELECT clientId, clientName, address, location FROM client 
                 LIMIT ? OFFSET ?
@@ -64,6 +64,35 @@ class ClientRepository {
             client.release();
         }
     }
+    async getAllWithDepartments() {
+        const connection = await this.db.getConnection();
+        try {
+            const dataQuery = `SELECT 
+              c.clientId, 
+              c.clientName, 
+              COALESCE(d.departments, JSON_ARRAY()) AS departments
+            FROM 
+              client c
+            LEFT JOIN (
+              SELECT 
+                clientId, 
+                JSON_ARRAYAGG(
+                  JSON_OBJECT('departmentId', departmentId, 'departmentName', departmentName)
+                ) AS departments
+              FROM department
+              GROUP BY clientId
+            ) d ON c.clientId = d.clientId;`;
+            const [data] = await connection.query(dataQuery);
+
+            return data.length > 0 ? data : null;
+
+        } catch (error) {
+            this._handleDatabaseError(error, 'getAllWithDepartments');
+        } finally {
+            connection.release();
+        }
+    }
+
     async create(clientData, location) {
         const client = await this.db.getConnection();
         try {

@@ -29,6 +29,10 @@ class ClientService {
         return await this.clientRepository.getAll(limit, page);;
     }
 
+    async getAllClientsWithDepartment() {
+        return await this.clientRepository.getAllWithDepartments();
+    }
+
     async getClientById(clientId) {
         const clientData = await this.clientRepository.getById(clientId);
 

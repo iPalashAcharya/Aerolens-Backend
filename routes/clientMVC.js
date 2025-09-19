@@ -17,7 +17,7 @@ const clientController = new ClientController(clientService);
     departmentController.getDepartmentsByClient
 );*/
 
-router.get('/all', async (req, res) => {
+/*router.get('/all', async (req, res) => {
     const client = await db.getConnection();
     try {
         const [clientDetails] = await client.query(`
@@ -54,11 +54,14 @@ router.get('/all', async (req, res) => {
     } finally {
         client.release();
     }
-});
+});*/
+router.get('/all',
+    clientController.getAllClientsWithDepartment
+);
 
 router.get('/',
     clientController.getAllClients
-)
+);
 
 router.post('/',
     ClientValidator.validateCreate,

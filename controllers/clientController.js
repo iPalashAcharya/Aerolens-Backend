@@ -15,6 +15,15 @@ class ClientController {
         );
     });
 
+    getAllClientsWithDepartment = catchAsync(async (req, res) => {
+        const clients = await this.clientService.getAllClientsWithDepartment();
+        return ApiResponse.success(
+            res,
+            clients,
+            'Clients with departments retrieved successfully'
+        );
+    });
+
     getClient = catchAsync(async (req, res) => {
         const client = await this.clientService.getClientById(
             parseInt(req.params.id)
