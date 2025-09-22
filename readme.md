@@ -983,7 +983,7 @@ General database or internal server errors with details.
 
 ## Delete client contact
 
-**Endpoint:** `DELETE /contact/:id`
+**Endpoint:** `DELETE /contact/:contactId`
 
 Deletes a department by its unique ID.
 
@@ -991,9 +991,9 @@ Deletes a department by its unique ID.
 
 Path Parameters:
 
-| Parameter | Type   | Required | Description                         |
-| --------- | ------ | -------- | ----------------------------------- |
-| `id`      | Number | Yes      | The unique ID of the contact person |
+| Parameter   | Type   | Required | Description                         |
+| ----------- | ------ | -------- | ----------------------------------- |
+| `contactId` | Number | Yes      | The unique ID of the contact person |
 
 ### Response
 

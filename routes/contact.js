@@ -1,4 +1,4 @@
-const express = require('express');
+/*const express = require('express');
 const db = require('../db');
 
 const router = express.Router();
@@ -368,5 +368,34 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
+
+module.exports = router;*/
+const express = require('express');
+const ContactController = require('../controllers/contactController');
+const ContactService = require('../services/contactService');
+const ContactRepository = require('../repositories/contactRepository');
+const ContactValidator = require('../validators/contactValidator');
+const db = require('../db');
+
+const router = express.Router();
+
+const contactRepository = new ContactRepository(db);
+const contactService = new ContactService(contactRepository, db);
+const contactController = new ContactController(contactService);
+
+router.post('/',
+    ContactValidator.validateCreate,
+    contactController.createContact
+);
+
+router.patch('/:contactId',
+    ContactValidator.validateUpdate,
+    contactController.updateContact
+);
+
+router.delete('/:contactId',
+    ContactValidator.validateDelete,
+    contactController.deleteContact
+);
 
 module.exports = router;

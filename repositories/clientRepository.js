@@ -27,6 +27,7 @@ class ClientRepository {
             if (!client) connection.release();
         }
     }
+
     async getById(clientId) {
         const client = await this.db.getConnection();
         try {
@@ -64,6 +65,7 @@ class ClientRepository {
             client.release();
         }
     }
+
     async getAllWithDepartments() {
         const connection = await this.db.getConnection();
         try {
