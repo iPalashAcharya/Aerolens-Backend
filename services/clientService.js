@@ -10,7 +10,18 @@ class ClientService {
 
     async getAllClients(options = {}) {
         const { limit = 10, page = 1 } = options;
-        //const totalPages = Math.ceil(result.totalRecords / limit);
+        const result = await this.clientRepository.getAll(limit, page);
+        const totalPages = Math.ceil(result.totalRecords / limit);
+        const pagination = {
+            currentPage: page,
+            totalPages,
+            totalRecords: result.totalRecords,
+            limit,
+            hasNextPage: page < totalPages,
+            hasPrevPage: page > 1,
+            nextPage: page < totalPages ? page + 1 : null,
+            prevPage: page > 1 ? page - 1 : null
+        };
 
         /*return {
             success: true,
@@ -26,7 +37,10 @@ class ClientService {
                 prevPage: page > 1 ? page - 1 : null
             }
         };*/
-        return await this.clientRepository.getAll(limit, page);;
+        return {
+            data: result.data,
+            pagination
+        };
     }
 
     async getAllClientsWithDepartment() {

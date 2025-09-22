@@ -8,9 +8,9 @@ class ClientRepository {
         const connection = client || await this.db.getConnection();
         try {
             const offset = (page - 1) * limit;
-            /*const countQuery = `SELECT COUNT(clientId) as total FROM client`;
+            const countQuery = `SELECT COUNT(clientId) as total FROM client`;
             const [countResult] = await connection.query(countQuery);
-            //const totalRecords = countResult[0].total;*/
+            const totalRecords = countResult[0].total;
             const dataQuery = `
                 SELECT clientId, clientName, address, location FROM client 
                 LIMIT ? OFFSET ?
@@ -20,7 +20,10 @@ class ClientRepository {
 
             const params = [numLimit, numOffset];
             const [clients] = await connection.query(dataQuery, params);
-            return clients;
+            return {
+                data: clients,
+                totalRecords: totalRecords
+            };
         } catch (error) {
             this._handleDatabaseError(error, 'getAll');
         } finally {

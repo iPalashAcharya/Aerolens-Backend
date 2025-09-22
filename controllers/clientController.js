@@ -7,12 +7,23 @@ class ClientController {
     }
 
     getAllClients = catchAsync(async (req, res) => {
-        const clients = await this.clientService.getAllClients();
-        return ApiResponse.success(
-            res,
-            clients,
-            'Clients retrieved successfully'
-        );
+        try {
+            const options = {
+                limit: parseInt(req.query.limit) || 10,
+                page: parseInt(req.query.page) || 1
+            };
+            const result = await this.clientService.getAllClients(options);
+
+            return ApiResponse.success(
+                res,
+                result.data,
+                'Clients retrieved successfully',
+                200,
+                result.pagination  // Pass pagination as meta
+            );
+        } catch (error) {
+            return ApiResponse.error(res, error)
+        }
     });
 
     getAllClientsWithDepartment = catchAsync(async (req, res) => {
