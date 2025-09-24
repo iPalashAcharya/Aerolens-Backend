@@ -26,7 +26,7 @@ class JobProfileRepository {
                 jobProfileData.positions,
                 jobProfileData.estimatedCloseDate || null,
                 jobProfileData.locationId,
-                jobProfileData.statusId || 4
+                jobProfileData.statusId || 7
             ]);
 
             return {
@@ -52,12 +52,12 @@ class JobProfileRepository {
             const query = `
             SELECT jp.jobProfileId, c.clientId,c.clientName, d.departmentId, d.departmentName, jp.jobProfileDescription, jp.jobRole,
                    jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,
-                   l.locationName, s.statusName
+                   loc.value AS location, stat.value AS status
             FROM jobProfile jp
             LEFT JOIN client c ON jp.clientId=c.clientId
             LEFT JOIN department d ON jp.departmentId = d.departmentId
-            LEFT JOIN profileStatus s ON jp.statusId = s.statusId
-            LEFT JOIN location l ON jp.locationId = l.locationId
+            LEFT JOIN lookup stat ON jp.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
+            LEFT JOIN lookup loc ON jp.locationId = loc.lookupKey AND loc.tag = 'jobProfileLocation'
             WHERE jp.jobProfileId = ?
             `;
 
@@ -164,11 +164,12 @@ class JobProfileRepository {
             let query = `
             SELECT jp.jobProfileId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
                    jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,
-                   jp.locationId, s.statusName
+                   loc.value AS location, stat.value AS status
             FROM jobProfile jp
             LEFT JOIN client c ON jp.clientId=c.clientId
             LEFT JOIN department d ON jp.departmentId = d.departmentId
-            LEFT JOIN profileStatus s on jp.statusId = s.statusId
+            LEFT JOIN lookup loc ON jp.locationId = loc.lookupKey AND loc.tag = 'jobProfileLocation'
+            LEFT JOIN lookup stat on jp.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
             WHERE jp.clientId = ?
             ORDER BY jp.receivedOn DESC
             `;
@@ -206,11 +207,12 @@ class JobProfileRepository {
             const query = `
             SELECT jp.jobProfileId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
                    jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,
-                   jp.locationId, s.statusName
+                   loc.value AS location, stat.value AS status
             FROM jobProfile jp
             LEFT JOIN client c ON jp.clientId=c.clientId
             LEFT JOIN department d ON jp.departmentId = d.departmentId
-            LEFT JOIN profileStatus s on jp.statusId = s.statusId
+            LEFT JOIN lookup loc ON jp.locationId = loc.lookupKey AND loc.tag = 'jobProfileLocation'
+            LEFT JOIN lookup stat on jp.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
             WHERE jp.statusId = ?
             ORDER BY jp.receivedOn DESC
             `;
@@ -236,11 +238,12 @@ class JobProfileRepository {
             const query = `
             SELECT jp.jobProfileId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
                    jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,
-                   jp.locationId, s.statusName
+                   loc.value AS location, stat.value AS status
             FROM jobProfile jp
             LEFT JOIN client c ON jp.clientId=c.clientId
             LEFT JOIN department d ON jp.departmentId = d.departmentId
-            LEFT JOIN profileStatus s on jp.statusId = s.statusId
+            LEFT JOIN lookup loc ON jp.locationId = loc.lookupKey AND loc.tag = 'jobProfileLocation'
+            LEFT JOIN lookup stat ON jp.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
             WHERE jp.departmentId = ?
             ORDER BY jp.receivedOn DESC
             `;
@@ -311,12 +314,12 @@ class JobProfileRepository {
             let query = `
             SELECT jp.jobProfileId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
                    jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,
-                   l.locationName, s.statusName
+                   loc.value AS location, stat.value AS status
             FROM jobProfile jp
             LEFT JOIN client c ON jp.clientId=c.clientId
             LEFT JOIN department d ON jp.departmentId = d.departmentId
-            LEFT JOIN location l ON jp.locationId = l.locationId
-            LEFT JOIN profileStatus s on jp.statusId = s.statusId
+            LEFT JOIN lookup loc ON jp.locationId = loc.lookupKey AND loc.tag = 'jobProfileLocation'
+            LEFT JOIN lookup stat on jp.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
             ORDER BY jp.receivedOn DESC
             `;
 

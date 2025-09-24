@@ -176,7 +176,7 @@ class JobProfileValidatorHelper {
         const connection = client || await this.db.getConnection();
 
         try {
-            const query = `SELECT statusId FROM profileStatus WHERE LOWER(statusName) = LOWER(?)`;
+            const query = `SELECT lookupKey FROM lookup WHERE LOWER(value) = LOWER(?) AND lookup.tag = 'profileStatus'`;
             const [rows] = await connection.execute(query, [statusName.trim()]);
 
             if (rows.length === 0) {
@@ -187,7 +187,7 @@ class JobProfileValidatorHelper {
                 );
             }
 
-            const statusId = rows[0].statusId;
+            const statusId = rows[0].lookupKey;
             this.statusCache.set(cacheKey, statusId);
 
             return statusId;
@@ -207,7 +207,7 @@ class JobProfileValidatorHelper {
         const connection = client || await this.db.getConnection();
 
         try {
-            const query = `SELECT locationId FROM location WHERE LOWER(locationName) = LOWER(?)`;
+            const query = `SELECT lookupKey FROM lookup WHERE LOWER(value) = LOWER(?) AND lookup.tag = 'jobProfileLocation'`;
             const [rows] = await connection.execute(query, [locationName.trim()]);
 
             if (rows.length === 0) {
@@ -218,7 +218,7 @@ class JobProfileValidatorHelper {
                 );
             }
 
-            const locationId = rows[0].locationId;
+            const locationId = rows[0].lookupKey;
             this.locationCache.set(cacheKey, locationId);
 
             return locationId;
