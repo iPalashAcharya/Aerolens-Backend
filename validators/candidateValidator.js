@@ -24,7 +24,7 @@ class CandidateValidatorHelper {
         const connection = client || await this.db.getConnection();
 
         try {
-            const query = `SELECT statusId FROM candidateStatus WHERE LOWER(statusName) = LOWER(?)`;
+            const query = `SELECT lookupKey FROM lookup WHERE LOWER(value) = LOWER(?) AND tag='candidateStatus'`;
             const [rows] = await connection.execute(query, [statusName.trim()]);
 
             if (rows.length === 0) {
@@ -35,7 +35,7 @@ class CandidateValidatorHelper {
                 );
             }
 
-            const statusId = rows[0].statusId;
+            const statusId = rows[0].lookupKey;
             this.statusCache.set(cacheKey, statusId);
 
             return statusId;
@@ -44,21 +44,33 @@ class CandidateValidatorHelper {
         }
     }
 
-    transformLocation(locationString) {
+    async transformLocation(locationString, client = null) {
         if (!locationString) return null;
+        const connection = client || await this.db.getConnection();
 
-        const normalizedLocation = locationString.toLowerCase().trim();
-        const mappedLocation = this.locationMap.get(normalizedLocation);
+        try {
+            const normalizationMap = {
+                "bengaluru": "bangalore",
+                "bangalore": "bangalore",
+                "ahmedabad": "ahmedabad",
+                "san francisco": "san francisco"
+            };
 
-        if (!mappedLocation) {
-            throw new AppError(
-                `Invalid location: '${locationString}'. Must be either Ahmedabad or Bangalore.`,
-                400,
-                'INVALID_LOCATION'
-            );
+            const normalizedLocation = normalizationMap[locationString.toLowerCase().trim()] || locationString.toLowerCase().trim();
+            const query = `SELECT lookupKey FROM lookup WHERE LOWER(value) = LOWER(?) AND tag = 'location'`;
+            const [rows] = await connection.execute(query, [normalizedLocation]);
+
+            if (!rows) {
+                throw new AppError(
+                    `Invalid location: '${locationString}'. Must be either Ahmedabad, Bangalore or San Francisco.`,
+                    400,
+                    'INVALID_LOCATION'
+                );
+            }
+            return rows[0].lookupKey;
+        } finally {
+            if (!client) connection.release();
         }
-
-        return mappedLocation;
     }
 
     async checkEmailExists(email, excludeCandidateId = null, client = null) {
@@ -509,7 +521,7 @@ class CandidateValidator {
 
             // Transform location
             if (value.preferredJobLocation) {
-                value.preferredJobLocation = CandidateValidator.helper.transformLocation(value.preferredJobLocation);
+                value.preferredJobLocation = await CandidateValidator.helper.transformLocation(value.preferredJobLocation);
             }
 
             // Transform status

@@ -9,6 +9,7 @@ class CandidateRepository {
         try {
             const query = `INSERT INTO candidate(candidateName,contactNumber,email,recruiterName,jobRole,preferredJobLocation,currentCTC,expectedCTC,noticePeriod,experienceYears,linkedinProfileUrl,statusId)
             VALUES(?,?,?,?,?,?,?,?,?,?,?,?);`
+            console.log(candidateData);
 
             const [result] = await connection.execute(query, [
                 candidateData.candidateName,
@@ -16,13 +17,13 @@ class CandidateRepository {
                 candidateData.email,
                 candidateData.recruiterName,
                 candidateData.jobRole,
-                candidateData.preferredJobLocation,
+                candidateData.preferredJobLocation !== undefined ? candidateData.preferredJobLocation : null,
                 candidateData.currentCTC,
                 candidateData.expectedCTC,
                 candidateData.noticePeriod,
                 candidateData.experienceYears,
                 candidateData.linkedinProfileUrl,
-                candidateData.statusId || 3
+                candidateData.statusId !== undefined ? candidateData.statusId : 9
             ]);
 
             return {
@@ -45,9 +46,10 @@ class CandidateRepository {
             }
 
             const query = `
-            SELECT c.candidateId,c.candidateName,c.contactNumber,c.email,c.recruiterName,c.jobRole,c.preferredJobLocation,c.currentCTC,c.expectedCTC,c.noticePeriod,c.experienceYears,c.linkedinProfileUrl,s.statusName
+            SELECT c.candidateId,c.candidateName,c.contactNumber,c.email,c.recruiterName,c.jobRole,loc.value AS preferredJobLocation,c.currentCTC,c.expectedCTC,c.noticePeriod,c.experienceYears,c.linkedinProfileUrl,stat.value AS statusName
             FROM candidate c
-            LEFT JOIN candidateStatus s ON c.statusId= s.statusId
+            LEFT JOIN lookup stat ON c.statusId= stat.lookupKey AND stat.tag = 'candidateStatus'
+            LEFT JOIN lookup loc ON c.preferredJobLocation = loc.lookupKey AND loc.tag = 'location'
             WHERE c.candidateId = ? 
             `;
 
@@ -70,11 +72,12 @@ class CandidateRepository {
 
             const query = `
             SELECT c.candidateId, c.candidateName, c.contactNumber, c.email, c.recruiterName, 
-                   c.jobRole, c.preferredJobLocation, c.currentCTC, c.expectedCTC, c.noticePeriod, 
-                   c.experienceYears, c.linkedinProfileUrl, c.statusId, c.createdAt, c.updatedAt,
-                   s.statusName
+                   c.jobRole, loc.value AS preferredJobLocation, c.currentCTC, c.expectedCTC, c.noticePeriod, 
+                   c.experienceYears, c.linkedinProfileUrl, c.createdAt, c.updatedAt,
+                   stat.value AS statusName
             FROM candidate c
-            LEFT JOIN candidateStatus s ON c.statusId = s.statusId
+            LEFT JOIN lookup stat ON c.statusId = stat.lookupKey and stat.tag = 'candidateStatus'
+            LEFT JOIN lookup loc ON c.preferredJobLocation = loc.lookupKey and loc.tag = 'location'
             WHERE c.email = ?`;
 
             const [rows] = await connection.execute(query, [email]);
@@ -95,12 +98,13 @@ class CandidateRepository {
             }
 
             const query = `
-            SELECT c.candidateId, c.candidateName, c.contactNumber, c.email, c.recruiterName, 
-                   c.jobRole, c.preferredJobLocation, c.currentCTC, c.expectedCTC, c.noticePeriod, 
-                   c.experienceYears, c.linkedinProfileUrl, c.statusId, c.createdAt, c.updatedAt,
-                   s.statusName
+            SELECT c.candidateId, c.candidateName, c.contactNumber, c.email, c.recruiterName,
+                   c.jobRole, loc.value AS preferredJobLocation, c.currentCTC, c.expectedCTC, c.noticePeriod,
+                   c.experienceYears, c.linkedinProfileUrl, c.createdAt, c.updatedAt,
+                   stat.value AS statusName
             FROM candidate c
-            LEFT JOIN candidateStatus s ON c.statusId = s.statusId
+            LEFT JOIN lookup stat ON c.statusId = stat.lookupKey and stat.tag = 'candidateStatus'
+            LEFT JOIN lookup loc ON c.preferredJobLocation = loc.lookupKey and loc.tag = 'location'
             WHERE c.contactNumber = ?`;
 
             const [rows] = await connection.execute(query, [contactNumber]);
@@ -121,12 +125,13 @@ class CandidateRepository {
             }
 
             let query = `
-            SELECT c.candidateId, c.candidateName, c.contactNumber, c.email, c.recruiterName, 
-                   c.jobRole, c.preferredJobLocation, c.currentCTC, c.expectedCTC, c.noticePeriod, 
-                   c.experienceYears, c.linkedinProfileUrl, c.statusId, c.createdAt, c.updatedAt,
-                   s.statusName
+            SELECT c.candidateId, c.candidateName, c.contactNumber, c.email, c.recruiterName,
+                   c.jobRole, loc.value AS preferredJobLocation, c.currentCTC, c.expectedCTC, c.noticePeriod,
+                   c.experienceYears, c.linkedinProfileUrl, c.createdAt, c.updatedAt,
+                   stat.value AS statusName
             FROM candidate c
-            LEFT JOIN candidateStatus s ON c.statusId = s.statusId
+            LEFT JOIN lookup stat ON c.statusId = stat.lookupKey and stat.tag = 'candidateStatus'
+            LEFT JOIN lookup loc ON c.preferredJobLocation = loc.lookupKey and loc.tag = 'location'
             WHERE c.statusId = ?
             ORDER BY c.createdAt DESC`;
 
@@ -156,12 +161,13 @@ class CandidateRepository {
 
         try {
             let query = `
-            SELECT c.candidateId, c.candidateName, c.contactNumber, c.email, c.recruiterName, 
-                   c.jobRole, c.preferredJobLocation, c.currentCTC, c.expectedCTC, c.noticePeriod, 
-                   c.experienceYears, c.linkedinProfileUrl, c.statusId, c.createdAt, c.updatedAt,
-                   s.statusName
+            SELECT c.candidateId, c.candidateName, c.contactNumber, c.email, c.recruiterName,
+                   c.jobRole, loc.value AS preferredJobLocation, c.currentCTC, c.expectedCTC, c.noticePeriod,
+                   c.experienceYears, c.linkedinProfileUrl, c.createdAt, c.updatedAt,
+                   stat.value AS statusName
             FROM candidate c
-            LEFT JOIN candidateStatus s ON c.statusId = s.statusId
+            LEFT JOIN lookup stat ON c.statusId = stat.lookupKey and stat.tag = 'candidateStatus'
+            LEFT JOIN lookup loc ON c.preferredJobLocation = loc.lookupKey and loc.tag = 'location'
             WHERE 1=1`;
 
             const params = [];
@@ -182,7 +188,7 @@ class CandidateRepository {
             }
 
             if (searchOptions.preferredJobLocation) {
-                query += ` AND c.preferredJobLocation = ?`;
+                query += ` AND loc.value = ?`;
                 params.push(searchOptions.preferredJobLocation);
             }
 
@@ -355,10 +361,13 @@ class CandidateRepository {
 
         try {
             const query = `
-            SELECT c.candidateId,c.candidateName, c.contactNumber, c.email, c.recruiterName, c.jobRole, c.preferredJobLocation,
-                   c.currentCTC, c.expectedCTC, c.noticePeriod, c.experienceYears, c.linkedinProfileUrl, s.statusName
+            SELECT c.candidateId, c.candidateName, c.contactNumber, c.email, c.recruiterName,
+                   c.jobRole, loc.value AS preferredJobLocation, c.currentCTC, c.expectedCTC, c.noticePeriod,
+                   c.experienceYears, c.linkedinProfileUrl, c.createdAt, c.updatedAt,
+                   stat.value AS statusName
             FROM candidate c
-            LEFT JOIN candidateStatus s ON c.statusId = s.statusId
+            LEFT JOIN lookup stat ON c.statusId = stat.lookupKey and stat.tag = 'candidateStatus'
+            LEFT JOIN lookup loc ON c.preferredJobLocation = loc.lookupKey and loc.tag = 'location'
             LIMIT ? OFFSET ?
         `;
 
@@ -399,7 +408,7 @@ class CandidateRepository {
         }
     }
 
-    async getCandidateStatistics(client = null) {
+    /*async getCandidateStatistics(client = null) {
         const connection = client || await this.db.getConnection();
 
         try {
@@ -422,7 +431,7 @@ class CandidateRepository {
         } finally {
             if (!client) connection.release();
         }
-    }
+    }*/
 
     async checkEmailExists(email, excludeCandidateId = null, client = null) {
         const connection = client || await this.db.getConnection();

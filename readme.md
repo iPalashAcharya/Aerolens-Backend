@@ -1239,7 +1239,7 @@ A structured **Node.js + Express.js API** for managing candidates, with validati
 "candidateName": "Alice Johnson",
 "contactNumber": "9876543210",
 "email": "alice@example.com",
-"recruiterName": "John Doe",
+"recruiterName": "Jayraj",
 "jobRole": "Backend Engineer",
 "preferredJobLocation": "bangalore",
 "currentCTC": 8,
