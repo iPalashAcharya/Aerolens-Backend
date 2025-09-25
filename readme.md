@@ -1226,193 +1226,233 @@ A structured **Node.js + Express.js API** for managing candidates, with validati
 
 ## API Endpoints
 
-### Base URL
+## Endpoints and Examples
 
-### Endpoints
+### Get All Candidates (Paginated & Filtered)
 
-#### 1. Create Candidate
+GET /candidate?page=1&pageSize=10&status=selected&preferredJobLocation=bangalore
 
-**POST** `/candidate`
+**Query Parameters:**
 
-**Request Body:**
+| Parameter            | Type   | Description                                 |
+| -------------------- | ------ | ------------------------------------------- |
+| page                 | Number | Page number (default: 1)                    |
+| pageSize             | Number | Number of candidates per page (default: 10) |
+| status               | String | Filter by candidate status (optional)       |
+| preferredJobLocation | String | Filter by location (optional)               |
+
+**Response:**
 {
-"candidateName": "Alice Johnson",
-"contactNumber": "9876543210",
-"email": "alice@example.com",
-"recruiterName": "Jayraj",
-"jobRole": "Backend Engineer",
-"preferredJobLocation": "bangalore",
-"currentCTC": 8,
-"expectedCTC": 10,
-"noticePeriod": 30,
-"experienceYears": 4,
-"linkedinProfileUrl": "https://www.linkedin.com/in/alice-johnson",
-"status": "Interview Pending"
-}
-
-**Example Success Response:**
+"data": [
 {
-"success": true,
-"message": "Candidate created successfully",
-"data": {
-"candidateId": 10,
-"candidateName": "Alice Johnson",
-"contactNumber": "9876543210",
-"email": "alice@example.com",
-"recruiterName": "John Doe",
-"jobRole": "Backend Engineer",
+"candidateId": 123,
+"candidateName": "John Doe",
+"contactNumber": "+1234567890",
+"email": "john@example.com",
+"recruiterName": "yash",
+"jobRole": "Software Engineer",
 "preferredJobLocation": "Bangalore",
-"currentCTC": 8,
-"expectedCTC": 10,
+"currentCTC": 900000,
+"expectedCTC": 1200000,
 "noticePeriod": 30,
 "experienceYears": 4,
-"linkedinProfileUrl": "https://www.linkedin.com/in/alice-johnson",
-"statusId": 1
-}
-}
-
----
-
-#### 2. Get All Candidates
-
-**GET** `/candidate?page=1&pageSize=10`
-
-**Example Success Response:**
-{
-"success": true,
-"message": "Candidates retrieved successfully",
-"data": {
-"candidates": [
-{
-"candidateId": 1,
-"candidateName": "Alice Johnson",
-"jobRole": "Backend Engineer",
-"preferredJobLocation": "Bangalore"
+"linkedinProfileUrl": "https://linkedin.com/in/johndoe",
+"statusName": "selected",
+"resumeFilename": "candidate123_resume.pdf",
+"resumeOriginalName": "John_Doe_Resume.pdf",
+"resumeUploadDate": "2025-09-20T14:30:00.000Z"
 }
 ],
 "pagination": {
 "currentPage": 1,
 "pageSize": 10,
-"totalCount": 42,
+"totalCount": 50,
 "totalPages": 5,
 "hasNextPage": true,
 "hasPreviousPage": false
 }
 }
+
+---
+
+### Get Candidate by ID
+
+GET /candidate/:id
+
+**Response:**
+{
+"candidateId": 123,
+"candidateName": "John Doe",
+"contactNumber": "+1234567890",
+"email": "john@example.com",
+"statusName": "selected",
+"preferredJobLocation": "Bangalore",
+"jobRole": "Software Engineer",
+"recruiterName": "yash",
+"currentCTC": 900000,
+"expectedCTC": 1200000,
+"noticePeriod": 30,
+"experienceYears": 4,
+"linkedinProfileUrl": "https://linkedin.com/in/johndoe",
+"resumeFilename": "candidate123_resume.pdf",
+"resumeOriginalName": "John_Doe_Resume.pdf",
+"resumeUploadDate": "2025-09-20T14:30:00.000Z"
 }
 
 ---
 
-#### 3. Get Candidate by ID
+### Create Candidate (with optional resume upload)
 
-**GET** `/candidate/:id`
+POST /candidate
+Content-Type: multipart/form-data
+**Request Body (form-data):**
 
-**Example Success Response:**
+| Field                | Type   | Description                                      |
+| -------------------- | ------ | ------------------------------------------------ |
+| candidateName        | String | Candidate full name (required)                   |
+| contactNumber        | String | Phone number (required)                          |
+| email                | String | Email address (required)                         |
+| recruiterName        | String | Recruiter name (required)                        |
+| jobRole              | String | Job title (required)                             |
+| preferredJobLocation | String | Ahmedabad / Bangalore / San Francisco (required) |
+| currentCTC           | Number | Current CTC in INR (required)                    |
+| expectedCTC          | Number | Expected CTC in INR (required)                   |
+| noticePeriod         | Number | Notice period in days (required)                 |
+| experienceYears      | Number | Years of experience (required)                   |
+| linkedinProfileUrl   | String | LinkedIn URL (optional)                          |
+| resume               | File   | PDF resume, max 5MB (optional)                   |
+
+**Response:**
 {
-"success": true,
-"message": "Candidate retrieved successfully",
+"message": "Candidate created successfully",
 "data": {
-"candidateId": 1,
-"candidateName": "Alice Johnson",
-"email": "alice@example.com",
-"jobRole": "Backend Engineer"
+"candidateId": 124,
+"candidateName": "Jane Smith",
+"contactNumber": "+1987654321",
+"email": "jane@example.com",
+"recruiterName": "khushi",
+"jobRole": "Backend Developer",
+"preferredJobLocation": "Ahmedabad",
+"currentCTC": 1000000,
+"expectedCTC": 1300000,
+"noticePeriod": 60,
+"experienceYears": 5,
+"linkedinProfileUrl": null,
+"resumeFilename": "candidate124_resume.pdf",
+"resumeOriginalName": "Jane_Smith_Resume.pdf",
+"resumeUploadDate": "2025-09-25T10:20:00.000Z"
 }
 }
 
 ---
 
-#### 4. Update Candidate
+### Update Candidate
 
-**PATCH** `/candidate/:id`
+PATCH /candidate/:id
+Content-Type: application/json
 
-**Request Body:** (At least one field required)
+**Request Body (JSON) - fields to update:**
 {
-"jobRole": "Senior Backend Engineer",
-"currentCTC": 9
+"jobRole": "Senior Backend Developer",
+"expectedCTC": 1500000,
+"status": "interview pending"
 }
 
-**Example Success Response:**
+**Response:**
 {
-"success": true,
 "message": "Candidate updated successfully",
 "data": {
-"candidateId": 1,
-"jobRole": "Senior Backend Engineer",
-"currentCTC": 9
+"candidateId": 124,
+"candidateName": "Jane Smith",
+"jobRole": "Senior Backend Developer",
+"expectedCTC": 1500000,
+"statusName": "interview pending"
 }
 }
 
 ---
 
-#### 5. Delete Candidate
+### Delete Candidate
 
-**DELETE** `/candidate/:id`
+DELETE /candidate/:id
 
-**Example Success Response:**
+**Response:**
 {
-"success": true,
-"message": "Candidate deleted successfully",
-"data": null
+"message": "Candidate deleted successfully"
 }
 
 ---
 
-## Validation Rules
+### Upload or Replace Resume
 
-Validation is handled with Joi. Highlights:
+POST /candidate/:id/resume
+Content-Type: multipart/form-data
 
-- `candidateName`, `recruiterName`: 2–100 chars, only letters, spaces, periods, hyphens, apostrophes
-- `contactNumber`: 7–25 chars, valid phone number format
-- `email`: must be valid, max 255 chars, unique
-- `jobRole`: 2–100 chars
-- `preferredJobLocation`: must be either Ahmedabad or Bangalore
-- `currentCTC`, `expectedCTC`: positive integers, expected CTC must not be less than current CTC
-- `noticePeriod`: 0–365 days
-- `experienceYears`: 0–50 years
-- `linkedinProfileUrl`: valid linkedin profile URL, max 500 chars
-- `status`: current status of candidate, Should be Selected, Rejected, Interview pending
+**Form data:**
 
-**Example Validation Error:**
+| Field  | Type | Description        |
+| ------ | ---- | ------------------ |
+| resume | File | PDF resume max 5MB |
+
+**Response:**
 {
-"success": false,
-"error": "VALIDATION_ERROR",
-"message": "Candidate name must be at least 2 characters long",
-"details": [
-{ "field": "candidateName", "message": "Candidate name must be at least 2 characters long" }
-]
+"message": "Resume uploaded successfully",
+"data": {
+"candidateId": 124,
+"filename": "candidate124_resume.pdf",
+"originalName": "Jane_Smith_Resume.pdf",
+"size": 450000,
+"uploadDate": "2025-09-25T10:45:00.000Z"
+}
 }
 
 ---
 
-## Error Handling
+### Download Resume
 
-**Duplicate Error (409):**
+GET /candidate/:id/resume
+
+**Response:**
+
+- Returns the PDF file as an attachment.
+
+---
+
+### Preview Resume Inline
+
+GET /candidate/:id/resume/preview
+
+**Response:**
+
+- Displays the PDF inline in the browser.
+
+---
+
+### Delete Resume
+
+DELETE /candidate/:id/resume
+
+**Response:**
 {
-"success": false,
-"error": "DUPLICATEEMAIL",
-"message": "A candidate with this email already exists",
-"details": { "field": "email" }
+"message": "Resume deleted successfully"
 }
 
-**Constraint/Database Error:**
+---
+
+## Error Response Example
+
 {
-"success": false,
-"error": "FOREIGN_KEY_CONSTRAINT",
-"message": "Invalid foreign key provided - referenced record does not exist"
+"error": "Candidate with ID 999 not found",
+"code": 404
 }
 
-**Not Found (404):**
-{
-"success": false,
-"error": "CANDIDATENOTFOUND",
-"message": "Candidate with ID 10 not found"
-}
+---
 
 ## Notes
 
-- All responses are in JSON format.
-- All fields are strictly validated.
-- Error messages are descriptive for troubleshooting.
-- Transactions and database connection handling are robust.
+- Resume files must be PDFs and no larger than 5MB.
+- Email and contact number must be unique across candidates.
+- Statuses include: selected, rejected, interview pending.
+- Locations include: Ahmedabad, Bangalore, San Francisco.
 
 ---
