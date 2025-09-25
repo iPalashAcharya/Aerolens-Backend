@@ -1,13 +1,23 @@
 const catchAsync = require('../utils/catchAsync');
 const ApiResponse = require('../utils/response');
 
-class JobProfileController {
+class CandidateController {
     constructor(candidateService) {
         this.candidateService = candidateService;
     }
 
     createCandidate = catchAsync(async (req, res) => {
-        const candidate = await this.candidateService.createCandidate(req.body);
+        const candidateData = req.body;
+        let resumeInfo = {};
+        if (req.file) {
+            resumeInfo = {
+                resumeFilename: req.file.filename,
+                resumeOriginalName: req.file.originalname,
+                resumeUploadDate: new Date()
+            };
+        }
+        const combined = { ...candidateData, ...resumeInfo };
+        const candidate = await this.candidateService.createCandidate(combined);
 
         return ApiResponse.success(
             res,
@@ -64,6 +74,75 @@ class JobProfileController {
             'Candidate deleted successfully'
         );
     });
+
+    uploadResume = catchAsync(async (req, res) => {
+        const candidateId = parseInt(req.params.id);
+
+        if (!req.file) {
+            throw new AppError('No resume file uploaded', 400, 'NO_FILE_UPLOADED');
+        }
+
+        const result = await this.candidateService.uploadResume(candidateId, req.file);
+
+        return ApiResponse.success(
+            res,
+            result,
+            'Resume uploaded successfully',
+            200
+        );
+    });
+
+    downloadResume = catchAsync(async (req, res) => {
+        const candidateId = parseInt(req.params.id);
+
+        const resumeData = await this.candidateService.downloadResume(candidateId);
+
+        // Set headers for PDF download
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${resumeData.originalName}"`);
+
+        // Send file
+        res.sendFile(resumeData.filePath);
+    });
+
+    previewResume = catchAsync(async (req, res) => {
+        const candidateId = parseInt(req.params.id);
+
+        const resumeData = await this.candidateService.downloadResume(candidateId);
+
+        // Set headers for PDF preview (inline display)
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'inline');
+
+        // Send file for preview
+        res.sendFile(resumeData.filePath);
+    });
+
+    deleteResume = catchAsync(async (req, res) => {
+        const candidateId = parseInt(req.params.id);
+
+        const result = await this.candidateService.deleteResume(candidateId);
+
+        return ApiResponse.success(
+            res,
+            result,
+            'Resume deleted successfully',
+            200
+        );
+    });
+
+    getResumeInfo = catchAsync(async (req, res) => {
+        const candidateId = parseInt(req.params.id);
+
+        const resumeInfo = await this.candidateService.getResumeInfo(candidateId);
+
+        return ApiResponse.success(
+            res,
+            resumeInfo,
+            'Resume information retrieved successfully',
+            200
+        );
+    });
 }
 
-module.exports = JobProfileController;
+module.exports = CandidateController;

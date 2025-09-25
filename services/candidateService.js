@@ -1,9 +1,238 @@
 const AppError = require('../utils/appError');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const { promisify } = require('util');
 
 class CandidateService {
     constructor(candidateRepository, db) {
         this.candidateRepository = candidateRepository;
         this.db = db;
+        this.initializeMulter();
+    }
+    initializeMulter() {
+        const resumeDir = path.join(__dirname, '../resumes');
+
+        const ensureResumeDirectory = async () => {
+            try {
+                await fs.promises.access(resumeDir);
+            } catch (error) {
+                await fs.promises.mkdir(resumeDir, { recursive: true });
+            }
+        };
+
+        ensureResumeDirectory();
+
+        // Multer configuration
+        const storage = multer.diskStorage({
+            destination: async (req, file, cb) => {
+                await ensureResumeDirectory();
+                cb(null, resumeDir);
+            },
+            filename: (req, file, cb) => {
+                const candidateId = req.params.id || req.body.candidateId;
+                const timestamp = Date.now();
+                const sanitizedOriginalName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+                const filename = `candidate_${candidateId}_${timestamp}_${sanitizedOriginalName}`;
+                cb(null, filename);
+            }
+        });
+
+        const fileFilter = (req, file, cb) => {
+            if (file.mimetype === 'application/pdf') {
+                cb(null, true);
+            } else {
+                cb(new Error('Only PDF files are allowed'), false);
+            }
+        };
+
+        this.upload = multer({
+            storage: storage,
+            limits: {
+                fileSize: 5 * 1024 * 1024 // 5MB limit
+            },
+            fileFilter: fileFilter
+        });
+    }
+
+    async uploadResume(candidateId, file) {
+        const client = await this.db.getConnection();
+
+        try {
+            await client.beginTransaction();
+
+            // Check if candidate exists
+            const candidate = await this.candidateRepository.findById(candidateId, client);
+            if (!candidate) {
+                throw new AppError(
+                    `Candidate with ID ${candidateId} not found`,
+                    404,
+                    'CANDIDATE_NOT_FOUND'
+                );
+            }
+
+            // If candidate already has a resume, delete the old file
+            const existingResumeInfo = await this.candidateRepository.getResumeInfo(candidateId, client);
+            if (existingResumeInfo && existingResumeInfo.resumeFilename) {
+                const oldFilePath = path.join(__dirname, '../resumes', existingResumeInfo.resumeFilename);
+                try {
+                    await fs.promises.unlink(oldFilePath);
+                } catch (error) {
+                    console.error('Error deleting old resume file:', error);
+                    // Continue with update even if old file deletion fails
+                }
+            }
+
+            // Update candidate record with new resume information
+            await this.candidateRepository.updateResumeInfo(
+                candidateId,
+                file.filename,
+                file.originalname,
+                client
+            );
+
+            await client.commit();
+
+            return {
+                candidateId: candidateId,
+                filename: file.filename,
+                originalName: file.originalname,
+                size: file.size,
+                uploadDate: new Date()
+            };
+
+        } catch (error) {
+            await client.rollback();
+
+            // Clean up uploaded file if database update fails
+            if (file && file.path) {
+                try {
+                    await fs.promises.unlink(file.path);
+                } catch (unlinkError) {
+                    console.error('Error deleting uploaded file:', unlinkError);
+                }
+            }
+
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
+    async downloadResume(candidateId) {
+        // Check if candidate exists
+        const candidate = await this.candidateRepository.findById(candidateId);
+        if (!candidate) {
+            throw new AppError(
+                `Candidate with ID ${candidateId} not found`,
+                404,
+                'CANDIDATE_NOT_FOUND'
+            );
+        }
+
+        // Get resume information
+        const resumeInfo = await this.candidateRepository.getResumeInfo(candidateId);
+
+        if (!resumeInfo || !resumeInfo.resumeFilename) {
+            throw new AppError(
+                'No resume found for this candidate',
+                404,
+                'RESUME_NOT_FOUND'
+            );
+        }
+
+        const filePath = path.join(__dirname, '../resumes', resumeInfo.resumeFilename);
+
+        // Check if file exists
+        try {
+            await fs.promises.access(filePath);
+        } catch (error) {
+            throw new AppError(
+                'Resume file not found on server',
+                404,
+                'RESUME_FILE_NOT_FOUND'
+            );
+        }
+
+        return {
+            filePath: filePath,
+            originalName: resumeInfo.resumeOriginalName,
+            filename: resumeInfo.resumeFilename
+        };
+    }
+
+    async deleteResume(candidateId) {
+        const client = await this.db.getConnection();
+
+        try {
+            await client.beginTransaction();
+
+            // Check if candidate exists
+            const candidate = await this.candidateRepository.findById(candidateId, client);
+            if (!candidate) {
+                throw new AppError(
+                    `Candidate with ID ${candidateId} not found`,
+                    404,
+                    'CANDIDATE_NOT_FOUND'
+                );
+            }
+
+            // Get current resume information
+            const resumeInfo = await this.candidateRepository.getResumeInfo(candidateId, client);
+
+            if (!resumeInfo || !resumeInfo.resumeFilename) {
+                throw new AppError(
+                    'No resume found for this candidate',
+                    404,
+                    'RESUME_NOT_FOUND'
+                );
+            }
+
+            // Delete file from filesystem
+            const filePath = path.join(__dirname, '../resumes', resumeInfo.resumeFilename);
+            try {
+                await fs.promises.unlink(filePath);
+            } catch (error) {
+                console.error('Error deleting resume file:', error);
+                // Continue with database update even if file deletion fails
+            }
+
+            // Update database to remove resume info
+            await this.candidateRepository.deleteResumeInfo(candidateId, client);
+
+            await client.commit();
+
+            return {
+                message: 'Resume deleted successfully',
+                deletedFile: resumeInfo.resumeOriginalName
+            };
+
+        } catch (error) {
+            await client.rollback();
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
+    async getResumeInfo(candidateId) {
+        // Check if candidate exists
+        const candidate = await this.candidateRepository.findById(candidateId);
+        if (!candidate) {
+            throw new AppError(
+                `Candidate with ID ${candidateId} not found`,
+                404,
+                'CANDIDATE_NOT_FOUND'
+            );
+        }
+
+        const resumeInfo = await this.candidateRepository.getResumeInfo(candidateId);
+
+        return {
+            hasResume: !!(resumeInfo && resumeInfo.resumeFilename),
+            originalName: resumeInfo?.resumeOriginalName || null,
+            uploadDate: resumeInfo?.resumeUploadDate || null
+        };
     }
 
     async createCandidate(candidateData) {

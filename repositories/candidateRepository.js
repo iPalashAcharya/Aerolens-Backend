@@ -7,8 +7,8 @@ class CandidateRepository {
     async create(candidateData, client = null) {
         const connection = client || await this.db.getConnection();
         try {
-            const query = `INSERT INTO candidate(candidateName,contactNumber,email,recruiterName,jobRole,preferredJobLocation,currentCTC,expectedCTC,noticePeriod,experienceYears,linkedinProfileUrl,statusId)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?);`
+            const query = `INSERT INTO candidate(candidateName,contactNumber,email,recruiterName,jobRole,preferredJobLocation,currentCTC,expectedCTC,noticePeriod,experienceYears,linkedinProfileUrl,statusId, resumeFilename, resumeOriginalName, resumeUploadDate)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`
             console.log(candidateData);
 
             const [result] = await connection.execute(query, [
@@ -23,7 +23,10 @@ class CandidateRepository {
                 candidateData.noticePeriod,
                 candidateData.experienceYears,
                 candidateData.linkedinProfileUrl,
-                candidateData.statusId !== undefined ? candidateData.statusId : 9
+                candidateData.statusId !== undefined ? candidateData.statusId : 9,
+                null,
+                null,
+                null
             ]);
 
             return {
@@ -46,7 +49,7 @@ class CandidateRepository {
             }
 
             const query = `
-            SELECT c.candidateId,c.candidateName,c.contactNumber,c.email,c.recruiterName,c.jobRole,loc.value AS preferredJobLocation,c.currentCTC,c.expectedCTC,c.noticePeriod,c.experienceYears,c.linkedinProfileUrl,stat.value AS statusName
+            SELECT c.candidateId,c.candidateName,c.contactNumber,c.email,c.recruiterName,c.jobRole,loc.value AS preferredJobLocation,c.currentCTC,c.expectedCTC,c.noticePeriod,c.experienceYears,c.linkedinProfileUrl,stat.value AS statusName, c.resumeFilename, c.resumeOriginalName, c.resumeUploadDate
             FROM candidate c
             LEFT JOIN lookup stat ON c.statusId= stat.lookupKey AND stat.tag = 'candidateStatus'
             LEFT JOIN lookup loc ON c.preferredJobLocation = loc.lookupKey AND loc.tag = 'location'
@@ -74,7 +77,7 @@ class CandidateRepository {
             SELECT c.candidateId, c.candidateName, c.contactNumber, c.email, c.recruiterName, 
                    c.jobRole, loc.value AS preferredJobLocation, c.currentCTC, c.expectedCTC, c.noticePeriod, 
                    c.experienceYears, c.linkedinProfileUrl, c.createdAt, c.updatedAt,
-                   stat.value AS statusName
+                   stat.value AS statusName, c.resumeFilename, c.resumeOriginalName, c.resumeUploadDate
             FROM candidate c
             LEFT JOIN lookup stat ON c.statusId = stat.lookupKey and stat.tag = 'candidateStatus'
             LEFT JOIN lookup loc ON c.preferredJobLocation = loc.lookupKey and loc.tag = 'location'
@@ -101,7 +104,7 @@ class CandidateRepository {
             SELECT c.candidateId, c.candidateName, c.contactNumber, c.email, c.recruiterName,
                    c.jobRole, loc.value AS preferredJobLocation, c.currentCTC, c.expectedCTC, c.noticePeriod,
                    c.experienceYears, c.linkedinProfileUrl, c.createdAt, c.updatedAt,
-                   stat.value AS statusName
+                   stat.value AS statusName, c.resumeFilename, c.resumeOriginalName, c.resumeUploadDate
             FROM candidate c
             LEFT JOIN lookup stat ON c.statusId = stat.lookupKey and stat.tag = 'candidateStatus'
             LEFT JOIN lookup loc ON c.preferredJobLocation = loc.lookupKey and loc.tag = 'location'
@@ -128,7 +131,7 @@ class CandidateRepository {
             SELECT c.candidateId, c.candidateName, c.contactNumber, c.email, c.recruiterName,
                    c.jobRole, loc.value AS preferredJobLocation, c.currentCTC, c.expectedCTC, c.noticePeriod,
                    c.experienceYears, c.linkedinProfileUrl, c.createdAt, c.updatedAt,
-                   stat.value AS statusName
+                   stat.value AS statusName, c.resumeFilename, c.resumeUploadDate, c.resumeOriginalName
             FROM candidate c
             LEFT JOIN lookup stat ON c.statusId = stat.lookupKey and stat.tag = 'candidateStatus'
             LEFT JOIN lookup loc ON c.preferredJobLocation = loc.lookupKey and loc.tag = 'location'
@@ -164,7 +167,7 @@ class CandidateRepository {
             SELECT c.candidateId, c.candidateName, c.contactNumber, c.email, c.recruiterName,
                    c.jobRole, loc.value AS preferredJobLocation, c.currentCTC, c.expectedCTC, c.noticePeriod,
                    c.experienceYears, c.linkedinProfileUrl, c.createdAt, c.updatedAt,
-                   stat.value AS statusName
+                   stat.value AS statusName, c.resumeFilename, c.resumeOriginalName, c.resumeUploadDate
             FROM candidate c
             LEFT JOIN lookup stat ON c.statusId = stat.lookupKey and stat.tag = 'candidateStatus'
             LEFT JOIN lookup loc ON c.preferredJobLocation = loc.lookupKey and loc.tag = 'location'
@@ -469,6 +472,102 @@ class CandidateRepository {
             const [rows] = await connection.execute(query, params);
             return rows.length > 0;
         } catch (error) {
+            this._handleDatabaseError(error);
+        } finally {
+            if (!client) connection.release();
+        }
+    }
+
+    async updateResumeInfo(candidateId, resumeFilename, originalName, client = null) {
+        const connection = client || await this.db.getConnection();
+
+        try {
+            if (!candidateId) {
+                throw new AppError('Candidate ID is required', 400, 'MISSING_CANDIDATE_ID');
+            }
+
+            const query = `
+            UPDATE candidate 
+            SET resumeFilename = ?, 
+                resumeOriginalName = ?, 
+                resumeUploadDate = NOW(),
+                updatedAt = NOW()
+            WHERE candidateId = ?
+        `;
+
+            const [result] = await connection.execute(query, [resumeFilename, originalName, candidateId]);
+
+            if (result.affectedRows === 0) {
+                throw new AppError(
+                    `Candidate with ID ${candidateId} not found`,
+                    404,
+                    'CANDIDATE_NOT_FOUND'
+                );
+            }
+
+            return result.affectedRows;
+        } catch (error) {
+            if (error instanceof AppError) throw error;
+            this._handleDatabaseError(error);
+        } finally {
+            if (!client) connection.release();
+        }
+    }
+
+    async getResumeInfo(candidateId, client = null) {
+        const connection = client || await this.db.getConnection();
+
+        try {
+            if (!candidateId) {
+                throw new AppError('Candidate ID is required', 400, 'MISSING_CANDIDATE_ID');
+            }
+
+            const query = `
+            SELECT resumeFilename, resumeOriginalName, resumeUploadDate
+            FROM candidate 
+            WHERE candidateId = ?
+        `;
+
+            const [rows] = await connection.execute(query, [candidateId]);
+            return rows[0] || null;
+        } catch (error) {
+            if (error instanceof AppError) throw error;
+            this._handleDatabaseError(error);
+        } finally {
+            if (!client) connection.release();
+        }
+    }
+
+    async deleteResumeInfo(candidateId, client = null) {
+        const connection = client || await this.db.getConnection();
+
+        try {
+            if (!candidateId) {
+                throw new AppError('Candidate ID is required', 400, 'MISSING_CANDIDATE_ID');
+            }
+
+            const query = `
+            UPDATE candidate 
+            SET resumeFilename = NULL, 
+                resumeOriginalName = NULL, 
+                resumeUploadDate = NULL,
+                updatedAt = NOW()
+            WHERE candidateId = ?
+        `;
+
+            const [result] = await connection.execute(query, [candidateId]);
+
+            if (result.affectedRows === 0) {
+                throw new AppError(
+                    `Candidate with ID ${candidateId} not found`,
+                    404,
+                    'CANDIDATE_NOT_FOUND'
+                );
+            }
+
+            return result.affectedRows;
+        } catch (error) {
+            if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
         } finally {
             if (!client) connection.release();
