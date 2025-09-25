@@ -1,31 +1,79 @@
 const catchAsync = require('../utils/catchAsync');
 const ApiResponse = require('../utils/response');
+const path = require('path');
+const fs = require('fs');
 
 class CandidateController {
     constructor(candidateService) {
         this.candidateService = candidateService;
     }
 
-    createCandidate = catchAsync(async (req, res) => {
-        const candidateData = req.body;
-        let resumeInfo = {};
-        if (req.file) {
-            resumeInfo = {
-                resumeFilename: req.file.filename,
-                resumeOriginalName: req.file.originalname,
-                resumeUploadDate: new Date()
-            };
-        }
-        const combined = { ...candidateData, ...resumeInfo };
-        const candidate = await this.candidateService.createCandidate(combined);
+    createCandidate = catchAsync(async (req, res, next) => {
+        try {
+            const candidateData = req.body;
 
-        return ApiResponse.success(
-            res,
-            candidate,
-            'Candidate created successfully',
-            201
-        );
+            // Step 1: Create candidate record in DB without resume info
+            const candidate = await this.candidateService.createCandidate(candidateData);
+
+            if (req.file) {
+                // Step 2: Define the new filename using candidateId
+                const originalExtension = path.extname(req.file.originalname);
+                const newFilename = `candidate_${candidate.candidateId}${originalExtension}`;
+
+                // Step 3: Rename/move the file on disk
+                const resumeDir = path.join(__dirname, '..', 'resumes');
+                const oldPath = req.file.path; // temp location by multer
+                const newPath = path.join(resumeDir, newFilename);
+
+                // Rename the file asynchronously
+                await fs.promises.rename(oldPath, newPath);
+
+                // Step 4: Update candidate resume info in DB
+                await this.candidateService.updateCandidateResumeInfo(candidate.candidateId, {
+                    resumeFilename: newFilename,
+                    resumeOriginalName: req.file.originalname,
+                    resumeUploadDate: new Date()
+                });
+            }
+
+            return ApiResponse.success(res, candidate, "Candidate created successfully", 201);
+        } catch (error) {
+            next(error);
+        }
     });
+    /*async createCandidate(req, res, next) {
+        try {
+            const candidateData = req.body;
+
+            // Step 1: Create candidate record in DB without resume info
+            const candidate = await this.candidateService.createCandidate(candidateData);
+
+            if (req.file) {
+                // Step 2: Define the new filename using candidateId
+                const originalExtension = path.extname(req.file.originalname);
+                const newFilename = `candidate_${candidate.candidateId}${originalExtension}`;
+
+                // Step 3: Rename/move the file on disk
+                const resumeDir = path.join(__dirname, '..', 'resumes');
+                const oldPath = req.file.path; // temp location by multer
+                const newPath = path.join(resumeDir, newFilename);
+
+                // Rename the file asynchronously
+                await fs.promises.rename(oldPath, newPath);
+
+                // Step 4: Update candidate resume info in DB
+                await this.candidateService.updateCandidateResumeInfo(candidate.candidateId, {
+                    resumeFilename: newFilename,
+                    resumeOriginalName: req.file.originalname,
+                    resumeUploadDate: new Date()
+                });
+            }
+
+            return ApiResponse.success(res, candidate, "Candidate created successfully", 201);
+        } catch (error) {
+            next(error);
+        }
+    }*/
 
     getCandidate = catchAsync(async (req, res) => {
         const candidate = await this.candidateService.getCandidateById(
@@ -66,8 +114,8 @@ class CandidateController {
     });
 
     deleteCandidate = catchAsync(async (req, res) => {
+        await this.candidateService.deleteResume(parseInt(req.params.id));
         await this.candidateService.deleteCandidate(parseInt(req.params.id));
-
         return ApiResponse.success(
             res,
             null,

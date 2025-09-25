@@ -235,6 +235,25 @@ class CandidateService {
         };
     }
 
+    async updateCandidateResumeInfo(candidateId, resumeData) {
+        const client = await this.db.getConnection();
+        try {
+            await client.beginTransaction();
+            await this.candidateRepository.updateResumeInfo(
+                candidateId,
+                resumeData.resumeFilename,
+                resumeData.resumeOriginalName,
+                client
+            );
+            await client.commit();
+        } catch (error) {
+            await client.rollback();
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
     async createCandidate(candidateData) {
         const client = await this.db.getConnection();
 
