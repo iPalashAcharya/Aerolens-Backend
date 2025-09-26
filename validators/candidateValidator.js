@@ -1,5 +1,7 @@
 const Joi = require('joi');
 const AppError = require('../utils/appError');
+const path = require('path');
+const fs = require('fs');
 
 // Database helper class for lookups
 class CandidateValidatorHelper {
@@ -543,7 +545,13 @@ class CandidateValidator {
             req.body = value;
             next();
         } catch (error) {
-            next(error);
+            if (req.file && req.file.path) {
+                fs.unlink(req.file.path, (unlinkErr) => {
+                    next(error);
+                });
+            } else {
+                next(error);
+            }
         }
     }
 
