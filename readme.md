@@ -1321,6 +1321,7 @@ Content-Type: multipart/form-data
 | experienceYears      | Number | Years of experience (required)                   |
 | linkedinProfileUrl   | String | LinkedIn URL (optional)                          |
 | resume               | File   | PDF resume, max 5MB (optional)                   |
+| status               | String | candidate status 50 characters                   |
 
 **Response:**
 {
