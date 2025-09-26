@@ -31,7 +31,6 @@ router.post('/',
 router.post('/:id/resume',
     CandidateValidator.validateDelete,
     (req, res, next) => {
-        // Use the upload middleware from candidateService
         candidateService.upload.single('resume')(req, res, (err) => {
             if (err) {
                 if (err instanceof multer.MulterError) {

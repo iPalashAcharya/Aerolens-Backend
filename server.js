@@ -11,6 +11,7 @@ const jobProfileRoutes = require('./routes/jobProfileRoutes');
 const contactRoutes = require('./routes/contact');
 const candidateRoutes = require('./routes/candidateRoutes');
 const CandidateValidator = require('./validators/candidateValidator');
+const lookupRoutes = require('./routes/lookupRoutes');
 const db = require('./db');
 const JobProfileValidator = require('./validators/jobProfileValidator');
 
@@ -53,10 +54,8 @@ JobProfileValidator.init(db);
 app.use('/jobProfile', jobProfileRoutes);
 CandidateValidator.init(db);
 app.use('/candidate', candidateRoutes);
+app.use('/lookup', lookupRoutes);
 
-/*app.all('/*', (req, res, next) => {
-    next(new AppError(`Can't find ${req.originalUrl} on this server!`, 404, 'ROUTE_NOT_FOUND'));
-});*/
 app.use(globalErrorHandler);
 app.use((err, req, res, next) => {
     console.error('Error:', err);

@@ -171,6 +171,7 @@ class ClientRepository {
             client.release();
         }
     }
+
     async exists(clientId, client = null) {
         const connection = client || await this.db.getConnection();
         try {

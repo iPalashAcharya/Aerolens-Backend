@@ -1457,3 +1457,163 @@ DELETE /candidate/:id/resume
 - Locations include: Ahmedabad, Bangalore, San Francisco.
 
 ---
+
+# Lookup Endpoints
+
+Base URL
+/lookup
+
+Response Format
+All responses follow a consistent JSON structure.
+
+Success Response
+{
+"success": true,
+"message": "Operation successful",
+"data": { ... },
+"meta": { ... } // optional pagination info
+}
+
+Error Response
+{
+"success": false,
+"error": "ERROR_CODE",
+"message": "Description of the error",
+"details": { ... }, // optional extra information
+"stack": "..." // only available in development
+}
+Endpoints
+
+1. Get All Lookup Entries
+
+GET /api/lookup
+
+Retrieve paginated lookup entries.
+
+Query Parameters
+
+page (integer, optional, default: 1) – current page number
+
+limit (integer, optional, default: 10, max: 100) – number of records per page
+
+GET /lookup?page=1&limit=5
+{
+"success": true,
+"message": "Lookup entries retrieved successfully",
+"data": [
+{
+"lookupKey": 1,
+"tag": "status",
+"value": "active"
+}
+],
+"meta": {
+"currentPage": 1,
+"totalPages": 10,
+"totalRecords": 50,
+"limit": 5,
+"hasNextPage": true,
+"hasPrevPage": false,
+"nextPage": 2,
+"prevPage": null
+}
+} 2. Get Lookup by Key
+
+GET /lookup/:lookupKey
+
+Retrieve a single lookup entry by its lookupKey.
+URL Params
+
+lookupKey (integer, required)
+
+Example Request
+GET /lookup/1
+
+Example Response
+{
+"success": true,
+"message": "Lookup entry retrieved successfully",
+"data": [
+{
+"lookupKey": 1,
+"tag": "status",
+"value": "active"
+}
+]
+}
+
+3. Create Lookup Entry
+
+POST /lookup
+
+Create a new lookup entry with validation.
+
+Request Body
+{
+"tag": "status",
+"value": "inactive"
+}
+Validation Rules
+
+tag: required, string, 1–100 characters
+
+value: required, string, 1–500 characters
+
+Example Response:
+{
+"success": true,
+"message": "lookup created successfully",
+"data": {
+"lookupKey": 2,
+"tag": "status",
+"value": "inactive"
+}
+}
+
+Error Example (Validation):
+{
+"success": false,
+"error": "VALIDATION_ERROR",
+"message": "Validation failed",
+"details": {
+"validationErrors": [
+{ "field": "tag", "message": "Tag cannot be empty" }
+]
+}
+}
+
+4. Delete Lookup Entry
+
+DELETE /lookup/:lookupKey
+
+Delete a lookup entry by its lookupKey.
+
+URL Params
+
+lookupKey (integer, required)
+
+Example Request
+DELETE /lookup/1
+
+Response
+{
+"success": true,
+"message": "Lookup entry deleted successfully",
+"data": {
+"lookupKey": 1,
+"deletedAt": "2025-09-26T13:31:20.123Z"
+}
+}
+
+Error Codes
+VALIDATION_ERROR – Invalid input data
+
+LOOKUP_NOT_FOUND – Lookup entry doesn’t exist
+
+DUPLICATE_LOOKUP_VALUE – Entry with the same value already exists
+
+DATABASE_ERROR – Generic database error
+
+DATABASE_SCHEMA_ERROR – Missing table or invalid schema
+
+DATABASE_CONNECTION_ERROR – Connection timeout or reset
