@@ -74,6 +74,7 @@ router.get('/:id',
 );
 
 router.patch('/:id',
+    candidateService.upload.single('resume'),
     CandidateValidator.validateUpdate,
     candidateController.updateCandidate
 );

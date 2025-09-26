@@ -610,7 +610,13 @@ class CandidateValidator {
             req.body = value;
             next();
         } catch (error) {
-            next(error);
+            if (req.file && req.file.path) {
+                fs.unlink(req.file.path, (unlinkErr) => {
+                    next(error);
+                });
+            } else {
+                next(error);
+            }
         }
     }
 
