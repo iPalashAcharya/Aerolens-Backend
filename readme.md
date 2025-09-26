@@ -1321,27 +1321,27 @@ Content-Type: multipart/form-data
 | experienceYears      | Number | Years of experience (required)                   |
 | linkedinProfileUrl   | String | LinkedIn URL (optional)                          |
 | resume               | File   | PDF resume, max 5MB (optional)                   |
-| status               | String | candidate status 50 characters                   |
+| status               | String | candidate status 50 characters (optional)        |
 
 **Response:**
 {
+"success": true,
 "message": "Candidate created successfully",
 "data": {
-"candidateId": 124,
-"candidateName": "Jane Smith",
-"contactNumber": "+1987654321",
-"email": "jane@example.com",
-"recruiterName": "khushi",
-"jobRole": "Backend Developer",
-"preferredJobLocation": "Ahmedabad",
-"currentCTC": 1000000,
-"expectedCTC": 1300000,
-"noticePeriod": 60,
-"experienceYears": 5,
-"linkedinProfileUrl": null,
-"resumeFilename": "candidate124_resume.pdf",
-"resumeOriginalName": "Jane_Smith_Resume.pdf",
-"resumeUploadDate": "2025-09-25T10:20:00.000Z"
+"candidateId": 26,
+"candidateName": "Palash Testing",
+"contactNumber": "9999996",
+"currentCTC": 9,
+"email": "palashtest321@example.com",
+"expectedCTC": 11,
+"experienceYears": 4,
+"jobRole": "Backend Engineer",
+"linkedinProfileUrl": "https://www.linkedin.com/in/alice-johnson",
+"noticePeriod": 30,
+"preferredJobLocation": 1,
+"recruiterName": "Jayraj",
+"statusId": 9,
+"createdOn": "2025-09-26T12:11:27.615Z"
 }
 }
 
@@ -1350,7 +1350,7 @@ Content-Type: multipart/form-data
 ### Update Candidate
 
 PATCH /candidate/:id
-Content-Type: application/json
+Content-Type: multipart/form-data
 
 **Request Body (JSON) - fields to update:**
 {
