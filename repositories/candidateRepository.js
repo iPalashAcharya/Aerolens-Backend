@@ -367,7 +367,7 @@ class CandidateRepository {
             SELECT c.candidateId, c.candidateName, c.contactNumber, c.email, c.recruiterName,
                    c.jobRole, loc.value AS preferredJobLocation, c.currentCTC, c.expectedCTC, c.noticePeriod,
                    c.experienceYears, c.linkedinProfileUrl, c.createdAt, c.updatedAt,
-                   stat.value AS statusName
+                   stat.value AS statusName, c.resumeFilename, c.resumeOriginalName, c.resumeUploadDate
             FROM candidate c
             LEFT JOIN lookup stat ON c.statusId = stat.lookupKey and stat.tag = 'candidateStatus'
             LEFT JOIN lookup loc ON c.preferredJobLocation = loc.lookupKey and loc.tag = 'location'
