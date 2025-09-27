@@ -11,7 +11,8 @@ class CandidateController {
     createCandidate = catchAsync(async (req, res, next) => {
         try {
             const candidateData = req.body;
-            console.log(req.body);
+            console.log("Candidate body:", JSON.stringify(req.body, null, 2));
+            console.log("File info:", req.file);
 
             // Step 1: Create candidate record in DB without resume info
             const candidate = await this.candidateService.createCandidate(candidateData);

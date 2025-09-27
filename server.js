@@ -44,6 +44,27 @@ app.use((req, res, next) => {
     next();
 });
 
+app.use((req, res, next) => {
+    console.log("==== Incoming Request ====");
+    console.log("URL:", req.originalUrl);
+    console.log("Method:", req.method);
+    console.log("Headers:", req.headers);
+
+    // For JSON or urlencoded
+    if (req.is("application/json") || req.is("application/x-www-form-urlencoded")) {
+        console.log("Body:", req.body);
+    }
+
+    // For multipart/form-data (multer case)
+    if (req.is("multipart/form-data")) {
+        console.log("Multipart form detected");
+        // You won’t see files here (multer handles them), but text fields will show in req.body after multer runs
+    }
+
+    console.log("==========================");
+    next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

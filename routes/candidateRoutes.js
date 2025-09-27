@@ -24,6 +24,24 @@ router.get('/',
 
 router.post('/',
     candidateService.upload.single('resume'),
+    (req, res, next) => {                       // logger runs AFTER multer but BEFORE validator
+        console.log("==== Parsed body BEFORE validator ====");
+        console.log(JSON.stringify(req.body, null, 2));  // parsed fields
+        console.log("==== File info ====");
+        if (req.file) {
+            console.log({
+                fieldname: req.file.fieldname,
+                originalname: req.file.originalname,
+                mimetype: req.file.mimetype,
+                size: req.file.size,
+                path: req.file.path
+            });
+        } else {
+            console.log("No file");
+        }
+        console.log("=============================================");
+        next();
+    },
     CandidateValidator.validateCreate,
     candidateController.createCandidate
 );
