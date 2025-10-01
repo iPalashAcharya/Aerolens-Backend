@@ -338,6 +338,12 @@ class CandidateService {
 
             return await this.candidateRepository.findById(candidateId);
         } catch (error) {
+            if (updateData.resume) {
+                const newFilePath = path.join(__dirname, "../resumes", updateData.resume);
+                fs.unlink(newFilePath, (err) => {
+                    if (err) console.error("Failed to cleanup new resume:", err);
+                });
+            }
             await client.rollback();
             throw error;
         } finally {

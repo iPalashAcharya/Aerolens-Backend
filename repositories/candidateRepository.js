@@ -261,7 +261,7 @@ class CandidateRepository {
             // Filter only allowed fields for security
             const allowedFields = [
                 'candidateName', 'contactNumber', 'email', 'recruiterName',
-                'jobRole', 'preferredJobLocation', 'currentCTC', 'expectedCTC', 'noticePeriod', 'experienceYears', 'linkedinProfileUrl', 'statusId'
+                'jobRole', 'preferredJobLocation', 'currentCTC', 'expectedCTC', 'noticePeriod', 'experienceYears', 'linkedinProfileUrl', 'statusId', 'resume'
             ];
 
             const filteredData = {};

@@ -521,6 +521,23 @@ class CandidateValidator {
                 throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details });
             }
 
+            if (req.file) {
+                const allowedMimeTypes = [
+                    'application/pdf',
+                    'application/msword',
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                ];
+                if (!allowedMimeTypes.includes(req.file.mimetype)) {
+                    fs.unlink(req.file.path, () => { });
+                    throw new AppError('Invalid resume file format. Only PDF, DOC and DOCX are allowed.', 400, 'VALIDATION_ERROR', { field: 'resume' });
+                }
+                const maxSizeBytes = 5 * 1024 * 1024;
+                if (req.file.size > maxSizeBytes) {
+                    fs.unlink(req.file.path, () => { });
+                    throw new AppError('Resume file size cannot exceed 5MB', 400, 'VALIDATION_ERROR', { field: 'resume' });
+                }
+            }
+
             // Transform location
             if (value.preferredJobLocation) {
                 value.preferredJobLocation = await CandidateValidator.helper.transformLocation(value.preferredJobLocation);
@@ -561,11 +578,19 @@ class CandidateValidator {
             const { error: paramsError } = candidateSchemas.params.validate(req.params, { abortEarly: false });
 
             // Validate body
-            const { error: bodyError, value } = candidateSchemas.update.validate(req.body, {
+            let { error: bodyError, value } = candidateSchemas.update.validate(req.body, {
                 abortEarly: false,
                 stripUnknown: true,
                 convert: true
             });
+
+            // If no body fields but req.file exists, ignore "min(1)" error
+            if (bodyError) {
+                const hasMinOneError = bodyError.details.some(d => d.type === 'object.min');
+                if (hasMinOneError && req.file) {
+                    bodyError = null;
+                }
+            }
 
             if (paramsError || bodyError) {
                 const details = [];
@@ -582,6 +607,25 @@ class CandidateValidator {
                     })));
                 }
                 throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details });
+            }
+
+            if (req.file) {
+                const allowedMimeTypes = [
+                    'application/pdf',
+                    'application/msword',
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                ];
+                if (!allowedMimeTypes.includes(req.file.mimetype)) {
+                    fs.unlink(req.file.path, () => { });
+                    throw new AppError('Invalid resume file format. Only PDF, DOC and DOCX are allowed.', 400, 'VALIDATION_ERROR', { field: 'resume' });
+                }
+                const maxSizeBytes = 5 * 1024 * 1024;
+                if (req.file.size > maxSizeBytes) {
+                    fs.unlink(req.file.path, () => { });
+                    throw new AppError('Resume file size cannot exceed 5MB', 400, 'VALIDATION_ERROR', { field: 'resume' });
+                }
+                value.resumeFilename = path.extname(req.file.originalname);
+                value.resumeOriginalName = req.file.originalname;
             }
 
             const candidateId = req.params.id;

@@ -108,6 +108,27 @@ class CandidateController {
             req.body
         );
 
+        if (req.file) {
+            // Step 2: Define the new filename using candidateId
+            const originalExtension = path.extname(req.file.originalname);
+            const newFilename = `candidate_${req.params.id}${originalExtension}`;
+
+            // Step 3: Rename/move the file on disk
+            const resumeDir = path.join(__dirname, '..', 'resumes');
+            const oldPath = req.file.path; // temp location by multer
+            const newPath = path.join(resumeDir, newFilename);
+
+            // Rename the file asynchronously
+            await fs.promises.rename(oldPath, newPath);
+
+            // Step 4: Update candidate resume info in DB
+            await this.candidateService.updateCandidateResumeInfo(req.params.id, {
+                resumeFilename: newFilename,
+                resumeOriginalName: req.file.originalname,
+                resumeUploadDate: new Date()
+            });
+        }
+
         return ApiResponse.success(
             res,
             updatedCandidate,
