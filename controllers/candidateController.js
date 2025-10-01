@@ -116,7 +116,9 @@ class CandidateController {
     });
 
     deleteCandidate = catchAsync(async (req, res) => {
-        await this.candidateService.deleteResume(parseInt(req.params.id));
+        if (req.file) {
+            await this.candidateService.deleteResume(parseInt(req.params.id));
+        }
         await this.candidateService.deleteCandidate(parseInt(req.params.id));
         return ApiResponse.success(
             res,
