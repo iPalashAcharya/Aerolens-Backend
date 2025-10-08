@@ -62,7 +62,7 @@ class CandidateValidatorHelper {
             const query = `SELECT lookupKey FROM lookup WHERE LOWER(value) = LOWER(?) AND tag = 'location'`;
             const [rows] = await connection.execute(query, [normalizedLocation]);
 
-            if (!rows) {
+            if (!rows || rows.length == 0) {
                 throw new AppError(
                     `Invalid location: '${locationString}'. Must be either Ahmedabad, Bangalore or San Francisco.`,
                     400,
