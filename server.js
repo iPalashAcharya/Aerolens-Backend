@@ -24,8 +24,6 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization'],
 }));
-
-app.options('*', cors());
 app.use(compression());
 
 app.set('trust proxy', 1);

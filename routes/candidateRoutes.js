@@ -5,8 +5,15 @@ const CandidateService = require('../services/candidateService');
 const CandidateRepository = require('../repositories/candidateRepository');
 const CandidateValidator = require('../validators/candidateValidator');
 const db = require('../db');
+const cors = require('cors');
 
 const router = express.Router();
+
+const corsOptions = {
+    origin: 'http://localhost:5173',
+    methods: ['PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+};
 
 // Dependency injection
 const candidateRepository = new CandidateRepository(db);
@@ -92,6 +99,7 @@ router.get('/:id',
 
 router.patch('/:id',
     candidateService.upload.single('resume'),
+    cors(corsOptions),
     (req, res, next) => {                       // logger runs AFTER multer but BEFORE validator
         console.log("==== Parsed body BEFORE validator ====");
         console.log(JSON.stringify(req.body, null, 2));  // parsed fields
