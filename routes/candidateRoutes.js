@@ -98,8 +98,8 @@ router.get('/:id',
 );
 
 router.patch('/:id',
-    candidateService.upload.single('resume'),
     cors(corsOptions),
+    candidateService.upload.single('resume'),
     (req, res, next) => {                       // logger runs AFTER multer but BEFORE validator
         console.log("==== Parsed body BEFORE validator ====");
         console.log(JSON.stringify(req.body, null, 2));  // parsed fields
