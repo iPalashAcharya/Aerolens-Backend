@@ -1,4 +1,4 @@
-const GeocodingService = require('./geocodingService');
+const GeocodingService = require('./geocodingService2');
 const AppError = require('../utils/appError');
 
 class ClientService {

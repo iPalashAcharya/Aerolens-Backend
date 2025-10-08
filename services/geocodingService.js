@@ -97,6 +97,7 @@ class GeocodingService {
         const isIndianAddress = /india|gujarat|maharashtra|delhi|mumbai|bangalore|chennai|kolkata|hyderabad|pune|ahmedabad/i.test(address);
         const addressVariations = this._getAddressVariations(cleanAddress, isIndianAddress);
         // Try first 3 variations in parallel for speed
+        console.log("Trying parallel processing");
         const result = await this._tryParallelGeocoding(addressVariations.slice(0, 3), url, isIndianAddress);
         if (result) return result;
         // If all parallel attempts failed, try remaining variations sequentially

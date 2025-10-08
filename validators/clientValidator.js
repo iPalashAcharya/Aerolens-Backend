@@ -1,6 +1,8 @@
 const Joi = require('joi');
 const AppError = require('../utils/appError');
 
+const ADDRESS_REGEX = /^(?:[A-Z0-9]{4,8}\+[A-Z0-9]{2,3},\s*)?[\w\s\.\#\/-]+(?:,\s*[\w\s\.-]+){1,}$/i;
+
 const clientSchemas = {
     create: Joi.object({
         name: Joi.string()
@@ -20,10 +22,17 @@ const clientSchemas = {
             .min(5)
             .max(500)
             .required()
+            .custom((value, helpers) => {
+                if (!ADDRESS_REGEX.test(value)) {
+                    return helpers.error('string.pattern.base');
+                }
+                return value;
+            })
             .messages({
                 'string.base': 'Address must be a string',
                 'string.empty': 'Address cannot be empty',
                 'string.min': 'Address must be at least 5 characters long',
+                'string.pattern.base': 'Address is not a valid format (Plus Codes, commas, unit numbers allowed)',
                 'string.max': 'Address cannot exceed 500 characters',
                 'any.required': 'Address is required'
             })
@@ -45,12 +54,19 @@ const clientSchemas = {
             .trim()
             .min(5)
             .max(500)
+            .custom((value, helpers) => {
+                if (!ADDRESS_REGEX.test(value)) {
+                    return helpers.error('string.pattern.base');
+                }
+                return value;
+            })
             .optional()
             .messages({
                 'string.base': 'Address must be a string',
                 'string.empty': 'Address cannot be empty',
                 'string.min': 'Address must be at least 5 characters long',
-                'string.max': 'Address cannot exceed 500 characters'
+                'string.max': 'Address cannot exceed 500 characters',
+                'string.pattern.base': 'Address is not a valid format (Plus Codes, commas, unit numbers allowed)'
             })
     }).min(1).messages({
         'object.min': 'At least one field (name or address) must be provided for update'
@@ -95,13 +111,14 @@ const clientSchemas = {
 
 class ClientValidator {
     static validateCreate(req, res, next) {
+        console.log('Validating create with body:', req.body);
         const { error } = clientSchemas.create.validate(req.body, { abortEarly: false });
         if (error) {
             const details = error.details.map(detail => ({
                 field: detail.path[0],
                 message: detail.message
             }));
-            throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details });
+            return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details }));
         }
         next();
     }
