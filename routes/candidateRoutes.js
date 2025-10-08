@@ -6,14 +6,14 @@ const CandidateRepository = require('../repositories/candidateRepository');
 const CandidateValidator = require('../validators/candidateValidator');
 const db = require('../db');
 const cors = require('cors');
-
-const router = express.Router();
-
 const corsOptions = {
     origin: 'http://localhost:5173',
     methods: ['PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 };
+const router = express.Router();
+
+router.options('/:id', cors(corsOptions));
 
 // Dependency injection
 const candidateRepository = new CandidateRepository(db);
