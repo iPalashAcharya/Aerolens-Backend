@@ -274,6 +274,10 @@ class CandidateRepository {
             if (Object.keys(filteredData).length === 0) {
                 throw new AppError('No valid fields to update', 400, 'NO_VALID_FIELDS');
             }
+            console.log("Filtered data values and their types:");
+            Object.entries(filteredData).forEach(([key, val]) => {
+                console.log(key, typeof val, val);
+            });
 
             const fields = Object.keys(filteredData);
             const values = Object.values(filteredData);
