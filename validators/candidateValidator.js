@@ -632,7 +632,7 @@ class CandidateValidator {
 
             // Transform location
             if (value.preferredJobLocation) {
-                value.preferredJobLocation = CandidateValidator.helper.transformLocation(value.preferredJobLocation);
+                value.preferredJobLocation = await CandidateValidator.helper.transformLocation(value.preferredJobLocation);
             }
 
             // Transform status
