@@ -231,7 +231,7 @@ class ClientService {
                 }
             };
         } catch (error) {
-            if (error instanceof AppError) {
+            if (error instanceof AppError || error.name === 'AppError') {
                 throw error;
             }
 
