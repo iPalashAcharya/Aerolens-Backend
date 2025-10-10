@@ -112,7 +112,7 @@ const clientSchemas = {
 class ClientValidator {
     static validateCreate(req, res, next) {
         console.log('Validating create with body:', req.body);
-        const { error } = clientSchemas.create.validate(req.body, { abortEarly: false });
+        const { value, error } = clientSchemas.create.validate(req.body, { abortEarly: false });
         if (error) {
             const details = error.details.map(detail => ({
                 field: detail.path[0],
@@ -120,11 +120,12 @@ class ClientValidator {
             }));
             return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details }));
         }
+        req.body = value;
         next();
     }
 
     static validateUpdate(req, res, next) {
-        const { error: bodyError } = clientSchemas.update.validate(req.body, { abortEarly: false });
+        const { value, error: bodyError } = clientSchemas.update.validate(req.body, { abortEarly: false });
         const { error: paramsError } = clientSchemas.params.validate(req.params, { abortEarly: false });
 
         if (bodyError || paramsError) {
@@ -143,6 +144,7 @@ class ClientValidator {
             }
             throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details });
         }
+        req.body = value;
         next();
     }
 

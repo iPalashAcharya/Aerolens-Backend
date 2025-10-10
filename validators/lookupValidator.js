@@ -68,7 +68,7 @@ const lookupSchemas = {
 
 class LookupValidator {
     static validateCreate(req, res, next) {
-        const { error } = lookupSchemas.create.validate(req.body, { abortEarly: false });
+        const { value, error } = lookupSchemas.create.validate(req.body, { abortEarly: false });
         if (error) {
             const details = error.details.map(detail => ({
                 field: detail.path[0],
@@ -76,6 +76,7 @@ class LookupValidator {
             }));
             throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details });
         }
+        req.body = value;
         next();
     }
 

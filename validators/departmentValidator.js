@@ -74,7 +74,7 @@ const departmentSchemas = {
 
 class DepartmentValidator {
     static validateCreate(req, res, next) {
-        const { error } = departmentSchemas.create.validate(req.body, { abortEarly: false }); //abortEearly purpose defined below
+        const { value, error } = departmentSchemas.create.validate(req.body, { abortEarly: false }); //abortEearly purpose defined below
         if (error) {
             const details = error.details.map(detail => ({ //converts joi data into a small array of {field and message}
                 field: detail.path[0], //only show the first field because we dont have nested structures ie we only have department name, client id and department description
@@ -82,11 +82,12 @@ class DepartmentValidator {
             }));
             throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details });
         }
+        req.body = value;
         next();
     }
 
     static validateUpdate(req, res, next) { //validates both request body and route params, Aggregates errors from both validations into a single details array.
-        const { error: bodyError } = departmentSchemas.update.validate(req.body, { abortEarly: false }); //abortEarly false gathers all the validation errors instead of stopping at the first one
+        const { value, error: bodyError } = departmentSchemas.update.validate(req.body, { abortEarly: false }); //abortEarly false gathers all the validation errors instead of stopping at the first one
         const { error: paramsError } = departmentSchemas.params.validate(req.params, { abortEarly: false });
 
         if (bodyError || paramsError) {
@@ -105,6 +106,7 @@ class DepartmentValidator {
             }
             throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details });
         }
+        req.body = value;
         next();
     }
 

@@ -718,7 +718,7 @@ class CandidateValidator {
             }
 
             // Replace request query with validated and transformed data
-            req.query = value;
+            req.validatedSearch = value;
             next();
         } catch (error) {
             next(error);

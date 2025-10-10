@@ -118,7 +118,7 @@ const contactSchemas = {
 
 class ContactValidator {
     static validateCreate(req, res, next) {
-        const { error } = contactSchemas.create.validate(req.body, { abortEarly: false });
+        const { value, error } = contactSchemas.create.validate(req.body, { abortEarly: false });
         if (error) {
             const details = error.details.map(detail => ({
                 field: detail.path[0],
@@ -126,11 +126,12 @@ class ContactValidator {
             }));
             throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details });
         }
+        req.body = value;
         next();
     }
 
     static validateUpdate(req, res, next) {
-        const { error: bodyError } = contactSchemas.update.validate(req.body, { abortEarly: false });
+        const { value, error: bodyError } = contactSchemas.update.validate(req.body, { abortEarly: false });
         const { error: paramsError } = contactSchemas.params.validate(req.params, { abortEarly: false });
 
         if (bodyError || paramsError) {
@@ -149,6 +150,7 @@ class ContactValidator {
             }
             throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details });
         }
+        req.body = value;
         next();
     }
 

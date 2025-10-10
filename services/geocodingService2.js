@@ -113,12 +113,14 @@ class GeocodingService {
                 throw new Error(`${provider.name} API key not set`);
             }
             const params = provider.buildParams(address);
+            console.log(`[${provider.name}] Params:`, params);
             const resp = await axios.get(provider.url, {
                 params,
                 headers: { 'User-Agent': 'Aerolens/1.0' },
                 timeout: 3000
             });
             const data = resp.data;
+            console.log(`[${provider.name}] Response:`, data);
             if (!data || data.features?.length === 0) {
                 throw new Error(`${provider.name} returned no results`);
             }
