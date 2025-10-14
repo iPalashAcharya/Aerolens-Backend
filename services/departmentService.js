@@ -34,6 +34,15 @@ class DepartmentService {
             return department;
         } catch (error) {
             await client.rollback();
+            if (!(error instanceof AppError)) {
+                console.error('Error creating Department', error.stack);
+                throw new AppError(
+                    'Failed to create Department',
+                    500,
+                    'DEPARTMENT_CREATION_ERROR',
+                    { operation: 'createDepartment', departmentData }
+                );
+            }
             throw error;
         } finally {
             client.release();
@@ -60,7 +69,6 @@ class DepartmentService {
         try {
             await client.beginTransaction();
 
-            // Check if department exists
             const existingDepartment = await this.departmentRepository.findById(departmentId, client);
             if (!existingDepartment) {
                 throw new AppError(
@@ -70,7 +78,6 @@ class DepartmentService {
                 );
             }
 
-            // If updating name, check for duplicates
             if (updateData.departmentName) {
                 const exists = await this.departmentRepository.existsByName(
                     updateData.departmentName,
@@ -91,10 +98,18 @@ class DepartmentService {
             await this.departmentRepository.update(departmentId, updateData, client);
             await client.commit();
 
-            // Return updated department
             return await this.departmentRepository.findById(departmentId);
         } catch (error) {
             await client.rollback();
+            if (!(error instanceof AppError)) {
+                console.error('Error updating Department', error.stack);
+                throw new AppError(
+                    'Failed to update Department',
+                    500,
+                    'DEPARTMENT_UPDATION_ERROR',
+                    { operation: 'updateDepartment', updateData }
+                );
+            }
             throw error;
         } finally {
             client.release();
@@ -107,7 +122,6 @@ class DepartmentService {
         try {
             await client.beginTransaction();
 
-            // Check if department exists before deletion
             const department = await this.departmentRepository.findById(departmentId, client);
             if (!department) {
                 throw new AppError(
@@ -123,6 +137,15 @@ class DepartmentService {
             return { deletedDepartment: department };
         } catch (error) {
             await client.rollback();
+            if (!(error instanceof AppError)) {
+                console.error('Error deleting Department', error.stack);
+                throw new AppError(
+                    'Failed to delete Department',
+                    500,
+                    'DEPARTMENT_DELETION_ERROR',
+                    { departmentId, operation: 'deleteDepartment' }
+                );
+            }
             throw error;
         } finally {
             client.release();

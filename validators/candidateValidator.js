@@ -563,9 +563,12 @@ class CandidateValidator {
             next();
         } catch (error) {
             if (req.file && req.file.path) {
-                fs.unlink(req.file.path, (unlinkErr) => {
-                    next(error);
-                });
+                try {
+                    await fs.promises.unlink(req.file.path);
+                } catch (unlinkErr) {
+                    // ignore
+                }
+                next(error);
             } else {
                 next(error);
             }
@@ -655,9 +658,12 @@ class CandidateValidator {
             next();
         } catch (error) {
             if (req.file && req.file.path) {
-                fs.unlink(req.file.path, (unlinkErr) => {
-                    next(error);
-                });
+                try {
+                    await fs.promises.unlink(req.file.path);
+                } catch (unlinkErr) {
+                    // ignore
+                }
+                next(error);
             } else {
                 next(error);
             }
@@ -708,7 +714,7 @@ class CandidateValidator {
 
             // Transform location
             if (value.preferredJobLocation) {
-                value.preferredJobLocation = CandidateValidator.helper.transformLocation(value.preferredJobLocation);
+                value.preferredJobLocation = await CandidateValidator.helper.transformLocation(value.preferredJobLocation);
             }
 
             // Transform status
