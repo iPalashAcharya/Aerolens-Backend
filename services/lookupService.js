@@ -6,8 +6,8 @@ class LookupService {
         this.lookupRepository = lookupRepository;
     }
 
-    async getAll(options = {}) {
-        const { limit = 10, page = 1 } = options;
+    async getAll(options) {
+        const { limit = 10, page = 1 } = options || {};
         const result = await this.lookupRepository.getAll(limit, page);
         const totalPages = Math.ceil(result.totalRecords / limit);
         const pagination = {

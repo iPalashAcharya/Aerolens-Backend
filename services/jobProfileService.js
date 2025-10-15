@@ -203,7 +203,6 @@ class JobProfileService {
             if (errors.length === 0) {
                 await client.commit();
             } else {
-                await client.rollback();
                 throw new AppError(
                     'Bulk update failed for some records',
                     400,

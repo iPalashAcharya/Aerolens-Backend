@@ -15,8 +15,8 @@ class LookupRepository {
                 SELECT tag, lookupKey, value FROM lookup 
                 LIMIT ? OFFSET ?
             `;
-            const numLimit = Math.max(1, parseInt(limit, 10) || 10);
-            const numOffset = Math.max(0, parseInt(offset, 10) || 0);
+            const numLimit = Math.max(1, parseInt(limit, 10) ?? 10);
+            const numOffset = Math.max(0, parseInt(offset, 10) ?? 0);
 
             const params = [numLimit, numOffset];
             const [lookupData] = await connection.query(dataQuery, params);

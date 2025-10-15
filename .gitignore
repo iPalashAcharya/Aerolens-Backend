@@ -38,9 +38,6 @@ logs/
 .env.*
 !.env.example # Keep an example file for collaborators
 
-# Test files
-*.test.js
-*.spec.js
 
 # Uploads
 uploads/ # If you have a directory for user uploads

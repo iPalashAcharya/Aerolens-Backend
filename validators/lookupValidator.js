@@ -68,7 +68,7 @@ const lookupSchemas = {
 
 class LookupValidator {
     static validateCreate(req, res, next) {
-        const { value, error } = lookupSchemas.create.validate(req.body, { abortEarly: false });
+        const { value, error } = lookupSchemas.create.validate(req.body, { abortEarly: false, stripUnknown: true });
         if (error) {
             const details = error.details.map(detail => ({
                 field: detail.path[0],
@@ -81,7 +81,7 @@ class LookupValidator {
     }
 
     static validateDelete(req, res, next) {
-        const { error } = lookupSchemas.params.validate(req.params, { abortEarly: false });
+        const { error } = lookupSchemas.params.validate(req.params, { abortEarly: false, stripUnknown: true });
         if (error) {
             const details = error.details.map(detail => ({
                 field: detail.path[0],
@@ -93,7 +93,7 @@ class LookupValidator {
     }
 
     static validatePagination(req, res, next) {
-        const { error } = lookupSchemas.pagination.validate(req.query, { abortEarly: false });
+        const { error } = lookupSchemas.pagination.validate(req.query, { abortEarly: false, stripUnknown: true });
         if (error) {
             const details = error.details.map(detail => ({
                 field: detail.path[0],
