@@ -30,7 +30,7 @@ Designation must match the database values in lookup
 "memberId": 1,
 "memberName": "John Doe",
 "email": "john@example.com",
-"designation": "software engineer",
+"designation": 4,
 "isRecruiter": false
 }
 }
@@ -58,7 +58,7 @@ Request Body(Json):
 "memberId": 1,
 "memberName": "John Doe",
 "email": "john@example.com",
-"designation": "software engineer",
+"designation": 4,
 "isRecruiter": false
 },
 "accessToken": "<ACCESS_TOKEN>",
@@ -146,7 +146,7 @@ Authorization: Bearer <ACCESS_TOKEN>
 "member": {
 "memberId": 1,
 "email": "john@example.com",
-"designation": "software engineer",
+"designation": 4,
 "isRecruiter": false
 }
 }
