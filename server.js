@@ -1,10 +1,13 @@
 const express = require('express');
+const cookieParser = require('cookie-parser');
+const passport = require('./config/passport');
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const globalErrorHandler = require('./middleware/errorHandler');
-const AppError = require('./utils/appError');
+//const AppError = require('./utils/appError');
 const rateLimit = require('express-rate-limit');
+const authRoutes = require('./routes/authRoutes');
 const clientRoutes = require('./routes/clientMVC');
 const departmentRoutes = require('./routes/department');
 const jobProfileRoutes = require('./routes/jobProfileRoutes');
@@ -14,6 +17,7 @@ const CandidateValidator = require('./validators/candidateValidator');
 const lookupRoutes = require('./routes/lookupRoutes');
 const db = require('./db');
 const JobProfileValidator = require('./validators/jobProfileValidator');
+const AuthValidator = require('./validators/authValidator');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -28,8 +32,8 @@ app.use(compression());
 
 app.set('trust proxy', 1);
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 500, // limit each IP to 100 requests per windowMs
+    windowMs: 15 * 60 * 1000,
+    max: 500,
     message: {
         success: false,
         error: 'RATE_LIMIT_EXCEEDED',
@@ -50,15 +54,12 @@ app.use((req, res, next) => {
     console.log("Method:", req.method);
     console.log("Headers:", req.headers);
 
-    // For JSON or urlencoded
     if (req.is("application/json") || req.is("application/x-www-form-urlencoded")) {
         console.log("Body:", req.body);
     }
 
-    // For multipart/form-data (multer case)
     if (req.is("multipart/form-data")) {
         console.log("Multipart form detected");
-        // You won’t see files here (multer handles them), but text fields will show in req.body after multer runs
     }
 
     console.log("==========================");
@@ -67,7 +68,12 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
+app.use(passport.initialize());
+
+AuthValidator.init(db);
+app.use('/auth', authRoutes);
 app.use('/client', clientRoutes);
 app.use('/department', departmentRoutes);
 app.use('/contact', contactRoutes);

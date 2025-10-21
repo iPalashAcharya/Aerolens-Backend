@@ -4,6 +4,7 @@ const CandidateController = require('../controllers/candidateController');
 const CandidateService = require('../services/candidateService');
 const CandidateRepository = require('../repositories/candidateRepository');
 const CandidateValidator = require('../validators/candidateValidator');
+const { authenticate } = require('../middleware/authMiddleware');
 const db = require('../db');
 const cors = require('cors');
 const corsOptions = {
@@ -19,6 +20,7 @@ router.options('/:id', cors(corsOptions));
 const candidateRepository = new CandidateRepository(db);
 const candidateService = new CandidateService(candidateRepository, db);
 const candidateController = new CandidateController(candidateService);
+router.use(authenticate);
 
 // Routes
 /*router.get('/client/:clientId',

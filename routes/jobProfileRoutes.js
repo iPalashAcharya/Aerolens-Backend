@@ -3,6 +3,7 @@ const JobProfileController = require('../controllers/jobProfileController');
 const JobProfileService = require('../services/jobProfileService');
 const JobProfileRepository = require('../repositories/jobProfileRepository');
 const JobProfileValidator = require('../validators/jobProfileValidator');
+const { authenticate } = require('../middleware/authMiddleware');
 const db = require('../db');
 
 const router = express.Router();
@@ -11,6 +12,7 @@ const router = express.Router();
 const jobProfileRepository = new JobProfileRepository(db);
 const jobProfileService = new JobProfileService(jobProfileRepository, db);
 const jobProfileController = new JobProfileController(jobProfileService);
+router.use(authenticate);
 
 // Routes
 /*router.get('/client/:clientId',

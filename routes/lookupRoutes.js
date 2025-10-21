@@ -3,6 +3,7 @@ const LookupController = require('../controllers/lookupController');
 const LookupService = require('../services/lookupService');
 const LookupRepository = require('../repositories/lookupRepository');
 const LookupValidator = require('../validators/lookupValidator');
+const { authenticate } = require('../middleware/authMiddleware');
 const db = require('../db');
 
 const router = express.Router();
@@ -10,6 +11,7 @@ const router = express.Router();
 const lookupRepository = new LookupRepository(db);
 const lookupService = new LookupService(lookupRepository, db);
 const lookupController = new LookupController(lookupService);
+router.use(authenticate);
 
 
 router.get('/',

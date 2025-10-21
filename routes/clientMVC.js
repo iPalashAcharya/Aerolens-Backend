@@ -3,6 +3,7 @@ const ClientController = require('../controllers/clientController');
 const ClientService = require('../services/clientService');
 const ClientRepository = require('../repositories/clientRepository');
 const ClientValidator = require('../validators/clientValidator');
+const { authenticate } = require('../middleware/authMiddleware');
 const db = require('../db');
 
 const router = express.Router();
@@ -11,6 +12,7 @@ const router = express.Router();
 const clientRepository = new ClientRepository(db);
 const clientService = new ClientService(clientRepository, db);
 const clientController = new ClientController(clientService);
+router.use(authenticate);
 
 // Routes
 /*router.get('/client/:clientId',

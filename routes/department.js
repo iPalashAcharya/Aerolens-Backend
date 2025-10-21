@@ -3,6 +3,7 @@ const DepartmentController = require('../controllers/departmentController');
 const DepartmentService = require('../services/departmentService');
 const DepartmentRepository = require('../repositories/departmentRepository');
 const DepartmentValidator = require('../validators/departmentValidator');
+const { authenticate } = require('../middleware/authMiddleware');
 const db = require('../db');
 
 const router = express.Router();
@@ -11,6 +12,7 @@ const router = express.Router();
 const departmentRepository = new DepartmentRepository(db);
 const departmentService = new DepartmentService(departmentRepository, db);
 const departmentController = new DepartmentController(departmentService);
+router.use(authenticate);
 
 // Routes
 router.get('/client/:clientId',
