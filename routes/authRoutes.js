@@ -10,7 +10,6 @@ router.post('/login', loginRateLimiter, AuthValidator.validateLogin, authControl
 router.post('/refresh', refreshRateLimiter, authController.refreshToken);
 router.post('/logout', authController.logout);
 
-// Protected routes (require authentication)
 router.post('/logout-all', authenticate, authController.logoutAllDevices);
 router.get('/sessions', authenticate, authController.getActiveSessions);
 router.get('/profile', authenticate, authController.getProfile);

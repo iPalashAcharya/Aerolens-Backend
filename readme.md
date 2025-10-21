@@ -1,3 +1,171 @@
+# Authentication Endpoints
+
+## Endpoints
+
+### POST `/auth/register`
+
+Registers the new user
+
+### Request
+
+Request body (Json):
+{
+"memberName": "John Doe",
+"memberContact": "+91 9999999999",
+"email": "john@example.com",
+"password": "Password@123",
+"designation": "software engineer",
+"isRecruiter": false
+}
+Notes:
+Designation must match the database values in lookup
+
+### Response
+
+{
+"success": true,
+"message": "Registration successful",
+"data": {
+"member": {
+"memberId": 1,
+"memberName": "John Doe",
+"email": "john@example.com",
+"designation": "software engineer",
+"isRecruiter": false
+}
+}
+}
+
+### POST `/auth/login`
+
+Logs in the user
+
+### Request
+
+Request Body(Json):
+{
+"email": "john@example.com",
+"password": "Password@123"
+}
+
+### Reponse
+
+{
+"success": true,
+"message": "Login successful",
+"data": {
+"member": {
+"memberId": 1,
+"memberName": "John Doe",
+"email": "john@example.com",
+"designation": "software engineer",
+"isRecruiter": false
+},
+"accessToken": "<ACCESS_TOKEN>",
+"expiresIn": "15m"
+}
+}
+Notes:
+
+Refresh token automatically sent as an HTTP-only cookie.
+
+Access token must be used in the Authorization header for all the endpoints mentioned below as all API endpoints are protected
+Authorization: Bearer <ACCESS_TOKEN>
+
+### POST `/auth/logout`
+
+revokes the refresh token and clears cookie
+
+### Request (optional ie stored in cookie)
+
+{
+"refreshToken":<refreshToken>
+}
+
+### Response
+
+{
+"success": true,
+"message": "Logout successful"
+}
+
+### POST `/auth/logout-all`
+
+Revokes all active tokens for the authenticated user.
+
+### Headers
+
+Authorization: Bearer <ACCESS_TOKEN>
+
+### Response
+
+{
+"success": true,
+"message": "Logged out from all devices successfully"
+}
+
+### GET `/auth/sessions`
+
+Retrieves all currently active refresh sessions.
+
+### Headers
+
+Authorization: Bearer <ACCESS_TOKEN>
+
+### Response
+
+{
+"success": true,
+"data": {
+"sessions": [
+{
+"id": 10,
+"userAgent": "Mozilla/5.0 Chrome/120.0.0",
+"ipAddress": "192.168.1.2",
+"issuedAt": "2025-10-20T10:35:24.000Z",
+"expiresAt": "2025-10-27T10:35:24.000Z",
+"tokenFamily": "c693a76a-90a8-4441-b229-bb57cc4f3f70"
+}
+]
+}
+}
+
+### GET `/auth/profile`
+
+Returns profile information of the logged-in user.
+
+### Headers
+
+Authorization: Bearer <ACCESS_TOKEN>
+
+### Response
+
+{
+"success": true,
+"data": {
+"member": {
+"memberId": 1,
+"email": "john@example.com",
+"designation": "software engineer",
+"isRecruiter": false
+}
+}
+}
+
+## NOTES
+
+---
+
+Authorization Requirement for Endpoints
+All API endpoints below require the client to include a valid Access Token in the HTTP Authorization header for authentication and authorization, except for the explicitly public endpoints (/register, /login, /refresh, /logout).
+
+The Access Token must be supplied as a Bearer token:
+
+Authorization: Bearer <ACCESS_TOKEN>
+Failure to provide a valid token in the Authorization header will result in a 401 Unauthorized response.
+
+---
+
 # Client API Endpoints
 
 This document describes the RESTful API endpoints for Aerolens Backend
