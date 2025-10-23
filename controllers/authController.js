@@ -56,7 +56,9 @@ class AuthController {
     async refreshToken(req, res, next) {
         try {
             // Get refresh token from cookie or body
-            const refreshToken = req.cookies.refreshToken || req.body.refreshToken;
+            const refreshToken =
+                (req.cookies && req.cookies.refreshToken) ||
+                (req.body && req.body.refreshToken);
 
             if (!refreshToken) {
                 throw new AppError('Refresh token not provided', 401, 'TOKEN_MISSING');
@@ -102,7 +104,8 @@ class AuthController {
                 200
             );
         } catch (error) {
-            next(error);
+            res.clearCookie('refreshToken', jwtConfig.cookieOptions);
+            return ApiResponse.success(res, null, 'Logout successful', 200);
         }
     }
 

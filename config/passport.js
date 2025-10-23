@@ -16,30 +16,25 @@ const jwtOptions = {
 // JWT Strategy
 passport.use('jwt', new JwtStrategy(jwtOptions, async (jwtPayload, done) => {
     try {
-        // Validate token structure
         if (!jwtPayload.memberId || !jwtPayload.tokenFamily) {
             return done(null, false, { message: 'Invalid token structure' });
         }
 
-        // Check token expiration explicitly
         const currentTimestamp = Math.floor(Date.now() / 1000);
         if (jwtPayload.exp && jwtPayload.exp < currentTimestamp) {
             return done(null, false, { message: 'Token expired' });
         }
 
-        // Find member by ID
         const member = await memberRepository.findById(jwtPayload.memberId);
 
         if (!member) {
             return done(null, false, { message: 'Member not found' });
         }
 
-        // Check if member is active
         if (!member.isActive) {
             return done(null, false, { message: 'Account is inactive' });
         }
 
-        // Attach member to request
         return done(null, {
             memberId: member.memberId,
             email: member.email,
@@ -53,7 +48,6 @@ passport.use('jwt', new JwtStrategy(jwtOptions, async (jwtPayload, done) => {
     }
 }));
 
-// Optional: Cookie extraction strategy for additional security
 const cookieExtractor = (req) => {
     let token = null;
     if (req && req.cookies) {
@@ -70,7 +64,6 @@ const refreshJwtOptions = {
     passReqToCallback: true
 };
 
-// Refresh Token Strategy
 passport.use('jwt-refresh', new JwtStrategy(refreshJwtOptions, async (req, jwtPayload, done) => {
     try {
         if (!jwtPayload.memberId || !jwtPayload.tokenFamily) {
