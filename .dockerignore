@@ -1,5 +1,5 @@
 node_modules
-**tests**
+__tests__
 appForTest.js
 db_dump.sql
 .git
