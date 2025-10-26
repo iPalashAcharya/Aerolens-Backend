@@ -5,7 +5,6 @@ const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
 const globalErrorHandler = require('./middleware/errorHandler');
-//const AppError = require('./utils/appError');
 const rateLimit = require('express-rate-limit');
 const authRoutes = require('./routes/authRoutes');
 const clientRoutes = require('./routes/clientMVC');
@@ -92,7 +91,13 @@ app.use((err, req, res, next) => {
         message: 'Something went wrong'
     });
 });
-
-app.listen(PORT, () => {
-    console.log(`Server started on port ${PORT}`);
-});
+if (process.env.MODE === 'LOCAL') {
+    app.listen(PORT, () => {
+        console.log(`Server started on port ${PORT}`);
+    });
+} else {
+    // https
+    app.listen(PORT, () => {
+        console.log(`Server started on port ${PORT}`);
+    });
+}

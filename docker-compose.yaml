@@ -1,0 +1,10 @@
+services:
+  backend:
+    build: .
+    image: aerolens_backend:1.0
+    container_name: aerolens_backend
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    restart: always

@@ -26,7 +26,7 @@ class AuthService {
         return jwt.sign(payload, jwtConfig.access.secret, {
             expiresIn: jwtConfig.access.expiresIn,
             algorithm: jwtConfig.access.algorithm,
-            issuer: 'hr-management-system',
+            issuer: 'aerolens-hr-management-system',
             audience: 'hr-app-users'
         });
     }
@@ -57,7 +57,7 @@ class AuthService {
     async register(memberData) {
         const existingMember = await memberRepository.findByEmail(memberData.email);
         if (existingMember) {
-            throw new AppError('Email already registered', 409, 'EMAIL_EXISTS');
+            throw new AppError('Email already registered, Please Login', 409, 'EMAIL_EXISTS');
         }
 
         const hashedPassword = await this.hashPassword(memberData.password);
@@ -84,7 +84,7 @@ class AuthService {
 
         const isPasswordValid = await this.comparePassword(password, member.password);
         if (!isPasswordValid) {
-            throw new AppError('Invalid credentials', 401, 'INVALID_CREDENTIALS');
+            throw new AppError('Invalid credentials, Wrong Password Entered', 401, 'INVALID_CREDENTIALS');
         }
 
         const tokenFamily = this.generateTokenFamily();

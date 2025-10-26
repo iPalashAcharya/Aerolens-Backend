@@ -1,0 +1,12 @@
+node_modules
+**tests**
+appForTest.js
+db_dump.sql
+.git
+.gitignore
+.env
+jest.config.js
+readme.md
+dist
+coverage
+secret
