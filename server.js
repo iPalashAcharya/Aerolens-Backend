@@ -17,20 +17,22 @@ const lookupRoutes = require('./routes/lookupRoutes');
 const db = require('./db');
 const JobProfileValidator = require('./validators/jobProfileValidator');
 const AuthValidator = require('./validators/authValidator');
+const auditContextMiddleware = require('./middleware/auditContext');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(helmet());
 app.use(cors({
     origin: 'http://localhost:5173',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
 }));
+app.use(helmet());
 app.use(compression());
 
 app.set('trust proxy', 1);
+
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 500,
@@ -71,6 +73,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 app.use(passport.initialize());
+app.use(auditContextMiddleware);
 
 AuthValidator.init(db);
 app.use('/auth', authRoutes);
