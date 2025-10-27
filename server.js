@@ -26,6 +26,7 @@ app.use(cors({
     origin: 'http://localhost:5173',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
 }));
 app.use(compression());
 
@@ -96,7 +97,6 @@ if (process.env.MODE === 'LOCAL') {
         console.log(`Server started on port ${PORT}`);
     });
 } else {
-    // https
     app.listen(PORT, () => {
         console.log(`Server started on port ${PORT}`);
     });
