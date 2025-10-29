@@ -1,4 +1,5 @@
 const AppError = require('../utils/appError');
+const auditLogService = require('./auditLogService');
 
 class DepartmentService {
     constructor(departmentRepository, db) {
@@ -6,13 +7,12 @@ class DepartmentService {
         this.db = db;
     }
 
-    async createDepartment(departmentData) {
+    async createDepartment(departmentData, auditContext) {
         const client = await this.db.getConnection();
 
         try {
             await client.beginTransaction();
 
-            // Check if department name already exists for this client
             const exists = await this.departmentRepository.existsByName(
                 departmentData.departmentName,
                 departmentData.clientId,
@@ -29,6 +29,14 @@ class DepartmentService {
             }
 
             const department = await this.departmentRepository.create(departmentData, client);
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'CREATE',
+                newValues: department,
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, client);
             await client.commit();
 
             return department;
@@ -50,22 +58,37 @@ class DepartmentService {
     }
 
     async getDepartmentById(departmentId) {
-        const department = await this.departmentRepository.findById(departmentId);
+        const client = await this.db.getConnection();
+        try {
+            const department = await this.departmentRepository.findById(departmentId, client);
 
-        if (!department) {
-            throw new AppError(
-                `Department with ID ${departmentId} not found`,
-                404,
-                'DEPARTMENT_NOT_FOUND'
-            );
+            if (!department) {
+                throw new AppError(
+                    `Department with ID ${departmentId} not found`,
+                    404,
+                    'DEPARTMENT_NOT_FOUND'
+                );
+            }
+
+            return department;
+        } catch (error) {
+            if (!(error instanceof AppError)) {
+                console.error('Error Fetching Department with ID', error.stack);
+                throw new AppError(
+                    'Failed to FETCH Department',
+                    500,
+                    'DEPARTMENT_FETCH_ERROR',
+                    { operation: 'getDepartmentById' }
+                );
+            }
+            throw error;
+        } finally {
+            client.release();
         }
-
-        return department;
     }
 
-    async updateDepartment(departmentId, updateData) {
+    async updateDepartment(departmentId, updateData, auditContext) {
         const client = await this.db.getConnection();
-
         try {
             await client.beginTransaction();
 
@@ -95,10 +118,19 @@ class DepartmentService {
                 }
             }
 
-            await this.departmentRepository.update(departmentId, updateData, client);
+            const department = await this.departmentRepository.update(departmentId, updateData, client);
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'UPDATE',
+                newValues: department,
+                oldValues: existingDepartment,
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, client);
             await client.commit();
 
-            return await this.departmentRepository.findById(departmentId);
+            return await this.departmentRepository.findById(departmentId, client);
         } catch (error) {
             await client.rollback();
             if (!(error instanceof AppError)) {
@@ -116,7 +148,7 @@ class DepartmentService {
         }
     }
 
-    async deleteDepartment(departmentId) {
+    async deleteDepartment(departmentId, auditContext) {
         const client = await this.db.getConnection();
 
         try {
@@ -132,6 +164,13 @@ class DepartmentService {
             }
 
             await this.departmentRepository.delete(departmentId, client);
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'DELETE',
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, client);
             await client.commit();
 
             return { deletedDepartment: department };
@@ -153,7 +192,23 @@ class DepartmentService {
     }
 
     async getDepartmentsByClientId(clientId) {
-        return await this.departmentRepository.findByClientId(clientId);
+        const client = await this.db.getConnection();
+        try {
+            return await this.departmentRepository.findByClientId(clientId, client);
+        } catch (error) {
+            if (!(error instanceof AppError)) {
+                console.error('Error deleting Department', error.stack);
+                throw new AppError(
+                    'Failed to delete Department',
+                    500,
+                    'DEPARTMENT_DELETION_ERROR',
+                    { departmentId, operation: 'deleteDepartment' }
+                );
+            }
+            throw error;
+        } finally {
+            client.release();
+        }
     }
 }
 

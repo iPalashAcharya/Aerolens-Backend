@@ -5,6 +5,7 @@ const LookupRepository = require('../repositories/lookupRepository');
 const LookupValidator = require('../validators/lookupValidator');
 const { authenticate } = require('../middleware/authMiddleware');
 const db = require('../db');
+const auditContextMiddleware = require('../middleware/auditContext');
 
 const router = express.Router();
 
@@ -12,6 +13,7 @@ const lookupRepository = new LookupRepository(db);
 const lookupService = new LookupService(lookupRepository, db);
 const lookupController = new LookupController(lookupService);
 router.use(authenticate);
+router.use(auditContextMiddleware);
 
 
 router.get('/',

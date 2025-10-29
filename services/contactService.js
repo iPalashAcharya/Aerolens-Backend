@@ -1,4 +1,5 @@
 const AppError = require('../utils/appError');
+const auditLogService = require('./auditLogService');
 
 class ContactService {
     constructor(contactRepository, db) {
@@ -6,7 +7,7 @@ class ContactService {
         this.contactRepository = contactRepository;
     }
 
-    async createContact(contactData) {
+    async createContact(contactData, auditContext) {
         const client = await this.db.getConnection();
         try {
             await client.beginTransaction();
@@ -25,7 +26,15 @@ class ContactService {
                 );
             }
 
-            const result = await this.contactRepository.create(contactData);
+            const result = await this.contactRepository.create(contactData, client);
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'CREATE',
+                newValues: result,
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, client);
             await client.commit();
 
             return result;
@@ -47,9 +56,11 @@ class ContactService {
         }
     }
 
-    async updateContact(contactId, updateData) {
+    async updateContact(contactId, updateData, auditContext) {
+        const client = await this.db.getConnection();
         try {
-            const existingContact = await this.contactRepository.exists(contactId);
+            await client.beginTransaction();
+            const existingContact = await this.contactRepository.exists(contactId, client);
             if (!existingContact) {
                 throw new AppError(
                     `Contact Person with ID ${contactId} does not exist`,
@@ -68,7 +79,7 @@ class ContactService {
             const phone = updateData.phone || existingContact.phone;
             const finalUpdateData = { contactPersonName: name, designation, emailAddress: email, phone };
 
-            const result = await this.contactRepository.update(contactId, finalUpdateData);
+            const result = await this.contactRepository.update(contactId, finalUpdateData, client);
 
             if (!result) {
                 throw new AppError(
@@ -81,9 +92,20 @@ class ContactService {
                     }
                 );
             }
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'UPDATE',
+                oldValues: existingContact,
+                newValues: result,
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, client);
+            await client.commit();
 
-            return await this.contactRepository.getById(contactId);
+            return await this.contactRepository.getById(contactId, client);
         } catch (error) {
+            await client.rollback();
             if (error instanceof AppError) {
                 throw error;
             }
@@ -95,12 +117,16 @@ class ContactService {
                 "CLIENT_CONTACT_UPDATE_ERROR",
                 { contactId, operation: "updateContact" }
             );
+        } finally {
+            client.release();
         }
     }
 
-    async deleteContact(contactId) {
+    async deleteContact(contactId, auditContext) {
+        const connection = await this.db.getConnection();
         try {
-            const client = await this.contactRepository.getById(contactId);
+            await connection.beginTransaction();
+            const client = await this.contactRepository.getById(contactId, connection);
             if (!client) {
                 throw new AppError(
                     `Contact Person with ID ${contactId} not found`,
@@ -108,7 +134,7 @@ class ContactService {
                     'CLIENT_CONTACT_NOT_FOUND'
                 );
             }
-            const deleted = await this.contactRepository.delete(contactId);
+            const deleted = await this.contactRepository.delete(contactId, connection);
 
             if (!deleted) {
                 throw new AppError(
@@ -121,9 +147,18 @@ class ContactService {
                     }
                 );
             }
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'DELETE',
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, connection);
+            await connection.commit();
 
             return { deletedContact: deleted };
         } catch (error) {
+            await connection.rollback();
             if (error instanceof AppError) {
                 throw error;
             }
@@ -135,6 +170,8 @@ class ContactService {
                 "CLIENT_CONTACT_DELETION_ERROR",
                 { contactId, operation: "deleteClient" }
             );
+        } finally {
+            connection.release();
         }
     }
 }

@@ -7,7 +7,7 @@ class DepartmentController {
     }
 
     createDepartment = catchAsync(async (req, res) => {
-        const department = await this.departmentService.createDepartment(req.body);
+        const department = await this.departmentService.createDepartment(req.body, req.auditContext);
 
         return ApiResponse.success(
             res,
@@ -32,7 +32,8 @@ class DepartmentController {
     updateDepartment = catchAsync(async (req, res) => {
         const updatedDepartment = await this.departmentService.updateDepartment(
             parseInt(req.params.id),
-            req.body
+            req.body,
+            req.auditContext
         );
 
         return ApiResponse.success(
@@ -43,7 +44,7 @@ class DepartmentController {
     });
 
     deleteDepartment = catchAsync(async (req, res) => {
-        await this.departmentService.deleteDepartment(parseInt(req.params.id));
+        await this.departmentService.deleteDepartment(parseInt(req.params.id), req.auditContext);
 
         return ApiResponse.success(
             res,

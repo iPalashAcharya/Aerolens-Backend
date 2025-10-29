@@ -5,6 +5,7 @@ const JobProfileRepository = require('../repositories/jobProfileRepository');
 const JobProfileValidator = require('../validators/jobProfileValidator');
 const { authenticate } = require('../middleware/authMiddleware');
 const db = require('../db');
+const auditContextMiddleware = require('../middleware/auditContext');
 
 const router = express.Router();
 
@@ -13,6 +14,7 @@ const jobProfileRepository = new JobProfileRepository(db);
 const jobProfileService = new JobProfileService(jobProfileRepository, db);
 const jobProfileController = new JobProfileController(jobProfileService);
 router.use(authenticate);
+router.use(auditContextMiddleware);
 
 // Routes
 /*router.get('/client/:clientId',

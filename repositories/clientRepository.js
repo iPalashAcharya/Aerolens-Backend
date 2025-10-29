@@ -4,8 +4,8 @@ class ClientRepository {
     constructor(db) {
         this.db = db;
     }
-    async getAll(limit = 10, page = 1, client = null) {
-        const connection = client || await this.db.getConnection();
+    async getAll(limit = 10, page = 1, client) {
+        const connection = client;
         try {
             const offset = (page - 1) * limit;
             const countQuery = `SELECT COUNT(clientId) as total FROM client`;
@@ -26,13 +26,10 @@ class ClientRepository {
             };
         } catch (error) {
             this._handleDatabaseError(error, 'getAll');
-        } finally {
-            if (!client) connection.release();
         }
     }
 
-    async getById(clientId) {
-        const client = await this.db.getConnection();
+    async getById(clientId, client) {
         try {
             const [clientDetails] = await client.execute(`
                 SELECT 
@@ -64,13 +61,10 @@ class ClientRepository {
             return clientDetails.length > 0 ? clientDetails[0] : null;
         } catch (error) {
             this._handleDatabaseError(error, 'getById');
-        } finally {
-            client.release();
         }
     }
 
-    async getAllWithDepartments() {
-        const connection = await this.db.getConnection();
+    async getAllWithDepartments(connection) {
         try {
             const dataQuery = `SELECT 
               c.clientId, 
@@ -93,22 +87,17 @@ class ClientRepository {
 
         } catch (error) {
             this._handleDatabaseError(error, 'getAllWithDepartments');
-        } finally {
-            connection.release();
         }
     }
 
-    async create(clientData, location) {
-        const client = await this.db.getConnection();
+    async create(clientData, location, client) {
         try {
-            await client.beginTransaction();
             const point = `POINT(${location.lat} ${location.lon})`;
             const [result] = await client.execute(
                 `INSERT INTO client(clientName, address, location, createdAt, updatedAt) 
                  VALUES(?, ?, ST_GeomFromText(?, 4326), NOW(), NOW())`,
                 [clientData.name, clientData.address, point]
             );
-            await client.commit();
             return {
                 clientId: result.insertId,
                 clientName: clientData.name,
@@ -116,16 +105,11 @@ class ClientRepository {
                 location
             };
         } catch (error) {
-            await client.rollback();
             this._handleDatabaseError(error, 'create');
-        } finally {
-            client.release();
         }
     }
-    async update(clientId, updateData, location = null) {
-        const client = await this.db.getConnection();
+    async update(clientId, updateData, location = null, client) {
         try {
-            await client.beginTransaction();
             let updateQuery, updateParams;
             if (location) {
                 const point = `POINT(${location.lat} ${location.lon})`;
@@ -137,43 +121,31 @@ class ClientRepository {
             }
             const [result] = await client.execute(updateQuery, updateParams);
             if (result.affectedRows === 0) {
-                await client.rollback();
                 return null;
             }
-            await client.commit();
             return {
                 clientId,
                 ...updateData,
                 ...(location && { location })
             };
         } catch (error) {
-            await client.rollback();
             this._handleDatabaseError(error, 'update');
-        } finally {
-            client.release();
         }
     }
-    async delete(clientId) {
-        const client = await this.db.getConnection();
+    async delete(clientId, client) {
         try {
-            await client.beginTransaction();
             const [result] = await client.execute(`DELETE FROM client WHERE clientId = ?`, [clientId]);
             if (result.affectedRows === 0) {
-                await client.rollback();
                 return false;
             }
-            await client.commit();
             return result.affectedRows;
         } catch (error) {
-            await client.rollback();
             this._handleDatabaseError(error, 'delete');
-        } finally {
-            client.release();
         }
     }
 
-    async exists(clientId, client = null) {
-        const connection = client || await this.db.getConnection();
+    async exists(clientId, client) {
+        const connection = client;
         try {
             const [result] = await connection.execute(
                 `SELECT clientId, clientName, address FROM client WHERE clientId = ?`,
@@ -182,13 +154,11 @@ class ClientRepository {
             return result.length > 0 ? result[0] : null;
         } catch (error) {
             this._handleDatabaseError(error, 'exists');
-        } finally {
-            connection.release();
         }
     }
 
-    async existsByName(clientName, excludeId = null, client = null) {
-        const connection = client || await this.db.getConnection();
+    async existsByName(clientName, excludeId = null, client) {
+        const connection = client;
 
         try {
             let query = `
@@ -207,8 +177,6 @@ class ClientRepository {
             return rows[0].count > 0;
         } catch (error) {
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
     _handleDatabaseError(error, operation) {

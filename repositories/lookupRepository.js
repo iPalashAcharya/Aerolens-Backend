@@ -4,8 +4,8 @@ class LookupRepository {
     constructor(db) {
         this.db = db;
     }
-    async getAll(limit = 10, page = 1, client = null) {
-        const connection = client || await this.db.getConnection();
+    async getAll(limit = 10, page = 1, client) {
+        const connection = client;
         try {
             const offset = (page - 1) * limit;
             const countQuery = `SELECT COUNT(lookupKey) as total FROM lookup`;
@@ -26,13 +26,11 @@ class LookupRepository {
             };
         } catch (error) {
             this._handleDatabaseError(error, 'getAll');
-        } finally {
-            if (!client) connection.release();
         }
     }
 
-    async getByKey(lookupKey) {
-        const connection = await this.db.getConnection();
+    async getByKey(lookupKey, client) {
+        const connection = client;
         try {
             const dataQuery = `SELECT tag, lookupKey, value FROM lookup WHERE lookupKey=?`;
             const [lookupData] = await connection.query(dataQuery, [lookupKey]);
@@ -41,13 +39,10 @@ class LookupRepository {
             }
         } catch (error) {
             this._handleDatabaseError(error, 'getByKey');
-        } finally {
-            connection.release();
         }
     }
 
-    async getByTag(tag) {
-        const connection = await this.db.getConnection();
+    async getByTag(tag, connection) {
         try {
             const dataQuery = `SELECT lookupKey,tag,value FROM lookup WHERE tag=?`;
             const [lookupData] = await connection.query(dataQuery, [tag]);
@@ -56,55 +51,44 @@ class LookupRepository {
             }
         } catch (error) {
             this._handleDatabaseError(error, 'getByTag');
-        } finally {
-            connection.release();
         }
     }
 
-    async create(lookupData, client = null) {
-        const connection = client || await this.db.getConnection();
+    async create(lookupData, client) {
+        const connection = client;
+        console.log('Creating lookup with data:', lookupData);
         try {
-            await connection.beginTransaction();
             const [result] = await connection.execute(
                 `INSERT INTO lookup(tag, value) 
                  VALUES(?, ?)`,
                 [lookupData.tag, lookupData.value]
             );
-            await connection.commit();
             return {
                 lookupKey: result.insertId,
                 tag: lookupData.tag,
                 value: lookupData.value,
             };
         } catch (error) {
-            await connection.rollback();
+            console.error('DB error in LookupRepository.create:', error);
             this._handleDatabaseError(error, 'create');
-        } finally {
-            if (!client) connection.release();
         }
     }
 
-    async delete(lookupKey) {
-        const client = await this.db.getConnection();
+    async delete(lookupKey, client) {
         try {
-            await client.beginTransaction();
             const [result] = await client.execute(`DELETE FROM lookup WHERE lookupKey = ?`, [lookupKey]);
             if (result.affectedRows === 0) {
                 await client.rollback();
                 return false;
             }
-            await client.commit();
             return result.affectedRows;
         } catch (error) {
-            await client.rollback();
             this._handleDatabaseError(error, 'delete');
-        } finally {
-            client.release();
         }
     }
 
-    async exists(value, client = null) {
-        const connection = client || await this.db.getConnection();
+    async exists(value, client) {
+        const connection = client;
         try {
             const [result] = await connection.execute(
                 `SELECT lookupKey FROM lookup WHERE value = ?`,
@@ -113,8 +97,6 @@ class LookupRepository {
             return result.length > 0 ? result[0] : null;
         } catch (error) {
             this._handleDatabaseError(error, 'exists');
-        } finally {
-            if (!client) connection.release();
         }
     }
 

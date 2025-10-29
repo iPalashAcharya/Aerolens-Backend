@@ -15,7 +15,7 @@ class CandidateController {
             console.log("File info:", req.file);
 
             // Step 1: Create candidate record in DB without resume info
-            const candidate = await this.candidateService.createCandidate(candidateData);
+            const candidate = await this.candidateService.createCandidate(candidateData, req.auditContext);
 
             if (req.file) {
                 // Step 2: Define the new filename using candidateId
@@ -105,7 +105,8 @@ class CandidateController {
     updateCandidate = catchAsync(async (req, res) => {
         const updatedCandidate = await this.candidateService.updateCandidate(
             parseInt(req.params.id),
-            req.body
+            req.body,
+            req.auditContext
         );
 
         if (req.file) {
@@ -140,7 +141,7 @@ class CandidateController {
         if (req.file) {
             await this.candidateService.deleteResume(parseInt(req.params.id));
         }
-        await this.candidateService.deleteCandidate(parseInt(req.params.id));
+        await this.candidateService.deleteCandidate(parseInt(req.params.id), req.auditContext);
         return ApiResponse.success(
             res,
             null,

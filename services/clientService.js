@@ -1,5 +1,6 @@
 const GeocodingService = require('./geocodingService2');
 const AppError = require('../utils/appError');
+const auditLogService = require('./auditLogService');
 
 class ClientService {
     constructor(clientRepository, db) {
@@ -9,24 +10,12 @@ class ClientService {
     }
 
     async getAllClients(options = {}) {
-        const { limit = 10, page = 1 } = options;
-        const result = await this.clientRepository.getAll(limit, page);
-        const totalPages = Math.ceil(result.totalRecords / limit);
-        const pagination = {
-            currentPage: page,
-            totalPages,
-            totalRecords: result.totalRecords,
-            limit,
-            hasNextPage: page < totalPages,
-            hasPrevPage: page > 1,
-            nextPage: page < totalPages ? page + 1 : null,
-            prevPage: page > 1 ? page - 1 : null
-        };
-
-        /*return {
-            success: true,
-            data: result.data,
-            pagination: {
+        const client = await this.db.getConnection();
+        try {
+            const { limit = 10, page = 1 } = options;
+            const result = await this.clientRepository.getAll(limit, page, client);
+            const totalPages = Math.ceil(result.totalRecords / limit);
+            const pagination = {
                 currentPage: page,
                 totalPages,
                 totalRecords: result.totalRecords,
@@ -35,37 +24,86 @@ class ClientService {
                 hasPrevPage: page > 1,
                 nextPage: page < totalPages ? page + 1 : null,
                 prevPage: page > 1 ? page - 1 : null
+            };
+            return {
+                data: result.data,
+                pagination
+            };
+        } catch (error) {
+            if (error instanceof AppError) {
+                throw error;
             }
-        };*/
-        return {
-            data: result.data,
-            pagination
-        };
+
+            console.error("Error Fetching clients:", error.stack);
+            throw new AppError(
+                "Failed to Fetch clients",
+                500,
+                "CLIENT_FETCH_ERROR",
+                { operation: "getAllCLients" }
+            );
+        } finally {
+            client.release();
+        }
+
     }
 
     async getAllClientsWithDepartment() {
-        return await this.clientRepository.getAllWithDepartments();
+        const client = await this.db.getConnection();
+        try {
+            return await this.clientRepository.getAllWithDepartments(client);
+        } catch (error) {
+            if (error instanceof AppError) {
+                throw error;
+            }
+
+            console.error("Error Fetching clients:", error.stack);
+            throw new AppError(
+                "Failed to Fetch clients with departments",
+                500,
+                "CLIENT_FETCH_ERROR",
+                { operation: "getAllCLientsWithDepartment" }
+            );
+        } finally {
+            client.release();
+        }
+
     }
 
     async getClientById(clientId) {
-        const clientData = await this.clientRepository.getById(clientId);
+        const client = await this.db.getConnection();
+        try {
+            const clientData = await this.clientRepository.getById(clientId, client);
 
-        if (!clientData) {
+            if (!clientData) {
+                throw new AppError(
+                    `Client with ID ${clientId} not found`,
+                    404,
+                    "CLIENT_NOT_FOUND",
+                    {
+                        clientId,
+                        suggestion: "Please verify the client ID and try again",
+                        searchHint: "You can search for clients using the list endpoint"
+                    }
+                );
+            }
+            return clientData;
+        } catch (error) {
+            if (error instanceof AppError) {
+                throw error;
+            }
+
+            console.error("Error Fetching client with ID:", error.stack);
             throw new AppError(
-                `Client with ID ${clientId} not found`,
-                404,
-                "CLIENT_NOT_FOUND",
-                {
-                    clientId,
-                    suggestion: "Please verify the client ID and try again",
-                    searchHint: "You can search for clients using the list endpoint"
-                }
-            );
+                "Failed to Fetch client with ID",
+                500,
+                "CLIENT_FETCH_ERROR",
+                { operation: "getClientById" });
+        } finally {
+            client.release();
         }
-        return clientData;
     }
 
-    async createClient(clientData) {
+    async createClient(clientData, auditContext) {
         const client = await this.db.getConnection();
         try {
             await client.beginTransaction();
@@ -101,7 +139,15 @@ class ClientService {
                 );
             }
 
-            const result = await this.clientRepository.create(clientData, location);
+            const result = await this.clientRepository.create(clientData, location, client);
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'CREATE',
+                newValues: result,
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, client);
             await client.commit();
 
             return result;
@@ -123,9 +169,11 @@ class ClientService {
         }
     }
 
-    async updateClient(clientId, updateData) {
+    async updateClient(clientId, updateData, auditContext) {
+        const client = await this.db.getConnection();
         try {
-            const existingClient = await this.clientRepository.exists(clientId);
+            await client.beginTransaction();
+            const existingClient = await this.clientRepository.exists(clientId, client);
             if (!existingClient) {
                 throw new AppError(
                     `Client with ID ${clientId} does not exist`,
@@ -168,7 +216,7 @@ class ClientService {
                 console.log('Address unchanged, keeping existing location');
             }
 
-            const result = await this.clientRepository.update(clientId, finalUpdateData, location);
+            const result = await this.clientRepository.update(clientId, finalUpdateData, location, client);
 
             if (!result) {
                 throw new AppError(
@@ -181,9 +229,20 @@ class ClientService {
                     }
                 );
             }
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'UPDATE',
+                oldValues: existingClient,
+                newValues: result,
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, client);
+            await client.commit();
 
-            return await this.clientRepository.getById(clientId);
+            return await this.clientRepository.getById(clientId, client);
         } catch (error) {
+            await client.rollback();
             if (error instanceof AppError) {
                 throw error;
             }
@@ -195,12 +254,16 @@ class ClientService {
                 "CLIENT_UPDATE_ERROR",
                 { clientId, operation: "updateClient" }
             );
+        } finally {
+            await client.release();
         }
     }
 
-    async deleteClient(clientId) {
+    async deleteClient(clientId, auditContext) {
+        const connection = await this.db.getConnection();
         try {
-            const client = await this.clientRepository.getById(clientId);
+            await connection.beginTransaction();
+            const client = await this.clientRepository.getById(clientId, connection);
             if (!client) {
                 throw new AppError(
                     `Client with ID ${clientId} not found`,
@@ -208,7 +271,7 @@ class ClientService {
                     'CLIENT_NOT_FOUND'
                 );
             }
-            const deleted = await this.clientRepository.delete(clientId);
+            const deleted = await this.clientRepository.delete(clientId, connection);
 
             if (!deleted) {
                 throw new AppError(
@@ -222,6 +285,16 @@ class ClientService {
                 );
             }
 
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'DELETE',
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, connection);
+
+            await connection.commit();
+
             return {
                 success: true,
                 message: "Client details deleted successfully",
@@ -231,6 +304,7 @@ class ClientService {
                 }
             };
         } catch (error) {
+            await connection.rollback();
             if (error instanceof AppError || error.name === 'AppError') {
                 throw error;
             }
@@ -242,6 +316,8 @@ class ClientService {
                 "CLIENT_DELETION_ERROR",
                 { clientId, operation: "deleteClient" }
             );
+        } finally {
+            connection.release();
         }
     }
 }

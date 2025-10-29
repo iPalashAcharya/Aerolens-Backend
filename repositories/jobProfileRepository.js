@@ -5,8 +5,8 @@ class JobProfileRepository {
         this.db = db;
     }
 
-    async create(jobProfileData, client = null) {
-        const connection = client || await this.db.getConnection();
+    async create(jobProfileData, client) {
+        const connection = client;
 
         try {
             const query = `
@@ -41,8 +41,8 @@ class JobProfileRepository {
         }
     }
 
-    async findById(jobProfileId, client = null) {
-        const connection = client || await this.db.getConnection();
+    async findById(jobProfileId, client) {
+        const connection = client;
 
         try {
             if (!jobProfileId) {
@@ -64,15 +64,12 @@ class JobProfileRepository {
             const [rows] = await connection.execute(query, [jobProfileId]);
             return rows[0] || null;
         } catch (error) {
-            if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
 
-    async update(jobProfileId, updateData, client = null) {
-        const connection = client || await this.db.getConnection();
+    async update(jobProfileId, updateData, client) {
+        const connection = client;
 
         try {
             if (!jobProfileId) {
@@ -116,17 +113,17 @@ class JobProfileRepository {
                 );
             }
 
-            return result.affectedRows;
+            return {
+                jobProfileId,
+                ...updateData
+            };
         } catch (error) {
-            if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
 
-    async delete(jobProfileId, client = null) {
-        const connection = client || await this.db.getConnection();
+    async delete(jobProfileId, client) {
+        const connection = client;
 
         try {
             if (!jobProfileId) {
@@ -146,15 +143,12 @@ class JobProfileRepository {
 
             return result.affectedRows;
         } catch (error) {
-            if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
 
-    async findByClientId(clientId, limit = null, offset = null, client = null) {
-        const connection = client || await this.db.getConnection();
+    async findByClientId(clientId, limit = null, offset = null, client) {
+        const connection = client;
 
         try {
             if (!clientId) {
@@ -189,15 +183,12 @@ class JobProfileRepository {
             const [rows] = await connection.execute(query, params);
             return rows;
         } catch (error) {
-            if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
 
-    async findByStatus(statusId, client = null) {
-        const connection = client || await this.db.getConnection();
+    async findByStatus(statusId, client) {
+        const connection = client;
 
         try {
             if (!statusId) {
@@ -220,15 +211,12 @@ class JobProfileRepository {
             const [rows] = await connection.execute(query, [statusId]);
             return rows;
         } catch (error) {
-            if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
 
-    async findByDepartment(departmentId, client = null) {
-        const connection = client || await this.db.getConnection();
+    async findByDepartment(departmentId, client) {
+        const connection = client;
 
         try {
             if (!departmentId) {
@@ -251,15 +239,12 @@ class JobProfileRepository {
             const [rows] = await connection.execute(query, [departmentId]);
             return rows;
         } catch (error) {
-            if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
 
-    async countByClient(clientId, client = null) {
-        const connection = client || await this.db.getConnection();
+    async countByClient(clientId, client) {
+        const connection = client;
 
         try {
             if (!clientId) {
@@ -277,8 +262,8 @@ class JobProfileRepository {
         }
     }
 
-    async existsByRole(jobRole, clientId, excludeId = null, client = null) {
-        const connection = client || await this.db.getConnection();
+    async existsByRole(jobRole, clientId, excludeId = null, client) {
+        const connection = client;
 
         try {
             if (!jobRole || !clientId) {
@@ -300,15 +285,12 @@ class JobProfileRepository {
             const [rows] = await connection.execute(query, params);
             return rows[0].count > 0;
         } catch (error) {
-            if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
 
-    async findAll(limit = null, offset = null, client = null) {
-        const connection = client || await this.db.getConnection();
+    async findAll(limit = null, offset = null, client) {
+        const connection = client;
 
         try {
             let query = `
@@ -339,8 +321,6 @@ class JobProfileRepository {
             return rows;
         } catch (error) {
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
 

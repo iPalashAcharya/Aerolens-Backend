@@ -5,6 +5,7 @@ const DepartmentRepository = require('../repositories/departmentRepository');
 const DepartmentValidator = require('../validators/departmentValidator');
 const { authenticate } = require('../middleware/authMiddleware');
 const db = require('../db');
+const auditContextMiddleware = require('../middleware/auditContext');
 
 const router = express.Router();
 
@@ -13,6 +14,7 @@ const departmentRepository = new DepartmentRepository(db);
 const departmentService = new DepartmentService(departmentRepository, db);
 const departmentController = new DepartmentController(departmentService);
 router.use(authenticate);
+router.use(auditContextMiddleware);
 
 // Routes
 router.get('/client/:clientId',

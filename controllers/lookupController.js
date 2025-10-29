@@ -36,7 +36,7 @@ class LookupController {
     })
 
     createLookup = catchAsync(async (req, res) => {
-        const lookup = await this.lookupService.createLookup(req.body);
+        const lookup = await this.lookupService.createLookup(req.body, req.auditContext);
 
         return ApiResponse.success(
             res,
@@ -47,7 +47,7 @@ class LookupController {
     });
 
     deleteLookup = catchAsync(async (req, res) => {
-        await this.lookupService.deleteLookup(parseInt(req.params.lookupKey));
+        await this.lookupService.deleteLookup(parseInt(req.params.lookupKey), req.auditContext);
 
         return ApiResponse.success(
             res,

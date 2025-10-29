@@ -7,7 +7,7 @@ class ContactController {
     }
 
     createContact = catchAsync(async (req, res) => {
-        const contact = await this.contactService.createContact(req.body);
+        const contact = await this.contactService.createContact(req.body, req.auditContext);
 
         return ApiResponse.success(
             res,
@@ -20,7 +20,8 @@ class ContactController {
     updateContact = catchAsync(async (req, res) => {
         const contact = await this.contactService.updateContact(
             parseInt(req.params.contactId),
-            req.body
+            req.body,
+            req.auditContext
         );
 
         return ApiResponse.success(
@@ -31,7 +32,7 @@ class ContactController {
     });
 
     deleteContact = catchAsync(async (req, res) => {
-        await this.contactService.deleteContact(parseInt(req.params.contactId));
+        await this.contactService.deleteContact(parseInt(req.params.contactId), req.auditContext);
 
         return ApiResponse.success(
             res,

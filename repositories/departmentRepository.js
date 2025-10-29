@@ -5,8 +5,8 @@ class DepartmentRepository {
         this.db = db;
     }
 
-    async create(departmentData, client = null) {
-        const connection = client || await this.db.getConnection(); //use the client passed if passed ie in case of transaction ie db.beginTransaction or create a new one
+    async create(departmentData, client) {
+        const connection = client;
 
         try {
             const query = `
@@ -26,13 +26,11 @@ class DepartmentRepository {
             };
         } catch (error) {
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
 
-    async findById(departmentId, client = null) {
-        const connection = client || await this.db.getConnection();
+    async findById(departmentId, client) {
+        const connection = client;
 
         try {
             const query = `
@@ -46,13 +44,11 @@ class DepartmentRepository {
             return rows[0] || null;
         } catch (error) {
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release(); //release the client only if this function is not part of a transaction
         }
     }
 
-    async update(departmentId, updateData, client = null) {
-        const connection = client || await this.db.getConnection();
+    async update(departmentId, updateData, client) {
+        const connection = client;
 
         try {
             const fields = Object.keys(updateData);
@@ -71,17 +67,17 @@ class DepartmentRepository {
                 );
             }
 
-            return result.affectedRows;
+            return {
+                departmentId,
+                ...updateData
+            };
         } catch (error) {
-            if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
 
-    async delete(departmentId, client = null) {
-        const connection = client || await this.db.getConnection();
+    async delete(departmentId, client) {
+        const connection = client;
 
         try {
             const query = `DELETE FROM department WHERE departmentId = ?`;
@@ -97,15 +93,12 @@ class DepartmentRepository {
 
             return result.affectedRows;
         } catch (error) {
-            if (error instanceof AppError) throw error; //if the error is a department not found error then throw it as is
-            this._handleDatabaseError(error); //otherwise its a raw sql error so let the error handler defined below handle it
-        } finally {
-            if (!client) connection.release();
+            this._handleDatabaseError(error);
         }
     }
 
-    async findByClientId(clientId, client = null) {
-        const connection = client || await this.db.getConnection();
+    async findByClientId(clientId, client) {
+        const connection = client;
 
         try {
             const query = `
@@ -120,13 +113,11 @@ class DepartmentRepository {
             return rows;
         } catch (error) {
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
 
-    async existsByName(departmentName, clientId, excludeId = null, client = null) {
-        const connection = client || await this.db.getConnection();
+    async existsByName(departmentName, clientId, excludeId = null, client) {
+        const connection = client;
 
         try {
             let query = `
@@ -145,8 +136,6 @@ class DepartmentRepository {
             return rows[0].count > 0;
         } catch (error) {
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
 

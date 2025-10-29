@@ -4,8 +4,8 @@ class CandidateRepository {
     constructor(db) {
         this.db = db;
     }
-    async create(candidateData, client = null) {
-        const connection = client || await this.db.getConnection();
+    async create(candidateData, client) {
+        const connection = client;
         try {
             const query = `INSERT INTO candidate(candidateName,contactNumber,email,recruiterName,jobRole,preferredJobLocation,currentCTC,expectedCTC,noticePeriod,experienceYears,linkedinProfileUrl,statusId, resumeFilename, resumeOriginalName, resumeUploadDate)
             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`
@@ -36,12 +36,10 @@ class CandidateRepository {
             };
         } catch (error) {
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
-    async findById(candidateId, client = null) {
-        const connection = client || await this.db.getConnection();
+    async findById(candidateId, client) {
+        const connection = client;
 
         try {
             if (!candidateId) {
@@ -59,14 +57,11 @@ class CandidateRepository {
             const [rows] = await connection.execute(query, [candidateId]);
             return rows[0] || null;
         } catch (error) {
-            if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
-    async findByEmail(email, client = null) {
-        const connection = client || await this.db.getConnection();
+    async findByEmail(email, client) {
+        const connection = client;
 
         try {
             if (!email) {
@@ -86,14 +81,11 @@ class CandidateRepository {
             const [rows] = await connection.execute(query, [email]);
             return rows[0] || null;
         } catch (error) {
-            if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
-    async findByContactNumber(contactNumber, client = null) {
-        const connection = client || await this.db.getConnection();
+    async findByContactNumber(contactNumber, client) {
+        const connection = client;
 
         try {
             if (!contactNumber) {
@@ -113,14 +105,11 @@ class CandidateRepository {
             const [rows] = await connection.execute(query, [contactNumber]);
             return rows[0] || null;
         } catch (error) {
-            if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
-    async findByStatus(statusId, limit = null, offset = null, client = null) {
-        const connection = client || await this.db.getConnection();
+    async findByStatus(statusId, limit = null, offset = null, client) {
+        const connection = client;
 
         try {
             if (!statusId) {
@@ -153,14 +142,11 @@ class CandidateRepository {
             const [rows] = await connection.execute(query, params);
             return rows;
         } catch (error) {
-            if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
-    async searchCandidates(searchOptions = {}, limit = null, offset = null, client = null) {
-        const connection = client || await this.db.getConnection();
+    async searchCandidates(searchOptions = {}, limit = null, offset = null, client) {
+        const connection = client;
 
         try {
             let query = `
@@ -241,13 +227,71 @@ class CandidateRepository {
             return rows;
         } catch (error) {
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
 
-    async update(candidateId, updateData, client = null) {
-        const connection = client || await this.db.getConnection();
+    async countCandidates(searchOptions = {}, client) {
+        const connection = client;
+        try {
+            let query = `
+            SELECT COUNT(*) AS totalCount
+            FROM candidate c
+            LEFT JOIN lookup stat ON c.statusId = stat.lookupKey and stat.tag = 'candidateStatus'
+            LEFT JOIN lookup loc ON c.preferredJobLocation = loc.lookupKey and loc.tag = 'location'
+            WHERE 1=1`;
+
+            const params = [];
+
+            if (searchOptions.candidateName) {
+                query += ` AND c.candidateName LIKE ?`;
+                params.push(`%${searchOptions.candidateName}%`);
+            }
+            if (searchOptions.email) {
+                query += ` AND c.email LIKE ?`;
+                params.push(`%${searchOptions.email}%`);
+            }
+            if (searchOptions.jobRole) {
+                query += ` AND c.jobRole LIKE ?`;
+                params.push(`%${searchOptions.jobRole}%`);
+            }
+            if (searchOptions.preferredJobLocation) {
+                query += ` AND loc.value = ?`;
+                params.push(searchOptions.preferredJobLocation);
+            }
+            if (searchOptions.recruiterName) {
+                query += ` AND c.recruiterName LIKE ?`;
+                params.push(`%${searchOptions.recruiterName}%`);
+            }
+            if (searchOptions.minExperience) {
+                query += ` AND c.experienceYears >= ?`;
+                params.push(searchOptions.minExperience);
+            }
+            if (searchOptions.maxExperience) {
+                query += ` AND c.experienceYears <= ?`;
+                params.push(searchOptions.maxExperience);
+            }
+            if (searchOptions.minCurrentCTC) {
+                query += ` AND c.currentCTC >= ?`;
+                params.push(searchOptions.minCurrentCTC);
+            }
+            if (searchOptions.maxCurrentCTC) {
+                query += ` AND c.currentCTC <= ?`;
+                params.push(searchOptions.maxCurrentCTC);
+            }
+            if (searchOptions.statusId) {
+                query += ` AND c.statusId = ?`;
+                params.push(searchOptions.statusId);
+            }
+
+            const [rows] = await connection.execute(query, params);
+            return rows[0].totalCount || 0;
+        } catch (error) {
+            this._handleDatabaseError(error);
+        }
+    }
+
+    async update(candidateId, updateData, client) {
+        const connection = client;
 
         try {
             if (!candidateId) {
@@ -294,17 +338,16 @@ class CandidateRepository {
                     'CANDIDATE_NOT_FOUND'
                 );
             }
-
-            return result.affectedRows;
+            return {
+                candidateId,
+                ...updateData,
+            };
         } catch (error) {
-            if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
-    async updateStatus(candidateId, statusId, client = null) {
-        const connection = client || await this.db.getConnection();
+    async updateStatus(candidateId, statusId, client) {
+        const connection = client;
 
         try {
             if (!candidateId) {
@@ -328,15 +371,12 @@ class CandidateRepository {
 
             return result.affectedRows;
         } catch (error) {
-            if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
 
-    async delete(candidateId, client = null) {
-        const connection = client || await this.db.getConnection();
+    async delete(candidateId, client) {
+        const connection = client;
 
         try {
             if (!candidateId) {
@@ -356,15 +396,12 @@ class CandidateRepository {
 
             return result.affectedRows;
         } catch (error) {
-            if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
 
-    async findAll(limit = 10, offset = 0, client = null) {
-        const connection = client || await this.db.getConnection();
+    async findAll(limit = 10, offset = 0, client) {
+        const connection = client;
 
         try {
             const query = `
@@ -383,19 +420,15 @@ class CandidateRepository {
 
             const params = [numLimit, numOffset];
 
-            // Use query instead of execute
             const [rows] = await connection.query(query, params);
             return rows;
         } catch (error) {
-            console.error('Database error:', error);
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
 
-    async getCount(statusId = null, client = null) {
-        const connection = client || await this.db.getConnection();
+    async getCount(client, statusId = null) {
+        const connection = client;
 
         try {
             let query = `SELECT COUNT(*) as count FROM candidate`;
@@ -410,8 +443,6 @@ class CandidateRepository {
             return rows[0].count;
         } catch (error) {
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
 
@@ -440,8 +471,8 @@ class CandidateRepository {
         }
     }*/
 
-    async checkEmailExists(email, excludeCandidateId = null, client = null) {
-        const connection = client || await this.db.getConnection();
+    async checkEmailExists(email, excludeCandidateId = null, client) {
+        const connection = client;
 
         try {
             let query = `SELECT candidateId FROM candidate WHERE email = ?`;
@@ -456,13 +487,11 @@ class CandidateRepository {
             return rows.length > 0;
         } catch (error) {
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
 
-    async checkContactExists(contactNumber, excludeCandidateId = null, client = null) {
-        const connection = client || await this.db.getConnection();
+    async checkContactExists(contactNumber, excludeCandidateId = null, client) {
+        const connection = client;
 
         try {
             let query = `SELECT candidateId FROM candidate WHERE contactNumber = ?`;
@@ -477,13 +506,11 @@ class CandidateRepository {
             return rows.length > 0;
         } catch (error) {
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
 
-    async updateResumeInfo(candidateId, resumeFilename, originalName, client = null) {
-        const connection = client || await this.db.getConnection();
+    async updateResumeInfo(candidateId, resumeFilename, originalName, client) {
+        const connection = client;
 
         try {
             if (!candidateId) {
@@ -511,15 +538,12 @@ class CandidateRepository {
 
             return result.affectedRows;
         } catch (error) {
-            if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
 
-    async getResumeInfo(candidateId, client = null) {
-        const connection = client || await this.db.getConnection();
+    async getResumeInfo(candidateId, client) {
+        const connection = client;
 
         try {
             if (!candidateId) {
@@ -535,15 +559,12 @@ class CandidateRepository {
             const [rows] = await connection.execute(query, [candidateId]);
             return rows[0] || null;
         } catch (error) {
-            if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
 
-    async deleteResumeInfo(candidateId, client = null) {
-        const connection = client || await this.db.getConnection();
+    async deleteResumeInfo(candidateId, client) {
+        const connection = client;
 
         try {
             if (!candidateId) {
@@ -571,10 +592,7 @@ class CandidateRepository {
 
             return result.affectedRows;
         } catch (error) {
-            if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
 

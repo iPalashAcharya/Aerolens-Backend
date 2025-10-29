@@ -17,7 +17,6 @@ const lookupRoutes = require('./routes/lookupRoutes');
 const db = require('./db');
 const JobProfileValidator = require('./validators/jobProfileValidator');
 const AuthValidator = require('./validators/authValidator');
-//const auditContextMiddleware = require('./middleware/auditContext');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -50,6 +49,12 @@ app.use((req, res, next) => {
     next();
 });
 
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+
+app.use(passport.initialize());
+
 app.use((req, res, next) => {
     console.log("==== Incoming Request ====");
     console.log("URL:", req.originalUrl);
@@ -67,13 +72,6 @@ app.use((req, res, next) => {
     console.log("==========================");
     next();
 });
-
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser());
-
-app.use(passport.initialize());
-//app.use(auditContextMiddleware);
 
 AuthValidator.init(db);
 app.use('/auth', authRoutes);

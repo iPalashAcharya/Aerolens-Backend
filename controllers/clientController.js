@@ -48,7 +48,7 @@ class ClientController {
     });
 
     createClient = catchAsync(async (req, res) => {
-        const client = await this.clientService.createClient(req.body);
+        const client = await this.clientService.createClient(req.body, req.auditContext);
 
         return ApiResponse.success(
             res,
@@ -61,7 +61,8 @@ class ClientController {
     updateClient = catchAsync(async (req, res) => {
         const client = await this.clientService.updateClient(
             parseInt(req.params.id),
-            req.body
+            req.body,
+            req.auditContext
         );
 
         return ApiResponse.success(
@@ -72,7 +73,7 @@ class ClientController {
     });
 
     deleteClient = catchAsync(async (req, res) => {
-        await this.clientService.deleteClient(parseInt(req.params.id));
+        await this.clientService.deleteClient(parseInt(req.params.id), req.auditContext);
 
         return ApiResponse.success(
             res,

@@ -2,7 +2,8 @@ const AppError = require('../utils/appError');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { promisify } = require('util');
+const auditLogService = require('./auditLogService');
+const { exist } = require('joi');
 
 class CandidateService {
     constructor(candidateRepository, db) {
@@ -61,7 +62,6 @@ class CandidateService {
         try {
             await client.beginTransaction();
 
-            // Check if candidate exists
             const candidate = await this.candidateRepository.findById(candidateId, client);
             if (!candidate) {
                 throw new AppError(
@@ -71,7 +71,6 @@ class CandidateService {
                 );
             }
 
-            // If candidate already has a resume, delete the old file
             const existingResumeInfo = await this.candidateRepository.getResumeInfo(candidateId, client);
             if (existingResumeInfo && existingResumeInfo.resumeFilename) {
                 const oldFilePath = path.join(__dirname, '../resumes', existingResumeInfo.resumeFilename);
@@ -104,7 +103,6 @@ class CandidateService {
         } catch (error) {
             await client.rollback();
 
-            // Clean up uploaded file if database update fails
             if (file && file.path) {
                 try {
                     await fs.promises.unlink(file.path);
@@ -113,52 +111,78 @@ class CandidateService {
                 }
             }
 
-            throw error;
+            if (error instanceof AppError) {
+                throw error;
+            }
+
+            console.error("Error Uploading Resume:", error.stack);
+            throw new AppError(
+                "Failed to Upload Resume",
+                500,
+                "RESUME_UPLOAD_ERROR",
+                { candidateId, operation: "uploadResume" }
+            );
         } finally {
             client.release();
         }
     }
 
     async downloadResume(candidateId) {
-        // Check if candidate exists
-        const candidate = await this.candidateRepository.findById(candidateId);
-        if (!candidate) {
-            throw new AppError(
-                `Candidate with ID ${candidateId} not found`,
-                404,
-                'CANDIDATE_NOT_FOUND'
-            );
-        }
-
-        // Get resume information
-        const resumeInfo = await this.candidateRepository.getResumeInfo(candidateId);
-
-        if (!resumeInfo || !resumeInfo.resumeFilename) {
-            throw new AppError(
-                'No resume found for this candidate',
-                404,
-                'RESUME_NOT_FOUND'
-            );
-        }
-
-        const filePath = path.join(__dirname, '../resumes', resumeInfo.resumeFilename);
-
-        // Check if file exists
+        const client = await this.db.getConnection();
         try {
-            await fs.promises.access(filePath);
-        } catch (error) {
-            throw new AppError(
-                'Resume file not found on server',
-                404,
-                'RESUME_FILE_NOT_FOUND'
-            );
-        }
+            const candidate = await this.candidateRepository.findById(candidateId, client);
+            if (!candidate) {
+                throw new AppError(
+                    `Candidate with ID ${candidateId} not found`,
+                    404,
+                    'CANDIDATE_NOT_FOUND'
+                );
+            }
 
-        return {
-            filePath: filePath,
-            originalName: resumeInfo.resumeOriginalName,
-            filename: resumeInfo.resumeFilename
-        };
+            // Get resume information
+            const resumeInfo = await this.candidateRepository.getResumeInfo(candidateId, client);
+
+            if (!resumeInfo || !resumeInfo.resumeFilename) {
+                throw new AppError(
+                    'No resume found for this candidate',
+                    404,
+                    'RESUME_NOT_FOUND'
+                );
+            }
+
+            const filePath = path.join(__dirname, '../resumes', resumeInfo.resumeFilename);
+
+            // Check if file exists
+            try {
+                await fs.promises.access(filePath);
+            } catch (error) {
+                throw new AppError(
+                    'Resume file not found on server',
+                    404,
+                    'RESUME_FILE_NOT_FOUND'
+                );
+            }
+
+            return {
+                filePath: filePath,
+                originalName: resumeInfo.resumeOriginalName,
+                filename: resumeInfo.resumeFilename
+            };
+        } catch (error) {
+            if (error instanceof AppError) {
+                throw error;
+            }
+
+            console.error("Error Downloading Resume:", error.stack);
+            throw new AppError(
+                "Failed to Download Resume",
+                500,
+                "RESUME_DOWNLOAD_ERROR",
+                { candidateId, operation: "downloadResume" }
+            );
+        } finally {
+            client.release();
+        }
     }
 
     async deleteResume(candidateId) {
@@ -209,30 +233,55 @@ class CandidateService {
 
         } catch (error) {
             await client.rollback();
-            throw error;
+            if (error instanceof AppError) {
+                throw error;
+            }
+
+            console.error("Error Deleting Resume:", error.stack);
+            throw new AppError(
+                "Failed to Delete Resume",
+                500,
+                "RESUME_DELETE_ERROR",
+                { candidateId, operation: "deleteResume" });
         } finally {
             client.release();
         }
     }
 
     async getResumeInfo(candidateId) {
+        const client = await this.db.getConnection();
         // Check if candidate exists
-        const candidate = await this.candidateRepository.findById(candidateId);
-        if (!candidate) {
+        try {
+            const candidate = await this.candidateRepository.findById(candidateId, client);
+            if (!candidate) {
+                throw new AppError(
+                    `Candidate with ID ${candidateId} not found`,
+                    404,
+                    'CANDIDATE_NOT_FOUND'
+                );
+            }
+
+            const resumeInfo = await this.candidateRepository.getResumeInfo(candidateId, client);
+
+            return {
+                hasResume: !!(resumeInfo && resumeInfo.resumeFilename),
+                originalName: resumeInfo?.resumeOriginalName || null,
+                uploadDate: resumeInfo?.resumeUploadDate || null
+            };
+        } catch (error) {
+            if (error instanceof AppError) {
+                throw error;
+            }
+
+            console.error("Error Fetching Resume Information:", error.stack);
             throw new AppError(
-                `Candidate with ID ${candidateId} not found`,
-                404,
-                'CANDIDATE_NOT_FOUND'
-            );
+                "Failed to Fetch Resume Information",
+                500,
+                "RESUME_FETCH_ERROR",
+                { candidateId, operation: "getResumeInfo" });
+        } finally {
+            client.release();
         }
-
-        const resumeInfo = await this.candidateRepository.getResumeInfo(candidateId);
-
-        return {
-            hasResume: !!(resumeInfo && resumeInfo.resumeFilename),
-            originalName: resumeInfo?.resumeOriginalName || null,
-            uploadDate: resumeInfo?.resumeUploadDate || null
-        };
     }
 
     async updateCandidateResumeInfo(candidateId, resumeData) {
@@ -248,19 +297,27 @@ class CandidateService {
             await client.commit();
         } catch (error) {
             await client.rollback();
-            throw error;
+            if (error instanceof AppError) {
+                throw error;
+            }
+
+            console.error("Error Updating Resume Information:", error.stack);
+            throw new AppError(
+                "Failed to Update Resume Information",
+                500,
+                "RESUME_UPDATE_ERROR",
+                { candidateId, operation: "updateCandidateResumeInfo" });
         } finally {
             client.release();
         }
     }
 
-    async createCandidate(candidateData) {
+    async createCandidate(candidateData, auditContext) {
         const client = await this.db.getConnection();
 
         try {
             await client.beginTransaction();
 
-            // Check if candidate with same email already exists
             const exists = await this.candidateRepository.checkEmailExists(
                 candidateData.email,
                 null,
@@ -276,6 +333,15 @@ class CandidateService {
             }
 
             const candidate = await this.candidateRepository.create(candidateData, client);
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'CREATE',
+                newValues: candidate,
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, client);
+
             await client.commit();
 
             return candidate;
@@ -288,20 +354,37 @@ class CandidateService {
     }
 
     async getCandidateById(candidateId) {
-        const candidate = await this.candidateRepository.findById(candidateId);
+        const client = await this.db.getConnection();
+        try {
+            const candidate = await this.candidateRepository.findById(candidateId, client);
 
-        if (!candidate) {
+            if (!candidate) {
+                throw new AppError(
+                    `Candidate with ID ${candidateId} not found`,
+                    404,
+                    'CANDIDATE_NOT_FOUND'
+                );
+            }
+
+            return candidate;
+        } catch (error) {
+            if (error instanceof AppError) {
+                throw error;
+            }
+
+            console.error("Error Fetching Candidate By ID:", error.stack);
             throw new AppError(
-                `Candidate with ID ${candidateId} not found`,
-                404,
-                'CANDIDATE_NOT_FOUND'
+                "Failed to Fetch Candidate",
+                500,
+                "CANDIDATE_FETCH_ERROR",
+                { candidateId, operation: "getCandidateById" }
             );
+        } finally {
+            client.release();
         }
-
-        return candidate;
     }
 
-    async updateCandidate(candidateId, updateData) {
+    async updateCandidate(candidateId, updateData, auditContext) {
         const client = await this.db.getConnection();
 
         try {
@@ -316,7 +399,6 @@ class CandidateService {
                 );
             }
 
-            // Check for email uniqueness if email is being updated
             if (updateData.email && updateData.email !== existingCandidate.email) {
                 const exists = await this.candidateRepository.checkEmailExists(
                     updateData.email,
@@ -333,10 +415,19 @@ class CandidateService {
                 }
             }
 
-            await this.candidateRepository.update(candidateId, updateData, client);
+            const candidate = await this.candidateRepository.update(candidateId, updateData, client);
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'UPDATE',
+                oldValues: existingCandidate,
+                newValues: candidate,
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, client);
             await client.commit();
 
-            return await this.candidateRepository.findById(candidateId);
+            return await this.candidateRepository.findById(candidateId, client);
         } catch (error) {
             if (updateData.resume) {
                 const newFilePath = path.join(__dirname, "../resumes", updateData.resume);
@@ -345,13 +436,23 @@ class CandidateService {
                 });
             }
             await client.rollback();
-            throw error;
+            if (error instanceof AppError) {
+                throw error;
+            }
+
+            console.error("Error Updating Candidate", error.stack);
+            throw new AppError(
+                "Failed to Update Candidate",
+                500,
+                "CANDIDATE_UPDATE_ERROR",
+                { candidateId, operation: "updateCandidate" }
+            );
         } finally {
             client.release();
         }
     }
 
-    async deleteCandidate(candidateId) {
+    async deleteCandidate(candidateId, auditContext) {
         const client = await this.db.getConnection();
 
         try {
@@ -367,69 +468,165 @@ class CandidateService {
             }
 
             await this.candidateRepository.delete(candidateId, client);
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'DELETE',
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, client);
             await client.commit();
 
             return { deletedCandidate: candidate };
         } catch (error) {
             await client.rollback();
-            throw error;
+            if (error instanceof AppError) {
+                throw error;
+            }
+
+            console.error("Error Deleting Candidate", error.stack);
+            throw new AppError(
+                "Failed to Delete Candidate",
+                500,
+                "CANDIDATE_DELETE_ERROR",
+                { candidateId, operation: "deleteCandidate" }
+            );
         } finally {
             client.release();
         }
     }
 
     async getCandidatesByStatus(statusId) {
-        return await this.candidateRepository.findByStatus(statusId);
+        const client = await this.db.getConnection();
+        try {
+            return await this.candidateRepository.findByStatus(statusId, client);
+        } catch (error) {
+            if (error instanceof AppError) {
+                throw error;
+            }
+
+            console.error("Error Fetching Candidates by Status", error.stack);
+            throw new AppError(
+                "Failed to fetch Candidates",
+                500,
+                "CANDIDATE_FETCH_ERROR",
+                { statusId, operation: "getCandidatesByStatus" }
+            );
+        } finally {
+            client.release();
+        }
     }
 
     async getAllCandidates(options = {}) {
         const { limit, offset } = options;
-        return await this.candidateRepository.findAll(limit, offset);
+        const client = await this.db.getConnection();
+        try {
+            return await this.candidateRepository.findAll(limit, offset, client);
+        } catch (error) {
+            if (error instanceof AppError) {
+                throw error;
+            }
+
+            console.error("Error Fetching All Candidates", error.stack);
+            throw new AppError(
+                "Failed to fetch Candidates",
+                500,
+                "CANDIDATE_FETCH_ERROR",
+                { operation: "getAllCandidates" }
+            );
+        } finally {
+            client.release();
+        }
     }
 
     async getCandidateCount() {
-        return await this.candidateRepository.getCount();
+        const client = await this.db.getConnection();
+        try {
+            return await this.candidateRepository.getCount(client);
+        } catch (error) {
+            if (error instanceof AppError) {
+                throw error;
+            }
+
+            console.error("Error Fetching Candidate count", error.stack);
+            throw new AppError(
+                "Failed to fetch candidate count",
+                500,
+                "CANDIDATE_COUNT_FETCH_ERROR",
+                { operation: "getCandidateCount" });
+        } finally {
+            client.release();
+        }
     }
 
     async getCandidatesWithPagination(page = 1, pageSize = 10, filters = {}) {
         const offset = (page - 1) * pageSize;
+        const client = await this.db.getConnection();
+        try {
+            const candidates = await this.candidateRepository.searchCandidates(filters, pageSize, offset, client);
+            const totalCount = await this.candidateRepository.countCandidates(filters, client);
 
-        // Use searchCandidates for filtered results
-        const candidates = await this.candidateRepository.searchCandidates(filters, pageSize, offset);
-
-        // Get total count for the same filters
-        const totalCount = await this.getCandidateCountWithFilters(filters);
-
-        return {
-            candidates,
-            pagination: {
-                currentPage: page,
-                pageSize,
-                totalCount,
-                totalPages: Math.ceil(totalCount / pageSize),
-                hasNextPage: page < Math.ceil(totalCount / pageSize),
-                hasPreviousPage: page > 1
+            return {
+                candidates,
+                pagination: {
+                    currentPage: page,
+                    pageSize,
+                    totalCount,
+                    totalPages: Math.ceil(totalCount / pageSize),
+                    hasNextPage: page < Math.ceil(totalCount / pageSize),
+                    hasPreviousPage: page > 1
+                }
+            };
+        } catch (error) {
+            if (error instanceof AppError) {
+                throw error;
             }
-        };
+
+            console.error("Error Fetching Candidates with pagination", error.stack);
+            throw new AppError(
+                "Failed to fetch candidates",
+                500,
+                "CANDIDATE_FETCH_ERROR",
+                { operation: "getCandidatesWithPagination" });
+        } finally {
+            client.release();
+        }
     }
 
     async getAllCandidatesWithPagination(page = 1, pageSize = 10) {
         const offset = (page - 1) * pageSize;
-        const candidates = await this.candidateRepository.findAll(pageSize, offset);
+        const client = await this.db.getConnection();
+        try {
+            const candidates = await this.candidateRepository.findAll(pageSize, offset, client);
 
-        const totalCount = await this.candidateRepository.getCount();
+            const totalCount = await this.candidateRepository.getCount(client);
 
-        return {
-            candidates,
-            pagination: {
-                currentPage: page,
-                pageSize,
-                totalCount,
-                totalPages: Math.ceil(totalCount / pageSize),
-                hasNextPage: page < Math.ceil(totalCount / pageSize),
-                hasPreviousPage: page > 1
+            return {
+                candidates,
+                pagination: {
+                    currentPage: page,
+                    pageSize,
+                    totalCount,
+                    totalPages: Math.ceil(totalCount / pageSize),
+                    hasNextPage: page < Math.ceil(totalCount / pageSize),
+                    hasPreviousPage: page > 1
+                }
+            };
+        } catch (error) {
+            if (error instanceof AppError) {
+                throw error;
             }
-        };
+
+            console.error("Error Fetching Candidates with pagination", error.stack);
+            throw new AppError(
+                "Failed to fetch candidates",
+                500,
+                "CANDIDATE_FETCH_ERROR",
+                { operation: "getAllCandidatesWithPagination" });
+        } finally {
+            client.release();
+        }
+
     }
 
     async bulkUpdateCandidates(candidateIds, updateData) {
@@ -469,7 +666,16 @@ class CandidateService {
             };
         } catch (error) {
             await client.rollback();
-            throw error;
+            if (error instanceof AppError) {
+                throw error;
+            }
+
+            console.error("Error Updating Candidates in Bulk", error.stack);
+            throw new AppError(
+                "Failed to update Candidates",
+                500,
+                "CANDIDATE_UPDATE_ERROR",
+                { operation: "bulkUpdateCandidates" });
         } finally {
             client.release();
         }
@@ -517,7 +723,16 @@ class CandidateService {
             };
         } catch (error) {
             await client.rollback();
-            throw error;
+            if (error instanceof AppError) {
+                throw error;
+            }
+
+            console.error("Error Deleting Candidates in bulk", error.stack);
+            throw new AppError(
+                "Failed to delete candidates",
+                500,
+                "CANDIDATE_DELETE_ERROR",
+                { operation: "bulkDeleteCandidates" });
         } finally {
             client.release();
         }
@@ -536,6 +751,7 @@ class CandidateService {
             statusId,
             recruiterName
         } = searchCriteria;
+        const client = await this.db.getConnection();
 
         const filters = {};
 
@@ -551,8 +767,22 @@ class CandidateService {
         if (minExpectedCTC !== undefined || maxExpectedCTC !== undefined) {
             filters.expectedCTCRange = { min: minExpectedCTC, max: maxExpectedCTC };
         }
+        try {
+            return await this.candidateRepository.searchCandidates(filters, client);
+        } catch (error) {
+            if (error instanceof AppError) {
+                throw error;
+            }
 
-        return await this.candidateRepository.searchCandidates(filters);
+            console.error("Error Deleting Candidates in bulk", error.stack);
+            throw new AppError(
+                "Failed to delete candidates",
+                500,
+                "CANDIDATE_DELETE_ERROR",
+                { operation: "bulkDeleteCandidates" });
+        } finally {
+            client.release();
+        }
     }
 }
 

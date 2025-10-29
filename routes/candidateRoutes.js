@@ -7,6 +7,7 @@ const CandidateValidator = require('../validators/candidateValidator');
 const { authenticate } = require('../middleware/authMiddleware');
 const db = require('../db');
 const cors = require('cors');
+const auditContextMiddleware = require('../middleware/auditContext');
 const corsOptions = {
     origin: 'http://localhost:5173',
     methods: ['PATCH', 'OPTIONS'],
@@ -21,6 +22,7 @@ const candidateRepository = new CandidateRepository(db);
 const candidateService = new CandidateService(candidateRepository, db);
 const candidateController = new CandidateController(candidateService);
 router.use(authenticate);
+router.use(auditContextMiddleware)
 
 // Routes
 /*router.get('/client/:clientId',

@@ -7,7 +7,7 @@ class JobProfileController {
     }
 
     createJobProfile = catchAsync(async (req, res) => {
-        const jobProfile = await this.jobProfileService.createJobProfile(req.body);
+        const jobProfile = await this.jobProfileService.createJobProfile(req.body, req.auditContext);
 
         return ApiResponse.success(
             res,
@@ -41,7 +41,8 @@ class JobProfileController {
     updateJobProfile = catchAsync(async (req, res) => {
         const updatedjobProfile = await this.jobProfileService.updateJobProfile(
             parseInt(req.params.id),
-            req.body
+            req.body,
+            req.auditContext
         );
 
         return ApiResponse.success(
@@ -52,7 +53,7 @@ class JobProfileController {
     });
 
     deleteJobProfile = catchAsync(async (req, res) => {
-        await this.jobProfileService.deleteJobProfile(parseInt(req.params.id));
+        await this.jobProfileService.deleteJobProfile(parseInt(req.params.id), req.auditContext);
 
         return ApiResponse.success(
             res,

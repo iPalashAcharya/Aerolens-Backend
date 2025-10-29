@@ -5,6 +5,7 @@ const ClientRepository = require('../repositories/clientRepository');
 const ClientValidator = require('../validators/clientValidator');
 const { authenticate } = require('../middleware/authMiddleware');
 const db = require('../db');
+const auditContextMiddleware = require('../middleware/auditContext');
 
 const router = express.Router();
 
@@ -13,6 +14,7 @@ const clientRepository = new ClientRepository(db);
 const clientService = new ClientService(clientRepository, db);
 const clientController = new ClientController(clientService);
 router.use(authenticate);
+router.use(auditContextMiddleware);
 
 // Routes
 /*router.get('/client/:clientId',
