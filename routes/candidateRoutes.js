@@ -8,6 +8,7 @@ const { authenticate } = require('../middleware/authMiddleware');
 const db = require('../db');
 const cors = require('cors');
 const auditContextMiddleware = require('../middleware/auditContext');
+const AppError = require('../utils/appError');
 const corsOptions = {
     origin: 'http://localhost:5173',
     methods: ['PATCH', 'OPTIONS'],
