@@ -57,6 +57,7 @@ class CandidateRepository {
             const [rows] = await connection.execute(query, [candidateId]);
             return rows[0] || null;
         } catch (error) {
+            if (error instanceof AppError) { throw error; }
             this._handleDatabaseError(error);
         }
     }
@@ -81,6 +82,7 @@ class CandidateRepository {
             const [rows] = await connection.execute(query, [email]);
             return rows[0] || null;
         } catch (error) {
+            if (error instanceof AppError) { throw error; }
             this._handleDatabaseError(error);
         }
     }
@@ -105,6 +107,7 @@ class CandidateRepository {
             const [rows] = await connection.execute(query, [contactNumber]);
             return rows[0] || null;
         } catch (error) {
+            if (error instanceof AppError) { throw error; }
             this._handleDatabaseError(error);
         }
     }
@@ -142,6 +145,7 @@ class CandidateRepository {
             const [rows] = await connection.execute(query, params);
             return rows;
         } catch (error) {
+            if (error instanceof AppError) { throw error; }
             this._handleDatabaseError(error);
         }
     }
@@ -343,6 +347,7 @@ class CandidateRepository {
                 ...updateData,
             };
         } catch (error) {
+            if (error instanceof AppError) { throw error; }
             this._handleDatabaseError(error);
         }
     }
@@ -371,6 +376,7 @@ class CandidateRepository {
 
             return result.affectedRows;
         } catch (error) {
+            if (error instanceof AppError) { throw error; }
             this._handleDatabaseError(error);
         }
     }
@@ -396,6 +402,7 @@ class CandidateRepository {
 
             return result.affectedRows;
         } catch (error) {
+            if (error instanceof AppError) { throw error; }
             this._handleDatabaseError(error);
         }
     }
@@ -538,6 +545,7 @@ class CandidateRepository {
 
             return result.affectedRows;
         } catch (error) {
+            if (error instanceof AppError) { throw error; }
             this._handleDatabaseError(error);
         }
     }
@@ -559,6 +567,7 @@ class CandidateRepository {
             const [rows] = await connection.execute(query, [candidateId]);
             return rows[0] || null;
         } catch (error) {
+            if (error instanceof AppError) { throw error; }
             this._handleDatabaseError(error);
         }
     }
@@ -592,6 +601,7 @@ class CandidateRepository {
 
             return result.affectedRows;
         } catch (error) {
+            if (error instanceof AppError) { throw error; }
             this._handleDatabaseError(error);
         }
     }

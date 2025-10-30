@@ -64,6 +64,7 @@ class JobProfileRepository {
             const [rows] = await connection.execute(query, [jobProfileId]);
             return rows[0] || null;
         } catch (error) {
+            if (error instanceof AppError) { throw error; }
             this._handleDatabaseError(error);
         }
     }
@@ -118,6 +119,7 @@ class JobProfileRepository {
                 ...updateData
             };
         } catch (error) {
+            if (error instanceof AppError) { throw error; }
             this._handleDatabaseError(error);
         }
     }
@@ -143,6 +145,7 @@ class JobProfileRepository {
 
             return result.affectedRows;
         } catch (error) {
+            if (error instanceof AppError) { throw error; }
             this._handleDatabaseError(error);
         }
     }
@@ -183,6 +186,7 @@ class JobProfileRepository {
             const [rows] = await connection.execute(query, params);
             return rows;
         } catch (error) {
+            if (error instanceof AppError) { throw error; }
             this._handleDatabaseError(error);
         }
     }
@@ -211,6 +215,7 @@ class JobProfileRepository {
             const [rows] = await connection.execute(query, [statusId]);
             return rows;
         } catch (error) {
+            if (error instanceof AppError) { throw error; }
             this._handleDatabaseError(error);
         }
     }
@@ -239,6 +244,7 @@ class JobProfileRepository {
             const [rows] = await connection.execute(query, [departmentId]);
             return rows;
         } catch (error) {
+            if (error instanceof AppError) { throw error; }
             this._handleDatabaseError(error);
         }
     }
@@ -257,8 +263,6 @@ class JobProfileRepository {
         } catch (error) {
             if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
         }
     }
 
@@ -285,6 +289,7 @@ class JobProfileRepository {
             const [rows] = await connection.execute(query, params);
             return rows[0].count > 0;
         } catch (error) {
+            if (error instanceof AppError) { throw error; }
             this._handleDatabaseError(error);
         }
     }

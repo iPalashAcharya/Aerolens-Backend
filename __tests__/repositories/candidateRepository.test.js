@@ -44,7 +44,7 @@ describe('CandidateRepository', () => {
             const mockResult = { insertId: 1, affectedRows: 1 };
             mockConnection.execute.mockResolvedValue([mockResult]);
 
-            const result = await candidateRepository.create(mockCandidateData);
+            const result = await candidateRepository.create(mockCandidateData, mockConnection);
 
             expect(mockConnection.execute).toHaveBeenCalledWith(
                 expect.stringContaining('INSERT INTO candidate'),
@@ -58,7 +58,6 @@ describe('CandidateRepository', () => {
                 candidateId: 1,
                 ...mockCandidateData
             });
-            expect(mockConnection.release).toHaveBeenCalled();
         });
 
         it('should use default statusId when not provided', async () => {
@@ -66,7 +65,7 @@ describe('CandidateRepository', () => {
             delete dataWithoutStatus.statusId;
             mockConnection.execute.mockResolvedValue([{ insertId: 1 }]);
 
-            await candidateRepository.create(dataWithoutStatus);
+            await candidateRepository.create(dataWithoutStatus, mockConnection);
 
             const callArgs = mockConnection.execute.mock.calls[0][1];
             expect(callArgs[11]).toBe(9); // Default statusId
@@ -77,7 +76,7 @@ describe('CandidateRepository', () => {
             delete dataWithoutLocation.preferredJobLocation;
             mockConnection.execute.mockResolvedValue([{ insertId: 1 }]);
 
-            await candidateRepository.create(dataWithoutLocation);
+            await candidateRepository.create(dataWithoutLocation, mockConnection);
 
             const callArgs = mockConnection.execute.mock.calls[0][1];
             expect(callArgs[5]).toBeNull();
@@ -88,17 +87,9 @@ describe('CandidateRepository', () => {
             dbError.code = 'ER_DUP_ENTRY';
             mockConnection.execute.mockRejectedValue(dbError);
 
-            await expect(candidateRepository.create(mockCandidateData))
+            await expect(candidateRepository.create(mockCandidateData, mockConnection))
                 .rejects
                 .toThrow(AppError);
-        });
-
-        it('should not release connection when client is provided', async () => {
-            mockConnection.execute.mockResolvedValue([{ insertId: 1 }]);
-
-            await candidateRepository.create(mockCandidateData, mockConnection);
-
-            expect(mockConnection.release).not.toHaveBeenCalled();
         });
     });
 
@@ -112,38 +103,27 @@ describe('CandidateRepository', () => {
             };
             mockConnection.execute.mockResolvedValue([[mockCandidate]]);
 
-            const result = await candidateRepository.findById(1);
+            const result = await candidateRepository.findById(1, mockConnection);
 
             expect(mockConnection.execute).toHaveBeenCalledWith(
                 expect.stringContaining('SELECT'),
                 [1]
             );
             expect(result).toEqual(mockCandidate);
-            expect(mockConnection.release).toHaveBeenCalled();
         });
 
         it('should return null when candidate not found', async () => {
             mockConnection.execute.mockResolvedValue([[]]);
 
-            const result = await candidateRepository.findById(999);
+            const result = await candidateRepository.findById(999, mockConnection);
 
             expect(result).toBeNull();
         });
 
         it('should throw error when candidateId is missing', async () => {
-            await expect(candidateRepository.findById(null))
+            await expect(candidateRepository.findById(null, mockConnection))
                 .rejects
                 .toThrow(AppError);
-
-            expect(mockConnection.release).toHaveBeenCalled();
-        });
-
-        it('should not release connection when client is provided', async () => {
-            mockConnection.execute.mockResolvedValue([[{ candidateId: 1 }]]);
-
-            await candidateRepository.findById(1, mockConnection);
-
-            expect(mockConnection.release).not.toHaveBeenCalled();
         });
     });
 
@@ -155,7 +135,7 @@ describe('CandidateRepository', () => {
             };
             mockConnection.execute.mockResolvedValue([[mockCandidate]]);
 
-            const result = await candidateRepository.findByEmail('john@example.com');
+            const result = await candidateRepository.findByEmail('john@example.com', mockConnection);
 
             expect(mockConnection.execute).toHaveBeenCalledWith(
                 expect.stringContaining('WHERE c.email = ?'),
@@ -167,13 +147,13 @@ describe('CandidateRepository', () => {
         it('should return null when email not found', async () => {
             mockConnection.execute.mockResolvedValue([[]]);
 
-            const result = await candidateRepository.findByEmail('notfound@example.com');
+            const result = await candidateRepository.findByEmail('notfound@example.com', mockConnection);
 
             expect(result).toBeNull();
         });
 
         it('should throw error when email is missing', async () => {
-            await expect(candidateRepository.findByEmail(null))
+            await expect(candidateRepository.findByEmail(null, mockConnection))
                 .rejects
                 .toThrow(AppError);
         });
@@ -187,7 +167,7 @@ describe('CandidateRepository', () => {
             };
             mockConnection.execute.mockResolvedValue([[mockCandidate]]);
 
-            const result = await candidateRepository.findByContactNumber('1234567890');
+            const result = await candidateRepository.findByContactNumber('1234567890', mockConnection);
 
             expect(mockConnection.execute).toHaveBeenCalledWith(
                 expect.stringContaining('WHERE c.contactNumber = ?'),
@@ -197,7 +177,7 @@ describe('CandidateRepository', () => {
         });
 
         it('should throw error when contact number is missing', async () => {
-            await expect(candidateRepository.findByContactNumber(null))
+            await expect(candidateRepository.findByContactNumber(null, mockConnection))
                 .rejects
                 .toThrow(AppError);
         });
@@ -211,7 +191,7 @@ describe('CandidateRepository', () => {
             ];
             mockConnection.execute.mockResolvedValue([mockCandidates]);
 
-            const result = await candidateRepository.findByStatus(1);
+            const result = await candidateRepository.findByStatus(1, null, null, mockConnection);
 
             expect(mockConnection.execute).toHaveBeenCalledWith(
                 expect.stringContaining('WHERE c.statusId = ?'),
@@ -223,7 +203,7 @@ describe('CandidateRepository', () => {
         it('should apply limit and offset', async () => {
             mockConnection.execute.mockResolvedValue([[]]);
 
-            await candidateRepository.findByStatus(1, 10, 5);
+            await candidateRepository.findByStatus(1, 10, 5, mockConnection);
 
             expect(mockConnection.execute).toHaveBeenCalledWith(
                 expect.stringContaining('LIMIT ? OFFSET ?'),
@@ -234,7 +214,7 @@ describe('CandidateRepository', () => {
         it('should apply only limit without offset', async () => {
             mockConnection.execute.mockResolvedValue([[]]);
 
-            await candidateRepository.findByStatus(1, 10);
+            await candidateRepository.findByStatus(1, 10, null, mockConnection);
 
             expect(mockConnection.execute).toHaveBeenCalledWith(
                 expect.stringContaining('LIMIT ?'),
@@ -243,7 +223,7 @@ describe('CandidateRepository', () => {
         });
 
         it('should throw error when statusId is missing', async () => {
-            await expect(candidateRepository.findByStatus(null))
+            await expect(candidateRepository.findByStatus(null, null, null, mockConnection))
                 .rejects
                 .toThrow(AppError);
         });
@@ -265,7 +245,7 @@ describe('CandidateRepository', () => {
             };
             mockConnection.execute.mockResolvedValue([[]]);
 
-            await candidateRepository.searchCandidates(searchOptions);
+            await candidateRepository.searchCandidates(searchOptions, null, null, mockConnection);
 
             const query = mockConnection.execute.mock.calls[0][0];
             expect(query).toContain('c.candidateName LIKE ?');
@@ -286,7 +266,7 @@ describe('CandidateRepository', () => {
             };
             mockConnection.execute.mockResolvedValue([[]]);
 
-            await candidateRepository.searchCandidates(searchOptions);
+            await candidateRepository.searchCandidates(searchOptions, null, null, mockConnection);
 
             const params = mockConnection.execute.mock.calls[0][1];
             expect(params).toEqual(['%John%']);
@@ -295,7 +275,7 @@ describe('CandidateRepository', () => {
         it('should handle empty search options', async () => {
             mockConnection.execute.mockResolvedValue([[]]);
 
-            await candidateRepository.searchCandidates({});
+            await candidateRepository.searchCandidates({}, null, null, mockConnection);
 
             const query = mockConnection.execute.mock.calls[0][0];
             expect(query).toContain('WHERE 1=1');
@@ -304,7 +284,7 @@ describe('CandidateRepository', () => {
         it('should apply limit and offset', async () => {
             mockConnection.execute.mockResolvedValue([[]]);
 
-            await candidateRepository.searchCandidates({}, 10, 5);
+            await candidateRepository.searchCandidates({}, 10, 5, mockConnection);
 
             expect(mockConnection.execute).toHaveBeenCalledWith(
                 expect.stringContaining('LIMIT ? OFFSET ?'),
@@ -323,30 +303,32 @@ describe('CandidateRepository', () => {
         it('should update candidate successfully', async () => {
             mockConnection.execute.mockResolvedValue([{ affectedRows: 1 }]);
 
-            const result = await candidateRepository.update(candidateId, updateData);
+            const result = await candidateRepository.update(candidateId, updateData, mockConnection);
 
             expect(mockConnection.execute).toHaveBeenCalledWith(
                 expect.stringContaining('UPDATE candidate SET'),
                 expect.arrayContaining(['Jane Doe', 'jane@example.com', 1])
             );
-            expect(result).toBe(1);
-            expect(mockConnection.release).toHaveBeenCalled();
+            expect(result).toMatchObject({
+                candidateId: 1,
+                ...updateData
+            });
         });
 
         it('should throw error when candidateId is missing', async () => {
-            await expect(candidateRepository.update(null, updateData))
+            await expect(candidateRepository.update(null, updateData, mockConnection))
                 .rejects
                 .toThrow(AppError);
         });
 
         it('should throw error when updateData is empty', async () => {
-            await expect(candidateRepository.update(candidateId, {}))
+            await expect(candidateRepository.update(candidateId, {}, mockConnection))
                 .rejects
                 .toThrow(AppError);
         });
 
         it('should throw error when updateData is null', async () => {
-            await expect(candidateRepository.update(candidateId, null))
+            await expect(candidateRepository.update(candidateId, null, mockConnection))
                 .rejects
                 .toThrow(AppError);
         });
@@ -359,7 +341,7 @@ describe('CandidateRepository', () => {
             };
             mockConnection.execute.mockResolvedValue([{ affectedRows: 1 }]);
 
-            await candidateRepository.update(candidateId, dataWithInvalidFields);
+            await candidateRepository.update(candidateId, dataWithInvalidFields, mockConnection);
 
             const query = mockConnection.execute.mock.calls[0][0];
             expect(query).toContain('candidateName = ?');
@@ -371,7 +353,7 @@ describe('CandidateRepository', () => {
                 invalidField: 'test'
             };
 
-            await expect(candidateRepository.update(candidateId, invalidData))
+            await expect(candidateRepository.update(candidateId, invalidData, mockConnection))
                 .rejects
                 .toThrow(AppError);
         });
@@ -379,17 +361,9 @@ describe('CandidateRepository', () => {
         it('should throw error when candidate not found', async () => {
             mockConnection.execute.mockResolvedValue([{ affectedRows: 0 }]);
 
-            await expect(candidateRepository.update(candidateId, updateData))
+            await expect(candidateRepository.update(candidateId, updateData, mockConnection))
                 .rejects
                 .toThrow(AppError);
-        });
-
-        it('should not release connection when client is provided', async () => {
-            mockConnection.execute.mockResolvedValue([{ affectedRows: 1 }]);
-
-            await candidateRepository.update(candidateId, updateData, mockConnection);
-
-            expect(mockConnection.release).not.toHaveBeenCalled();
         });
     });
 
@@ -397,7 +371,7 @@ describe('CandidateRepository', () => {
         it('should update status successfully', async () => {
             mockConnection.execute.mockResolvedValue([{ affectedRows: 1 }]);
 
-            const result = await candidateRepository.updateStatus(1, 2);
+            const result = await candidateRepository.updateStatus(1, 2, mockConnection);
 
             expect(mockConnection.execute).toHaveBeenCalledWith(
                 expect.stringContaining('UPDATE candidate SET statusId = ?'),
@@ -407,13 +381,13 @@ describe('CandidateRepository', () => {
         });
 
         it('should throw error when candidateId is missing', async () => {
-            await expect(candidateRepository.updateStatus(null, 2))
+            await expect(candidateRepository.updateStatus(null, 2, mockConnection))
                 .rejects
                 .toThrow(AppError);
         });
 
         it('should throw error when statusId is missing', async () => {
-            await expect(candidateRepository.updateStatus(1, null))
+            await expect(candidateRepository.updateStatus(1, null, mockConnection))
                 .rejects
                 .toThrow(AppError);
         });
@@ -421,7 +395,7 @@ describe('CandidateRepository', () => {
         it('should throw error when candidate not found', async () => {
             mockConnection.execute.mockResolvedValue([{ affectedRows: 0 }]);
 
-            await expect(candidateRepository.updateStatus(999, 2))
+            await expect(candidateRepository.updateStatus(999, 2, mockConnection))
                 .rejects
                 .toThrow(AppError);
         });
@@ -431,18 +405,17 @@ describe('CandidateRepository', () => {
         it('should delete candidate successfully', async () => {
             mockConnection.execute.mockResolvedValue([{ affectedRows: 1 }]);
 
-            const result = await candidateRepository.delete(1);
+            const result = await candidateRepository.delete(1, mockConnection);
 
             expect(mockConnection.execute).toHaveBeenCalledWith(
                 expect.stringContaining('DELETE FROM candidate WHERE candidateId = ?'),
                 [1]
             );
             expect(result).toBe(1);
-            expect(mockConnection.release).toHaveBeenCalled();
         });
 
         it('should throw error when candidateId is missing', async () => {
-            await expect(candidateRepository.delete(null))
+            await expect(candidateRepository.delete(null, mockConnection))
                 .rejects
                 .toThrow(AppError);
         });
@@ -450,17 +423,9 @@ describe('CandidateRepository', () => {
         it('should throw error when candidate not found', async () => {
             mockConnection.execute.mockResolvedValue([{ affectedRows: 0 }]);
 
-            await expect(candidateRepository.delete(999))
+            await expect(candidateRepository.delete(999, mockConnection))
                 .rejects
                 .toThrow(AppError);
-        });
-
-        it('should not release connection when client is provided', async () => {
-            mockConnection.execute.mockResolvedValue([{ affectedRows: 1 }]);
-
-            await candidateRepository.delete(1, mockConnection);
-
-            expect(mockConnection.release).not.toHaveBeenCalled();
         });
     });
 
@@ -472,7 +437,7 @@ describe('CandidateRepository', () => {
             ];
             mockConnection.query.mockResolvedValue([mockCandidates]);
 
-            const result = await candidateRepository.findAll();
+            const result = await candidateRepository.findAll(10, 0, mockConnection);
 
             expect(mockConnection.query).toHaveBeenCalledWith(
                 expect.stringContaining('LIMIT ? OFFSET ?'),
@@ -484,7 +449,7 @@ describe('CandidateRepository', () => {
         it('should find all candidates with custom pagination', async () => {
             mockConnection.query.mockResolvedValue([[]]);
 
-            await candidateRepository.findAll(20, 10);
+            await candidateRepository.findAll(20, 10, mockConnection);
 
             expect(mockConnection.query).toHaveBeenCalledWith(
                 expect.any(String),
@@ -495,7 +460,7 @@ describe('CandidateRepository', () => {
         it('should handle invalid limit values', async () => {
             mockConnection.query.mockResolvedValue([[]]);
 
-            await candidateRepository.findAll(-5, 0);
+            await candidateRepository.findAll(-5, 0, mockConnection);
 
             const params = mockConnection.query.mock.calls[0][1];
             expect(params[0]).toBeGreaterThanOrEqual(1);
@@ -504,7 +469,7 @@ describe('CandidateRepository', () => {
         it('should handle invalid offset values', async () => {
             mockConnection.query.mockResolvedValue([[]]);
 
-            await candidateRepository.findAll(10, -5);
+            await candidateRepository.findAll(10, -5, mockConnection);
 
             const params = mockConnection.query.mock.calls[0][1];
             expect(params[1]).toBeGreaterThanOrEqual(0);
@@ -515,7 +480,7 @@ describe('CandidateRepository', () => {
         it('should get total count', async () => {
             mockConnection.execute.mockResolvedValue([[{ count: 42 }]]);
 
-            const result = await candidateRepository.getCount();
+            const result = await candidateRepository.getCount(mockConnection);
 
             expect(mockConnection.execute).toHaveBeenCalledWith(
                 expect.stringContaining('SELECT COUNT(*) as count FROM candidate'),
@@ -527,7 +492,7 @@ describe('CandidateRepository', () => {
         it('should get count by status', async () => {
             mockConnection.execute.mockResolvedValue([[{ count: 15 }]]);
 
-            const result = await candidateRepository.getCount(1);
+            const result = await candidateRepository.getCount(mockConnection, 1);
 
             expect(mockConnection.execute).toHaveBeenCalledWith(
                 expect.stringContaining('WHERE statusId = ?'),
@@ -541,7 +506,7 @@ describe('CandidateRepository', () => {
         it('should return true when email exists', async () => {
             mockConnection.execute.mockResolvedValue([[{ candidateId: 1 }]]);
 
-            const result = await candidateRepository.checkEmailExists('john@example.com');
+            const result = await candidateRepository.checkEmailExists('john@example.com', null, mockConnection);
 
             expect(result).toBe(true);
         });
@@ -549,7 +514,7 @@ describe('CandidateRepository', () => {
         it('should return false when email does not exist', async () => {
             mockConnection.execute.mockResolvedValue([[]]);
 
-            const result = await candidateRepository.checkEmailExists('notfound@example.com');
+            const result = await candidateRepository.checkEmailExists('notfound@example.com', null, mockConnection);
 
             expect(result).toBe(false);
         });
@@ -557,7 +522,7 @@ describe('CandidateRepository', () => {
         it('should exclude specific candidate when provided', async () => {
             mockConnection.execute.mockResolvedValue([[]]);
 
-            await candidateRepository.checkEmailExists('john@example.com', 1);
+            await candidateRepository.checkEmailExists('john@example.com', 1, mockConnection);
 
             expect(mockConnection.execute).toHaveBeenCalledWith(
                 expect.stringContaining('AND candidateId != ?'),
@@ -570,7 +535,7 @@ describe('CandidateRepository', () => {
         it('should return true when contact exists', async () => {
             mockConnection.execute.mockResolvedValue([[{ candidateId: 1 }]]);
 
-            const result = await candidateRepository.checkContactExists('1234567890');
+            const result = await candidateRepository.checkContactExists('1234567890', null, mockConnection);
 
             expect(result).toBe(true);
         });
@@ -578,7 +543,7 @@ describe('CandidateRepository', () => {
         it('should return false when contact does not exist', async () => {
             mockConnection.execute.mockResolvedValue([[]]);
 
-            const result = await candidateRepository.checkContactExists('9999999999');
+            const result = await candidateRepository.checkContactExists('9999999999', null, mockConnection);
 
             expect(result).toBe(false);
         });
@@ -586,7 +551,7 @@ describe('CandidateRepository', () => {
         it('should exclude specific candidate when provided', async () => {
             mockConnection.execute.mockResolvedValue([[]]);
 
-            await candidateRepository.checkContactExists('1234567890', 1);
+            await candidateRepository.checkContactExists('1234567890', 1, mockConnection);
 
             expect(mockConnection.execute).toHaveBeenCalledWith(
                 expect.stringContaining('AND candidateId != ?'),
@@ -602,7 +567,8 @@ describe('CandidateRepository', () => {
             const result = await candidateRepository.updateResumeInfo(
                 1,
                 'resume.pdf',
-                'original_resume.pdf'
+                'original_resume.pdf',
+                mockConnection
             );
 
             expect(mockConnection.execute).toHaveBeenCalledWith(
@@ -614,7 +580,7 @@ describe('CandidateRepository', () => {
 
         it('should throw error when candidateId is missing', async () => {
             await expect(
-                candidateRepository.updateResumeInfo(null, 'resume.pdf', 'original.pdf')
+                candidateRepository.updateResumeInfo(null, 'resume.pdf', 'original.pdf', mockConnection)
             ).rejects.toThrow(AppError);
         });
 
@@ -622,7 +588,7 @@ describe('CandidateRepository', () => {
             mockConnection.execute.mockResolvedValue([{ affectedRows: 0 }]);
 
             await expect(
-                candidateRepository.updateResumeInfo(999, 'resume.pdf', 'original.pdf')
+                candidateRepository.updateResumeInfo(999, 'resume.pdf', 'original.pdf', mockConnection)
             ).rejects.toThrow(AppError);
         });
     });
@@ -636,7 +602,7 @@ describe('CandidateRepository', () => {
             };
             mockConnection.execute.mockResolvedValue([[mockResumeInfo]]);
 
-            const result = await candidateRepository.getResumeInfo(1);
+            const result = await candidateRepository.getResumeInfo(1, mockConnection);
 
             expect(mockConnection.execute).toHaveBeenCalledWith(
                 expect.stringContaining('SELECT resumeFilename'),
@@ -648,13 +614,13 @@ describe('CandidateRepository', () => {
         it('should return null when no resume found', async () => {
             mockConnection.execute.mockResolvedValue([[]]);
 
-            const result = await candidateRepository.getResumeInfo(1);
+            const result = await candidateRepository.getResumeInfo(1, mockConnection);
 
             expect(result).toBeNull();
         });
 
         it('should throw error when candidateId is missing', async () => {
-            await expect(candidateRepository.getResumeInfo(null))
+            await expect(candidateRepository.getResumeInfo(null, mockConnection))
                 .rejects
                 .toThrow(AppError);
         });
@@ -664,7 +630,7 @@ describe('CandidateRepository', () => {
         it('should delete resume info successfully', async () => {
             mockConnection.execute.mockResolvedValue([{ affectedRows: 1 }]);
 
-            const result = await candidateRepository.deleteResumeInfo(1);
+            const result = await candidateRepository.deleteResumeInfo(1, mockConnection);
 
             expect(mockConnection.execute).toHaveBeenCalledWith(
                 expect.stringContaining('SET resumeFilename = NULL'),
@@ -674,7 +640,7 @@ describe('CandidateRepository', () => {
         });
 
         it('should throw error when candidateId is missing', async () => {
-            await expect(candidateRepository.deleteResumeInfo(null))
+            await expect(candidateRepository.deleteResumeInfo(null, mockConnection))
                 .rejects
                 .toThrow(AppError);
         });
@@ -682,9 +648,31 @@ describe('CandidateRepository', () => {
         it('should throw error when candidate not found', async () => {
             mockConnection.execute.mockResolvedValue([{ affectedRows: 0 }]);
 
-            await expect(candidateRepository.deleteResumeInfo(999))
+            await expect(candidateRepository.deleteResumeInfo(999, mockConnection))
                 .rejects
                 .toThrow(AppError);
+        });
+    });
+
+    describe('countCandidates', () => {
+        it('should count candidates with search options', async () => {
+            mockConnection.execute.mockResolvedValue([[{ totalCount: 10 }]]);
+
+            const result = await candidateRepository.countCandidates({ candidateName: 'John' }, mockConnection);
+
+            expect(mockConnection.execute).toHaveBeenCalledWith(
+                expect.stringContaining('COUNT(*)'),
+                ['%John%']
+            );
+            expect(result).toBe(10);
+        });
+
+        it('should count all candidates when no search options', async () => {
+            mockConnection.execute.mockResolvedValue([[{ totalCount: 50 }]]);
+
+            const result = await candidateRepository.countCandidates({}, mockConnection);
+
+            expect(result).toBe(50);
         });
     });
 
@@ -752,46 +740,6 @@ describe('CandidateRepository', () => {
 
             expect(() => candidateRepository._handleDatabaseError(error))
                 .toThrow(AppError);
-        });
-    });
-
-    describe('Connection Management', () => {
-        it('should release connection on error when no client provided', async () => {
-            const dbError = new Error('Database error');
-            mockConnection.execute.mockRejectedValue(dbError);
-
-            await expect(candidateRepository.findById(1))
-                .rejects
-                .toThrow();
-
-            expect(mockConnection.release).toHaveBeenCalled();
-        });
-
-        it('should not release connection on error when client is provided', async () => {
-            const dbError = new Error('Database error');
-            mockConnection.execute.mockRejectedValue(dbError);
-
-            await expect(candidateRepository.findById(1, mockConnection))
-                .rejects
-                .toThrow();
-
-            expect(mockConnection.release).not.toHaveBeenCalled();
-        });
-
-        it('should get new connection when client is not provided', async () => {
-            mockConnection.execute.mockResolvedValue([[{ candidateId: 1 }]]);
-
-            await candidateRepository.findById(1);
-
-            expect(mockDb.getConnection).toHaveBeenCalled();
-        });
-
-        it('should use provided client instead of getting new connection', async () => {
-            mockConnection.execute.mockResolvedValue([[{ candidateId: 1 }]]);
-
-            await candidateRepository.findById(1, mockConnection);
-
-            expect(mockDb.getConnection).not.toHaveBeenCalled();
         });
     });
 });

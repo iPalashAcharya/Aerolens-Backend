@@ -72,6 +72,7 @@ class DepartmentRepository {
                 ...updateData
             };
         } catch (error) {
+            if (error instanceof AppError) { throw error; }
             this._handleDatabaseError(error);
         }
     }
@@ -93,6 +94,7 @@ class DepartmentRepository {
 
             return result.affectedRows;
         } catch (error) {
+            if (error instanceof AppError) { throw error; }
             this._handleDatabaseError(error);
         }
     }

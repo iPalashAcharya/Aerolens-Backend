@@ -10,9 +10,6 @@ describe('ContactRepository', () => {
         // Mock database client
         mockClient = {
             execute: jest.fn(),
-            beginTransaction: jest.fn(),
-            commit: jest.fn(),
-            rollback: jest.fn(),
             release: jest.fn()
         };
 
@@ -41,24 +38,21 @@ describe('ContactRepository', () => {
         it('should retrieve contact by ID successfully', async () => {
             mockClient.execute.mockResolvedValue([[mockContact]]);
 
-            const result = await contactRepository.getById(mockContactId);
+            const result = await contactRepository.getById(mockContactId, mockClient);
 
             expect(result).toEqual(mockContact);
-            expect(mockDb.getConnection).toHaveBeenCalledTimes(1);
             expect(mockClient.execute).toHaveBeenCalledWith(
                 expect.stringContaining('SELECT clientContactId'),
                 [mockContactId]
             );
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
         it('should return null when contact is not found', async () => {
             mockClient.execute.mockResolvedValue([[]]);
 
-            const result = await contactRepository.getById(999);
+            const result = await contactRepository.getById(999, mockClient);
 
             expect(result).toBeNull();
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
         it('should handle database errors properly', async () => {
@@ -66,19 +60,15 @@ describe('ContactRepository', () => {
             dbError.code = 'ER_BAD_FIELD_ERROR';
             mockClient.execute.mockRejectedValue(dbError);
 
-            await expect(contactRepository.getById(mockContactId))
+            await expect(contactRepository.getById(mockContactId, mockClient))
                 .rejects
                 .toThrow(AppError);
-
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
-        it('should release connection even when error occurs', async () => {
+        it('should throw error when error occurs', async () => {
             mockClient.execute.mockRejectedValue(new Error('Connection lost'));
 
-            await expect(contactRepository.getById(mockContactId)).rejects.toThrow();
-
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
+            await expect(contactRepository.getById(mockContactId, mockClient)).rejects.toThrow();
         });
     });
 
@@ -96,10 +86,10 @@ describe('ContactRepository', () => {
             affectedRows: 1
         };
 
-        it('should create contact successfully with transaction', async () => {
+        it('should create contact successfully', async () => {
             mockClient.execute.mockResolvedValue([mockInsertResult]);
 
-            const result = await contactRepository.create(mockContactData);
+            const result = await contactRepository.create(mockContactData, mockClient);
 
             expect(result).toEqual({
                 contactId: 42,
@@ -108,31 +98,22 @@ describe('ContactRepository', () => {
                 phone: mockContactData.phone,
                 email: mockContactData.email
             });
-            expect(mockClient.beginTransaction).toHaveBeenCalledTimes(1);
-            expect(mockClient.commit).toHaveBeenCalledTimes(1);
-            expect(mockClient.rollback).not.toHaveBeenCalled();
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
-        it('should rollback transaction on error', async () => {
+        it('should throw error on database error', async () => {
             const dbError = new Error('Insert failed');
             dbError.code = 'ER_DUP_ENTRY';
             mockClient.execute.mockRejectedValue(dbError);
 
-            await expect(contactRepository.create(mockContactData))
+            await expect(contactRepository.create(mockContactData, mockClient))
                 .rejects
                 .toThrow(AppError);
-
-            expect(mockClient.beginTransaction).toHaveBeenCalledTimes(1);
-            expect(mockClient.rollback).toHaveBeenCalledTimes(1);
-            expect(mockClient.commit).not.toHaveBeenCalled();
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
         it('should pass correct parameters to INSERT query', async () => {
             mockClient.execute.mockResolvedValue([mockInsertResult]);
 
-            await contactRepository.create(mockContactData);
+            await contactRepository.create(mockContactData, mockClient);
 
             expect(mockClient.execute).toHaveBeenCalledWith(
                 expect.stringContaining('INSERT INTO clientContact'),
@@ -151,7 +132,7 @@ describe('ContactRepository', () => {
             dupError.code = 'ER_DUP_ENTRY';
             mockClient.execute.mockRejectedValue(dupError);
 
-            await expect(contactRepository.create(mockContactData))
+            await expect(contactRepository.create(mockContactData, mockClient))
                 .rejects
                 .toMatchObject({
                     statusCode: 409,
@@ -172,46 +153,36 @@ describe('ContactRepository', () => {
         it('should update contact successfully', async () => {
             mockClient.execute.mockResolvedValue([{ affectedRows: 1 }]);
 
-            const result = await contactRepository.update(mockContactId, mockUpdateData);
+            const result = await contactRepository.update(mockContactId, mockUpdateData, mockClient);
 
             expect(result).toEqual({
                 contactId: mockContactId,
                 ...mockUpdateData
             });
-            expect(mockClient.beginTransaction).toHaveBeenCalledTimes(1);
-            expect(mockClient.commit).toHaveBeenCalledTimes(1);
-            expect(mockClient.rollback).not.toHaveBeenCalled();
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
         it('should return null when contact not found', async () => {
             mockClient.execute.mockResolvedValue([{ affectedRows: 0 }]);
 
-            const result = await contactRepository.update(999, mockUpdateData);
+            const result = await contactRepository.update(999, mockUpdateData, mockClient);
 
             expect(result).toBeNull();
-            expect(mockClient.rollback).toHaveBeenCalledTimes(1);
-            expect(mockClient.commit).not.toHaveBeenCalled();
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
-        it('should rollback on database error', async () => {
+        it('should throw error on database error', async () => {
             const dbError = new Error('Update failed');
             dbError.code = 'ER_DATA_TOO_LONG';
             mockClient.execute.mockRejectedValue(dbError);
 
-            await expect(contactRepository.update(mockContactId, mockUpdateData))
+            await expect(contactRepository.update(mockContactId, mockUpdateData, mockClient))
                 .rejects
                 .toThrow(AppError);
-
-            expect(mockClient.rollback).toHaveBeenCalledTimes(1);
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
         it('should pass correct parameters to UPDATE query', async () => {
             mockClient.execute.mockResolvedValue([{ affectedRows: 1 }]);
 
-            await contactRepository.update(mockContactId, mockUpdateData);
+            await contactRepository.update(mockContactId, mockUpdateData, mockClient);
 
             expect(mockClient.execute).toHaveBeenCalledWith(
                 expect.stringContaining('UPDATE clientContact SET'),
@@ -232,43 +203,33 @@ describe('ContactRepository', () => {
         it('should delete contact successfully', async () => {
             mockClient.execute.mockResolvedValue([{ affectedRows: 1 }]);
 
-            const result = await contactRepository.delete(mockContactId);
+            const result = await contactRepository.delete(mockContactId, mockClient);
 
             expect(result).toBe(1);
-            expect(mockClient.beginTransaction).toHaveBeenCalledTimes(1);
-            expect(mockClient.commit).toHaveBeenCalledTimes(1);
-            expect(mockClient.rollback).not.toHaveBeenCalled();
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
         it('should return false when contact not found', async () => {
             mockClient.execute.mockResolvedValue([{ affectedRows: 0 }]);
 
-            const result = await contactRepository.delete(999);
+            const result = await contactRepository.delete(999, mockClient);
 
             expect(result).toBe(false);
-            expect(mockClient.rollback).toHaveBeenCalledTimes(1);
-            expect(mockClient.commit).not.toHaveBeenCalled();
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
-        it('should rollback on database error', async () => {
+        it('should throw error on database error', async () => {
             const dbError = new Error('Delete failed');
             dbError.code = 'ER_ACCESS_DENIED_ERROR';
             mockClient.execute.mockRejectedValue(dbError);
 
-            await expect(contactRepository.delete(mockContactId))
+            await expect(contactRepository.delete(mockContactId, mockClient))
                 .rejects
                 .toThrow(AppError);
-
-            expect(mockClient.rollback).toHaveBeenCalledTimes(1);
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
         it('should pass correct parameters to DELETE query', async () => {
             mockClient.execute.mockResolvedValue([{ affectedRows: 1 }]);
 
-            await contactRepository.delete(mockContactId);
+            await contactRepository.delete(mockContactId, mockClient);
 
             expect(mockClient.execute).toHaveBeenCalledWith(
                 expect.stringContaining('DELETE FROM clientContact'),
@@ -290,33 +251,27 @@ describe('ContactRepository', () => {
         it('should return contact when exists', async () => {
             mockClient.execute.mockResolvedValue([[mockContact]]);
 
-            const result = await contactRepository.exists(mockContactId);
+            const result = await contactRepository.exists(mockContactId, mockClient);
 
             expect(result).toEqual(mockContact);
-            expect(mockDb.getConnection).toHaveBeenCalledTimes(1);
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
         it('should return null when contact does not exist', async () => {
             mockClient.execute.mockResolvedValue([[]]);
 
-            const result = await contactRepository.exists(999);
+            const result = await contactRepository.exists(999, mockClient);
 
             expect(result).toBeNull();
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
-        it('should use provided client connection when passed', async () => {
+        it('should use provided client connection', async () => {
             const externalClient = {
-                execute: jest.fn().mockResolvedValue([[mockContact]]),
-                release: jest.fn()
+                execute: jest.fn().mockResolvedValue([[mockContact]])
             };
 
             await contactRepository.exists(mockContactId, externalClient);
 
-            expect(mockDb.getConnection).not.toHaveBeenCalled();
             expect(externalClient.execute).toHaveBeenCalledTimes(1);
-            expect(externalClient.release).toHaveBeenCalledTimes(1);
         });
 
         it('should handle database errors', async () => {
@@ -324,11 +279,9 @@ describe('ContactRepository', () => {
             dbError.code = 'ETIMEDOUT';
             mockClient.execute.mockRejectedValue(dbError);
 
-            await expect(contactRepository.exists(mockContactId))
+            await expect(contactRepository.exists(mockContactId, mockClient))
                 .rejects
                 .toThrow(AppError);
-
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
     });
 
@@ -338,7 +291,7 @@ describe('ContactRepository', () => {
         it('should return true when contact name exists', async () => {
             mockClient.execute.mockResolvedValue([[{ count: 1 }]]);
 
-            const result = await contactRepository.existsByName(mockContactName);
+            const result = await contactRepository.existsByName(mockContactName, null, mockClient);
 
             expect(result).toBe(true);
             expect(mockClient.execute).toHaveBeenCalledWith(
@@ -350,7 +303,7 @@ describe('ContactRepository', () => {
         it('should return false when contact name does not exist', async () => {
             mockClient.execute.mockResolvedValue([[{ count: 0 }]]);
 
-            const result = await contactRepository.existsByName('Non Existent');
+            const result = await contactRepository.existsByName('Non Existent', null, mockClient);
 
             expect(result).toBe(false);
         });
@@ -359,7 +312,7 @@ describe('ContactRepository', () => {
             mockClient.execute.mockResolvedValue([[{ count: 0 }]]);
             const excludeId = 5;
 
-            await contactRepository.existsByName(mockContactName, excludeId);
+            await contactRepository.existsByName(mockContactName, excludeId, mockClient);
 
             expect(mockClient.execute).toHaveBeenCalledWith(
                 expect.stringContaining('AND clientContactId != ?'),
@@ -370,7 +323,7 @@ describe('ContactRepository', () => {
         it('should not exclude ID when excludeId is null', async () => {
             mockClient.execute.mockResolvedValue([[{ count: 1 }]]);
 
-            await contactRepository.existsByName(mockContactName, null);
+            await contactRepository.existsByName(mockContactName, null, mockClient);
 
             const callArgs = mockClient.execute.mock.calls[0];
             expect(callArgs[0]).not.toContain('AND clientContactId != ?');
@@ -379,23 +332,12 @@ describe('ContactRepository', () => {
 
         it('should use provided client connection when passed', async () => {
             const externalClient = {
-                execute: jest.fn().mockResolvedValue([[{ count: 1 }]]),
-                release: jest.fn()
+                execute: jest.fn().mockResolvedValue([[{ count: 1 }]])
             };
 
             await contactRepository.existsByName(mockContactName, null, externalClient);
 
-            expect(mockDb.getConnection).not.toHaveBeenCalled();
             expect(externalClient.execute).toHaveBeenCalledTimes(1);
-            expect(externalClient.release).not.toHaveBeenCalled();
-        });
-
-        it('should release connection when no client provided', async () => {
-            mockClient.execute.mockResolvedValue([[{ count: 1 }]]);
-
-            await contactRepository.existsByName(mockContactName);
-
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
         it('should handle database errors', async () => {
@@ -403,7 +345,7 @@ describe('ContactRepository', () => {
             dbError.code = 'ER_NO_SUCH_TABLE';
             mockClient.execute.mockRejectedValue(dbError);
 
-            await expect(contactRepository.existsByName(mockContactName))
+            await expect(contactRepository.existsByName(mockContactName, null, mockClient))
                 .rejects
                 .toThrow(AppError);
         });
@@ -517,38 +459,11 @@ describe('ContactRepository', () => {
         });
     });
 
-    describe('Connection Management', () => {
-        it('should always release connection in getById', async () => {
-            mockClient.execute.mockResolvedValue([[]]);
-
-            await contactRepository.getById(1);
-
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
-        });
-
-        it('should release connection even on transaction failure', async () => {
-            mockClient.execute.mockRejectedValue(new Error('Transaction failed'));
-
-            await expect(contactRepository.create({})).rejects.toThrow();
-
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
-        });
-
-        it('should get new connection for each operation', async () => {
-            mockClient.execute.mockResolvedValue([[]]);
-
-            await contactRepository.getById(1);
-            await contactRepository.getById(2);
-
-            expect(mockDb.getConnection).toHaveBeenCalledTimes(2);
-        });
-    });
-
     describe('Edge Cases', () => {
         it('should handle empty string contact name in existsByName', async () => {
             mockClient.execute.mockResolvedValue([[{ count: 0 }]]);
 
-            const result = await contactRepository.existsByName('');
+            const result = await contactRepository.existsByName('', null, mockClient);
 
             expect(result).toBe(false);
             expect(mockClient.execute).toHaveBeenCalledWith(
@@ -567,7 +482,7 @@ describe('ContactRepository', () => {
                 emailAddress: 'test@example.com'
             };
 
-            await contactRepository.update(1, updateData);
+            await contactRepository.update(1, updateData, mockClient);
 
             expect(mockClient.execute).toHaveBeenCalledWith(
                 expect.any(String),
@@ -575,21 +490,17 @@ describe('ContactRepository', () => {
             );
         });
 
-        it('should handle concurrent operations with separate connections', async () => {
-            const client1 = { ...mockClient, execute: jest.fn().mockResolvedValue([[]]), release: jest.fn() };
-            const client2 = { ...mockClient, execute: jest.fn().mockResolvedValue([[]]), release: jest.fn() };
-
-            mockDb.getConnection
-                .mockResolvedValueOnce(client1)
-                .mockResolvedValueOnce(client2);
+        it('should handle concurrent operations with separate clients', async () => {
+            const client1 = { execute: jest.fn().mockResolvedValue([[]]) };
+            const client2 = { execute: jest.fn().mockResolvedValue([[]]) };
 
             await Promise.all([
-                contactRepository.getById(1),
-                contactRepository.getById(2)
+                contactRepository.getById(1, client1),
+                contactRepository.getById(2, client2)
             ]);
 
-            expect(client1.release).toHaveBeenCalledTimes(1);
-            expect(client2.release).toHaveBeenCalledTimes(1);
+            expect(client1.execute).toHaveBeenCalledTimes(1);
+            expect(client2.execute).toHaveBeenCalledTimes(1);
         });
     });
 });

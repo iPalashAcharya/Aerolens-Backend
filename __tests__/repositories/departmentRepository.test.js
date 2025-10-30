@@ -9,9 +9,6 @@ describe('DepartmentRepository', () => {
     beforeEach(() => {
         mockClient = {
             execute: jest.fn(),
-            beginTransaction: jest.fn(),
-            commit: jest.fn(),
-            rollback: jest.fn(),
             release: jest.fn()
         };
 
@@ -38,24 +35,21 @@ describe('DepartmentRepository', () => {
         it('should retrieve department by ID successfully', async () => {
             mockClient.execute.mockResolvedValue([[mockDepartment]]);
 
-            const result = await departmentRepository.findById(mockDepartmentId);
+            const result = await departmentRepository.findById(mockDepartmentId, mockClient);
 
             expect(result).toEqual(mockDepartment);
-            expect(mockDb.getConnection).toHaveBeenCalledTimes(1);
             expect(mockClient.execute).toHaveBeenCalledWith(
                 expect.stringContaining('SELECT departmentId'),
                 [mockDepartmentId]
             );
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
         it('should return null when department is not found', async () => {
             mockClient.execute.mockResolvedValue([[]]);
 
-            const result = await departmentRepository.findById(999);
+            const result = await departmentRepository.findById(999, mockClient);
 
             expect(result).toBeNull();
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
         it('should handle database errors properly', async () => {
@@ -63,19 +57,15 @@ describe('DepartmentRepository', () => {
             dbError.code = 'ER_BAD_FIELD_ERROR';
             mockClient.execute.mockRejectedValue(dbError);
 
-            await expect(departmentRepository.findById(mockDepartmentId))
+            await expect(departmentRepository.findById(mockDepartmentId, mockClient))
                 .rejects
                 .toThrow(AppError);
-
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
-        it('should release connection even when error occurs', async () => {
+        it('should throw error when error occurs', async () => {
             mockClient.execute.mockRejectedValue(new Error('Connection lost'));
 
-            await expect(departmentRepository.findById(mockDepartmentId)).rejects.toThrow();
-
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
+            await expect(departmentRepository.findById(mockDepartmentId, mockClient)).rejects.toThrow();
         });
     });
 
@@ -91,10 +81,10 @@ describe('DepartmentRepository', () => {
             affectedRows: 1
         };
 
-        it('should create department successfully without transaction', async () => {
+        it('should create department successfully', async () => {
             mockClient.execute.mockResolvedValue([mockInsertResult]);
 
-            const result = await departmentRepository.create(mockDepartmentData);
+            const result = await departmentRepository.create(mockDepartmentData, mockClient);
 
             expect(result).toEqual({
                 departmentId: 42,
@@ -108,7 +98,6 @@ describe('DepartmentRepository', () => {
                     mockDepartmentData.clientId
                 ]
             );
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
         it('should handle duplicate entry error', async () => {
@@ -116,13 +105,12 @@ describe('DepartmentRepository', () => {
             dupError.code = 'ER_DUP_ENTRY';
             mockClient.execute.mockRejectedValue(dupError);
 
-            await expect(departmentRepository.create(mockDepartmentData))
+            await expect(departmentRepository.create(mockDepartmentData, mockClient))
                 .rejects
                 .toMatchObject({
                     statusCode: 409,
                     errorCode: 'DUPLICATE_ENTRY'
                 });
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
         it('should handle other database errors with AppError', async () => {
@@ -130,11 +118,9 @@ describe('DepartmentRepository', () => {
             dbError.code = 'ER_ACCESS_DENIED_ERROR';
             mockClient.execute.mockRejectedValue(dbError);
 
-            await expect(departmentRepository.create(mockDepartmentData))
+            await expect(departmentRepository.create(mockDepartmentData, mockClient))
                 .rejects
                 .toThrow(AppError);
-
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
     });
 
@@ -148,26 +134,27 @@ describe('DepartmentRepository', () => {
         it('should update department successfully', async () => {
             mockClient.execute.mockResolvedValue([{ affectedRows: 1 }]);
 
-            const result = await departmentRepository.update(mockDepartmentId, mockUpdateData);
+            const result = await departmentRepository.update(mockDepartmentId, mockUpdateData, mockClient);
 
-            expect(result).toEqual(1);
+            expect(result).toEqual({
+                departmentId: mockDepartmentId,
+                ...mockUpdateData
+            });
             expect(mockClient.execute).toHaveBeenCalledWith(
                 expect.stringContaining('UPDATE department SET'),
-                [mockUpdateData.departmentName, mockUpdateData.departmentDescription, mockDepartmentId]
+                expect.arrayContaining([...Object.values(mockUpdateData), mockDepartmentId])
             );
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
         it('should throw AppError when department not found on update', async () => {
             mockClient.execute.mockResolvedValue([{ affectedRows: 0 }]);
 
-            await expect(departmentRepository.update(mockDepartmentId, mockUpdateData))
+            await expect(departmentRepository.update(mockDepartmentId, mockUpdateData, mockClient))
                 .rejects
                 .toMatchObject({
                     statusCode: 404,
                     errorCode: 'DEPARTMENT_NOT_FOUND'
                 });
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
         it('should handle database errors properly during update', async () => {
@@ -175,10 +162,9 @@ describe('DepartmentRepository', () => {
             dbError.code = 'ER_DATA_TOO_LONG';
             mockClient.execute.mockRejectedValue(dbError);
 
-            await expect(departmentRepository.update(mockDepartmentId, mockUpdateData))
+            await expect(departmentRepository.update(mockDepartmentId, mockUpdateData, mockClient))
                 .rejects
                 .toThrow(AppError);
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
     });
 
@@ -188,26 +174,24 @@ describe('DepartmentRepository', () => {
         it('should delete department successfully', async () => {
             mockClient.execute.mockResolvedValue([{ affectedRows: 1 }]);
 
-            const result = await departmentRepository.delete(mockDepartmentId);
+            const result = await departmentRepository.delete(mockDepartmentId, mockClient);
 
             expect(result).toBe(1);
             expect(mockClient.execute).toHaveBeenCalledWith(
                 expect.stringContaining('DELETE FROM department'),
                 [mockDepartmentId]
             );
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
         it('should throw AppError when department not found on delete', async () => {
             mockClient.execute.mockResolvedValue([{ affectedRows: 0 }]);
 
-            await expect(departmentRepository.delete(mockDepartmentId))
+            await expect(departmentRepository.delete(mockDepartmentId, mockClient))
                 .rejects
                 .toMatchObject({
                     statusCode: 404,
                     errorCode: 'DEPARTMENT_NOT_FOUND'
                 });
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
         it('should handle database errors during delete', async () => {
@@ -215,10 +199,9 @@ describe('DepartmentRepository', () => {
             dbError.code = 'ER_ACCESS_DENIED_ERROR';
             mockClient.execute.mockRejectedValue(dbError);
 
-            await expect(departmentRepository.delete(mockDepartmentId))
+            await expect(departmentRepository.delete(mockDepartmentId, mockClient))
                 .rejects
                 .toThrow(AppError);
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
     });
 
@@ -232,14 +215,13 @@ describe('DepartmentRepository', () => {
         it('should return departments for given client ID', async () => {
             mockClient.execute.mockResolvedValue([mockDepartments]);
 
-            const result = await departmentRepository.findByClientId(clientId);
+            const result = await departmentRepository.findByClientId(clientId, mockClient);
 
             expect(result).toEqual(mockDepartments);
             expect(mockClient.execute).toHaveBeenCalledWith(
                 expect.stringContaining('SELECT departmentId'),
                 [clientId]
             );
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
         it('should handle database errors during findByClientId', async () => {
@@ -247,10 +229,9 @@ describe('DepartmentRepository', () => {
             dbError.code = 'ER_NO_SUCH_TABLE';
             mockClient.execute.mockRejectedValue(dbError);
 
-            await expect(departmentRepository.findByClientId(clientId))
+            await expect(departmentRepository.findByClientId(clientId, mockClient))
                 .rejects
                 .toThrow(AppError);
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
     });
 
@@ -261,58 +242,44 @@ describe('DepartmentRepository', () => {
         it('should return true when department name exists', async () => {
             mockClient.execute.mockResolvedValue([[{ count: 1 }]]);
 
-            const result = await departmentRepository.existsByName(departmentName, clientId);
+            const result = await departmentRepository.existsByName(departmentName, clientId, null, mockClient);
 
             expect(result).toBe(true);
             expect(mockClient.execute).toHaveBeenCalledWith(
                 expect.stringContaining('SELECT COUNT(*) as count'),
                 [departmentName, clientId]
             );
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
         it('should return false when department name does not exist', async () => {
             mockClient.execute.mockResolvedValue([[{ count: 0 }]]);
 
-            const result = await departmentRepository.existsByName('NonExistentDept', clientId);
+            const result = await departmentRepository.existsByName('NonExistentDept', clientId, null, mockClient);
 
             expect(result).toBe(false);
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
         it('should exclude a department ID when provided', async () => {
             mockClient.execute.mockResolvedValue([[{ count: 0 }]]);
             const excludeId = 5;
 
-            await departmentRepository.existsByName(departmentName, clientId, excludeId);
+            await departmentRepository.existsByName(departmentName, clientId, excludeId, mockClient);
 
             const queryCalled = mockClient.execute.mock.calls[0][0];
             const paramsCalled = mockClient.execute.mock.calls[0][1];
 
             expect(queryCalled).toContain('AND departmentId != ?');
             expect(paramsCalled).toEqual([departmentName, clientId, excludeId]);
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
-        it('should release connection when no client is provided', async () => {
-            mockClient.execute.mockResolvedValue([[{ count: 1 }]]);
-
-            await departmentRepository.existsByName(departmentName, clientId);
-
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
-        });
-
-        it('should not release connection when client is externally provided', async () => {
+        it('should use provided client connection when passed', async () => {
             const externalClient = {
-                execute: jest.fn().mockResolvedValue([[{ count: 1 }]]),
-                release: jest.fn()
+                execute: jest.fn().mockResolvedValue([[{ count: 1 }]])
             };
 
             await departmentRepository.existsByName(departmentName, clientId, null, externalClient);
 
             expect(externalClient.execute).toHaveBeenCalledTimes(1);
-            expect(externalClient.release).not.toHaveBeenCalled();
-            expect(mockDb.getConnection).not.toHaveBeenCalled();
         });
 
         it('should handle database errors in existsByName', async () => {
@@ -320,10 +287,9 @@ describe('DepartmentRepository', () => {
             dbError.code = 'ER_NO_SUCH_TABLE';
             mockClient.execute.mockRejectedValue(dbError);
 
-            await expect(departmentRepository.existsByName(departmentName, clientId))
+            await expect(departmentRepository.existsByName(departmentName, clientId, null, mockClient))
                 .rejects
                 .toThrow(AppError);
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
     });
 
@@ -393,33 +359,6 @@ describe('DepartmentRepository', () => {
                 expect(err.details.code).toBe('UNKNOWN_ERROR');
                 expect(err.details.sqlState).toBe('42000');
             }
-        });
-    });
-
-    describe('Connection Management', () => {
-        it('should always release connection in findById', async () => {
-            mockClient.execute.mockResolvedValue([[]]);
-
-            await departmentRepository.findById(1);
-
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
-        });
-
-        it('should release connection even on database error', async () => {
-            mockClient.execute.mockRejectedValue(new Error('Query failed'));
-
-            await expect(departmentRepository.create({})).rejects.toThrow();
-
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
-        });
-
-        it('should get new connection for each operation', async () => {
-            mockClient.execute.mockResolvedValue([[]]);
-
-            await departmentRepository.findById(1);
-            await departmentRepository.findById(2);
-
-            expect(mockDb.getConnection).toHaveBeenCalledTimes(2);
         });
     });
 });

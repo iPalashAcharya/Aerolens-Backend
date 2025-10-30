@@ -39,9 +39,8 @@ describe('LookupRepository', () => {
                 .mockResolvedValueOnce(mockCountResult)
                 .mockResolvedValueOnce(mockDataResult);
 
-            const result = await lookupRepository.getAll();
+            const result = await lookupRepository.getAll(10, 1, mockConnection);
 
-            expect(mockDb.getConnection).toHaveBeenCalled();
             expect(mockConnection.query).toHaveBeenCalledTimes(2);
             expect(mockConnection.query).toHaveBeenNthCalledWith(1,
                 'SELECT COUNT(lookupKey) as total FROM lookup'
@@ -54,7 +53,7 @@ describe('LookupRepository', () => {
                 data: mockDataResult[0],
                 totalRecords: 25
             });
-            expect(mockConnection.release).toHaveBeenCalled();
+            expect(mockConnection.release).not.toHaveBeenCalled();
         });
 
         it('should calculate offset correctly for different pages', async () => {
@@ -65,7 +64,7 @@ describe('LookupRepository', () => {
                 .mockResolvedValueOnce(mockCountResult)
                 .mockResolvedValueOnce(mockDataResult);
 
-            await lookupRepository.getAll(10, 3);
+            await lookupRepository.getAll(10, 3, mockConnection);
 
             expect(mockConnection.query).toHaveBeenNthCalledWith(2,
                 expect.any(String),
@@ -81,7 +80,7 @@ describe('LookupRepository', () => {
                 .mockResolvedValueOnce(mockCountResult)
                 .mockResolvedValueOnce(mockDataResult);
 
-            await lookupRepository.getAll(20, 2);
+            await lookupRepository.getAll(20, 2, mockConnection);
 
             expect(mockConnection.query).toHaveBeenNthCalledWith(2,
                 expect.any(String),
@@ -97,7 +96,7 @@ describe('LookupRepository', () => {
                 .mockResolvedValueOnce(mockCountResult)
                 .mockResolvedValueOnce(mockDataResult);
 
-            await lookupRepository.getAll(0, 1);
+            await lookupRepository.getAll(0, 1, mockConnection);
 
             expect(mockConnection.query).toHaveBeenNthCalledWith(2,
                 expect.any(String),
@@ -113,7 +112,7 @@ describe('LookupRepository', () => {
                 .mockResolvedValueOnce(mockCountResult)
                 .mockResolvedValueOnce(mockDataResult);
 
-            await lookupRepository.getAll(10, 0);
+            await lookupRepository.getAll(10, 0, mockConnection);
 
             expect(mockConnection.query).toHaveBeenNthCalledWith(2,
                 expect.any(String),
@@ -143,7 +142,7 @@ describe('LookupRepository', () => {
                 .mockResolvedValueOnce(mockCountResult)
                 .mockResolvedValueOnce(mockDataResult);
 
-            const result = await lookupRepository.getAll();
+            const result = await lookupRepository.getAll(10, 1, mockConnection);
 
             expect(result).toEqual({
                 data: [],
@@ -156,18 +155,16 @@ describe('LookupRepository', () => {
             dbError.code = 'ECONNRESET';
             mockConnection.query.mockRejectedValue(dbError);
 
-            await expect(lookupRepository.getAll())
+            await expect(lookupRepository.getAll(10, 1, mockConnection))
                 .rejects
                 .toThrow(AppError);
 
-            await expect(lookupRepository.getAll())
+            await expect(lookupRepository.getAll(10, 1, mockConnection))
                 .rejects
                 .toMatchObject({
                     statusCode: 503,
                     errorCode: 'DATABASE_CONNECTION_ERROR'
                 });
-
-            expect(mockConnection.release).toHaveBeenCalled();
         });
     });
 
@@ -176,7 +173,7 @@ describe('LookupRepository', () => {
             const mockLookupData = [{ tag: 'TEST_TAG', lookupKey: 123, value: 'test_value' }];
             mockConnection.query.mockResolvedValue([mockLookupData]);
 
-            const result = await lookupRepository.getByKey(123);
+            const result = await lookupRepository.getByKey(123, mockConnection);
 
             expect(mockConnection.query).toHaveBeenCalledWith(
                 'SELECT tag, lookupKey, value FROM lookup WHERE lookupKey=?',
@@ -185,13 +182,13 @@ describe('LookupRepository', () => {
             expect(result).toEqual({
                 data: mockLookupData
             });
-            expect(mockConnection.release).toHaveBeenCalled();
+            expect(mockConnection.release).not.toHaveBeenCalled();
         });
 
         it('should return empty data array when key not found', async () => {
             mockConnection.query.mockResolvedValue([[]]);
 
-            const result = await lookupRepository.getByKey(999);
+            const result = await lookupRepository.getByKey(999, mockConnection);
 
             expect(result).toEqual({
                 data: []
@@ -202,7 +199,7 @@ describe('LookupRepository', () => {
             const mockLookupData = [{ tag: 'TEST_TAG', lookupKey: 'ABC123', value: 'test_value' }];
             mockConnection.query.mockResolvedValue([mockLookupData]);
 
-            const result = await lookupRepository.getByKey('ABC123');
+            const result = await lookupRepository.getByKey('ABC123', mockConnection);
 
             expect(mockConnection.query).toHaveBeenCalledWith(
                 expect.any(String),
@@ -216,31 +213,29 @@ describe('LookupRepository', () => {
             dbError.code = 'ER_NO_SUCH_TABLE';
             mockConnection.query.mockRejectedValue(dbError);
 
-            await expect(lookupRepository.getByKey(123))
+            await expect(lookupRepository.getByKey(123, mockConnection))
                 .rejects
                 .toThrow(AppError);
 
-            await expect(lookupRepository.getByKey(123))
+            await expect(lookupRepository.getByKey(123, mockConnection))
                 .rejects
                 .toMatchObject({
                     statusCode: 500,
                     errorCode: 'DATABASE_SCHEMA_ERROR',
                     message: 'Required database table not found'
                 });
-
-            expect(mockConnection.release).toHaveBeenCalled();
         });
 
-        it('should release connection even on error', async () => {
+        it('should not release connection even on error', async () => {
             const dbError = new Error('Query error');
             dbError.code = 'UNKNOWN_ERROR';
             mockConnection.query.mockRejectedValue(dbError);
 
-            await expect(lookupRepository.getByKey(123))
+            await expect(lookupRepository.getByKey(123, mockConnection))
                 .rejects
                 .toThrow();
 
-            expect(mockConnection.release).toHaveBeenCalled();
+            expect(mockConnection.release).not.toHaveBeenCalled();
         });
     });
 
@@ -252,7 +247,7 @@ describe('LookupRepository', () => {
             ];
             mockConnection.query.mockResolvedValue([mockLookupData]);
 
-            const result = await lookupRepository.getByTag('STATUS');
+            const result = await lookupRepository.getByTag('STATUS', mockConnection);
 
             expect(mockConnection.query).toHaveBeenCalledWith(
                 'SELECT lookupKey,tag,value FROM lookup WHERE tag=?',
@@ -261,13 +256,13 @@ describe('LookupRepository', () => {
             expect(result).toEqual({
                 data: mockLookupData
             });
-            expect(mockConnection.release).toHaveBeenCalled();
+            expect(mockConnection.release).not.toHaveBeenCalled();
         });
 
         it('should return empty data array when tag not found', async () => {
             mockConnection.query.mockResolvedValue([[]]);
 
-            const result = await lookupRepository.getByTag('NON_EXISTENT_TAG');
+            const result = await lookupRepository.getByTag('NON_EXISTENT_TAG', mockConnection);
 
             expect(result).toEqual({
                 data: []
@@ -278,7 +273,7 @@ describe('LookupRepository', () => {
             const mockLookupData = [{ lookupKey: 1, tag: 'TAG_WITH-DASH', value: 'test' }];
             mockConnection.query.mockResolvedValue([mockLookupData]);
 
-            const result = await lookupRepository.getByTag('TAG_WITH-DASH');
+            const result = await lookupRepository.getByTag('TAG_WITH-DASH', mockConnection);
 
             expect(mockConnection.query).toHaveBeenCalledWith(
                 expect.any(String),
@@ -292,19 +287,17 @@ describe('LookupRepository', () => {
             dbError.code = 'ER_ACCESS_DENIED_ERROR';
             mockConnection.query.mockRejectedValue(dbError);
 
-            await expect(lookupRepository.getByTag('TEST'))
+            await expect(lookupRepository.getByTag('TEST', mockConnection))
                 .rejects
                 .toThrow(AppError);
 
-            await expect(lookupRepository.getByTag('TEST'))
+            await expect(lookupRepository.getByTag('TEST', mockConnection))
                 .rejects
                 .toMatchObject({
                     statusCode: 500,
                     errorCode: 'DATABASE_ACCESS_ERROR',
                     message: 'Database access denied'
                 });
-
-            expect(mockConnection.release).toHaveBeenCalled();
         });
     });
 
@@ -315,20 +308,18 @@ describe('LookupRepository', () => {
             const mockInsertResult = [{ insertId: 123 }];
             mockConnection.execute.mockResolvedValue(mockInsertResult);
 
-            const result = await lookupRepository.create(lookupData);
+            const result = await lookupRepository.create(lookupData, mockConnection);
 
-            expect(mockConnection.beginTransaction).toHaveBeenCalled();
             expect(mockConnection.execute).toHaveBeenCalledWith(
                 expect.stringContaining('INSERT INTO lookup'),
                 ['NEW_TAG', 'NEW_VALUE']
             );
-            expect(mockConnection.commit).toHaveBeenCalled();
             expect(result).toEqual({
                 lookupKey: 123,
                 tag: 'NEW_TAG',
                 value: 'NEW_VALUE'
             });
-            expect(mockConnection.release).toHaveBeenCalled();
+            expect(mockConnection.release).not.toHaveBeenCalled();
         });
 
         it('should use provided client connection and not release it', async () => {
@@ -339,20 +330,19 @@ describe('LookupRepository', () => {
 
             expect(mockDb.getConnection).not.toHaveBeenCalled();
             expect(mockConnection.release).not.toHaveBeenCalled();
-            expect(mockConnection.commit).toHaveBeenCalled();
         });
 
-        it('should rollback and throw AppError on duplicate entry', async () => {
+        it('should throw AppError on duplicate entry', async () => {
             const dbError = new Error('Duplicate entry');
             dbError.code = 'ER_DUP_ENTRY';
             dbError.message = 'Duplicate entry for lookupKey';
             mockConnection.execute.mockRejectedValue(dbError);
 
-            await expect(lookupRepository.create(lookupData))
+            await expect(lookupRepository.create(lookupData, mockConnection))
                 .rejects
                 .toThrow(AppError);
 
-            await expect(lookupRepository.create(lookupData))
+            await expect(lookupRepository.create(lookupData, mockConnection))
                 .rejects
                 .toMatchObject({
                     statusCode: 409,
@@ -360,81 +350,72 @@ describe('LookupRepository', () => {
                     message: 'A lookup entry with this information already exists'
                 });
 
-            expect(mockConnection.rollback).toHaveBeenCalled();
-            expect(mockConnection.commit).not.toHaveBeenCalled();
-            expect(mockConnection.release).toHaveBeenCalled();
+            expect(mockConnection.release).not.toHaveBeenCalled();
         });
 
-        it('should rollback and throw AppError on data too long error', async () => {
+        it('should throw AppError on data too long error', async () => {
             const dbError = new Error('Data too long for column value');
             dbError.code = 'ER_DATA_TOO_LONG';
             mockConnection.execute.mockRejectedValue(dbError);
 
-            await expect(lookupRepository.create(lookupData))
+            await expect(lookupRepository.create(lookupData, mockConnection))
                 .rejects
                 .toThrow(AppError);
 
-            await expect(lookupRepository.create(lookupData))
+            await expect(lookupRepository.create(lookupData, mockConnection))
                 .rejects
                 .toMatchObject({
                     statusCode: 400,
                     errorCode: 'DATA_TOO_LONG'
                 });
-
-            expect(mockConnection.rollback).toHaveBeenCalled();
         });
 
-        it('should rollback and throw AppError on connection timeout', async () => {
+        it('should throw AppError on connection timeout', async () => {
             const dbError = new Error('Connection timeout');
             dbError.code = 'ETIMEDOUT';
             mockConnection.execute.mockRejectedValue(dbError);
 
-            await expect(lookupRepository.create(lookupData))
+            await expect(lookupRepository.create(lookupData, mockConnection))
                 .rejects
                 .toThrow(AppError);
 
-            await expect(lookupRepository.create(lookupData))
+            await expect(lookupRepository.create(lookupData, mockConnection))
                 .rejects
                 .toMatchObject({
                     statusCode: 503,
                     errorCode: 'DATABASE_CONNECTION_ERROR'
                 });
-
-            expect(mockConnection.rollback).toHaveBeenCalled();
         });
 
-        it('should rollback and throw generic AppError on unknown error', async () => {
+        it('should throw generic AppError on unknown error', async () => {
             const dbError = new Error('Unknown database error');
             dbError.code = 'UNKNOWN_CODE';
             dbError.sqlState = '45000';
             mockConnection.execute.mockRejectedValue(dbError);
 
-            await expect(lookupRepository.create(lookupData))
+            await expect(lookupRepository.create(lookupData, mockConnection))
                 .rejects
                 .toThrow(AppError);
 
-            await expect(lookupRepository.create(lookupData))
+            await expect(lookupRepository.create(lookupData, mockConnection))
                 .rejects
                 .toMatchObject({
                     statusCode: 500,
                     errorCode: 'DATABASE_ERROR',
                     message: 'Database operation failed'
                 });
-
-            expect(mockConnection.rollback).toHaveBeenCalled();
         });
 
-        it('should release connection even if rollback fails', async () => {
+        it('should not release connection even on error', async () => {
             const dbError = new Error('Insert failed');
             dbError.code = 'ER_BAD_FIELD_ERROR';
             mockConnection.execute.mockRejectedValue(dbError);
-            mockConnection.rollback.mockRejectedValue(new Error('Rollback failed'));
 
-            await expect(lookupRepository.create(lookupData))
+            await expect(lookupRepository.create(lookupData, mockConnection))
                 .rejects
                 .toThrow();
 
-            expect(mockConnection.release).toHaveBeenCalled();
+            expect(mockConnection.release).not.toHaveBeenCalled();
         });
     });
 
@@ -443,39 +424,39 @@ describe('LookupRepository', () => {
             const mockDeleteResult = [{ affectedRows: 1 }];
             mockConnection.execute.mockResolvedValue(mockDeleteResult);
 
-            const result = await lookupRepository.delete(123);
+            const result = await lookupRepository.delete(123, mockConnection);
 
-            expect(mockConnection.beginTransaction).toHaveBeenCalled();
+            expect(mockConnection.beginTransaction).not.toHaveBeenCalled();
             expect(mockConnection.execute).toHaveBeenCalledWith(
                 'DELETE FROM lookup WHERE lookupKey = ?',
                 [123]
             );
-            expect(mockConnection.commit).toHaveBeenCalled();
+            expect(mockConnection.commit).not.toHaveBeenCalled();
             expect(result).toBe(1);
-            expect(mockConnection.release).toHaveBeenCalled();
+            expect(mockConnection.release).not.toHaveBeenCalled();
         });
 
         it('should return false when no rows affected and rollback', async () => {
             const mockDeleteResult = [{ affectedRows: 0 }];
             mockConnection.execute.mockResolvedValue(mockDeleteResult);
 
-            const result = await lookupRepository.delete(999);
+            const result = await lookupRepository.delete(999, mockConnection);
 
-            expect(mockConnection.beginTransaction).toHaveBeenCalled();
+            expect(mockConnection.beginTransaction).not.toHaveBeenCalled();
             expect(mockConnection.rollback).toHaveBeenCalled();
             expect(mockConnection.commit).not.toHaveBeenCalled();
             expect(result).toBe(false);
-            expect(mockConnection.release).toHaveBeenCalled();
+            expect(mockConnection.release).not.toHaveBeenCalled();
         });
 
         it('should handle deletion of multiple rows', async () => {
             const mockDeleteResult = [{ affectedRows: 3 }];
             mockConnection.execute.mockResolvedValue(mockDeleteResult);
 
-            const result = await lookupRepository.delete('MULTI_KEY');
+            const result = await lookupRepository.delete('MULTI_KEY', mockConnection);
 
             expect(result).toBe(3);
-            expect(mockConnection.commit).toHaveBeenCalled();
+            expect(mockConnection.commit).not.toHaveBeenCalled();
         });
 
         it('should rollback and throw AppError on database error', async () => {
@@ -483,11 +464,11 @@ describe('LookupRepository', () => {
             dbError.code = 'ER_BAD_FIELD_ERROR';
             mockConnection.execute.mockRejectedValue(dbError);
 
-            await expect(lookupRepository.delete(123))
+            await expect(lookupRepository.delete(123, mockConnection))
                 .rejects
                 .toThrow(AppError);
 
-            await expect(lookupRepository.delete(123))
+            await expect(lookupRepository.delete(123, mockConnection))
                 .rejects
                 .toMatchObject({
                     statusCode: 500,
@@ -495,21 +476,21 @@ describe('LookupRepository', () => {
                     message: 'Database schema error - invalid field reference'
                 });
 
-            expect(mockConnection.rollback).toHaveBeenCalled();
+            expect(mockConnection.rollback).not.toHaveBeenCalled();
             expect(mockConnection.commit).not.toHaveBeenCalled();
-            expect(mockConnection.release).toHaveBeenCalled();
+            expect(mockConnection.release).not.toHaveBeenCalled();
         });
 
-        it('should release connection even if rollback fails', async () => {
+        it('should not release connection even if rollback fails', async () => {
             const dbError = new Error('Delete failed');
             mockConnection.execute.mockRejectedValue(dbError);
             mockConnection.rollback.mockRejectedValue(new Error('Rollback failed'));
 
-            await expect(lookupRepository.delete(123))
+            await expect(lookupRepository.delete(123, mockConnection))
                 .rejects
                 .toThrow();
 
-            expect(mockConnection.release).toHaveBeenCalled();
+            expect(mockConnection.release).not.toHaveBeenCalled();
         });
     });
 
@@ -518,21 +499,21 @@ describe('LookupRepository', () => {
             const mockResult = [[{ lookupKey: 123 }]];
             mockConnection.execute.mockResolvedValue(mockResult);
 
-            const result = await lookupRepository.exists('EXISTING_VALUE');
+            const result = await lookupRepository.exists('EXISTING_VALUE', mockConnection);
 
             expect(mockConnection.execute).toHaveBeenCalledWith(
                 'SELECT lookupKey FROM lookup WHERE value = ?',
                 ['EXISTING_VALUE']
             );
             expect(result).toEqual({ lookupKey: 123 });
-            expect(mockConnection.release).toHaveBeenCalled();
+            expect(mockConnection.release).not.toHaveBeenCalled();
         });
 
         it('should return null when value does not exist', async () => {
             const mockResult = [[]];
             mockConnection.execute.mockResolvedValue(mockResult);
 
-            const result = await lookupRepository.exists('NON_EXISTENT_VALUE');
+            const result = await lookupRepository.exists('NON_EXISTENT_VALUE', mockConnection);
 
             expect(result).toBeNull();
         });
@@ -551,7 +532,7 @@ describe('LookupRepository', () => {
             const mockResult = [[{ lookupKey: 789 }]];
             mockConnection.execute.mockResolvedValue(mockResult);
 
-            const result = await lookupRepository.exists('');
+            const result = await lookupRepository.exists('', mockConnection);
 
             expect(mockConnection.execute).toHaveBeenCalledWith(
                 expect.any(String),
@@ -565,29 +546,27 @@ describe('LookupRepository', () => {
             dbError.code = 'ECONNRESET';
             mockConnection.execute.mockRejectedValue(dbError);
 
-            await expect(lookupRepository.exists('TEST_VALUE'))
+            await expect(lookupRepository.exists('TEST_VALUE', mockConnection))
                 .rejects
                 .toThrow(AppError);
 
-            await expect(lookupRepository.exists('TEST_VALUE'))
+            await expect(lookupRepository.exists('TEST_VALUE', mockConnection))
                 .rejects
                 .toMatchObject({
                     statusCode: 503,
                     errorCode: 'DATABASE_CONNECTION_ERROR'
                 });
-
-            expect(mockConnection.release).toHaveBeenCalled();
         });
 
-        it('should release connection even on error', async () => {
+        it('should not release connection even on error', async () => {
             const dbError = new Error('Query failed');
             mockConnection.execute.mockRejectedValue(dbError);
 
-            await expect(lookupRepository.exists('TEST'))
+            await expect(lookupRepository.exists('TEST', mockConnection))
                 .rejects
                 .toThrow();
 
-            expect(mockConnection.release).toHaveBeenCalled();
+            expect(mockConnection.release).not.toHaveBeenCalled();
         });
     });
 
