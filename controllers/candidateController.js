@@ -91,7 +91,7 @@ class CandidateController {
 
     getAllCandidates = catchAsync(async (req, res) => {
         const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-        const pageSize = Math.max(1, Math.min(100, parseInt(req.query.pageSize, 10) || 10));
+        const pageSize = Math.max(1, Math.min(100, parseInt(req.query.limit, 10) || 10));
 
         const candidates = await this.candidateService.getAllCandidatesWithPagination(page, pageSize);
 

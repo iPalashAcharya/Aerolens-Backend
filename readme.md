@@ -2,7 +2,7 @@
 
 ### Endpoints
 
-POST /auth/register
+## POST /auth/register
 
 Registers a new user.
 
@@ -35,7 +35,8 @@ json
 }
 }
 }
-POST /auth/login
+
+## POST /auth/login
 
 Logs in the user and returns a JWT token.
 
@@ -71,14 +72,17 @@ Use this token in the Authorization header for all subsequent authenticated requ
 
 text
 Authorization: Bearer <JWT_ACCESS_TOKEN>
-POST /auth/refresh
+
+## POST /auth/refresh
 
 (Optional) Refreshes the current JWT token before expiry.
 
 ## Request
 
 Accepts the current token either in request body or Authorization header.
-optional request body:
+
+## optional Request body:
+
 {
 "token":"jwt_token"
 }
@@ -96,7 +100,7 @@ json
 }
 Revokes the old token identified by jti and issues a new token in the same token family.
 
-POST /auth/logout
+## POST /auth/logout
 
 Revokes the current token.
 
@@ -113,7 +117,7 @@ json
 }
 The token's jti is marked revoked to invalidate it.
 
-POST /auth/logout-all
+## POST /auth/logout-all
 
 Revokes all tokens for the authenticated user across devices.
 
@@ -129,11 +133,12 @@ json
 "success": true,
 "message": "Logged out from all devices successfully"
 }
-GET /auth/sessions
+
+## GET /auth/sessions
 
 Fetches all active non-revoked sessions (tokens) for the authenticated user with details.
 
-Headers
+## Headers
 
 text
 Authorization: Bearer <JWT_ACCESS_TOKEN>
@@ -156,7 +161,8 @@ json
 ]
 }
 }
-GET /auth/profile
+
+## GET /auth/profile
 
 Returns the profile of the authenticated user.
 
