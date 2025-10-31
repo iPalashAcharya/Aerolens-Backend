@@ -4,7 +4,6 @@ const AppError = require('../utils/appError');
 const jwtConfig = require('../config/jwt');
 
 class AuthController {
-
     async register(req, res, next) {
         try {
             const memberData = req.body;
@@ -29,9 +28,6 @@ class AuthController {
 
             const result = await authService.login(email, password, userAgent, ipAddress);
 
-            // Set refresh token in httpOnly cookie
-            res.cookie('refreshToken', result.refreshToken, jwtConfig.cookieOptions);
-
             return ApiResponse.success(
                 res,
                 {
@@ -42,8 +38,8 @@ class AuthController {
                         designation: result.member.designation,
                         isRecruiter: result.member.isRecruiter
                     },
-                    accessToken: result.accessToken,
-                    expiresIn: jwtConfig.access.expiresIn
+                    token: result.token,
+                    expiresIn: result.expiresIn
                 },
                 'Login successful',
                 200
@@ -53,30 +49,25 @@ class AuthController {
         }
     }
 
+    // Optional: Refresh/renew token endpoint
     async refreshToken(req, res, next) {
         try {
-            // Get refresh token from cookie or body
-            const refreshToken =
-                (req.cookies && req.cookies.refreshToken) ||
-                (req.body && req.body.refreshToken);
+            const token = req.body.token || req.headers.authorization?.replace('Bearer ', '');
 
-            if (!refreshToken) {
-                throw new AppError('Refresh token not provided', 401, 'TOKEN_MISSING');
+            if (!token) {
+                throw new AppError('Token not provided', 401, 'TOKEN_MISSING');
             }
 
             const userAgent = req.headers['user-agent'];
             const ipAddress = req.ip || req.connection.remoteAddress;
 
-            const result = await authService.refreshAccessToken(refreshToken, userAgent, ipAddress);
-
-            // Set new refresh token in httpOnly cookie
-            res.cookie('refreshToken', result.refreshToken, jwtConfig.cookieOptions);
+            const result = await authService.refreshToken(token, userAgent, ipAddress);
 
             return ApiResponse.success(
                 res,
                 {
-                    accessToken: result.accessToken,
-                    expiresIn: jwtConfig.access.expiresIn
+                    token: result.token,
+                    expiresIn: result.expiresIn
                 },
                 'Token refreshed successfully',
                 200
@@ -88,14 +79,11 @@ class AuthController {
 
     async logout(req, res, next) {
         try {
-            const refreshToken = req.cookies.refreshToken || req.body.refreshToken;
+            const token = req.headers.authorization?.replace('Bearer ', '') || req.body.token;
 
-            if (refreshToken) {
-                await authService.logout(refreshToken);
+            if (token) {
+                await authService.logout(token);
             }
-
-            // Clear refresh token cookie
-            res.clearCookie('refreshToken', jwtConfig.cookieOptions);
 
             return ApiResponse.success(
                 res,
@@ -104,7 +92,6 @@ class AuthController {
                 200
             );
         } catch (error) {
-            res.clearCookie('refreshToken', jwtConfig.cookieOptions);
             return ApiResponse.success(res, null, 'Logout successful', 200);
         }
     }
@@ -112,11 +99,7 @@ class AuthController {
     async logoutAllDevices(req, res, next) {
         try {
             const memberId = req.user.memberId;
-
             await authService.logoutAllDevices(memberId);
-
-            // Clear refresh token cookie
-            res.clearCookie('refreshToken', jwtConfig.cookieOptions);
 
             return ApiResponse.success(
                 res,
@@ -147,7 +130,6 @@ class AuthController {
 
     async getProfile(req, res, next) {
         try {
-            // req.user is populated by passport authenticate middleware
             return ApiResponse.success(
                 res,
                 { member: req.user },

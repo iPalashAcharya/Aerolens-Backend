@@ -1,14 +1,14 @@
 # Authentication Endpoints
 
-## Endpoints
+### Endpoints
 
-### POST `/auth/register`
+POST /auth/register
 
-Registers the new user
+Registers a new user.
 
-### Request
+## Request Body (JSON)
 
-Request body (Json):
+json
 {
 "memberName": "John Doe",
 "memberContact": "+91 9999999999",
@@ -17,11 +17,11 @@ Request body (Json):
 "designation": "software engineer",
 "isRecruiter": false
 }
-Notes:
-Designation must match the database values in lookup
+designation must match existing designation values in the database lookup table (case-insensitive).
 
-### Response
+## Response
 
+json
 {
 "success": true,
 "message": "Registration successful",
@@ -35,21 +35,21 @@ Designation must match the database values in lookup
 }
 }
 }
+POST /auth/login
 
-### POST `/auth/login`
+Logs in the user and returns a JWT token.
 
-Logs in the user
+## Request Body (JSON)
 
-### Request
-
-Request Body(Json):
+json
 {
 "email": "john@example.com",
 "password": "Password@123"
 }
 
-### Reponse
+## Response
 
+json
 {
 "success": true,
 "message": "Login successful",
@@ -61,59 +61,86 @@ Request Body(Json):
 "designation": 4,
 "isRecruiter": false
 },
-"accessToken": "<ACCESS_TOKEN>",
-"expiresIn": "15m"
+"token": "<JWT_ACCESS_TOKEN>",
+"expiresIn": "2h"
 }
 }
-Notes:
+The JWT access token includes jti (unique token ID) and family claims.
 
-Refresh token automatically sent as an HTTP-only cookie.
+Use this token in the Authorization header for all subsequent authenticated requests:
 
-Access token must be used in the Authorization header for all the endpoints mentioned below as all API endpoints are protected
-Authorization: Bearer <ACCESS_TOKEN>
+text
+Authorization: Bearer <JWT_ACCESS_TOKEN>
+POST /auth/refresh
 
-### POST `/auth/logout`
+(Optional) Refreshes the current JWT token before expiry.
 
-revokes the refresh token and clears cookie
+## Request
 
-### Request (optional ie stored in cookie)
-
+Accepts the current token either in request body or Authorization header.
+optional request body:
 {
-"refreshToken":<refreshToken>
+"token":"jwt_token"
 }
 
-### Response
+## Response
 
+json
+{
+"success": true,
+"message": "Token refreshed successfully",
+"data": {
+"token": "<NEW_JWT_ACCESS_TOKEN>",
+"expiresIn": "2h"
+}
+}
+Revokes the old token identified by jti and issues a new token in the same token family.
+
+POST /auth/logout
+
+Revokes the current token.
+
+## Request
+
+Token sent in Authorization header or optionally in request body.
+
+## Response
+
+json
 {
 "success": true,
 "message": "Logout successful"
 }
+The token's jti is marked revoked to invalidate it.
 
-### POST `/auth/logout-all`
+POST /auth/logout-all
 
-Revokes all active tokens for the authenticated user.
+Revokes all tokens for the authenticated user across devices.
 
-### Headers
+Headers
 
-Authorization: Bearer <ACCESS_TOKEN>
+text
+Authorization: Bearer <JWT_ACCESS_TOKEN>
 
-### Response
+## Response
 
+json
 {
 "success": true,
 "message": "Logged out from all devices successfully"
 }
+GET /auth/sessions
 
-### GET `/auth/sessions`
+Fetches all active non-revoked sessions (tokens) for the authenticated user with details.
 
-Retrieves all currently active refresh sessions.
+Headers
 
-### Headers
+text
+Authorization: Bearer <JWT_ACCESS_TOKEN>
 
-Authorization: Bearer <ACCESS_TOKEN>
+## Response
 
-### Response
-
+json
 {
 "success": true,
 "data": {
@@ -122,24 +149,25 @@ Authorization: Bearer <ACCESS_TOKEN>
 "id": 10,
 "userAgent": "Mozilla/5.0 Chrome/120.0.0",
 "ipAddress": "192.168.1.2",
-"issuedAt": "2025-10-20T10:35:24.000Z",
+"createdAt": "2025-10-20T10:35:24.000Z",
 "expiresAt": "2025-10-27T10:35:24.000Z",
 "tokenFamily": "c693a76a-90a8-4441-b229-bb57cc4f3f70"
 }
 ]
 }
 }
+GET /auth/profile
 
-### GET `/auth/profile`
+Returns the profile of the authenticated user.
 
-Returns profile information of the logged-in user.
+Headers
 
-### Headers
+text
+Authorization: Bearer <JWT_ACCESS_TOKEN>
 
-Authorization: Bearer <ACCESS_TOKEN>
+## Response
 
-### Response
-
+json
 {
 "success": true,
 "data": {

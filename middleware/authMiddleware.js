@@ -1,26 +1,51 @@
-const passport = require('../config/passport');
+const authService = require('../services/authServices');
+const memberRepository = require('../repositories/memberRepository');
 const AppError = require('../utils/appError');
 const rateLimit = require('express-rate-limit');
 
 // JWT Authentication Middleware
-const authenticate = (req, res, next) => {
-    passport.authenticate('jwt', { session: false }, (err, user, info) => {
-        if (err) {
-            return next(err);
+const authenticate = async (req, res, next) => {
+    try {
+        const authHeader = req.headers.authorization;
+
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            throw new AppError('Authentication token required', 401, 'TOKEN_MISSING');
         }
 
-        if (!user) {
-            const message = info?.message || 'Authentication failed';
-            return next(new AppError(message, 401, 'AUTHENTICATION_FAILED'));
+        const token = authHeader.replace('Bearer ', '');
+        const decoded = await authService.verifyToken(token);
+
+        // Fetch full member details
+        const member = await memberRepository.findById(decoded.memberId);
+
+        if (!member) {
+            throw new AppError('Member not found', 401, 'MEMBER_NOT_FOUND');
         }
 
-        // Attach user to request object
-        req.user = user;
+        if (!member.isActive) {
+            throw new AppError('Account is inactive', 403, 'ACCOUNT_INACTIVE');
+        }
+
+        // Attach user to request
+        req.user = {
+            memberId: member.memberId,
+            email: member.email,
+            designation: member.designation,
+            isRecruiter: member.isRecruiter,
+            tokenFamily: decoded.family,
+            jti: decoded.jti
+        };
+
         next();
-    })(req, res, next);
+    } catch (error) {
+        if (error instanceof AppError) {
+            return next(error);
+        }
+        return next(new AppError('Authentication failed', 401, 'AUTHENTICATION_FAILED'));
+    }
 };
 
-// Optional: Role-based authorization middleware
+// Role-based authorization middleware
 const authorize = (...allowedRoles) => {
     return (req, res, next) => {
         if (!req.user) {
@@ -35,7 +60,7 @@ const authorize = (...allowedRoles) => {
     };
 };
 
-// Rate limiting for authentication endpoints
+// Rate limiting
 const loginRateLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 5,

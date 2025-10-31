@@ -96,21 +96,21 @@ const registerSchema = Joi.object({
         .default(false)
 });
 
-
-
-const refreshTokenSchema = Joi.object({
-    refreshToken: Joi.string()
+const tokenSchema = Joi.object({
+    token: Joi.string()
         .required()
         .messages({
-            'any.required': 'Refresh token is required'
+            'any.required': 'Token is required'
         })
 });
 
 class AuthValidator {
     static helper = null;
+
     static init(db) {
         AuthValidator.helper = new AuthValidatorHelper(db);
     }
+
     static async validateLogin(req, res, next) {
         const { error } = loginSchema.validate(req.body, { abortEarly: false });
 
@@ -122,7 +122,7 @@ class AuthValidator {
             return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR', details));
         }
         next();
-    };
+    }
 
     static async validateRegister(req, res, next) {
         const { error, value } = registerSchema.validate(req.body, { abortEarly: false });
@@ -134,15 +134,16 @@ class AuthValidator {
             }));
             return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR', details));
         }
+
         if (value.designation) {
             value.designation = await AuthValidator.helper.transformDesignation(value.designation);
         }
         req.body = value;
         next();
-    };
+    }
 
-    static async validateRefreshToken(req, res, next) {
-        const { error } = refreshTokenSchema.validate(req.body, { abortEarly: false });
+    static async validateToken(req, res, next) {
+        const { error } = tokenSchema.validate(req.body, { abortEarly: false });
 
         if (error) {
             const details = error.details.map(detail => ({
@@ -151,9 +152,8 @@ class AuthValidator {
             }));
             return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR', details));
         }
-
         next();
-    };
+    }
 }
 
 module.exports = AuthValidator;

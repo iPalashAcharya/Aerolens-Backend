@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('node:crypto');
 const jwtConfig = require('../config/jwt');
 const memberRepository = require('../repositories/memberRepository');
-const refreshTokenRepository = require('../repositories/refreshTokenRepository');
+const tokenRepository = require('../repositories/tokenRepository');
 const AppError = require('../utils/appError');
 
 class AuthService {
@@ -15,43 +15,31 @@ class AuthService {
         return await bcrypt.compare(password, hash);
     }
 
-    generateAccessToken(memberId, email, tokenFamily) {
-        const payload = {
-            memberId,
-            email,
-            tokenFamily,
-            type: 'access'
-        };
-
-        return jwt.sign(payload, jwtConfig.access.secret, {
-            expiresIn: jwtConfig.access.expiresIn,
-            algorithm: jwtConfig.access.algorithm,
-            issuer: 'aerolens-hr-management-system',
-            audience: 'hr-app-users'
-        });
-    }
-
-    generateRefreshToken(memberId, tokenFamily) {
-        const payload = {
-            memberId,
-            tokenFamily,
-            type: 'refresh'
-        };
-
-        return jwt.sign(payload, jwtConfig.refresh.secret, {
-            expiresIn: jwtConfig.refresh.expiresIn,
-            algorithm: jwtConfig.refresh.algorithm,
-            issuer: 'hr-management-system',
-            audience: 'hr-app-users'
-        });
-    }
-
     generateTokenFamily() {
         return crypto.randomUUID();
     }
 
-    hashRefreshToken(token) {
-        return crypto.createHash('sha256').update(token).digest('hex');
+    generateJTI() {
+        return crypto.randomUUID();
+    }
+
+    generateToken(memberId, email, tokenFamily, jti) {
+        const payload = {
+            sub: memberId,
+            memberId,
+            email,
+            jti,
+            family: tokenFamily,
+            type: 'access',
+            iat: Math.floor(Date.now() / 1000)
+        };
+
+        return jwt.sign(payload, jwtConfig.token.secret, {
+            expiresIn: jwtConfig.token.expiresIn,
+            algorithm: jwtConfig.token.algorithm,
+            issuer: 'aerolens-hr-management-system',
+            audience: 'hr-app-users'
+        });
     }
 
     async register(memberData) {
@@ -68,7 +56,6 @@ class AuthService {
         });
 
         delete newMember.password;
-
         return newMember;
     }
 
@@ -88,18 +75,27 @@ class AuthService {
         }
 
         const tokenFamily = this.generateTokenFamily();
+        const jti = this.generateJTI();
+        const token = this.generateToken(member.memberId, member.email, tokenFamily, jti);
 
-        const accessToken = this.generateAccessToken(member.memberId, member.email, tokenFamily);
-        const refreshToken = this.generateRefreshToken(member.memberId, tokenFamily);
-
-        const tokenHash = this.hashRefreshToken(refreshToken);
-
+        // Calculate expiration based on JWT config
+        const expiryMatch = jwtConfig.token.expiresIn.match(/(\d+)([smhd])/);
         const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
+        if (expiryMatch) {
+            const value = parseInt(expiryMatch[1]);
+            const unit = expiryMatch[2];
+            switch (unit) {
+                case 's': expiresAt.setSeconds(expiresAt.getSeconds() + value); break;
+                case 'm': expiresAt.setMinutes(expiresAt.getMinutes() + value); break;
+                case 'h': expiresAt.setHours(expiresAt.getHours() + value); break;
+                case 'd': expiresAt.setDate(expiresAt.getDate() + value); break;
+            }
+        }
 
-        await refreshTokenRepository.create({
+        // Store token for tracking and potential revocation
+        await tokenRepository.storeToken({
             memberId: member.memberId,
-            tokenHash,
+            jti,
             tokenFamily,
             userAgent: userAgent || null,
             ipAddress: ipAddress || null,
@@ -112,55 +108,35 @@ class AuthService {
 
         return {
             member,
-            accessToken,
-            refreshToken,
-            tokenFamily
+            token,
+            tokenFamily,
+            expiresIn: jwtConfig.token.expiresIn
         };
     }
 
-    async refreshAccessToken(refreshToken, userAgent, ipAddress) {
+    // Optional: Refresh/renew token before expiration
+    async refreshToken(currentToken, userAgent, ipAddress) {
         let decoded;
 
         try {
-            decoded = jwt.verify(refreshToken, jwtConfig.refresh.secret, {
-                algorithms: [jwtConfig.refresh.algorithm],
-                issuer: 'hr-management-system',
+            decoded = jwt.verify(currentToken, jwtConfig.token.secret, {
+                algorithms: [jwtConfig.token.algorithm],
+                issuer: 'aerolens-hr-management-system',
                 audience: 'hr-app-users'
             });
         } catch (error) {
             if (error.name === 'TokenExpiredError') {
-                throw new AppError('Refresh token expired', 401, 'TOKEN_EXPIRED');
+                throw new AppError('Token expired', 401, 'TOKEN_EXPIRED');
             }
-            throw new AppError('Invalid refresh token', 401, 'INVALID_TOKEN');
+            throw new AppError('Invalid token', 401, 'INVALID_TOKEN');
         }
 
-        const { memberId, tokenFamily } = decoded;
+        const { memberId, jti, family } = decoded;
 
-        const tokenHash = this.hashRefreshToken(refreshToken);
-
-        const storedToken = await refreshTokenRepository.findByMemberAndHash(memberId, tokenHash);
-
-        if (!storedToken) {
-            const tokenFamilyExists = await refreshTokenRepository.findByTokenFamily(memberId, tokenFamily);
-
-            if (tokenFamilyExists) {
-                await refreshTokenRepository.revokeTokenFamily(memberId, tokenFamily);
-                throw new AppError(
-                    'Token reuse detected. All tokens have been revoked. Please login again.',
-                    401,
-                    'TOKEN_REUSE_DETECTED'
-                );
-            }
-
-            throw new AppError('Invalid refresh token', 401, 'INVALID_TOKEN');
-        }
-
-        if (storedToken.isRevoked) {
+        // Check if token is revoked
+        const isRevoked = await tokenRepository.isTokenRevoked(jti);
+        if (isRevoked) {
             throw new AppError('Token has been revoked', 401, 'TOKEN_REVOKED');
-        }
-
-        if (new Date() > new Date(storedToken.expiresAt)) {
-            throw new AppError('Refresh token expired', 401, 'TOKEN_EXPIRED');
         }
 
         const member = await memberRepository.findById(memberId);
@@ -168,20 +144,30 @@ class AuthService {
             throw new AppError('Invalid member or inactive account', 401, 'INVALID_MEMBER');
         }
 
-        await refreshTokenRepository.revokeToken(storedToken.id);
+        // Revoke old token
+        await tokenRepository.revokeToken(jti);
 
-        const newAccessToken = this.generateAccessToken(member.memberId, member.email, tokenFamily);
-        const newRefreshToken = this.generateRefreshToken(member.memberId, tokenFamily);
+        // Generate new token with same family (for tracking)
+        const newJti = this.generateJTI();
+        const newToken = this.generateToken(member.memberId, member.email, family, newJti);
 
-        const newTokenHash = this.hashRefreshToken(newRefreshToken);
-
+        const expiryMatch = jwtConfig.token.expiresIn.match(/(\d+)([smhd])/);
         const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 7);
+        if (expiryMatch) {
+            const value = parseInt(expiryMatch[1]);
+            const unit = expiryMatch[2];
+            switch (unit) {
+                case 's': expiresAt.setSeconds(expiresAt.getSeconds() + value); break;
+                case 'm': expiresAt.setMinutes(expiresAt.getMinutes() + value); break;
+                case 'h': expiresAt.setHours(expiresAt.getHours() + value); break;
+                case 'd': expiresAt.setDate(expiresAt.getDate() + value); break;
+            }
+        }
 
-        await refreshTokenRepository.create({
+        await tokenRepository.storeToken({
             memberId: member.memberId,
-            tokenHash: newTokenHash,
-            tokenFamily,
+            jti: newJti,
+            tokenFamily: family,
             userAgent: userAgent || null,
             ipAddress: ipAddress || null,
             expiresAt
@@ -191,21 +177,17 @@ class AuthService {
 
         return {
             member,
-            accessToken: newAccessToken,
-            refreshToken: newRefreshToken
+            token: newToken,
+            expiresIn: jwtConfig.token.expiresIn
         };
     }
 
-    async logout(refreshToken) {
+    async logout(token) {
         try {
-            const tokenHash = this.hashRefreshToken(refreshToken);
-
-            const token = await refreshTokenRepository.findByHash(tokenHash);
-
-            if (token) {
-                await refreshTokenRepository.revokeToken(token.id);
+            const decoded = jwt.decode(token);
+            if (decoded && decoded.jti) {
+                await tokenRepository.revokeToken(decoded.jti);
             }
-
             return { success: true };
         } catch (error) {
             return { success: true };
@@ -213,23 +195,32 @@ class AuthService {
     }
 
     async logoutAllDevices(memberId) {
-        await refreshTokenRepository.revokeAllTokensByMember(memberId);
+        await tokenRepository.revokeAllTokensByMember(memberId);
         return { success: true };
     }
 
     async getActiveSessions(memberId) {
-        return await refreshTokenRepository.findActiveByMember(memberId);
+        return await tokenRepository.findActiveByMember(memberId);
     }
 
-    verifyAccessToken(token) {
+    async verifyToken(token) {
         try {
-            return jwt.verify(token, jwtConfig.access.secret, {
-                algorithms: [jwtConfig.access.algorithm],
-                issuer: 'hr-management-system',
+            const decoded = jwt.verify(token, jwtConfig.token.secret, {
+                algorithms: [jwtConfig.token.algorithm],
+                issuer: 'aerolens-hr-management-system',
                 audience: 'hr-app-users'
             });
+
+            // Check if token is revoked
+            const isRevoked = await tokenRepository.isTokenRevoked(decoded.jti);
+            if (isRevoked) {
+                throw new AppError('Token has been revoked', 401, 'TOKEN_REVOKED');
+            }
+
+            return decoded;
         } catch (error) {
-            throw new AppError('Invalid access token', 401, 'INVALID_TOKEN');
+            if (error instanceof AppError) throw error;
+            throw new AppError('Invalid token', 401, 'INVALID_TOKEN');
         }
     }
 }

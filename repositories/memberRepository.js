@@ -2,15 +2,14 @@ const db = require('../db');
 const AppError = require('../utils/appError');
 
 class MemberRepository {
-
     async findById(memberId) {
         const connection = await db.getConnection();
         try {
             const [rows] = await connection.execute(
                 `SELECT memberId, memberName, memberContact, email, designation, 
-                isRecruiter, isActive, lastLogin, createdAt, updatedAt
-         FROM member 
-         WHERE memberId = ?`,
+                        isRecruiter, isActive, lastLogin, createdAt, updatedAt
+                 FROM member 
+                 WHERE memberId = ?`,
                 [memberId]
             );
             return rows[0] || null;
@@ -26,9 +25,9 @@ class MemberRepository {
         try {
             const [rows] = await connection.execute(
                 `SELECT memberId, memberName, memberContact, email, password, designation,
-                isRecruiter, isActive, lastLogin, createdAt, updatedAt
-         FROM member 
-         WHERE email = ?`,
+                        isRecruiter, isActive, lastLogin, createdAt, updatedAt
+                 FROM member 
+                 WHERE email = ?`,
                 [email]
             );
             return rows[0] || null;
@@ -44,7 +43,7 @@ class MemberRepository {
         try {
             const [result] = await connection.execute(
                 `INSERT INTO member (memberName, memberContact, email, password, designation, isRecruiter)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+                 VALUES (?, ?, ?, ?, ?, ?)`,
                 [
                     memberData.memberName,
                     memberData.memberContact,
@@ -54,7 +53,6 @@ class MemberRepository {
                     memberData.isRecruiter || false
                 ]
             );
-
             return await this.findById(result.insertId);
         } catch (error) {
             if (error.code === 'ER_DUP_ENTRY') {
@@ -84,7 +82,7 @@ class MemberRepository {
         const connection = await db.getConnection();
         try {
             await connection.execute(
-                `UPDATE member SET password = ? WHERE memberId = ?`,
+                `UPDATE member SET password = ?, updatedAt = NOW() WHERE memberId = ?`,
                 [newPassword, memberId]
             );
         } catch (error) {
