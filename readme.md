@@ -1432,7 +1432,7 @@ A structured **Node.js + Express.js API** for managing candidates, with validati
 
 ### Get All Candidates (Paginated & Filtered)
 
-GET /candidate?page=1&pageSize=10&status=selected&preferredJobLocation=bangalore
+GET /candidate?page=1&limit=10&status=selected&preferredJobLocation=bangalore
 
 **Query Parameters:**
 
