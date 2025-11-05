@@ -1,3 +1,4 @@
+// authServices.js - FIXED VERSION
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('node:crypto');
@@ -114,29 +115,39 @@ class AuthService {
         };
     }
 
-    // Optional: Refresh/renew token before expiration
+    // FIXED: Refresh/renew token - now accepts expired tokens
     async refreshToken(currentToken, userAgent, ipAddress) {
         let decoded;
 
         try {
+            // ✅ KEY FIX: Use ignoreExpiration: true to allow expired tokens
             decoded = jwt.verify(currentToken, jwtConfig.token.secret, {
                 algorithms: [jwtConfig.token.algorithm],
                 issuer: 'aerolens-hr-management-system',
-                audience: 'hr-app-users'
+                audience: 'hr-app-users',
+                ignoreExpiration: true // ✅ This allows expired tokens to be verified
             });
         } catch (error) {
-            if (error.name === 'TokenExpiredError') {
-                throw new AppError('Token expired', 401, 'TOKEN_EXPIRED');
-            }
-            throw new AppError('Invalid token', 401, 'INVALID_TOKEN');
+            // Only throw error for invalid tokens, not expired ones
+            throw new AppError('Invalid token structure or signature', 401, 'INVALID_TOKEN');
         }
 
         const { memberId, jti, family } = decoded;
 
+        // ✅ Additional security: Check if token is TOO old (e.g., more than 7 days expired)
+        // This prevents tokens from being refreshed indefinitely
+        const tokenAge = Math.floor(Date.now() / 1000) - decoded.iat;
+        const maxRefreshAge = 7 * 24 * 60 * 60; // 7 days in seconds
+        if (tokenAge > maxRefreshAge) {
+            throw new AppError('Token is too old to refresh. Please login again.', 401, 'TOKEN_TOO_OLD');
+        }
+
         // Check if token is revoked
         const isRevoked = await tokenRepository.isTokenRevoked(jti);
         if (isRevoked) {
-            throw new AppError('Token has been revoked', 401, 'TOKEN_REVOKED');
+            // ✅ Security: If a revoked token is used, revoke entire family
+            await tokenRepository.revokeTokenFamily(memberId, family);
+            throw new AppError('Token has been revoked. Please login again.', 401, 'TOKEN_REVOKED');
         }
 
         const member = await memberRepository.findById(memberId);
@@ -220,6 +231,9 @@ class AuthService {
             return decoded;
         } catch (error) {
             if (error instanceof AppError) throw error;
+            if (error.name === 'TokenExpiredError') {
+                throw new AppError('Token expired', 401, 'TOKEN_EXPIRED');
+            }
             throw new AppError('Invalid token', 401, 'INVALID_TOKEN');
         }
     }

@@ -9,7 +9,7 @@ router.post('/register', AuthValidator.validateRegister, authController.register
 router.post('/login', loginRateLimiter, AuthValidator.validateLogin, authController.login);
 
 // Optional: Token refresh endpoint (for clients that want to renew tokens before expiry)
-router.post('/refresh', refreshRateLimiter, AuthValidator.validateToken, authController.refreshToken);
+router.post('/refresh', refreshRateLimiter, authController.refreshToken);
 
 router.post('/logout', authController.logout);
 
