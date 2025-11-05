@@ -3,7 +3,7 @@ require('dotenv').config();
 module.exports = {
     token: {
         secret: process.env.JWT_SECRET || process.env.JWT_ACCESS_SECRET,
-        expiresIn: process.env.JWT_EXPIRY || '1m', // Single token with moderate lifetime
+        expiresIn: process.env.JWT_EXPIRY || '15m', // Single token with moderate lifetime
         algorithm: 'HS256'
     },
     bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS) || 12,
