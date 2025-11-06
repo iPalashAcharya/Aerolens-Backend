@@ -17,6 +17,7 @@ const lookupRoutes = require('./routes/lookupRoutes');
 const db = require('./db');
 const JobProfileValidator = require('./validators/jobProfileValidator');
 const AuthValidator = require('./validators/authValidator');
+const tokenCleanup = require('./jobs/tokenCleanupJob');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -88,6 +89,7 @@ app.use((req, res, next) => {
 });
 
 AuthValidator.init(db);
+tokenCleanup.initializeAll();
 app.use('/auth', authRoutes);
 app.use('/client', clientRoutes);
 app.use('/department', departmentRoutes);

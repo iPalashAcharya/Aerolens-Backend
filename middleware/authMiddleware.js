@@ -6,18 +6,19 @@ const rateLimit = require('express-rate-limit');
 // JWT Authentication Middleware
 const authenticate = async (req, res, next) => {
     try {
+        // Extract token from Authorization header
         const authHeader = req.headers.authorization;
-
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
             throw new AppError('Authentication token required', 401, 'TOKEN_MISSING');
         }
 
         const token = authHeader.replace('Bearer ', '');
+
+        // Verify token (checks signature, expiration, and revocation)
         const decoded = await authService.verifyToken(token);
 
         // Fetch full member details
         const member = await memberRepository.findById(decoded.memberId);
-
         if (!member) {
             throw new AppError('Member not found', 401, 'MEMBER_NOT_FOUND');
         }
@@ -30,6 +31,7 @@ const authenticate = async (req, res, next) => {
         req.user = {
             memberId: member.memberId,
             email: member.email,
+            memberName: member.memberName,
             designation: member.designation,
             isRecruiter: member.isRecruiter,
             tokenFamily: decoded.family,
@@ -60,10 +62,10 @@ const authorize = (...allowedRoles) => {
     };
 };
 
-// Rate limiting
+// Rate limiting for login
 const loginRateLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 5,
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 5, // 5 login attempts
     message: {
         success: false,
         error: 'RATE_LIMIT_EXCEEDED',
@@ -77,14 +79,15 @@ const loginRateLimiter = rateLimit({
             success: false,
             error: 'RATE_LIMIT_EXCEEDED',
             message: 'Too many login attempts. Please try again after 15 minutes.',
-            retryAfter: Math.ceil(req.rateLimit.resetTime / 1000)
+            retryAfter: Math.ceil((req.rateLimit.resetTime - Date.now()) / 1000)
         });
     }
 });
 
+// Rate limiting for refresh token
 const refreshRateLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 10,
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // 10 refresh attempts
     message: {
         success: false,
         error: 'RATE_LIMIT_EXCEEDED',
@@ -94,9 +97,23 @@ const refreshRateLimiter = rateLimit({
     legacyHeaders: false
 });
 
+// Rate limiting for registration
+const registerRateLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 3, // 3 registrations per hour
+    message: {
+        success: false,
+        error: 'RATE_LIMIT_EXCEEDED',
+        message: 'Too many registration attempts. Please try again later.'
+    },
+    standardHeaders: true,
+    legacyHeaders: false
+});
+
 module.exports = {
     authenticate,
     authorize,
     loginRateLimiter,
-    refreshRateLimiter
+    refreshRateLimiter,
+    registerRateLimiter
 };

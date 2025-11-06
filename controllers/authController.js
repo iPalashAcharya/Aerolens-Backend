@@ -1,7 +1,6 @@
 const authService = require('../services/authServices');
 const ApiResponse = require('../utils/response');
 const AppError = require('../utils/appError');
-const jwtConfig = require('../config/jwt');
 
 class AuthController {
     async register(req, res, next) {
@@ -30,17 +29,7 @@ class AuthController {
 
             return ApiResponse.success(
                 res,
-                {
-                    member: {
-                        memberId: result.member.memberId,
-                        memberName: result.member.memberName,
-                        email: result.member.email,
-                        designation: result.member.designation,
-                        isRecruiter: result.member.isRecruiter
-                    },
-                    token: result.token,
-                    expiresIn: result.expiresIn
-                },
+                result,
                 'Login successful',
                 200
             );
@@ -49,14 +38,16 @@ class AuthController {
         }
     }
 
-    // Optional: Refresh/renew token endpoint
     async refreshToken(req, res, next) {
         try {
-            const token = req.body.token || req.headers.authorization?.replace('Bearer ', '');
+            // ONLY extract token from Authorization header (best practice)
+            const authHeader = req.headers.authorization;
 
-            if (!token) {
-                throw new AppError('Token not provided', 401, 'TOKEN_MISSING');
+            if (!authHeader || !authHeader.startsWith('Bearer ')) {
+                throw new AppError('Token not provided in Authorization header', 401, 'TOKEN_MISSING');
             }
+
+            const token = authHeader.replace('Bearer ', '');
 
             const userAgent = req.headers['user-agent'];
             const ipAddress = req.ip || req.connection.remoteAddress;
@@ -65,10 +56,7 @@ class AuthController {
 
             return ApiResponse.success(
                 res,
-                {
-                    token: result.token,
-                    expiresIn: result.expiresIn
-                },
+                result,
                 'Token refreshed successfully',
                 200
             );
@@ -79,9 +67,11 @@ class AuthController {
 
     async logout(req, res, next) {
         try {
-            const token = req.headers.authorization?.replace('Bearer ', '') || req.body.token;
+            // ONLY extract token from Authorization header (best practice)
+            const authHeader = req.headers.authorization;
 
-            if (token) {
+            if (authHeader && authHeader.startsWith('Bearer ')) {
+                const token = authHeader.replace('Bearer ', '');
                 await authService.logout(token);
             }
 
@@ -92,6 +82,7 @@ class AuthController {
                 200
             );
         } catch (error) {
+            // Always return success for logout (even if token invalid)
             return ApiResponse.success(res, null, 'Logout successful', 200);
         }
     }

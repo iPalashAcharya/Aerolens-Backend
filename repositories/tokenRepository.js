@@ -113,9 +113,10 @@ class TokenRepository {
     async cleanupExpiredTokens() {
         const connection = await db.getConnection();
         try {
-            await connection.execute(
+            const [result] = await connection.execute(
                 `DELETE FROM active_token WHERE expiresAt < NOW() OR isRevoked = TRUE`
             );
+            return result.affectedRows;
         } catch (error) {
             throw new AppError('Database error while cleaning up tokens', 500, 'DB_ERROR', error.message);
         } finally {

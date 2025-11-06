@@ -96,14 +96,6 @@ const registerSchema = Joi.object({
         .default(false)
 });
 
-const tokenSchema = Joi.object({
-    token: Joi.string()
-        .required()
-        .messages({
-            'any.required': 'Token is required'
-        })
-});
-
 class AuthValidator {
     static helper = null;
 
@@ -139,19 +131,6 @@ class AuthValidator {
             value.designation = await AuthValidator.helper.transformDesignation(value.designation);
         }
         req.body = value;
-        next();
-    }
-
-    static async validateToken(req, res, next) {
-        const { error } = tokenSchema.validate(req.body, { abortEarly: false });
-
-        if (error) {
-            const details = error.details.map(detail => ({
-                field: detail.path.join('.'),
-                message: detail.message
-            }));
-            return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR', details));
-        }
         next();
     }
 }
