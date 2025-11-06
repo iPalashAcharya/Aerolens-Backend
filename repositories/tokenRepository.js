@@ -114,7 +114,9 @@ class TokenRepository {
         const connection = await db.getConnection();
         try {
             const [result] = await connection.execute(
-                `DELETE FROM active_token WHERE expiresAt < NOW() OR isRevoked = TRUE`
+                `DELETE FROM active_token
+             WHERE (expiresAt < DATE_SUB(NOW(), INTERVAL 7 DAY))
+             OR isRevoked = TRUE`
             );
             return result.affectedRows;
         } catch (error) {
