@@ -24,7 +24,8 @@ const PORT = process.env.PORT || 3000;
 const allowedOrigins = [
     'http://localhost:5173',
     'http://127.0.0.1:5173',
-    'http://localhost:3000', // Add other ports if needed
+    'http://localhost:3000',
+    'https://d2xbx07vhovv1u.cloudfront.net/' // Add other ports if needed
 ];
 
 app.use(cors({
