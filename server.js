@@ -25,15 +25,16 @@ const allowedOrigins = [
     'http://localhost:5173',
     'http://127.0.0.1:5173',
     'http://localhost:3000',
-    'https://d2xbx07vhovv1u.cloudfront.net/' // Add other ports if needed
+    'https://d2xbx07vhovv1u.cloudfront.net' // Add other ports if needed
 ];
 
 app.use(cors({
     origin: function (origin, callback) {
-        // Allow requests with no origin (like mobile apps or Postman)
+        // Allow requests with no origin (like Postman or mobile apps)
         if (!origin) return callback(null, true);
 
-        if (allowedOrigins.indexOf(origin) !== -1) {
+        // Check if the origin is in the allowed list
+        if (allowedOrigins.includes(origin)) {
             callback(null, true);
         } else {
             callback(new Error('Not allowed by CORS'));
