@@ -13,7 +13,7 @@ const pool = mysql.createPool({
     connectionLimit: 10,
     queueLimit: 0,
     ssl: {
-        ca: Buffer.from(process.env.DB_CA_BASE64, 'base64').toString('utf-8')
+        ca: fs.readFileSync(path.join(__dirname, 'secret', 'rds_ca.pem'))
     }
 });
 
