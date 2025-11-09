@@ -111,6 +111,11 @@ app.use((err, req, res, next) => {
         message: 'Something went wrong'
     });
 });
+
+app.get('/health', (req, res) => {
+    res.status(200).send('OK');
+});
+
 if (process.env.MODE === 'LOCAL') {
     app.listen(PORT, () => {
         console.log(`Server started on port ${PORT}`);
