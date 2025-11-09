@@ -1,5 +1,7 @@
 const mysql = require('mysql2');
 const env = require('dotenv');
+const fs = require('fs');
+const path = require('path');
 
 env.config();
 
