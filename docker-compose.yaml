@@ -1,8 +1,8 @@
 services:
   backend:
     build: .
-    image: aerolens_backend:1.0
-    container_name: aerolens_backend
+    image: aerolens-portal-backend:latest
+    container_name: aerolens-portal-backend
     ports:
       - "3000:3000"
     env_file:

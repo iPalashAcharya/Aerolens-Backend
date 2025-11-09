@@ -1,21 +1,18 @@
-# Use an official Node.js runtime as a parent image
 FROM node:22-alpine
 
-# Set the working directory in the container
 WORKDIR /app
 
-# Copy package.json and package-lock.json to leverage Docker layer caching
-# This step ensures that npm install is only re-run if dependencies change
 COPY package*.json ./
 
-# Install application dependencies
-RUN npm install --production
+RUN npm ci --omit=dev && \
+    npm cache clean --force && \
+    rm -rf /tmp/* /root/.npm
 
-# Copy the rest of the application code
 COPY . .
 
-# Expose the port your Node.js application listens on
+RUN mkdir -p certs && \
+    wget -O certs/rds_ca.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem || true
+
 EXPOSE 3000
 
-# Define the command to run your application
-CMD [ "node", "server.js" ]
+CMD ["node", "server.js"]
