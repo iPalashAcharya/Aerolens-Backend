@@ -506,7 +506,6 @@ class CandidateValidator {
 
     static async validateCreate(req, res, next) {
         try {
-            // Basic schema validation
             const { error, value } = candidateSchemas.create.validate(req.body, {
                 abortEarly: false,
                 stripUnknown: true,
@@ -518,9 +517,21 @@ class CandidateValidator {
                     field: detail.path.join('.'),
                     message: detail.message
                 }));
+
+                // Cleanup S3 file if validation fails
+                if (req.file && req.file.key) {
+                    const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+                    const s3Client = new S3Client({ region: process.env.AWS_REGION || 'ap-south-1' });
+                    await s3Client.send(new DeleteObjectCommand({
+                        Bucket: process.env.AWS_S3_BUCKET,
+                        Key: req.file.key
+                    })).catch(err => console.error('S3 cleanup error:', err));
+                }
+
                 throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details });
             }
 
+            // File type validation
             if (req.file) {
                 const allowedMimeTypes = [
                     'application/pdf',
@@ -528,12 +539,27 @@ class CandidateValidator {
                     'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
                 ];
                 if (!allowedMimeTypes.includes(req.file.mimetype)) {
-                    fs.unlink(req.file.path, () => { });
+                    // Cleanup S3 file
+                    const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+                    const s3Client = new S3Client({ region: process.env.AWS_REGION || 'ap-south-1' });
+                    await s3Client.send(new DeleteObjectCommand({
+                        Bucket: process.env.AWS_S3_BUCKET,
+                        Key: req.file.key
+                    })).catch(err => console.error('S3 cleanup error:', err));
+
                     throw new AppError('Invalid resume file format. Only PDF, DOC and DOCX are allowed.', 400, 'VALIDATION_ERROR', { field: 'resume' });
                 }
+
                 const maxSizeBytes = 5 * 1024 * 1024;
                 if (req.file.size > maxSizeBytes) {
-                    fs.unlink(req.file.path, () => { });
+                    // Cleanup S3 file
+                    const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+                    const s3Client = new S3Client({ region: process.env.AWS_REGION || 'ap-south-1' });
+                    await s3Client.send(new DeleteObjectCommand({
+                        Bucket: process.env.AWS_S3_BUCKET,
+                        Key: req.file.key
+                    })).catch(err => console.error('S3 cleanup error:', err));
+
                     throw new AppError('Resume file size cannot exceed 5MB', 400, 'VALIDATION_ERROR', { field: 'resume' });
                 }
             }
@@ -551,27 +577,35 @@ class CandidateValidator {
 
             // Check for duplicates
             if (await CandidateValidator.helper.checkEmailExists(value.email)) {
+                // Cleanup S3 file
+                if (req.file && req.file.key) {
+                    const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+                    const s3Client = new S3Client({ region: process.env.AWS_REGION || 'ap-south-1' });
+                    await s3Client.send(new DeleteObjectCommand({
+                        Bucket: process.env.AWS_S3_BUCKET,
+                        Key: req.file.key
+                    })).catch(err => console.error('S3 cleanup error:', err));
+                }
                 throw new AppError('A candidate with this email already exists', 409, 'DUPLICATE_EMAIL', { field: 'email' });
             }
 
             if (await CandidateValidator.helper.checkContactExists(value.contactNumber)) {
+                // Cleanup S3 file
+                if (req.file && req.file.key) {
+                    const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+                    const s3Client = new S3Client({ region: process.env.AWS_REGION || 'ap-south-1' });
+                    await s3Client.send(new DeleteObjectCommand({
+                        Bucket: process.env.AWS_S3_BUCKET,
+                        Key: req.file.key
+                    })).catch(err => console.error('S3 cleanup error:', err));
+                }
                 throw new AppError('A candidate with this contact number already exists', 409, 'DUPLICATE_CONTACT', { field: 'contactNumber' });
             }
 
-            // Replace request body with validated and transformed data
             req.body = value;
             next();
         } catch (error) {
-            if (req.file && req.file.path) {
-                try {
-                    await fs.promises.unlink(req.file.path);
-                } catch (unlinkErr) {
-                    // ignore
-                }
-                next(error);
-            } else {
-                next(error);
-            }
+            next(error);
         }
     }
 
@@ -609,26 +643,52 @@ class CandidateValidator {
                         message: detail.message
                     })));
                 }
+
+                // Cleanup S3 file if validation fails
+                if (req.file && req.file.key) {
+                    const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+                    const s3Client = new S3Client({ region: process.env.AWS_REGION || 'ap-south-1' });
+                    await s3Client.send(new DeleteObjectCommand({
+                        Bucket: process.env.AWS_S3_BUCKET,
+                        Key: req.file.key
+                    })).catch(err => console.error('S3 cleanup error:', err));
+                }
+
                 throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details });
             }
 
+            // File type validation
             if (req.file) {
                 const allowedMimeTypes = [
                     'application/pdf',
                     'application/msword',
                     'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
                 ];
+
                 if (!allowedMimeTypes.includes(req.file.mimetype)) {
-                    fs.unlink(req.file.path, () => { });
+                    // Cleanup S3 file
+                    const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+                    const s3Client = new S3Client({ region: process.env.AWS_REGION || 'ap-south-1' });
+                    await s3Client.send(new DeleteObjectCommand({
+                        Bucket: process.env.AWS_S3_BUCKET,
+                        Key: req.file.key
+                    })).catch(err => console.error('S3 cleanup error:', err));
+
                     throw new AppError('Invalid resume file format. Only PDF, DOC and DOCX are allowed.', 400, 'VALIDATION_ERROR', { field: 'resume' });
                 }
+
                 const maxSizeBytes = 5 * 1024 * 1024;
                 if (req.file.size > maxSizeBytes) {
-                    fs.unlink(req.file.path, () => { });
+                    // Cleanup S3 file
+                    const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+                    const s3Client = new S3Client({ region: process.env.AWS_REGION || 'ap-south-1' });
+                    await s3Client.send(new DeleteObjectCommand({
+                        Bucket: process.env.AWS_S3_BUCKET,
+                        Key: req.file.key
+                    })).catch(err => console.error('S3 cleanup error:', err));
+
                     throw new AppError('Resume file size cannot exceed 5MB', 400, 'VALIDATION_ERROR', { field: 'resume' });
                 }
-                value.resumeFilename = path.extname(req.file.originalname);
-                value.resumeOriginalName = req.file.originalname;
             }
 
             const candidateId = req.params.id;
@@ -646,27 +706,35 @@ class CandidateValidator {
 
             // Check for duplicates (excluding current candidate)
             if (value.email && await CandidateValidator.helper.checkEmailExists(value.email, candidateId)) {
+                // Cleanup S3 file
+                if (req.file && req.file.key) {
+                    const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+                    const s3Client = new S3Client({ region: process.env.AWS_REGION || 'ap-south-1' });
+                    await s3Client.send(new DeleteObjectCommand({
+                        Bucket: process.env.AWS_S3_BUCKET,
+                        Key: req.file.key
+                    })).catch(err => console.error('S3 cleanup error:', err));
+                }
                 throw new AppError('A candidate with this email already exists', 409, 'DUPLICATE_EMAIL', { field: 'email' });
             }
 
             if (value.contactNumber && await CandidateValidator.helper.checkContactExists(value.contactNumber, candidateId)) {
+                // Cleanup S3 file
+                if (req.file && req.file.key) {
+                    const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
+                    const s3Client = new S3Client({ region: process.env.AWS_REGION || 'ap-south-1' });
+                    await s3Client.send(new DeleteObjectCommand({
+                        Bucket: process.env.AWS_S3_BUCKET,
+                        Key: req.file.key
+                    })).catch(err => console.error('S3 cleanup error:', err));
+                }
                 throw new AppError('A candidate with this contact number already exists', 409, 'DUPLICATE_CONTACT', { field: 'contactNumber' });
             }
 
-            // Replace request body with validated and transformed data
             req.body = value;
             next();
         } catch (error) {
-            if (req.file && req.file.path) {
-                try {
-                    await fs.promises.unlink(req.file.path);
-                } catch (unlinkErr) {
-                    // ignore
-                }
-                next(error);
-            } else {
-                next(error);
-            }
+            next(error);
         }
     }
 

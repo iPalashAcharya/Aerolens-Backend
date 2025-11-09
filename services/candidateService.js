@@ -1,49 +1,72 @@
-const AppError = require('../utils/appError');
 const multer = require('multer');
-const path = require('path');
 const fs = require('fs');
 const auditLogService = require('./auditLogService');
 const { exist } = require('joi');
+const { S3Client, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+const multerS3 = require('multer-s3');
+const path = require('path');
+const AppError = require('../utils/appError');
+
+const s3Config = {
+    region: process.env.AWS_REGION || 'ap-south-1'
+};
+
+const s3Client = new S3Client(s3Config);
+
+const S3_BUCKET_NAME = process.env.AWS_S3_BUCKET || 'your-bucket-name';
+const S3_RESUME_FOLDER = 'resumes/';
 
 class CandidateService {
     constructor(candidateRepository, db) {
         this.candidateRepository = candidateRepository;
         this.db = db;
+        this.s3Client = s3Client;
+        this.bucketName = S3_BUCKET_NAME;
+        this.resumeFolder = S3_RESUME_FOLDER;
         this.initializeMulter();
     }
     initializeMulter() {
-        const resumeDir = path.join(__dirname, '../resumes');
-
-        const ensureResumeDirectory = async () => {
-            try {
-                await fs.promises.access(resumeDir);
-            } catch (error) {
-                await fs.promises.mkdir(resumeDir, { recursive: true });
-            }
-        };
-
-        ensureResumeDirectory();
-
-        // Multer configuration
-        const storage = multer.diskStorage({
-            destination: async (req, file, cb) => {
-                await ensureResumeDirectory();
-                cb(null, resumeDir);
+        const storage = multerS3({
+            s3: this.s3Client,
+            bucket: this.bucketName,
+            contentType: multerS3.AUTO_CONTENT_TYPE,
+            metadata: (req, file, cb) => {
+                cb(null, {
+                    fieldName: file.fieldname,
+                    originalName: file.originalname,
+                    uploadDate: new Date().toISOString(),
+                    candidateId: req.params.id || req.body.candidateId || 'temp'
+                });
             },
-            filename: (req, file, cb) => {
-                const candidateId = req.params.id || req.body.candidateId;
-                const timestamp = Date.now();
-                const sanitizedOriginalName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-                const filename = `candidate_${candidateId}_${timestamp}_${sanitizedOriginalName}`;
-                cb(null, filename);
+            key: (req, file, cb) => {
+                try {
+                    const candidateId = req.params.id || req.body.candidateId || 'temp';
+                    const timestamp = Date.now();
+                    const sanitizedOriginalName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
+                    const fileExtension = path.extname(sanitizedOriginalName);
+
+                    // Generate S3 key: resumes/candidate_123_1234567890.pdf
+                    const s3Key = `${this.resumeFolder}candidate_${candidateId}_${timestamp}${fileExtension}`;
+
+                    cb(null, s3Key);
+                } catch (error) {
+                    cb(error);
+                }
             }
         });
 
         const fileFilter = (req, file, cb) => {
-            if (file.mimetype === 'application/pdf') {
+            const allowedMimeTypes = [
+                'application/pdf',
+                'application/msword',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            ];
+
+            if (allowedMimeTypes.includes(file.mimetype)) {
                 cb(null, true);
             } else {
-                cb(new Error('Only PDF files are allowed'), false);
+                cb(new AppError('Only PDF, DOC and DOCX files are allowed', 400, 'INVALID_FILE_TYPE'), false);
             }
         };
 
@@ -56,6 +79,54 @@ class CandidateService {
         });
     }
 
+    async deleteFromS3(s3Key) {
+        try {
+            const command = new DeleteObjectCommand({
+                Bucket: this.bucketName,
+                Key: s3Key
+            });
+
+            await this.s3Client.send(command);
+            console.log(`Successfully deleted file from S3: ${s3Key}`);
+        } catch (error) {
+            console.error('Error deleting file from S3:', error);
+            throw new AppError('Failed to delete file from S3', 500, 'S3_DELETE_ERROR');
+        }
+    }
+
+    async fileExistsInS3(s3Key) {
+        try {
+            const command = new HeadObjectCommand({
+                Bucket: this.bucketName,
+                Key: s3Key
+            });
+
+            await this.s3Client.send(command);
+            return true;
+        } catch (error) {
+            if (error.name === 'NotFound' || error.$metadata?.httpStatusCode === 404) {
+                return false;
+            }
+            throw error;
+        }
+    }
+
+    async generatePresignedUrl(s3Key, expiresIn = 900) {
+        try {
+            const command = new GetObjectCommand({
+                Bucket: this.bucketName,
+                Key: s3Key
+            });
+
+            const url = await getSignedUrl(this.s3Client, command, { expiresIn });
+            return url;
+        } catch (error) {
+            console.error('Error generating presigned URL:', error);
+            throw new AppError('Failed to generate download URL', 500, 'S3_URL_ERROR');
+        }
+    }
+
+
     async uploadResume(candidateId, file) {
         const client = await this.db.getConnection();
 
@@ -64,6 +135,10 @@ class CandidateService {
 
             const candidate = await this.candidateRepository.findById(candidateId, client);
             if (!candidate) {
+                // Delete uploaded S3 file if candidate not found
+                if (file.key) {
+                    await this.deleteFromS3(file.key);
+                }
                 throw new AppError(
                     `Candidate with ID ${candidateId} not found`,
                     404,
@@ -71,21 +146,22 @@ class CandidateService {
                 );
             }
 
+            // Delete old resume from S3 if exists
             const existingResumeInfo = await this.candidateRepository.getResumeInfo(candidateId, client);
             if (existingResumeInfo && existingResumeInfo.resumeFilename) {
-                const oldFilePath = path.join(__dirname, '../resumes', existingResumeInfo.resumeFilename);
                 try {
-                    await fs.promises.unlink(oldFilePath);
+                    await this.deleteFromS3(existingResumeInfo.resumeFilename);
                 } catch (error) {
-                    console.error('Error deleting old resume file:', error);
+                    console.error('Error deleting old resume from S3:', error);
                     // Continue with update even if old file deletion fails
                 }
             }
 
             // Update candidate record with new resume information
+            // Store S3 key as resumeFilename
             await this.candidateRepository.updateResumeInfo(
                 candidateId,
-                file.filename,
+                file.key, // S3 key
                 file.originalname,
                 client
             );
@@ -94,20 +170,22 @@ class CandidateService {
 
             return {
                 candidateId: candidateId,
-                filename: file.filename,
+                filename: file.key,
                 originalName: file.originalname,
                 size: file.size,
+                location: file.location, // S3 URL
                 uploadDate: new Date()
             };
 
         } catch (error) {
             await client.rollback();
 
-            if (file && file.path) {
+            // Delete uploaded S3 file on error
+            if (file && file.key) {
                 try {
-                    await fs.promises.unlink(file.path);
-                } catch (unlinkError) {
-                    console.error('Error deleting uploaded file:', unlinkError);
+                    await this.deleteFromS3(file.key);
+                } catch (deleteError) {
+                    console.error('Error deleting uploaded S3 file:', deleteError);
                 }
             }
 
@@ -139,7 +217,6 @@ class CandidateService {
                 );
             }
 
-            // Get resume information
             const resumeInfo = await this.candidateRepository.getResumeInfo(candidateId, client);
 
             if (!resumeInfo || !resumeInfo.resumeFilename) {
@@ -150,23 +227,24 @@ class CandidateService {
                 );
             }
 
-            const filePath = path.join(__dirname, '../resumes', resumeInfo.resumeFilename);
-
-            // Check if file exists
-            try {
-                await fs.promises.access(filePath);
-            } catch (error) {
+            // Check if file exists in S3
+            const fileExists = await this.fileExistsInS3(resumeInfo.resumeFilename);
+            if (!fileExists) {
                 throw new AppError(
-                    'Resume file not found on server',
+                    'Resume file not found in storage',
                     404,
                     'RESUME_FILE_NOT_FOUND'
                 );
             }
 
+            // Generate presigned URL for download (15 minutes)
+            const downloadUrl = await this.generatePresignedUrl(resumeInfo.resumeFilename, 900);
+
             return {
-                filePath: filePath,
+                downloadUrl: downloadUrl,
                 originalName: resumeInfo.resumeOriginalName,
-                filename: resumeInfo.resumeFilename
+                filename: resumeInfo.resumeFilename,
+                s3Key: resumeInfo.resumeFilename
             };
         } catch (error) {
             if (error instanceof AppError) {
@@ -191,7 +269,6 @@ class CandidateService {
         try {
             await client.beginTransaction();
 
-            // Check if candidate exists
             const candidate = await this.candidateRepository.findById(candidateId, client);
             if (!candidate) {
                 throw new AppError(
@@ -201,7 +278,6 @@ class CandidateService {
                 );
             }
 
-            // Get current resume information
             const resumeInfo = await this.candidateRepository.getResumeInfo(candidateId, client);
 
             if (!resumeInfo || !resumeInfo.resumeFilename) {
@@ -212,13 +288,12 @@ class CandidateService {
                 );
             }
 
-            // Delete file from filesystem
-            const filePath = path.join(__dirname, '../resumes', resumeInfo.resumeFilename);
+            // Delete file from S3
             try {
-                await fs.promises.unlink(filePath);
+                await this.deleteFromS3(resumeInfo.resumeFilename);
             } catch (error) {
-                console.error('Error deleting resume file:', error);
-                // Continue with database update even if file deletion fails
+                console.error('Error deleting resume from S3:', error);
+                // Continue with database update even if S3 deletion fails
             }
 
             // Update database to remove resume info
@@ -242,7 +317,8 @@ class CandidateService {
                 "Failed to Delete Resume",
                 500,
                 "RESUME_DELETE_ERROR",
-                { candidateId, operation: "deleteResume" });
+                { candidateId, operation: "deleteResume" }
+            );
         } finally {
             client.release();
         }
@@ -250,7 +326,6 @@ class CandidateService {
 
     async getResumeInfo(candidateId) {
         const client = await this.db.getConnection();
-        // Check if candidate exists
         try {
             const candidate = await this.candidateRepository.findById(candidateId, client);
             if (!candidate) {
@@ -266,7 +341,8 @@ class CandidateService {
             return {
                 hasResume: !!(resumeInfo && resumeInfo.resumeFilename),
                 originalName: resumeInfo?.resumeOriginalName || null,
-                uploadDate: resumeInfo?.resumeUploadDate || null
+                uploadDate: resumeInfo?.resumeUploadDate || null,
+                s3Key: resumeInfo?.resumeFilename || null
             };
         } catch (error) {
             if (error instanceof AppError) {
@@ -278,7 +354,8 @@ class CandidateService {
                 "Failed to Fetch Resume Information",
                 500,
                 "RESUME_FETCH_ERROR",
-                { candidateId, operation: "getResumeInfo" });
+                { candidateId, operation: "getResumeInfo" }
+            );
         } finally {
             client.release();
         }
@@ -306,7 +383,8 @@ class CandidateService {
                 "Failed to Update Resume Information",
                 500,
                 "RESUME_UPDATE_ERROR",
-                { candidateId, operation: "updateCandidateResumeInfo" });
+                { candidateId, operation: "updateCandidateResumeInfo" }
+            );
         } finally {
             client.release();
         }
@@ -429,12 +507,6 @@ class CandidateService {
 
             return await this.candidateRepository.findById(candidateId, client);
         } catch (error) {
-            if (updateData.resume) {
-                const newFilePath = path.join(__dirname, "../resumes", updateData.resume);
-                fs.unlink(newFilePath, (err) => {
-                    if (err) console.error("Failed to cleanup new resume:", err);
-                });
-            }
             await client.rollback();
             if (error instanceof AppError) {
                 throw error;

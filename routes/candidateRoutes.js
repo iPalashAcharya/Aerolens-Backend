@@ -9,11 +9,13 @@ const db = require('../db');
 const cors = require('cors');
 const auditContextMiddleware = require('../middleware/auditContext');
 const AppError = require('../utils/appError');
+const cleanupS3OnError = require('../middleware/s3CleanupMiddleware');
 const corsOptions = {
     origin: 'http://localhost:5173',
     methods: ['PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 };
+
 const router = express.Router();
 
 router.options('/:id', cors(corsOptions));
@@ -22,23 +24,20 @@ router.options('/:id', cors(corsOptions));
 const candidateRepository = new CandidateRepository(db);
 const candidateService = new CandidateService(candidateRepository, db);
 const candidateController = new CandidateController(candidateService);
+
 router.use(authenticate);
-router.use(auditContextMiddleware)
+router.use(auditContextMiddleware);
 
 // Routes
-/*router.get('/client/:clientId',
-    departmentController.getDepartmentsByClient
-);*/
-
 router.get('/',
     candidateController.getAllCandidates
 );
 
 router.post('/',
     candidateService.upload.single('resume'),
-    (req, res, next) => {                       // logger runs AFTER multer but BEFORE validator
+    (req, res, next) => {
         console.log("==== Parsed body BEFORE validator ====");
-        console.log(JSON.stringify(req.body, null, 2));  // parsed fields
+        console.log(JSON.stringify(req.body, null, 2));
         console.log("==== File info ====");
         if (req.file) {
             console.log({
@@ -46,7 +45,9 @@ router.post('/',
                 originalname: req.file.originalname,
                 mimetype: req.file.mimetype,
                 size: req.file.size,
-                path: req.file.path
+                key: req.file.key, // S3 key
+                location: req.file.location, // S3 URL
+                bucket: req.file.bucket // S3 bucket
             });
         } else {
             console.log("No file");
@@ -55,7 +56,8 @@ router.post('/',
         next();
     },
     CandidateValidator.validateCreate,
-    candidateController.createCandidate
+    candidateController.createCandidate,
+    cleanupS3OnError
 );
 
 router.post('/:id/resume',
@@ -74,7 +76,8 @@ router.post('/:id/resume',
             next();
         });
     },
-    candidateController.uploadResume
+    candidateController.uploadResume,
+    cleanupS3OnError
 );
 
 router.get('/:id/resume',
@@ -105,9 +108,9 @@ router.get('/:id',
 router.patch('/:id',
     cors(corsOptions),
     candidateService.upload.single('resume'),
-    (req, res, next) => {                       // logger runs AFTER multer but BEFORE validator
+    (req, res, next) => {
         console.log("==== Parsed body BEFORE validator ====");
-        console.log(JSON.stringify(req.body, null, 2));  // parsed fields
+        console.log(JSON.stringify(req.body, null, 2));
         console.log("==== File info ====");
         if (req.file) {
             console.log({
@@ -115,7 +118,9 @@ router.patch('/:id',
                 originalname: req.file.originalname,
                 mimetype: req.file.mimetype,
                 size: req.file.size,
-                path: req.file.path
+                key: req.file.key, // S3 key
+                location: req.file.location, // S3 URL
+                bucket: req.file.bucket // S3 bucket
             });
         } else {
             console.log("No file");
@@ -124,7 +129,8 @@ router.patch('/:id',
         next();
     },
     CandidateValidator.validateUpdate,
-    candidateController.updateCandidate
+    candidateController.updateCandidate,
+    cleanupS3OnError
 );
 
 router.delete('/:id',

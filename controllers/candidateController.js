@@ -18,21 +18,10 @@ class CandidateController {
             const candidate = await this.candidateService.createCandidate(candidateData, req.auditContext);
 
             if (req.file) {
-                // Step 2: Define the new filename using candidateId
-                const originalExtension = path.extname(req.file.originalname);
-                const newFilename = `candidate_${candidate.candidateId}${originalExtension}`;
-
-                // Step 3: Rename/move the file on disk
-                const resumeDir = path.join(__dirname, '..', 'resumes');
-                const oldPath = req.file.path; // temp location by multer
-                const newPath = path.join(resumeDir, newFilename);
-
-                // Rename the file asynchronously
-                await fs.promises.rename(oldPath, newPath);
-
-                // Step 4: Update candidate resume info in DB
+                // Step 2: File is already uploaded to S3 by multer-s3
+                // Update candidate resume info in DB with S3 key
                 await this.candidateService.updateCandidateResumeInfo(candidate.candidateId, {
-                    resumeFilename: newFilename,
+                    resumeFilename: req.file.key, // S3 key
                     resumeOriginalName: req.file.originalname,
                     resumeUploadDate: new Date()
                 });
@@ -40,9 +29,18 @@ class CandidateController {
 
             return ApiResponse.success(res, candidate, "Candidate created successfully", 201);
         } catch (error) {
+            // If error occurs and file was uploaded to S3, delete it
+            if (req.file && req.file.key) {
+                try {
+                    await this.candidateService.deleteFromS3(req.file.key);
+                } catch (deleteError) {
+                    console.error('Error deleting S3 file after creation failure:', deleteError);
+                }
+            }
             next(error);
         }
     });
+
     /*async createCandidate(req, res, next) {
         try {
             const candidateData = req.body;
@@ -102,45 +100,49 @@ class CandidateController {
         );
     });
 
-    updateCandidate = catchAsync(async (req, res) => {
-        const updatedCandidate = await this.candidateService.updateCandidate(
-            parseInt(req.params.id),
-            req.body,
-            req.auditContext
-        );
+    updateCandidate = catchAsync(async (req, res, next) => {
+        try {
+            const updatedCandidate = await this.candidateService.updateCandidate(
+                parseInt(req.params.id),
+                req.body,
+                req.auditContext
+            );
 
-        if (req.file) {
-            // Step 2: Define the new filename using candidateId
-            const originalExtension = path.extname(req.file.originalname);
-            const newFilename = `candidate_${req.params.id}${originalExtension}`;
+            if (req.file) {
+                // File is already uploaded to S3 by multer-s3
+                // Update candidate resume info in DB with S3 key
+                await this.candidateService.updateCandidateResumeInfo(req.params.id, {
+                    resumeFilename: req.file.key, // S3 key
+                    resumeOriginalName: req.file.originalname,
+                    resumeUploadDate: new Date()
+                });
+            }
 
-            // Step 3: Rename/move the file on disk
-            const resumeDir = path.join(__dirname, '..', 'resumes');
-            const oldPath = req.file.path; // temp location by multer
-            const newPath = path.join(resumeDir, newFilename);
-
-            // Rename the file asynchronously
-            await fs.promises.rename(oldPath, newPath);
-
-            // Step 4: Update candidate resume info in DB
-            await this.candidateService.updateCandidateResumeInfo(req.params.id, {
-                resumeFilename: newFilename,
-                resumeOriginalName: req.file.originalname,
-                resumeUploadDate: new Date()
-            });
+            return ApiResponse.success(
+                res,
+                updatedCandidate,
+                'Candidate updated successfully'
+            );
+        } catch (error) {
+            // If error occurs and file was uploaded to S3, delete it
+            if (req.file && req.file.key) {
+                try {
+                    await this.candidateService.deleteFromS3(req.file.key);
+                } catch (deleteError) {
+                    console.error('Error deleting S3 file after update failure:', deleteError);
+                }
+            }
+            next(error);
         }
-
-        return ApiResponse.success(
-            res,
-            updatedCandidate,
-            'Candidate updated successfully'
-        );
     });
 
     deleteCandidate = catchAsync(async (req, res) => {
-        if (req.file) {
+        // Delete resume from S3 if exists
+        const resumeInfo = await this.candidateService.getResumeInfo(parseInt(req.params.id));
+        if (resumeInfo.hasResume) {
             await this.candidateService.deleteResume(parseInt(req.params.id));
         }
+
         await this.candidateService.deleteCandidate(parseInt(req.params.id), req.auditContext);
         return ApiResponse.success(
             res,
@@ -171,12 +173,16 @@ class CandidateController {
 
         const resumeData = await this.candidateService.downloadResume(candidateId);
 
-        // Set headers for PDF download
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="${resumeData.originalName}"`);
-
-        // Send file
-        res.sendFile(resumeData.filePath);
+        // Return presigned URL for S3 download
+        return ApiResponse.success(
+            res,
+            {
+                downloadUrl: resumeData.downloadUrl,
+                originalName: resumeData.originalName,
+                expiresIn: 900 // 15 minutes
+            },
+            'Resume download URL generated successfully'
+        );
     });
 
     previewResume = catchAsync(async (req, res) => {
@@ -184,12 +190,7 @@ class CandidateController {
 
         const resumeData = await this.candidateService.downloadResume(candidateId);
 
-        // Set headers for PDF preview (inline display)
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'inline');
-
-        // Send file for preview
-        res.sendFile(resumeData.filePath);
+        res.redirect(resumeData.downloadUrl);
     });
 
     deleteResume = catchAsync(async (req, res) => {

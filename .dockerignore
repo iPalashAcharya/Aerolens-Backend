@@ -1,7 +1,7 @@
 node_modules
 __tests__
 appForTest.js
-db_dump.sql
+dump.sql
 .git
 .gitignore
 .env
