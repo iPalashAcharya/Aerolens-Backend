@@ -3,14 +3,16 @@ const router = express.Router();
 const authController = require('../controllers/authController');
 const AuthValidator = require('../validators/authValidator');
 const {
+    authorize,
     authenticate,
     loginRateLimiter,
     refreshRateLimiter,
     registerRateLimiter
 } = require('../middleware/authMiddleware');
 
-// Public routes
 router.post('/register',
+    authenticate,
+    authorize('admin'),
     registerRateLimiter,
     AuthValidator.validateRegister,
     authController.register

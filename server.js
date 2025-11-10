@@ -73,6 +73,9 @@ app.use(cookieParser());
 app.use(passport.initialize());
 
 app.use((req, res, next) => {
+    if (req.originalUrl === '/health') {
+        return next();
+    }
     console.log("==== Incoming Request ====");
     console.log("URL:", req.originalUrl);
     console.log("Method:", req.method);

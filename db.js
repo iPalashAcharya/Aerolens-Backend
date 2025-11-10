@@ -5,6 +5,17 @@ const path = require('path');
 
 env.config();
 
+let sslConfig;
+if (process.env.NODE_ENV === 'development') {
+    sslConfig = {
+        ca: Buffer.from(process.env.DB_CA_BASE64, 'base64').toString('utf-8')
+    }
+} else {
+    sslConfig = {
+        ca: fs.readFileSync(path.join(__dirname, 'certs', 'rds_ca.pem'))
+    }
+}
+
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
     port: process.env.DB_PORT,
@@ -14,9 +25,7 @@ const pool = mysql.createPool({
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
-    ssl: {
-        ca: fs.readFileSync(path.join(__dirname, 'certs', 'rds_ca.pem'))
-    }
+    ssl: sslConfig
 });
 
 module.exports = pool.promise();
