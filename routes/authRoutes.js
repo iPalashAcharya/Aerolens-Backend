@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
 const AuthValidator = require('../validators/authValidator');
+const env = require('dotenv');
+env.config();
 const {
     authorize,
     authenticate,
@@ -12,7 +14,7 @@ const {
 
 router.post('/register',
     authenticate,
-    authorize('admin'),
+    authorize(process.env.ALLOWED_ROLES),
     registerRateLimiter,
     AuthValidator.validateRegister,
     authController.register

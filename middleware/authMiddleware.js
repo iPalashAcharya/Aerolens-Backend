@@ -47,14 +47,17 @@ const authenticate = async (req, res, next) => {
     }
 };
 
-// Role-based authorization middleware
 const authorize = (...allowedRoles) => {
     return (req, res, next) => {
         if (!req.user) {
             return next(new AppError('Authentication required', 401, 'AUTHENTICATION_REQUIRED'));
         }
 
-        if (!allowedRoles.includes(req.user.designation)) {
+        const allowed = allowedRoles
+            .map(role => role.toLowerCase())
+            .includes(req.user.designation.toLowerCase());
+
+        if (allowed) {
             return next(new AppError('Insufficient permissions', 403, 'FORBIDDEN'));
         }
 
