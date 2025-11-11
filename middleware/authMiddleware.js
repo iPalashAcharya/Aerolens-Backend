@@ -103,7 +103,7 @@ const refreshRateLimiter = rateLimit({
 // Rate limiting for registration
 const registerRateLimiter = rateLimit({
     windowMs: 60 * 60 * 1000, // 1 hour
-    max: 3, // 3 registrations per hour
+    max: 3,
     message: {
         success: false,
         error: 'RATE_LIMIT_EXCEEDED',

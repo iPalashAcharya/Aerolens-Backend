@@ -15,7 +15,6 @@ const {
 router.post('/register',
     authenticate,
     authorize(process.env.ALLOWED_ROLES),
-    registerRateLimiter,
     AuthValidator.validateRegister,
     authController.register
 );
