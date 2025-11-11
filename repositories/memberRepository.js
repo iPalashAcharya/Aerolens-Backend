@@ -57,9 +57,19 @@ class MemberRepository {
             return await this.findById(result.insertId);
         } catch (error) {
             if (error.code === 'ER_DUP_ENTRY') {
-                throw new AppError('Email already exists', 409, 'DUPLICATE_EMAIL');
+                let field = 'field';
+                const errorMsg = error.message.toLowerCase();
+
+                if (errorMsg.includes('email')) field = 'Email';
+                else if (errorMsg.includes('contact')) field = 'Contact number';
+                else if (errorMsg.includes('name')) field = 'Name';
+
+                throw new AppError(
+                    `${field} already exists`,
+                    409,
+                    `DUPLICATE_${field.toUpperCase().replace(/\s+/g, '_')}`
+                );
             }
-            throw new AppError('Database error while creating member', 500, 'DB_ERROR', error.message);
         } finally {
             connection.release();
         }
