@@ -81,14 +81,15 @@ app.use((req, res, next) => {
     console.log("Method:", req.method);
     console.log("Headers:", req.headers);
 
-    if (req.is("application/json") || req.is("application/x-www-form-urlencoded")) {
-        console.log("Body:", req.body);
+    if (!req.originalUrl.startsWith('/auth/')) {
+        if (req.is("application/json") || req.is("application/x-www-form-urlencoded")) {
+            console.log("Body:", req.body);
+        }
     }
 
     if (req.is("multipart/form-data")) {
         console.log("Multipart form detected");
     }
-
     console.log("==========================");
     next();
 });

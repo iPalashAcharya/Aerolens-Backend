@@ -29,9 +29,9 @@ class ClientRepository {
         }
     }
 
-    async getById(clientId, client) {
+    async getById(clientId, connection) {
         try {
-            const [clientDetails] = await client.execute(`
+            const [clientDetails] = await connection.execute(`
                 SELECT 
                     c.clientId,
                     c.clientName,
@@ -58,7 +58,18 @@ class ClientRepository {
                 WHERE 
                     c.clientId = ?;
             `, [clientId]);
-            return clientDetails.length > 0 ? clientDetails[0] : null;
+            if (clientDetails.length > 0) {
+                const client = clientDetails[0];
+                if (typeof client.departments === 'string') {
+                    client.departments = JSON.parse(client.departments);
+                }
+                if (typeof client.clientContact === 'string') {
+                    client.clientContact = JSON.parse(client.clientContact);
+                }
+                return client;
+            } else {
+                return null;
+            }
         } catch (error) {
             this._handleDatabaseError(error, 'getById');
         }
