@@ -10,15 +10,8 @@ const cors = require('cors');
 const auditContextMiddleware = require('../middleware/auditContext');
 const AppError = require('../utils/appError');
 const cleanupS3OnError = require('../middleware/s3CleanupMiddleware');
-const corsOptions = {
-    origin: 'http://localhost:5173',
-    methods: ['PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-};
 
 const router = express.Router();
-
-router.options('/:id', cors(corsOptions));
 
 // Dependency injection
 const candidateRepository = new CandidateRepository(db);
@@ -106,7 +99,6 @@ router.get('/:id',
 );
 
 router.patch('/:id',
-    cors(corsOptions),
     candidateService.upload.single('resume'),
     (req, res, next) => {
         console.log("==== Parsed body BEFORE validator ====");

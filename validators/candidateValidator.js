@@ -621,11 +621,12 @@ class CandidateValidator {
                 convert: true
             });
 
-            // If no body fields but req.file exists, ignore "min(1)" error
+            // ✅ If no body fields but req.file exists, set value to empty object
             if (bodyError) {
                 const hasMinOneError = bodyError.details.some(d => d.type === 'object.min');
                 if (hasMinOneError && req.file) {
                     bodyError = null;
+                    value = {};  // ✅ Set to empty object instead of leaving undefined
                 }
             }
 
@@ -731,7 +732,7 @@ class CandidateValidator {
                 throw new AppError('A candidate with this contact number already exists', 409, 'DUPLICATE_CONTACT', { field: 'contactNumber' });
             }
 
-            req.body = value;
+            req.body = value;  // ✅ Now this will be {} if only file uploaded
             next();
         } catch (error) {
             next(error);

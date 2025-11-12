@@ -303,7 +303,8 @@ class CandidateRepository {
             }
 
             if (!updateData || Object.keys(updateData).length === 0) {
-                throw new AppError('Update data is required', 400, 'MISSING_UPDATE_DATA');
+                // Return existing candidate data without updating
+                return { candidateId };
             }
 
             // Filter only allowed fields for security
