@@ -172,25 +172,46 @@ class CandidateController {
         const candidateId = parseInt(req.params.id);
 
         const resumeData = await this.candidateService.downloadResume(candidateId);
+        const { GetObjectCommand } = require('@aws-sdk/client-s3');
+        const { s3Client, bucketName } = this.candidateService;
 
-        // Return presigned URL for S3 download
-        return ApiResponse.success(
-            res,
-            {
-                downloadUrl: resumeData.downloadUrl,
-                originalName: resumeData.originalName,
-                expiresIn: 900 // 15 minutes
-            },
-            'Resume download URL generated successfully'
-        );
+        const command = new GetObjectCommand({
+            Bucket: bucketName,
+            Key: resumeData.s3Key
+        });
+
+        const s3Response = await s3Client.send(command);
+
+        // Set headers for download
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${resumeData.originalName}"`);
+        res.setHeader('Access-Control-Allow-Origin', '*');
+
+        // Pipe the S3 stream to response
+        s3Response.Body.pipe(res);
     });
 
     previewResume = catchAsync(async (req, res) => {
         const candidateId = parseInt(req.params.id);
 
         const resumeData = await this.candidateService.downloadResume(candidateId);
+        const { GetObjectCommand } = require('@aws-sdk/client-s3');
+        const { s3Client, bucketName } = this.candidateService;
 
-        res.redirect(resumeData.downloadUrl);
+        const command = new GetObjectCommand({
+            Bucket: bucketName,
+            Key: resumeData.s3Key
+        });
+
+        const s3Response = await s3Client.send(command);
+
+        // Set headers for inline preview
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename="${resumeData.originalName}"`);
+        res.setHeader('Access-Control-Allow-Origin', '*');
+
+        // Pipe the S3 stream to response
+        s3Response.Body.pipe(res);
     });
 
     deleteResume = catchAsync(async (req, res) => {
