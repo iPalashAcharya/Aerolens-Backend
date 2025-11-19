@@ -31,6 +31,7 @@ class CandidateService {
             s3: this.s3Client,
             bucket: this.bucketName,
             contentType: multerS3.AUTO_CONTENT_TYPE,
+            serverSideEncryption: 'AES256',
             metadata: (req, file, cb) => {
                 cb(null, {
                     fieldName: file.fieldname,
