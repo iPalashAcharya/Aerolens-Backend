@@ -41,6 +41,7 @@ const contactSchemas = {
             .trim()
             .pattern(/^[+]?[\d\s()-]{7,25}$/)
             .optional()
+            .allow('', null)
             .messages({
                 'string.pattern.base': 'Contact number must be a valid phone number (7-25 characters, numbers, spaces, +, -, () allowed)'
             }),
@@ -50,6 +51,7 @@ const contactSchemas = {
             .max(255)
             .lowercase()
             .optional()
+            .empty('', null)
             .messages({
                 'string.email': 'Email must be a valid email address',
                 'string.max': 'Email cannot exceed 255 characters'
@@ -85,6 +87,7 @@ const contactSchemas = {
             .trim()
             .pattern(/^[+]?[\d\s()-]{7,25}$/)
             .optional()
+            .allow('', null)
             .messages({
                 'string.pattern.base': 'Contact number must be a valid phone number (7-25 characters, numbers, spaces, +, -, () allowed)'
             }),
@@ -94,6 +97,7 @@ const contactSchemas = {
             .max(255)
             .lowercase()
             .optional()
+            .allow('', null)
             .messages({
                 'string.email': 'Email must be a valid email address',
                 'string.max': 'Email cannot exceed 255 characters'
