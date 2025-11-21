@@ -1,11 +1,31 @@
 const catchAsync = require('../utils/catchAsync');
 const ApiResponse = require('../utils/response');
+const AppError = require('../utils/appError');
 const path = require('path');
 const fs = require('fs');
 
 class CandidateController {
     constructor(candidateService) {
         this.candidateService = candidateService;
+    }
+
+    getMimeType(filename) {
+        const ext = path.extname(filename).toLowerCase();
+        const mimeTypes = {
+            '.pdf': 'application/pdf',
+            '.doc': 'application/msword',
+            '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        };
+        return mimeTypes[ext] || 'application/octet-stream';
+    }
+
+    supportsInlinePreview(filename) {
+        const ext = path.extname(filename).toLowerCase();
+        return ext === '.pdf';
+    }
+
+    sanitizeFilename(filename) {
+        return filename.replace(/["\\\r\n]/g, '');
     }
 
     createCandidate = catchAsync(async (req, res, next) => {
@@ -182,10 +202,18 @@ class CandidateController {
 
         const s3Response = await s3Client.send(command);
 
+        const mimeType = this.getMimeType(resumeData.originalName);
+        const sanitizedFilename = this.sanitizeFilename(resumeData.originalName);
+
         // Set headers for download
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="${resumeData.originalName}"`);
+        res.setHeader('Content-Type', mimeType);
+        res.setHeader('Content-Disposition', `attachment; filename="${sanitizedFilename}"`);
         res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+
+        if (s3Response.ContentLength) {
+            res.setHeader('Content-Length', s3Response.ContentLength);
+        }
 
         // Pipe the S3 stream to response
         s3Response.Body.pipe(res);
@@ -195,6 +223,17 @@ class CandidateController {
         const candidateId = parseInt(req.params.id);
 
         const resumeData = await this.candidateService.downloadResume(candidateId);
+        if (!this.supportsInlinePreview(resumeData.originalName)) {
+            throw new AppError(
+                'Preview is only supported for PDF files. Please download the file instead.',
+                400,
+                'PREVIEW_NOT_SUPPORTED',
+                {
+                    fileType: path.extname(resumeData.originalName),
+                    supportedTypes: ['.pdf']
+                }
+            );
+        }
         const { GetObjectCommand } = require('@aws-sdk/client-s3');
         const { s3Client, bucketName } = this.candidateService;
 
@@ -205,10 +244,18 @@ class CandidateController {
 
         const s3Response = await s3Client.send(command);
 
+        const mimeType = this.getMimeType(resumeData.originalName);
+        const sanitizedFilename = this.sanitizeFilename(resumeData.originalName);
+
         // Set headers for inline preview
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `inline; filename="${resumeData.originalName}"`);
+        res.setHeader('Content-Type', mimeType);
+        res.setHeader('Content-Disposition', `inline; filename="${sanitizedFilename}"`);
         res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+
+        if (s3Response.ContentLength) {
+            res.setHeader('Content-Length', s3Response.ContentLength);
+        }
 
         // Pipe the S3 stream to response
         s3Response.Body.pipe(res);
@@ -231,6 +278,13 @@ class CandidateController {
         const candidateId = parseInt(req.params.id);
 
         const resumeInfo = await this.candidateService.getResumeInfo(candidateId);
+
+        if (resumeInfo.hasResume && resumeInfo.originalName) {
+            const ext = path.extname(resumeInfo.originalName).toLowerCase();
+            resumeInfo.fileExtension = ext;
+            resumeInfo.mimeType = this.getMimeType(resumeInfo.originalName);
+            resumeInfo.supportsPreview = this.supportsInlinePreview(resumeInfo.originalName);
+        }
 
         return ApiResponse.success(
             res,

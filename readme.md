@@ -987,8 +987,8 @@ JSON body:
 | `clientId`          | Number | Yes      | The client's ID              |
 | `contactPersonName` | String | Yes      | Contact person's name        |
 | `designation`       | String | Yes      | Contact person's designation |
-| `phone`             | String | Yes      | Contact person's phone       |
-| `email`             | String | Yes      | Contact person's email       |
+| `phone`             | String | No       | Contact person's phone       |
+| `email`             | String | No       | Contact person's email       |
 
 **Example:**
 

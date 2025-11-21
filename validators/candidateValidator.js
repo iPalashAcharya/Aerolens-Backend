@@ -155,15 +155,15 @@ const candidateSchemas = {
             .trim()
             .min(2)
             .max(100)
-            .pattern(/^[a-zA-Z\s.'-]+$/)
+            .pattern(/^[a-zA-Z\s.'-()]+$/)
             .required()
-            .custom((value, helpers) => {
+            /*.custom((value, helpers) => {
                 const validRecruiters = ['jayraj', 'khushi', 'yash'];
                 if (!validRecruiters.includes(value.toLowerCase())) {
                     return helpers.error("any.invalid");
                 }
                 return value;
-            })
+            })*/
             .messages({
                 'string.empty': 'Recruiter name is required',
                 'string.min': 'Recruiter name must be at least 2 characters long',

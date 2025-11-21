@@ -127,6 +127,25 @@ class CandidateService {
         }
     }
 
+    async getS3FileMetadata(s3Key) {
+        try {
+            const command = new HeadObjectCommand({
+                Bucket: this.bucketName,
+                Key: s3Key
+            });
+
+            const metadata = await this.s3Client.send(command);
+            return {
+                contentType: metadata.ContentType,
+                contentLength: metadata.ContentLength,
+                lastModified: metadata.LastModified,
+                metadata: metadata.Metadata
+            };
+        } catch (error) {
+            console.error('Error getting S3 file metadata:', error);
+            throw new AppError('Failed to get file metadata', 500, 'S3_METADATA_ERROR');
+        }
+    }
 
     async uploadResume(candidateId, file) {
         const client = await this.db.getConnection();
@@ -238,14 +257,17 @@ class CandidateService {
                 );
             }
 
-            // Generate presigned URL for download (15 minutes)
-            const downloadUrl = await this.generatePresignedUrl(resumeInfo.resumeFilename, 900);
+            // Get file metadata for additional info
+            const metadata = await this.getS3FileMetadata(resumeInfo.resumeFilename);
 
+            // Return S3 key and metadata for controller to stream
             return {
-                downloadUrl: downloadUrl,
+                s3Key: resumeInfo.resumeFilename,
                 originalName: resumeInfo.resumeOriginalName,
                 filename: resumeInfo.resumeFilename,
-                s3Key: resumeInfo.resumeFilename
+                uploadDate: resumeInfo.resumeUploadDate,
+                contentType: metadata.contentType,
+                contentLength: metadata.contentLength
             };
         } catch (error) {
             if (error instanceof AppError) {
@@ -258,6 +280,65 @@ class CandidateService {
                 500,
                 "RESUME_DOWNLOAD_ERROR",
                 { candidateId, operation: "downloadResume" }
+            );
+        } finally {
+            client.release();
+        }
+    }
+
+    async getResumePresignedUrl(candidateId, expiresIn = 900) {
+        const client = await this.db.getConnection();
+        try {
+            const candidate = await this.candidateRepository.findById(candidateId, client);
+            if (!candidate) {
+                throw new AppError(
+                    `Candidate with ID ${candidateId} not found`,
+                    404,
+                    'CANDIDATE_NOT_FOUND'
+                );
+            }
+
+            const resumeInfo = await this.candidateRepository.getResumeInfo(candidateId, client);
+
+            if (!resumeInfo || !resumeInfo.resumeFilename) {
+                throw new AppError(
+                    'No resume found for this candidate',
+                    404,
+                    'RESUME_NOT_FOUND'
+                );
+            }
+
+            // Check if file exists in S3
+            const fileExists = await this.fileExistsInS3(resumeInfo.resumeFilename);
+            if (!fileExists) {
+                throw new AppError(
+                    'Resume file not found in storage',
+                    404,
+                    'RESUME_FILE_NOT_FOUND'
+                );
+            }
+
+            // Generate presigned URL
+            const downloadUrl = await this.generatePresignedUrl(resumeInfo.resumeFilename, expiresIn);
+
+            return {
+                downloadUrl: downloadUrl,
+                originalName: resumeInfo.resumeOriginalName,
+                filename: resumeInfo.resumeFilename,
+                expiresIn: expiresIn,
+                expiresAt: new Date(Date.now() + expiresIn * 1000)
+            };
+        } catch (error) {
+            if (error instanceof AppError) {
+                throw error;
+            }
+
+            console.error("Error Generating Presigned URL:", error.stack);
+            throw new AppError(
+                "Failed to Generate Download URL",
+                500,
+                "PRESIGNED_URL_ERROR",
+                { candidateId, operation: "getResumePresignedUrl" }
             );
         } finally {
             client.release();
