@@ -2,7 +2,7 @@ const multer = require('multer');
 const fs = require('fs');
 const auditLogService = require('./auditLogService');
 const { exist } = require('joi');
-const { S3Client, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, CopyObjectCommand, DeleteObjectCommand, GetObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const multerS3 = require('multer-s3');
 const path = require('path');
@@ -147,9 +147,61 @@ class CandidateService {
         }
     }
 
+    async renameS3File(oldKey, candidateId, originalName) {
+
+        try {
+            // Generate new key with actual candidateId
+            const timestamp = Date.now();
+            const sanitizedOriginalName = originalName.replace(/[^a-zA-Z0-9.-]/g, '_');
+            const fileExtension = path.extname(sanitizedOriginalName);
+            const newKey = `${this.resumeFolder}candidate_${candidateId}_${timestamp}${fileExtension}`;
+
+            // Copy object to new key
+            const copyCommand = new CopyObjectCommand({
+                Bucket: this.bucketName,
+                CopySource: `${this.bucketName}/${oldKey}`,
+                Key: newKey,
+                ServerSideEncryption: 'AES256',
+                MetadataDirective: 'REPLACE',
+                Metadata: {
+                    candidateId: candidateId.toString(),
+                    originalName: originalName,
+                    uploadDate: new Date().toISOString()
+                }
+            });
+
+            await this.s3Client.send(copyCommand);
+            console.log(`Successfully copied S3 file from ${oldKey} to ${newKey}`);
+
+            // Delete old temp file
+            const deleteCommand = new DeleteObjectCommand({
+                Bucket: this.bucketName,
+                Key: oldKey
+            });
+
+            await this.s3Client.send(deleteCommand);
+            console.log(`Successfully deleted temp S3 file: ${oldKey}`);
+
+            return {
+                oldKey,
+                newKey,
+                candidateId,
+                originalName
+            };
+        } catch (error) {
+            console.error('Error renaming S3 file:', error);
+            // If copy fails, try to delete the temp file
+            try {
+                await this.deleteFromS3(oldKey);
+            } catch (deleteError) {
+                console.error('Error deleting temp file after rename failure:', deleteError);
+            }
+            throw new AppError('Failed to rename resume file', 500, 'S3_RENAME_ERROR');
+        }
+    }
+
     async uploadResume(candidateId, file) {
         const client = await this.db.getConnection();
-
         try {
             await client.beginTransaction();
 
@@ -166,11 +218,11 @@ class CandidateService {
                 );
             }
 
-            // Delete old resume from S3 if exists
             const existingResumeInfo = await this.candidateRepository.getResumeInfo(candidateId, client);
             if (existingResumeInfo && existingResumeInfo.resumeFilename) {
                 try {
                     await this.deleteFromS3(existingResumeInfo.resumeFilename);
+                    console.log(`Deleted old resume from S3: ${existingResumeInfo.resumeFilename}`);
                 } catch (error) {
                     console.error('Error deleting old resume from S3:', error);
                     // Continue with update even if old file deletion fails
@@ -178,7 +230,6 @@ class CandidateService {
             }
 
             // Update candidate record with new resume information
-            // Store S3 key as resumeFilename
             await this.candidateRepository.updateResumeInfo(
                 candidateId,
                 file.key, // S3 key
@@ -196,7 +247,6 @@ class CandidateService {
                 location: file.location, // S3 URL
                 uploadDate: new Date()
             };
-
         } catch (error) {
             await client.rollback();
 
@@ -212,7 +262,6 @@ class CandidateService {
             if (error instanceof AppError) {
                 throw error;
             }
-
             console.error("Error Uploading Resume:", error.stack);
             throw new AppError(
                 "Failed to Upload Resume",

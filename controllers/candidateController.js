@@ -38,10 +38,16 @@ class CandidateController {
             const candidate = await this.candidateService.createCandidate(candidateData, req.auditContext);
 
             if (req.file) {
-                // Step 2: File is already uploaded to S3 by multer-s3
-                // Update candidate resume info in DB with S3 key
+                // Step 2: Rename the S3 file with the proper candidateId
+                const renamedFileInfo = await this.candidateService.renameS3File(
+                    req.file.key,
+                    candidate.candidateId,
+                    req.file.originalname
+                );
+
+                // Step 3: Update candidate resume info in DB with new S3 key
                 await this.candidateService.updateCandidateResumeInfo(candidate.candidateId, {
-                    resumeFilename: req.file.key, // S3 key
+                    resumeFilename: renamedFileInfo.newKey,
                     resumeOriginalName: req.file.originalname,
                     resumeUploadDate: new Date()
                 });
@@ -60,40 +66,6 @@ class CandidateController {
             next(error);
         }
     });
-
-    /*async createCandidate(req, res, next) {
-        try {
-            const candidateData = req.body;
-
-            // Step 1: Create candidate record in DB without resume info
-            const candidate = await this.candidateService.createCandidate(candidateData);
-
-            if (req.file) {
-                // Step 2: Define the new filename using candidateId
-                const originalExtension = path.extname(req.file.originalname);
-                const newFilename = `candidate_${candidate.candidateId}${originalExtension}`;
-
-                // Step 3: Rename/move the file on disk
-                const resumeDir = path.join(__dirname, '..', 'resumes');
-                const oldPath = req.file.path; // temp location by multer
-                const newPath = path.join(resumeDir, newFilename);
-
-                // Rename the file asynchronously
-                await fs.promises.rename(oldPath, newPath);
-
-                // Step 4: Update candidate resume info in DB
-                await this.candidateService.updateCandidateResumeInfo(candidate.candidateId, {
-                    resumeFilename: newFilename,
-                    resumeOriginalName: req.file.originalname,
-                    resumeUploadDate: new Date()
-                });
-            }
-
-            return ApiResponse.success(res, candidate, "Candidate created successfully", 201);
-        } catch (error) {
-            next(error);
-        }
-    }*/
 
     getCandidate = catchAsync(async (req, res) => {
         const candidate = await this.candidateService.getCandidateById(
@@ -122,17 +94,32 @@ class CandidateController {
 
     updateCandidate = catchAsync(async (req, res, next) => {
         try {
+            const candidateId = parseInt(req.params.id);
+
+            // If new file is uploaded, delete old resume first
+            if (req.file) {
+                const resumeInfo = await this.candidateService.getResumeInfo(candidateId);
+                if (resumeInfo.hasResume && resumeInfo.s3Key) {
+                    try {
+                        await this.candidateService.deleteFromS3(resumeInfo.s3Key);
+                        console.log(`Deleted old resume: ${resumeInfo.s3Key}`);
+                    } catch (deleteError) {
+                        console.error('Error deleting old resume:', deleteError);
+                        // Continue with update even if old file deletion fails
+                    }
+                }
+            }
+
             const updatedCandidate = await this.candidateService.updateCandidate(
-                parseInt(req.params.id),
+                candidateId,
                 req.body,
                 req.auditContext
             );
 
             if (req.file) {
-                // File is already uploaded to S3 by multer-s3
-                // Update candidate resume info in DB with S3 key
-                await this.candidateService.updateCandidateResumeInfo(req.params.id, {
-                    resumeFilename: req.file.key, // S3 key
+                // Update candidate resume info in DB with new S3 key
+                await this.candidateService.updateCandidateResumeInfo(candidateId, {
+                    resumeFilename: req.file.key,
                     resumeOriginalName: req.file.originalname,
                     resumeUploadDate: new Date()
                 });
@@ -178,6 +165,18 @@ class CandidateController {
             throw new AppError('No resume file uploaded', 400, 'NO_FILE_UPLOADED');
         }
 
+        // Delete old resume before uploading new one
+        const resumeInfo = await this.candidateService.getResumeInfo(candidateId);
+        if (resumeInfo.hasResume && resumeInfo.s3Key) {
+            try {
+                await this.candidateService.deleteFromS3(resumeInfo.s3Key);
+                console.log(`Deleted old resume: ${resumeInfo.s3Key}`);
+            } catch (deleteError) {
+                console.error('Error deleting old resume:', deleteError);
+                // Continue with upload even if old file deletion fails
+            }
+        }
+
         const result = await this.candidateService.uploadResume(candidateId, req.file);
 
         return ApiResponse.success(
@@ -215,8 +214,19 @@ class CandidateController {
             res.setHeader('Content-Length', s3Response.ContentLength);
         }
 
-        // Pipe the S3 stream to response
-        s3Response.Body.pipe(res);
+        // Stream the S3 response to client
+        // Handle both Node.js streams and Web streams
+        if (s3Response.Body.pipe) {
+            // Node.js stream
+            s3Response.Body.pipe(res);
+        } else {
+            // Web stream (AWS SDK v3)
+            const stream = s3Response.Body;
+            for await (const chunk of stream) {
+                res.write(chunk);
+            }
+            res.end();
+        }
     });
 
     previewResume = catchAsync(async (req, res) => {
@@ -257,8 +267,18 @@ class CandidateController {
             res.setHeader('Content-Length', s3Response.ContentLength);
         }
 
-        // Pipe the S3 stream to response
-        s3Response.Body.pipe(res);
+        // Stream the S3 response to client
+        if (s3Response.Body.pipe) {
+            // Node.js stream
+            s3Response.Body.pipe(res);
+        } else {
+            // Web stream (AWS SDK v3)
+            const stream = s3Response.Body;
+            for await (const chunk of stream) {
+                res.write(chunk);
+            }
+            res.end();
+        }
     });
 
     deleteResume = catchAsync(async (req, res) => {

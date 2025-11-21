@@ -324,7 +324,7 @@ const candidateSchemas = {
             .trim()
             .min(2)
             .max(100)
-            .pattern(/^[a-zA-Z\s.'-]+$/)
+            .pattern(/^[a-zA-Z\s.'-()]+$/)
             .optional()
             .messages({
                 'string.min': 'Recruiter name must be at least 2 characters long',
