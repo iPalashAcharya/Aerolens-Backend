@@ -408,11 +408,11 @@ class CandidateRepository {
         }
     }
 
-    async findAll(limit = 10, offset = 0, client) {
+    async findAll(limit = null, offset = null, client) {
         const connection = client;
 
         try {
-            const query = `
+            let query = `
             SELECT c.candidateId, c.candidateName, c.contactNumber, c.email, c.recruiterName,
                    c.jobRole, loc.value AS preferredJobLocation, c.currentCTC, c.expectedCTC, c.noticePeriod,
                    c.experienceYears, c.linkedinProfileUrl, c.createdAt, c.updatedAt,
@@ -420,15 +420,20 @@ class CandidateRepository {
             FROM candidate c
             LEFT JOIN lookup stat ON c.statusId = stat.lookupKey and stat.tag = 'candidateStatus'
             LEFT JOIN lookup loc ON c.preferredJobLocation = loc.lookupKey and loc.tag = 'location'
-            LIMIT ? OFFSET ?
         `;
+            console.log(query);
+            const params = [];
+            if (limit) {
+                query += ` LIMIT ?`;
+                params.push(limit);
 
-            const numLimit = Math.max(1, parseInt(limit, 10) || 10);
-            const numOffset = Math.max(0, parseInt(offset, 10) || 0);
+                if (offset) {
+                    query += ` OFFSET ?`;
+                    params.push(offset);
+                }
+            }
 
-            const params = [numLimit, numOffset];
-
-            const [rows] = await connection.query(query, params);
+            const [rows] = await connection.execute(query, params);
             return rows;
         } catch (error) {
             this._handleDatabaseError(error);

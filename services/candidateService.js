@@ -721,10 +721,11 @@ class CandidateService {
     }
 
     async getAllCandidates(options = {}) {
-        const { limit, offset } = options;
+        //const { limit, offset } = options;
         const client = await this.db.getConnection();
         try {
-            return await this.candidateRepository.findAll(limit, offset, client);
+            //return await this.candidateRepository.findAll(limit, offset, client);
+            return await this.candidateRepository.findAll(null, null, client);
         } catch (error) {
             if (error instanceof AppError) {
                 throw error;
