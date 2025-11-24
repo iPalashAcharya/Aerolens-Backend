@@ -29,6 +29,31 @@ const lookupSchemas = {
             })
     }),
 
+    update: Joi.object({
+        tag: Joi.string()
+            .trim()
+            .min(1)
+            .max(100)
+            .optional()
+            .messages({
+                'string.base': 'Tag must be a string',
+                'string.min': 'Tag must be at least 1 character long',
+                'string.max': 'Tag cannot exceed 100 characters'
+            }),
+        value: Joi.string()
+            .trim()
+            .min(1)
+            .max(500)
+            .optional()
+            .messages({
+                'string.base': 'Value must be a string',
+                'string.min': 'Value must be at least 1 character long',
+                'string.max': 'Value cannot exceed 500 characters'
+            })
+    }).min(1).messages({
+        'object.min': 'At least one field (tag or value) must be provided for update'
+    }),
+
     params: Joi.object({
         lookupKey: Joi.number()
             .integer()
@@ -69,6 +94,19 @@ const lookupSchemas = {
 class LookupValidator {
     static validateCreate(req, res, next) {
         const { value, error } = lookupSchemas.create.validate(req.body, { abortEarly: false, stripUnknown: true });
+        if (error) {
+            const details = error.details.map(detail => ({
+                field: detail.path[0],
+                message: detail.message
+            }));
+            throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details });
+        }
+        req.body = value;
+        next();
+    }
+
+    static validateUpdate(req, res, next) {
+        const { value, error } = lookupSchemas.update.validate(req.body, { abortEarly: false, stripUnknown: true });
         if (error) {
             const details = error.details.map(detail => ({
                 field: detail.path[0],

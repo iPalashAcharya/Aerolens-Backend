@@ -120,6 +120,53 @@ class LookupService {
         }
     }
 
+    async updateLookup(lookupKey, lookupData, auditContext) {
+        const client = await this.db.getConnection();
+        try {
+            await client.beginTransaction();
+
+            const existingLookup = await this.lookupRepository.getByKey(lookupKey, client);
+            if (!existingLookup) {
+                throw new AppError(
+                    `Lookup with Key ${lookupKey} not found`,
+                    404,
+                    'LOOKUP_NOT_FOUND'
+                );
+            }
+
+            const updatedLookup = await this.lookupRepository.update(lookupKey, lookupData, client);
+
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'UPDATE',
+                previousValues: existingLookup,
+                newValues: updatedLookup,
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, client);
+
+            await client.commit();
+
+            return updatedLookup;
+        } catch (error) {
+            await client.rollback();
+            if (error instanceof AppError) {
+                throw error;
+            }
+
+            console.error("Error updating Lookup entry:", error.stack);
+            throw new AppError(
+                "Failed to update lookup entry",
+                500,
+                "LOOKUP_UPDATE_ERROR",
+                { operation: "updateLookup", lookupKey }
+            );
+        } finally {
+            client.release();
+        }
+    }
+
     async getByKey(lookupKey) {
         const client = await this.db.getConnection();
         try {

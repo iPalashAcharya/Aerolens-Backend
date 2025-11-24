@@ -74,6 +74,56 @@ class LookupRepository {
         }
     }
 
+    async update(lookupKey, lookupData, client) {
+        const connection = client;
+        try {
+            if (!lookupKey) {
+                throw new AppError('Lookup Key is Required', 400, 'MISSING_LOOKUP_KEY');
+            }
+
+            if (!lookupData || Object.keys(lookupData).length === 0) {
+                throw new AppError('Lookup data is required', 400, 'MISSING_LOOKUP_DATA');
+            }
+
+            const allowedFields = [
+                'tag', 'value'
+            ];
+
+            const filteredData = {};
+            Object.keys(lookupData).forEach(key => {
+                if (allowedFields.includes(key)) {
+                    filteredData[key] = lookupData[key];
+                }
+            });
+
+            if (Object.keys(filteredData).length === 0) {
+                throw new AppError('No valid fields to update', 400, 'NO_VALID_FIELDS');
+            }
+
+            const fields = Object.keys(filteredData);
+            const values = Object.values(filteredData);
+
+            const setClause = fields.map(field => `${field} = ?`).join(', ');
+            const query = `UPDATE lookup SET ${setClause} WHERE lookupKey = ?`;
+
+            const [result] = await connection.execute(query, [...values, lookupKey]);
+            if (result.affectedRows === 0) {
+                throw new AppError(
+                    `Lookup with Key ${lookupKey} not found`,
+                    404,
+                    'LOOKUP_NOT_FOUND',
+                );
+            }
+            return {
+                lookupKey,
+                ...lookupData
+            }
+        } catch (error) {
+            if (error instanceof AppError) { throw error; }
+            this._handleDatabaseError(error, 'update');
+        }
+    }
+
     async delete(lookupKey, client) {
         try {
             const [result] = await client.execute(`DELETE FROM lookup WHERE lookupKey = ?`, [lookupKey]);
@@ -83,6 +133,9 @@ class LookupRepository {
             }
             return result.affectedRows;
         } catch (error) {
+            if (error.code === 'ER_ROW_IS_REFERENCED_2') {
+                throw new AppError("Cannot delete lookup entry as it is referenced by other records", 409, "FOREIGN_KEY_CONSTRAINT", { lookupKey });
+            }
             this._handleDatabaseError(error, 'delete');
         }
     }

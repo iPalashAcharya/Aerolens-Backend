@@ -46,6 +46,20 @@ class LookupController {
         );
     });
 
+    updateLookup = catchAsync(async (req, res) => {
+        const lookup = await this.lookupService.updateLookup(
+            parseInt(req.params.lookupKey),
+            req.body,
+            req.auditContext
+        );
+
+        return ApiResponse.success(
+            res,
+            lookup,
+            'Lookup entry updated successfully'
+        );
+    });
+
     deleteLookup = catchAsync(async (req, res) => {
         await this.lookupService.deleteLookup(parseInt(req.params.lookupKey), req.auditContext);
 
