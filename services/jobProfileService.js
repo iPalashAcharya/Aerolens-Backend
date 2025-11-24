@@ -101,7 +101,6 @@ class JobProfileService {
                     'JOB_PROFILE_NOT_FOUND'
                 );
             }
-            console.log(existingJobProfile);
 
             if (updateData.jobRole) {
                 const exists = await this.jobProfileRepository.existsByRole(
@@ -118,6 +117,14 @@ class JobProfileService {
                         'DUPLICATE_JOB_ROLE'
                     );
                 }
+            }
+
+            if (existingJobProfile.status.toLowerCase() === "closed" || existingJobProfile.status.toLowerCase() === "cancelled") {
+                throw new AppError(
+                    `Cannot update a job profile that is ${existingJobProfile.status}`,
+                    400,
+                    'JOB_PROFILE_UPDATE_NOT_ALLOWED'
+                );
             }
 
             const jobProfile = await this.jobProfileRepository.update(jobProfileId, updateData, client);
