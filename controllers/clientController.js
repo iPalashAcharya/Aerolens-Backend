@@ -8,18 +8,18 @@ class ClientController {
 
     getAllClients = catchAsync(async (req, res) => {
         try {
-            const options = {
+            /*const options = {
                 limit: parseInt(req.query.limit) || 10,
                 page: parseInt(req.query.page) || 1
-            };
-            const result = await this.clientService.getAllClients(options);
+            };*/
+            const result = await this.clientService.getAllClients();
 
             return ApiResponse.success(
                 res,
                 result.data,
                 'Clients retrieved successfully',
                 200,
-                result.pagination  // Pass pagination as meta
+                //result.pagination
             );
         } catch (error) {
             return ApiResponse.error(res, error)

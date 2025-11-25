@@ -62,7 +62,15 @@ class JobProfileRepository {
             `;
 
             const [rows] = await connection.execute(query, [jobProfileId]);
-            return rows[0] || null;
+            if (rows.length > 0) {
+                const jobProfile = rows[0];
+                if (typeof jobProfile.location === 'string') {
+                    jobProfile.location = JSON.parse(jobProfile.location);
+                }
+                return jobProfile;
+            } else {
+                return null;
+            }
         } catch (error) {
             if (error instanceof AppError) { throw error; }
             this._handleDatabaseError(error);
@@ -319,7 +327,12 @@ class JobProfileRepository {
             }
 
             const [rows] = await connection.execute(query, params);
-            return rows;
+            rows.forEach(row => {
+                if (typeof row.location === 'string') {
+                    row.location = JSON.parse(row.location);
+                }
+            });
+            return rows.length > 0 ? rows : null;
         } catch (error) {
             this._handleDatabaseError(error);
         }

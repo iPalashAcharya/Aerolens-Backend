@@ -4,26 +4,31 @@ class ClientRepository {
     constructor(db) {
         this.db = db;
     }
-    async getAll(limit = 10, page = 1, client) {
+    async getAll(limit, page, client) {
         const connection = client;
         try {
-            const offset = (page - 1) * limit;
-            const countQuery = `SELECT COUNT(clientId) as total FROM client`;
-            const [countResult] = await connection.query(countQuery);
-            const totalRecords = countResult[0].total;
-            const dataQuery = `
+            //const offset = (page - 1) * limit;
+            //const countQuery = `SELECT COUNT(clientId) as total FROM client`;
+            //const [countResult] = await connection.query(countQuery);
+            //const totalRecords = countResult[0].total;
+            /*const dataQuery = `
                 SELECT clientId, clientName, address, location FROM client 
                 LIMIT ? OFFSET ?
+            `;*/
+            const dataQuery = `
+                SELECT clientId, clientName, address, location FROM client 
             `;
-            const numLimit = Math.max(1, parseInt(limit, 10) || 10);
+            /*const numLimit = Math.max(1, parseInt(limit, 10) || 10);
             const numOffset = Math.max(0, parseInt(offset, 10) || 0);
 
-            const params = [numLimit, numOffset];
-            const [clients] = await connection.query(dataQuery, params);
-            return {
-                data: clients,
-                totalRecords: totalRecords
-            };
+            const params = [numLimit, numOffset];*/
+            const [clients] = await connection.query(dataQuery);
+            clients.forEach(row => {
+                if (typeof row.departments === 'string') {
+                    row.departments = JSON.parse(row.departments);
+                }
+            });
+            return clients
         } catch (error) {
             this._handleDatabaseError(error, 'getAll');
         }

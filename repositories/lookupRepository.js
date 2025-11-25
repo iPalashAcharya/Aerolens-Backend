@@ -4,25 +4,28 @@ class LookupRepository {
     constructor(db) {
         this.db = db;
     }
-    async getAll(limit = 10, page = 1, client) {
+    async getAll(limit, page, client) {
         const connection = client;
         try {
-            const offset = (page - 1) * limit;
+            /*const offset = (page - 1) * limit;
             const countQuery = `SELECT COUNT(lookupKey) as total FROM lookup`;
             const [countResult] = await connection.query(countQuery);
             const totalRecords = countResult[0].total;
             const dataQuery = `
                 SELECT tag, lookupKey, value FROM lookup 
                 LIMIT ? OFFSET ?
+            `;*/
+            const dataQuery = `
+                SELECT tag, lookupKey, value FROM lookup 
             `;
-            const numLimit = Math.max(1, parseInt(limit, 10) ?? 10);
-            const numOffset = Math.max(0, parseInt(offset, 10) ?? 0);
+            /*const numLimit = Math.max(1, parseInt(limit, 10) ?? 10);
+            const numOffset = Math.max(0, parseInt(offset, 10) ?? 0);*/
 
-            const params = [numLimit, numOffset];
-            const [lookupData] = await connection.query(dataQuery, params);
+            //const params = [numLimit, numOffset];
+            const [lookupData] = await connection.query(dataQuery);
             return {
                 data: lookupData,
-                totalRecords: totalRecords
+                //totalRecords: totalRecords
             };
         } catch (error) {
             this._handleDatabaseError(error, 'getAll');

@@ -12,10 +12,10 @@ class ClientService {
     async getAllClients(options = {}) {
         const client = await this.db.getConnection();
         try {
-            const { limit = 10, page = 1 } = options;
-            const result = await this.clientRepository.getAll(limit, page, client);
-            const totalPages = Math.ceil(result.totalRecords / limit);
-            const pagination = {
+            //const { limit = 10, page = 1 } = options;
+            const result = await this.clientRepository.getAll(null, null, client);
+            //const totalPages = Math.ceil(result.totalRecords / limit);
+            /*const pagination = {
                 currentPage: page,
                 totalPages,
                 totalRecords: result.totalRecords,
@@ -24,10 +24,10 @@ class ClientService {
                 hasPrevPage: page > 1,
                 nextPage: page < totalPages ? page + 1 : null,
                 prevPage: page > 1 ? page - 1 : null
-            };
+            };*/
             return {
-                data: result.data,
-                pagination
+                data: result
+                //pagination
             };
         } catch (error) {
             if (error instanceof AppError) {

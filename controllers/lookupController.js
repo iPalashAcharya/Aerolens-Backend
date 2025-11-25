@@ -8,18 +8,18 @@ class LookupController {
 
     getAll = catchAsync(async (req, res) => {
         try {
-            const options = {
+            /*const options = {
                 limit: parseInt(req.query.limit) || 10,
                 page: parseInt(req.query.page) || 1
-            };
-            const result = await this.lookupService.getAll(options);
+            };*/
+            const result = await this.lookupService.getAll();
 
             return ApiResponse.success(
                 res,
                 result.data,
                 'Lookup entries retrieved successfully',
                 200,
-                result.pagination
+                //result.pagination
             );
         } catch (error) {
             return ApiResponse.error(res, error)

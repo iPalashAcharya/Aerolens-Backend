@@ -7,12 +7,12 @@ class LookupService {
         this.lookupRepository = lookupRepository;
     }
 
-    async getAll(options) {
-        const { limit = 10, page = 1 } = options || {};
+    async getAll() {
+        //const { limit = 10, page = 1 } = options || {};
         const client = await this.db.getConnection();
         try {
-            const result = await this.lookupRepository.getAll(limit, page, client);
-            const totalPages = Math.ceil(result.totalRecords / limit);
+            const result = await this.lookupRepository.getAll(null, null, client);
+            /*const totalPages = Math.ceil(result.totalRecords / limit);
             const pagination = {
                 currentPage: page,
                 totalPages,
@@ -22,10 +22,10 @@ class LookupService {
                 hasPrevPage: page > 1,
                 nextPage: page < totalPages ? page + 1 : null,
                 prevPage: page > 1 ? page - 1 : null
-            };
+            };*/
             return {
-                data: result.data,
-                pagination
+                data: result.data
+                //pagination
             };
         } catch (error) {
             if (!(error instanceof AppError)) {
