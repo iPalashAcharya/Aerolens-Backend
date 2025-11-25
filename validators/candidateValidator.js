@@ -263,7 +263,7 @@ const candidateSchemas = {
                 'string.max': 'LinkedIn profile URL cannot exceed 500 characters'
             }),
 
-        status: Joi.string()
+        statusName: Joi.string()
             .trim()
             .min(1)
             .max(50)

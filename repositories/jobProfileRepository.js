@@ -50,15 +50,15 @@ class JobProfileRepository {
             }
 
             const query = `
-            SELECT jp.jobProfileId, c.clientId,c.clientName, d.departmentId, d.departmentName, jp.jobProfileDescription, jp.jobRole,
+            SELECT jp.jobProfileId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
                    jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,
-                   loc.value AS location, stat.value AS status
+                   COALESCE((SELECT JSON_OBJECT('country',l.country,'city',l.cityName) FROM location l WHERE l.locationId = jp.locationId)) AS location, stat.value AS status
             FROM jobProfile jp
             LEFT JOIN client c ON jp.clientId=c.clientId
             LEFT JOIN department d ON jp.departmentId = d.departmentId
-            LEFT JOIN lookup stat ON jp.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
-            LEFT JOIN lookup loc ON jp.locationId = loc.lookupKey AND loc.tag = 'jobProfileLocation'
+            LEFT JOIN lookup stat on jp.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
             WHERE jp.jobProfileId = ?
+            ORDER BY jp.receivedOn DESC
             `;
 
             const [rows] = await connection.execute(query, [jobProfileId]);
@@ -161,11 +161,10 @@ class JobProfileRepository {
             let query = `
             SELECT jp.jobProfileId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
                    jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,
-                   loc.value AS location, stat.value AS status
+                   COALESCE((SELECT JSON_OBJECT('country',l.country,'city',l.cityName) FROM location l WHERE l.locationId = jp.locationId)) AS location, stat.value AS status
             FROM jobProfile jp
             LEFT JOIN client c ON jp.clientId=c.clientId
             LEFT JOIN department d ON jp.departmentId = d.departmentId
-            LEFT JOIN lookup loc ON jp.locationId = loc.lookupKey AND loc.tag = 'jobProfileLocation'
             LEFT JOIN lookup stat on jp.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
             WHERE jp.clientId = ?
             ORDER BY jp.receivedOn DESC
@@ -202,11 +201,10 @@ class JobProfileRepository {
             const query = `
             SELECT jp.jobProfileId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
                    jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,
-                   loc.value AS location, stat.value AS status
+                   COALESCE((SELECT JSON_OBJECT('country',l.country,'city',l.cityName) FROM location l WHERE l.locationId = jp.locationId)) AS location, stat.value AS status
             FROM jobProfile jp
             LEFT JOIN client c ON jp.clientId=c.clientId
             LEFT JOIN department d ON jp.departmentId = d.departmentId
-            LEFT JOIN lookup loc ON jp.locationId = loc.lookupKey AND loc.tag = 'jobProfileLocation'
             LEFT JOIN lookup stat on jp.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
             WHERE jp.statusId = ?
             ORDER BY jp.receivedOn DESC
@@ -231,12 +229,11 @@ class JobProfileRepository {
             const query = `
             SELECT jp.jobProfileId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
                    jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,
-                   loc.value AS location, stat.value AS status
+                   COALESCE((SELECT JSON_OBJECT('country',l.country,'city',l.cityName) FROM location l WHERE l.locationId = jp.locationId)) AS location, stat.value AS status
             FROM jobProfile jp
             LEFT JOIN client c ON jp.clientId=c.clientId
             LEFT JOIN department d ON jp.departmentId = d.departmentId
-            LEFT JOIN lookup loc ON jp.locationId = loc.lookupKey AND loc.tag = 'jobProfileLocation'
-            LEFT JOIN lookup stat ON jp.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
+            LEFT JOIN lookup stat on jp.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
             WHERE jp.departmentId = ?
             ORDER BY jp.receivedOn DESC
             `;
@@ -301,11 +298,10 @@ class JobProfileRepository {
             let query = `
             SELECT jp.jobProfileId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
                    jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,
-                   loc.value AS location, stat.value AS status
+                   COALESCE((SELECT JSON_OBJECT('country',l.country,'city',l.cityName) FROM location l WHERE l.locationId = jp.locationId)) AS location, stat.value AS status
             FROM jobProfile jp
             LEFT JOIN client c ON jp.clientId=c.clientId
             LEFT JOIN department d ON jp.departmentId = d.departmentId
-            LEFT JOIN lookup loc ON jp.locationId = loc.lookupKey AND loc.tag = 'jobProfileLocation'
             LEFT JOIN lookup stat on jp.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
             ORDER BY jp.receivedOn DESC
             `;

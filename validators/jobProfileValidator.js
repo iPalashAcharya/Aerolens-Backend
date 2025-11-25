@@ -40,29 +40,37 @@ class JobProfileValidatorHelper {
 
     async getLocationIdByName(locationName, client = null) {
         if (!locationName) return null;
+        if (!locationName.city) {
+            throw new AppError(
+                `Invalid location object: 'city' is required.`,
+                400,
+                'INVALID_LOCATION_OBJECT'
+            );
+        }
 
-        const cacheKey = locationName.toLowerCase().trim();
+        const locationValue = locationName.city;
+        if (!locationValue) return null;
+
+        const cacheKey = locationValue.toLowerCase().trim();
         if (this.locationCache.has(cacheKey)) {
             return this.locationCache.get(cacheKey);
         }
 
         const connection = client || await this.db.getConnection();
-
         try {
-            const query = `SELECT lookupKey FROM lookup WHERE LOWER(value) = LOWER(?) AND lookup.tag = 'jobProfileLocation'`;
-            const [rows] = await connection.execute(query, [locationName.trim()]);
+            const query = `SELECT locationId FROM location WHERE LOWER(cityName) = LOWER(?))`;
+            const [rows] = await connection.execute(query, [locationValue.trim()]);
 
             if (rows.length === 0) {
                 throw new AppError(
-                    `Invalid location: '${locationName}'. Location does not exist.`,
+                    `Invalid location: '${locationValue}'. Location does not exist.`,
                     400,
                     'INVALID_LOCATION'
                 );
             }
 
-            const locationId = rows[0].lookupKey;
+            const locationId = rows[0].locationId;
             this.locationCache.set(cacheKey, locationId);
-
             return locationId;
         } finally {
             if (!client) connection.release();
@@ -151,24 +159,27 @@ const jobProfileSchemas = {
             "date.greater": "Estimated close date must be in the future",
         }),
 
-        location: Joi.string()
-            .trim()
-            .min(2)
-            .max(100)
-            .required()
-            .custom((value, helpers) => {
-                const validLocation = ['idc', 'us'];
-                if (!validLocation.includes(value.toLowerCase())) {
-                    return helpers.error("any.invalid");
-                }
-                return value;
-            })
-            .messages({
-                "string.empty": "Location is required",
-                "string.min": "Location must be at least 2 characters long",
-                "string.max": "Location cannot exceed 100 characters",
-                "any.required": "Location is required",
-            }),
+        location: Joi.object({
+            country: Joi.string()
+                .trim()
+                .lowercase()
+                .required()
+                .messages({
+                    "string.empty": "Location's country is required",
+                    "string.base": "Location's country must be a string",
+                }),
+            city: Joi.string()
+                .trim()
+                .min(2)
+                .max(100)
+                .required()
+                .messages({
+                    "string.min": "Location's city must be at least 2 characters long",
+                    "string.max": "Location's city cannot exceed 100 characters",
+                }),
+        }).required().messages({
+            "object.unknown": "Invalid location object structure",
+        }),
 
         status: Joi.string()
             .trim()
@@ -216,22 +227,28 @@ const jobProfileSchemas = {
             "number.positive": "Positions must be a positive number",
         }),
 
-        location: Joi.string()
-            .trim()
-            .min(2)
-            .max(100)
-            .optional()
-            .custom((value, helpers) => {
-                const validLocation = ['idc', 'us'];
-                if (!validLocation.includes(value.toLowerCase())) {
-                    return helpers.error("any.invalid");
-                }
-                return value;
-            })
-            .messages({
-                "string.min": "Location must be at least 2 characters long",
-                "string.max": "Location cannot exceed 100 characters",
-            }),
+        location: Joi.object({
+            country: Joi.string()
+                .trim()
+                .lowercase()
+                .optional()
+                .messages({
+                    "string.empty": "Location's country is required",
+                    "string.base": "Location's country must be a string",
+                }),
+            city: Joi.string()
+                .trim()
+                .min(2)
+                .max(100)
+                .optional()
+                .messages({
+                    "string.min": "Location's city must be at least 2 characters long",
+                    "string.max": "Location's city cannot exceed 100 characters",
+                }),
+        }).min(1).optional().messages({
+            "object.min": "At least one field (country or city) must be provided in location",
+            "object.unknown": "Invalid location object structure",
+        }),
 
         status: Joi.string()
             .trim()
