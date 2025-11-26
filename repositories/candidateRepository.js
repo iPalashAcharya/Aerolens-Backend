@@ -421,7 +421,6 @@ class CandidateRepository {
             LEFT JOIN lookup stat ON c.statusId = stat.lookupKey and stat.tag = 'candidateStatus'
             LEFT JOIN lookup loc ON c.preferredJobLocation = loc.lookupKey and loc.tag = 'location'
         `;
-            console.log(query);
             const params = [];
             if (limit) {
                 query += ` LIMIT ?`;

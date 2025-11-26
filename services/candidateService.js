@@ -9,12 +9,12 @@ const path = require('path');
 const AppError = require('../utils/appError');
 
 const s3Config = {
-    region: process.env.AWS_REGION || 'ap-south-1'
+    region: process.env.AWS_REGION
 };
 
 const s3Client = new S3Client(s3Config);
 
-const S3_BUCKET_NAME = process.env.AWS_S3_BUCKET || 'your-bucket-name';
+const S3_BUCKET_NAME = process.env.AWS_S3_BUCKET;
 const S3_RESUME_FOLDER = 'resumes/';
 
 class CandidateService {
@@ -47,7 +47,6 @@ class CandidateService {
                     const sanitizedOriginalName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
                     const fileExtension = path.extname(sanitizedOriginalName);
 
-                    // Generate S3 key: resumes/candidate_123_1234567890.pdf
                     const s3Key = `${this.resumeFolder}candidate_${candidateId}_${timestamp}${fileExtension}`;
 
                     cb(null, s3Key);
