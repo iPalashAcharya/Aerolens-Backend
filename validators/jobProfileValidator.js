@@ -58,7 +58,7 @@ class JobProfileValidatorHelper {
 
         const connection = client || await this.db.getConnection();
         try {
-            const query = `SELECT locationId FROM location WHERE LOWER(cityName) = LOWER(?))`;
+            const query = `SELECT locationId FROM location WHERE LOWER(cityName) = LOWER(?)`;
             const [rows] = await connection.execute(query, [locationValue.trim()]);
 
             if (rows.length === 0) {

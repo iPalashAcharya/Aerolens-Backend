@@ -210,12 +210,7 @@ This document describes the RESTful API endpoints for Aerolens Backend
 
 ### GET `/client`
 
-Retrieve a paginated list of clients.
-
-#### Query Parameters
-
-- `page` (optional, integer, default: 1) - Page number for pagination, minimum 1.
-- `limit` (optional, integer, default: 10, max: 100) - Number of records per page.
+Retrieve a list of clients.
 
 #### Response
 
@@ -224,19 +219,73 @@ Retrieve a paginated list of clients.
   - `clientName` (string)
   - `address` (string)
   - `location` (geospatial data)
-- `pagination`: Pagination metadata including:
-  - `currentPage`
-  - `totalPages`
-  - `totalRecords`
-  - `limit`
-  - `hasNextPage`
-  - `hasPrevPage`
-  - `nextPage`
-  - `prevPage`
 
 #### Example Request
 
-GET /?page=1&limit=10
+GET /
+
+### Response
+
+{
+"success": true,
+"message": "Clients retrieved successfully",
+"data": [
+{
+"clientId": 2,
+"clientName": "Intuit Bangalore Headquarters",
+"address": "12 Park Street, Bangalore, Karnataka 560001",
+"location": {
+"x": 77.590082,
+"y": 12.9767936
+}
+},
+{
+"clientId": 4,
+"clientName": "Google ( Alphabet ) Test",
+"address": "1600 Amphitheatre Parkway, Mountain View, CA 94043, USA",
+"location": {
+"x": -122.0855846,
+"y": 37.4224857
+}
+},
+{
+"clientId": 13,
+"clientName": "IBM Company",
+"address": "1 New Orchard Rd, Armonk, NY 10504, USA",
+"location": {
+"x": -73.720356,
+"y": 41.1134016
+}
+},
+{
+"clientId": 15,
+"clientName": "Microsoft",
+"address": "10000 NE 8th St, Bellevue, WA 98004, USA",
+"location": {
+"x": -122.206902,
+"y": 47.617524
+}
+},
+{
+"clientId": 16,
+"clientName": "Apple Inc.",
+"address": "One Apple Park Way, Cupertino, CA 95014, USA",
+"location": {
+"x": -122.0126936,
+"y": 37.3349372
+}
+},
+{
+"clientId": 17,
+"clientName": "Amazon",
+"address": "410 Terry Ave N, Seattle, WA 98109, USA",
+"location": {
+"x": -122.3365001,
+"y": 47.622298
+}
+}
+]
+}
 
 ---
 
@@ -585,35 +634,38 @@ Path Parameters:
 - **Success (200 OK)**
   {
   "success": true,
+  "message": "Client retrieved successfully",
   "data": {
-  "clientId": 123,
-  "clientName": "Client Name",
-  "address": "Client address",
+  "clientId": 2,
+  "clientName": "Intuit Bangalore Headquarters",
+  "address": "12 Park Street, Bangalore, Karnataka 560001",
   "location": {
-  "type": "Point",
-  "coordinates": [longitude, latitude]
+  "x": 77.590082,
+  "y": 12.9767936
   },
   "departments": [
   {
-  "departmentId": 1,
-  "departmentName": "HR",
-  "departmentDescription": "Human Resources"
+  "departmentId": 86,
+  "departmentName": "DevOps and AIOps",
+  "departmentDescription": "Teams responsible for operational automation, continuous integration/deployment, and monitoring of Intuit's cloud infrastructure."
   }
   ],
-  "clientContacts": [
+  "clientContact": [
   {
-  "clientContactId": 1,
-  "contactPersonName": "Jane Doe",
-  "designation": "Manager",
-  "phone": "1234567890",
-  "email": "jane@example.com"
+  "email": "palash@testing.com",
+  "phone": "9876500322",
+  "designation": "SDE",
+  "clientContactId": 23,
+  "contactPersonName": "Palash Acharya"
+  },
+  {
+  "email": "aksh@testing.com",
+  "phone": "9876500322",
+  "designation": "Senior Manager",
+  "clientContactId": 32,
+  "contactPersonName": "Aksh Patel"
   }
-  ],
-  "meta": {
-  "departmentCount": 1,
-  "contactCount": 1,
-  "retrievedAt": "2025-09-02T12:34:56.789Z"
-  }
+  ]
   }
   }
 
@@ -1246,15 +1298,16 @@ If a server/database error occurs during deletion:
 
 **Request Body:**
 {
-"clientId": 1,
-"departmentId": 2,
-"jobProfileDescription": "Responsible for managing backend APIs",
-"jobRole": "Backend Engineer",
-"techSpecification": "Node.js, Express, SQL",
-"positions": 3,
-"estimatedCloseDate": "2025-12-31",
-"location": "US",
-"status": "In Progress"
+"clientId":2,
+"departmentId":86,
+"jobProfileDescription":"Random JOB description for testing job profile",
+"jobRole": "SDE",
+"location": {
+"city": "Ahmedabad",
+"country": "India"
+},
+"positions": 4,
+"techSpecification": "NodeJS,ExpressJS"
 }
 
 **Response:**
@@ -1262,17 +1315,16 @@ If a server/database error occurs during deletion:
 "success": true,
 "message": "Job Profile created successfully",
 "data": {
-"jobProfileId": 10,
-"clientId": 1,
-"departmentId": 2,
-"jobProfileDescription": "Responsible for managing backend APIs",
-"jobRole": "Backend Engineer",
-"techSpecification": "Node.js, Express, SQL",
-"positions": 3,
-"estimatedCloseDate": "2025-12-31",
-"receivedOn":"2025-10-31"
-"location": "US",
-"status": "In Progress"
+"jobProfileId": 25,
+"clientId": 2,
+"departmentId": 86,
+"jobProfileDescription": "Random JOB description for testing job profile",
+"jobRole": "SDE",
+"positions": 4,
+"techSpecification": "NodeJS,ExpressJS",
+"locationId": 1,
+"statusId": 4,
+"receivedOn": "2025-11-26T11:10:40.223Z"
 }
 }
 
@@ -1288,17 +1340,36 @@ If a server/database error occurs during deletion:
 "message": "Job Profiles retrieved successfully",
 "data": [
 {
-"jobProfileId": 3,
-"clientName": "Intuit Banglore",
-"departmentName": "Finance/Budgeting1dfdfd",
-"jobProfileDescription": "Random description",
+"jobProfileId": 25,
+"clientName": "Intuit Bangalore Headquarters",
+"departmentName": "DevOps and AIOps",
+"jobProfileDescription": "Random JOB description for testing job profile",
 "jobRole": "SDE",
-"techSpecification": "testing,quality assurance",
-"positions": 3,
-"receivedOn": "2025-09-16T13:16:07.000Z",
-"estimatedCloseDate": "2025-10-20T15:30:00.000Z",
-"locationId": 2,
-"statusName": "In Progress"
+"techSpecification": "NodeJS,ExpressJS",
+"positions": 4,
+"receivedOn": "2025-11-26T11:10:40.000Z",
+"estimatedCloseDate": null,
+"location": {
+"city": "Ahmedabad",
+"country": "India"
+},
+"status": "In Progress"
+},
+{
+"jobProfileId": 23,
+"clientName": "IBM Company",
+"departmentName": "Software",
+"jobProfileDescription": "Continuous integration/deployment, and monitoring of Intuit's cloud infrastructure. Teams responsible for operational monitoring of Intuit's cloud infrastructure.",
+"jobRole": "Frontend",
+"techSpecification": "React",
+"positions": 2,
+"receivedOn": "2025-11-07T07:26:44.000Z",
+"estimatedCloseDate": "2025-11-24T18:30:00.000Z",
+"location": {
+"city": "Ahmedabad",
+"country": "India"
+},
+"status": "Closed"
 }
 ]
 }
@@ -1312,20 +1383,22 @@ If a server/database error occurs during deletion:
 **Response:**
 {
 "success": true,
-"message": "Department retrieved successfully",
+"message": "Job Profile retrieved successfully",
 "data": {
-"jobProfileId": 3,
-"clientId": 2,
-"clientName": "Intuit Banglore",
-"departmentName": "Finance/Budgeting1dfdfd",
-"jobProfileDescription": "Random description",
+"jobProfileId": 25,
+"clientName": "Intuit Bangalore Headquarters",
+"departmentName": "DevOps and AIOps",
+"jobProfileDescription": "Random JOB description for testing job profile",
 "jobRole": "SDE",
-"techSpecification": "testing,quality assurance",
-"positions": 3,
-"receivedOn": "2025-09-16T13:16:07.000Z",
-"estimatedCloseDate": "2025-10-20T15:30:00.000Z",
-"locationId": 2,
-"statusName": "In Progress"
+"techSpecification": "NodeJS,ExpressJS",
+"positions": 4,
+"receivedOn": "2025-11-26T11:10:40.000Z",
+"estimatedCloseDate": null,
+"location": {
+"city": "Ahmedabad",
+"country": "India"
+},
+"status": "In Progress"
 }
 }
 
@@ -1345,18 +1418,21 @@ If a server/database error occurs during deletion:
 "success": true,
 "message": "Job profile updated successfully",
 "data": {
-"jobProfileId": 3,
+"jobProfileId": 25,
 "clientId": 2,
-"clientName": "Intuit Banglore",
-"departmentName": "Finance/Budgeting1dfdfd",
-"jobProfileDescription": "Random description",
-"jobRole": "SDE-2",
-"techSpecification": "testing,quality assurance",
-"positions": 3,
-"receivedOn": "2025-09-16T13:16:07.000Z",
-"estimatedCloseDate": "2025-10-20T15:30:00.000Z",
-"locationId": 2,
-"statusName": "In Progress"
+"clientName": "Intuit Bangalore Headquarters",
+"departmentName": "DevOps and AIOps",
+"jobProfileDescription": "Random JOB description for testing job profile",
+"jobRole": "SDE-3",
+"techSpecification": "NodeJS,ExpressJS",
+"positions": 4,
+"receivedOn": "2025-11-26T05:40:40.000Z",
+"estimatedCloseDate": null,
+"location": {
+"city": "Ahmedabad",
+"country": "India"
+},
+"status": "In Progress"
 }
 }
 
@@ -1379,11 +1455,12 @@ If a server/database error occurs during deletion:
 
 Handled via Joi:
 
-- `clientId`, `departmentId`, `locationId`, `positions`: positive integers
+- `clientId`, `departmentId`, `positions`: positive integers
 - `jobProfileDescription`: minimum 10, maximum 500 characters
 - `jobRole`: 2–100 characters
 - `techSpecification`: comma-separated list, min 2 chars each
 - `estimatedCloseDate`: must be a valid date in the future
+- `location` : must be a json object with city and country attributes
 
 **Example Error:**
 {
@@ -1430,235 +1507,56 @@ A structured **Node.js + Express.js API** for managing candidates, with validati
 
 ## Endpoints and Examples
 
-### Get All Candidates (Paginated & Filtered)
+### Get All Candidates
 
-GET /candidate?page=1&pageSize=10&status=selected&preferredJobLocation=bangalore
-
-**Query Parameters:**
-
-| Parameter            | Type   | Description                                 |
-| -------------------- | ------ | ------------------------------------------- |
-| page                 | Number | Page number (default: 1)                    |
-| pageSize             | Number | Number of candidates per page (default: 10) |
-| status               | String | Filter by candidate status (optional)       |
-| preferredJobLocation | String | Filter by location (optional)               |
+GET /candidate
 
 **Response:**
 {
 "success": true,
 "message": "Candidates retrieved successfully",
-"data": {
-"candidates": [
+"data": [
 {
-"candidateId": 2,
-"candidateName": "azeempatel",
-"contactNumber": "99999999",
-"email": "randomemail@example.com",
+"candidateId": 38,
+"candidateName": "Yash Prajapati",
+"contactNumber": "9870654321",
+"email": "jaivals21@testing.com",
 "recruiterName": "Jayraj",
-"jobRole": "QA",
+"jobRole": "SDE",
 "preferredJobLocation": "Ahmedabad",
-"currentCTC": 20,
-"expectedCTC": 21,
+"currentCTC": 23,
+"expectedCTC": 33,
+"noticePeriod": 30,
+"experienceYears": 1,
+"linkedinProfileUrl": "https://www.linkedin.com/in/aksh-patel1/",
+"createdAt": "2025-09-27T11:39:13.000Z",
+"updatedAt": "2025-11-21T11:00:40.000Z",
+"statusName": "interview pending",
+"resumeFilename": "resumes/candidate_38_1763722838929.docx",
+"resumeOriginalName": "AICTE_Internship_2024_Project_Report_Template_2.docx",
+"resumeUploadDate": "2025-11-21T11:00:40.000Z"
+},
+{
+"candidateId": 40,
+"candidateName": "Parth",
+"contactNumber": "9898200321",
+"email": "parth@gmail.com",
+"recruiterName": "Jayraj",
+"jobRole": "Software Devloper",
+"preferredJobLocation": "Ahmedabad",
+"currentCTC": 300,
+"expectedCTC": 600,
 "noticePeriod": 60,
-"experienceYears": 5,
-"linkedinProfileUrl": "https://www.linkedin.com/in/andrewyng/",
-"createdAt": "2025-09-17T04:38:44.000Z",
-"updatedAt": "2025-09-25T06:14:58.000Z",
-"statusName": "Interview Pending",
-"resumeFilename": null,
-"resumeOriginalName": null,
-"resumeUploadDate": null
-},
-{
-"candidateId": 6,
-"candidateName": "Aksh",
-"contactNumber": "7748139121",
-"email": "aksh.patel@live.com",
-"recruiterName": "Khushi",
-"jobRole": "react",
-"preferredJobLocation": "Ahmedabad",
-"currentCTC": 30,
-"expectedCTC": 60,
-"noticePeriod": 40,
-"experienceYears": 5,
-"linkedinProfileUrl": "https://www.linkedin.com/in/AkshPatel",
-"createdAt": "2025-09-18T01:15:38.000Z",
-"updatedAt": "2025-09-23T03:21:34.000Z",
-"statusName": "Selected",
-"resumeFilename": null,
-"resumeOriginalName": null,
-"resumeUploadDate": "2025-09-25T04:41:52.000Z"
-},
-{
-"candidateId": 7,
-"candidateName": "Manish",
-"contactNumber": "7812589413",
-"email": "manish.patel@outlook.com",
-"recruiterName": "Khushi",
-"jobRole": "react",
-"preferredJobLocation": "Bangalore",
-"currentCTC": 30,
-"expectedCTC": 60,
-"noticePeriod": 4,
-"experienceYears": 5,
-"linkedinProfileUrl": "https://www.linkedin.com/in/Manish",
-"createdAt": "2025-09-18T03:11:31.000Z",
-"updatedAt": "2025-09-23T03:21:53.000Z",
-"statusName": "Selected",
-"resumeFilename": null,
-"resumeOriginalName": null,
-"resumeUploadDate": "2025-09-25T04:41:52.000Z"
-},
-{
-"candidateId": 8,
-"candidateName": "Alice",
-"contactNumber": "4324323412",
-"email": "aziim@gmail.com",
-"recruiterName": "Jayraj",
-"jobRole": "developer",
-"preferredJobLocation": "Ahmedabad",
-"currentCTC": 1222,
-"expectedCTC": 1233,
-"noticePeriod": 12,
 "experienceYears": 3,
-"linkedinProfileUrl": "https://www.linkedin.com/in/alice-johnson",
-"createdAt": "2025-09-18T03:29:00.000Z",
-"updatedAt": "2025-09-23T03:22:08.000Z",
-"statusName": "Interview Pending",
-"resumeFilename": null,
-"resumeOriginalName": null,
-"resumeUploadDate": "2025-09-25T04:41:52.000Z"
-},
-{
-"candidateId": 9,
-"candidateName": "Manish yadav",
-"contactNumber": "7748139122",
-"email": "spritesh@outlook.com",
-"recruiterName": "Khushi",
-"jobRole": "React",
-"preferredJobLocation": "Ahmedabad",
-"currentCTC": 30,
-"expectedCTC": 60,
-"noticePeriod": 30,
-"experienceYears": 50,
-"linkedinProfileUrl": "https://www.linkedin.com/in/aksh-patel-4881b126b/",
-"createdAt": "2025-09-18T05:50:35.000Z",
-"updatedAt": "2025-09-18T05:50:35.000Z",
-"statusName": "Interview Pending",
-"resumeFilename": null,
-"resumeOriginalName": null,
-"resumeUploadDate": "2025-09-25T04:41:52.000Z"
-},
-{
-"candidateId": 29,
-"candidateName": "Palash Testing..",
-"contactNumber": "9999993",
-"email": "palashtest721@example.com",
-"recruiterName": "Jayraj",
-"jobRole": "Backend Engineer",
-"preferredJobLocation": "Ahmedabad",
-"currentCTC": 9,
-"expectedCTC": 11,
-"noticePeriod": 30,
-"experienceYears": 4,
-"linkedinProfileUrl": "https://www.linkedin.com/in/alice-johnson",
-"createdAt": "2025-09-26T07:21:33.000Z",
-"updatedAt": "2025-09-26T07:21:33.000Z",
-"statusName": "Interview Pending",
+"linkedinProfileUrl": "https://www.linkedin.com/in/meghana-kaki-0862b8167/",
+"createdAt": "2025-09-27T11:44:07.000Z",
+"updatedAt": "2025-09-27T11:44:07.000Z",
+"statusName": "interview pending",
 "resumeFilename": null,
 "resumeOriginalName": null,
 "resumeUploadDate": null
-},
-{
-"candidateId": 31,
-"candidateName": "kjshdhr",
-"contactNumber": "1234512345",
-"email": "jaival@gmail.com",
-"recruiterName": "Jayraj",
-"jobRole": "SDE",
-"preferredJobLocation": "Ahmedabad",
-"currentCTC": 23,
-"expectedCTC": 43,
-"noticePeriod": 30,
-"experienceYears": 2,
-"linkedinProfileUrl": "https://www.linkedin.com/in/jaival-suthar",
-"createdAt": "2025-09-26T23:04:16.000Z",
-"updatedAt": "2025-09-26T23:04:16.000Z",
-"statusName": "Interview Pending",
-"resumeFilename": "candidate_31.pdf",
-"resumeOriginalName": "JD Kenexai Pvt. Ltd.pdf",
-"resumeUploadDate": "2025-09-26T23:04:16.000Z"
-},
-{
-"candidateId": 32,
-"candidateName": "kjshdhri",
-"contactNumber": "1234512347",
-"email": "jaival321@gmail.com",
-"recruiterName": "Jayraj",
-"jobRole": "SDE",
-"preferredJobLocation": "Ahmedabad",
-"currentCTC": 23,
-"expectedCTC": 43,
-"noticePeriod": 30,
-"experienceYears": 2,
-"linkedinProfileUrl": "https://www.linkedin.com/in/jaival-suthar",
-"createdAt": "2025-09-26T23:18:26.000Z",
-"updatedAt": "2025-09-26T23:18:27.000Z",
-"statusName": "Interview Pending",
-"resumeFilename": "candidate_32.pdf",
-"resumeOriginalName": "JD Kenexai Pvt. Ltd.pdf",
-"resumeUploadDate": "2025-09-26T23:18:27.000Z"
-},
-{
-"candidateId": 33,
-"candidateName": "kjshdhry",
-"contactNumber": "1234512349",
-"email": "jaival361@gmail.com",
-"recruiterName": "Jayraj",
-"jobRole": "SDE",
-"preferredJobLocation": "Ahmedabad",
-"currentCTC": 23,
-"expectedCTC": 43,
-"noticePeriod": 30,
-"experienceYears": 2,
-"linkedinProfileUrl": "https://www.linkedin.com/in/jaival-suthar",
-"createdAt": "2025-09-26T23:23:03.000Z",
-"updatedAt": "2025-09-26T23:23:03.000Z",
-"statusName": "Interview Pending",
-"resumeFilename": "candidate_33.pdf",
-"resumeOriginalName": "JD Kenexai Pvt. Ltd.pdf",
-"resumeUploadDate": "2025-09-26T23:23:03.000Z"
-},
-{
-"candidateId": 35,
-"candidateName": "kjshdhru",
-"contactNumber": "12345123499",
-"email": "jaival361@outlook.com",
-"recruiterName": "Jayraj",
-"jobRole": "SDE",
-"preferredJobLocation": "Ahmedabad",
-"currentCTC": 23,
-"expectedCTC": 43,
-"noticePeriod": 30,
-"experienceYears": 2,
-"linkedinProfileUrl": "https://www.linkedin.com/in/jaival-suthar",
-"createdAt": "2025-09-26T23:32:15.000Z",
-"updatedAt": "2025-09-26T23:32:15.000Z",
-"statusName": "Interview Pending",
-"resumeFilename": "candidate_35.pdf",
-"resumeOriginalName": "JD Kenexai Pvt. Ltd.pdf",
-"resumeUploadDate": "2025-09-26T23:32:15.000Z"
 }
-],
-"pagination": {
-"currentPage": 1,
-"pageSize": 10,
-"totalCount": 10,
-"totalPages": 1,
-"hasNextPage": false,
-"hasPreviousPage": false
-}
-}
+]
 }
 
 ---
@@ -1672,22 +1570,22 @@ GET /candidate/:id
 "success": true,
 "message": "Candidate retrieved successfully",
 "data": {
-"candidateId": 35,
-"candidateName": "kjshdhru",
-"contactNumber": "12345123499",
-"email": "jaival361@outlook.com",
+"candidateId": 38,
+"candidateName": "Yash Prajapati",
+"contactNumber": "9870654321",
+"email": "jaivals21@testing.com",
 "recruiterName": "Jayraj",
 "jobRole": "SDE",
 "preferredJobLocation": "Ahmedabad",
 "currentCTC": 23,
-"expectedCTC": 43,
+"expectedCTC": 33,
 "noticePeriod": 30,
-"experienceYears": 2,
-"linkedinProfileUrl": "https://www.linkedin.com/in/jaival-suthar",
-"statusName": "Interview Pending",
-"resumeFilename": "candidate_35.pdf",
-"resumeOriginalName": "JD Kenexai Pvt. Ltd.pdf",
-"resumeUploadDate": "2025-09-26T23:32:15.000Z"
+"experienceYears": 1,
+"linkedinProfileUrl": "https://www.linkedin.com/in/aksh-patel1/",
+"statusName": "interview pending",
+"resumeFilename": "resumes/candidate_38_1763722838929.docx",
+"resumeOriginalName": "AICTE_Internship_2024_Project_Report_Template_2.docx",
+"resumeUploadDate": "2025-11-21T11:00:40.000Z"
 }
 }
 
@@ -1882,15 +1780,9 @@ Endpoints
 
 GET /api/lookup
 
-Retrieve paginated lookup entries.
+Retrieve lookup entries.
 
-Query Parameters
-
-page (integer, optional, default: 1) – current page number
-
-limit (integer, optional, default: 10, max: 100) – number of records per page
-
-GET /lookup?page=1&limit=5
+GET /lookup
 {
 "success": true,
 "message": "Lookup entries retrieved successfully",
@@ -1900,17 +1792,7 @@ GET /lookup?page=1&limit=5
 "tag": "status",
 "value": "active"
 }
-],
-"meta": {
-"currentPage": 1,
-"totalPages": 10,
-"totalRecords": 50,
-"limit": 5,
-"hasNextPage": true,
-"hasPrevPage": false,
-"nextPage": 2,
-"prevPage": null
-}
+]
 } 2. Get Lookup by Key
 
 GET /lookup/:lookupKey

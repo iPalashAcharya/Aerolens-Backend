@@ -7,14 +7,14 @@ class JobProfileRepository {
 
     async create(jobProfileData, client) {
         const connection = client;
+        console.log(jobProfileData);
 
         try {
             const query = `
             INSERT INTO jobProfile (
                 clientId, departmentId, jobProfileDescription, jobRole, 
                 techSpecification, positions, receivedOn, estimatedCloseDate, locationId, statusId
-            ) 
-            VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?)
             `;
 
             const [result] = await connection.execute(query, [
@@ -50,7 +50,7 @@ class JobProfileRepository {
             }
 
             const query = `
-            SELECT jp.jobProfileId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
+            SELECT jp.jobProfileId, c.clientId ,c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
                    jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,
                    COALESCE((SELECT JSON_OBJECT('country',l.country,'city',l.cityName) FROM location l WHERE l.locationId = jp.locationId)) AS location, stat.value AS status
             FROM jobProfile jp
