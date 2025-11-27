@@ -82,7 +82,7 @@ class ClientRepository {
 
     async getAllWithDepartments(connection) {
         try {
-            const dataQuery = `SELECT 
+            const clientQuery = `SELECT 
               c.clientId, 
               c.clientName, 
               COALESCE(d.departments, JSON_ARRAY()) AS departments
@@ -97,9 +97,16 @@ class ClientRepository {
               FROM department
               GROUP BY clientId
             ) d ON c.clientId = d.clientId;`;
-            const [data] = await connection.query(dataQuery);
+            const locationQuery = `SELECT cityName AS city, stateName as state, country FROM location`
+            const [clientData] = await connection.query(clientQuery);
+            const [locationData] = await connection.query(locationQuery);
 
-            return data.length > 0 ? data : null;
+            if (clientData.length === 0) return null;
+
+            return {
+                clientData,
+                locationData
+            };
 
         } catch (error) {
             this._handleDatabaseError(error, 'getAllWithDepartments');

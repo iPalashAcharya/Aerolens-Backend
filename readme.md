@@ -289,6 +289,153 @@ GET /
 
 ---
 
+## Get All Clients with Departments
+
+### Example Request
+
+/client/all
+
+### Response
+
+{
+"success": true,
+"message": "Clients with departments retrieved successfully",
+"data": {
+"clientData": [
+{
+"clientId": 17,
+"clientName": "Amazon",
+"departments": []
+},
+{
+"clientId": 122,
+"clientName": "Amazon Web Services",
+"departments": []
+},
+{
+"clientId": 16,
+"clientName": "Apple Inc.",
+"departments": []
+},
+{
+"clientId": 64,
+"clientName": "Boston Airport 2Testing",
+"departments": []
+},
+{
+"clientId": 123,
+"clientName": "FoundersPodcast",
+"departments": []
+},
+{
+"clientId": 4,
+"clientName": "Google ( Alphabet ) Test",
+"departments": [
+{
+"departmentId": 83,
+"departmentName": "check"
+},
+{
+"departmentId": 71,
+"departmentName": "Marketinghj"
+}
+]
+},
+{
+"clientId": 13,
+"clientName": "IBM Company",
+"departments": [
+{
+"departmentId": 90,
+"departmentName": "AI & Data Science"
+},
+{
+"departmentId": 73,
+"departmentName": "Consulting"
+},
+{
+"departmentId": 89,
+"departmentName": "Finance"
+},
+{
+"departmentId": 88,
+"departmentName": "IT & Security"
+},
+{
+"departmentId": 87,
+"departmentName": "Product Infrastructure"
+},
+{
+"departmentId": 72,
+"departmentName": "Software"
+}
+]
+},
+{
+"clientId": 2,
+"clientName": "Intuit Bangalore Headquarters",
+"departments": [
+{
+"departmentId": 86,
+"departmentName": "DevOps and AIOps"
+}
+]
+},
+{
+"clientId": 15,
+"clientName": "Microsoft",
+"departments": [
+{
+"departmentId": 74,
+"departmentName": "Cloud and AI Grouptwo"
+},
+{
+"departmentId": 75,
+"departmentName": "Experiences and Devices"
+}
+]
+},
+{
+"clientId": 48,
+"clientName": "Ramp",
+"departments": []
+},
+{
+"clientId": 65,
+"clientName": "TCS",
+"departments": []
+},
+{
+"clientId": 69,
+"clientName": "Tesla",
+"departments": []
+}
+],
+"locationData": [
+{
+"city": "Ahmedabad",
+"state": "Gujarat",
+"country": "India"
+},
+{
+"city": "Bangalore",
+"state": "Karnataka",
+"country": "India"
+},
+{
+"city": "Mountain View",
+"state": "California",
+"country": "United States"
+},
+{
+"city": "San Francisco",
+"state": "California",
+"country": "United States"
+}
+]
+}
+}
+
 ## Create Client
 
 **Endpoint:** `POST /client`
