@@ -13,8 +13,8 @@ class JobProfileRepository {
             const query = `
             INSERT INTO jobProfile (
                 clientId, departmentId, jobProfileDescription, jobRole, 
-                techSpecification, positions, receivedOn, estimatedCloseDate, locationId, statusId
-            ) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?)
+                techSpecification, positions, receivedOn, estimatedCloseDate, locationId, workArrangement, statusId
+            ) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?,?)
             `;
 
             const [result] = await connection.execute(query, [
@@ -26,6 +26,7 @@ class JobProfileRepository {
                 jobProfileData.positions,
                 jobProfileData.estimatedCloseDate || null,
                 jobProfileData.locationId,
+                jobProfileData.workArrangement,
                 jobProfileData.statusId || 7
             ]);
 
@@ -51,7 +52,7 @@ class JobProfileRepository {
 
             const query = `
             SELECT jp.jobProfileId, c.clientId ,c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
-                   jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,
+                   jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate, jp.workArrangement,
                    COALESCE((SELECT JSON_OBJECT('country',l.country,'city',l.cityName) FROM location l WHERE l.locationId = jp.locationId)) AS location, stat.value AS status
             FROM jobProfile jp
             LEFT JOIN client c ON jp.clientId=c.clientId
@@ -92,7 +93,7 @@ class JobProfileRepository {
             // Filter only allowed fields for security
             const allowedFields = [
                 'clientId', 'departmentId', 'jobProfileDescription', 'jobRole',
-                'techSpecification', 'positions', 'estimatedCloseDate', 'locationId', 'statusId'
+                'techSpecification', 'positions', 'estimatedCloseDate', 'locationId', 'workArrangement', 'statusId'
             ];
 
             const filteredData = {};
@@ -168,7 +169,7 @@ class JobProfileRepository {
 
             let query = `
             SELECT jp.jobProfileId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
-                   jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,
+                   jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,jp.workArrangement,
                    COALESCE((SELECT JSON_OBJECT('country',l.country,'city',l.cityName) FROM location l WHERE l.locationId = jp.locationId)) AS location, stat.value AS status
             FROM jobProfile jp
             LEFT JOIN client c ON jp.clientId=c.clientId
@@ -208,7 +209,7 @@ class JobProfileRepository {
 
             const query = `
             SELECT jp.jobProfileId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
-                   jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,
+                   jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,jp.workArrangement,
                    COALESCE((SELECT JSON_OBJECT('country',l.country,'city',l.cityName) FROM location l WHERE l.locationId = jp.locationId)) AS location, stat.value AS status
             FROM jobProfile jp
             LEFT JOIN client c ON jp.clientId=c.clientId
@@ -236,7 +237,7 @@ class JobProfileRepository {
 
             const query = `
             SELECT jp.jobProfileId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
-                   jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,
+                   jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,jp.workArrangement,
                    COALESCE((SELECT JSON_OBJECT('country',l.country,'city',l.cityName) FROM location l WHERE l.locationId = jp.locationId)) AS location, stat.value AS status
             FROM jobProfile jp
             LEFT JOIN client c ON jp.clientId=c.clientId
@@ -305,7 +306,7 @@ class JobProfileRepository {
         try {
             let query = `
             SELECT jp.jobProfileId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
-                   jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,
+                   jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,jp.workArrangement,
                    COALESCE((SELECT JSON_OBJECT('country',l.country,'city',l.cityName) FROM location l WHERE l.locationId = jp.locationId)) AS location, stat.value AS status
             FROM jobProfile jp
             LEFT JOIN client c ON jp.clientId=c.clientId

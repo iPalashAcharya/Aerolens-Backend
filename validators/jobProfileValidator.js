@@ -159,6 +159,11 @@ const jobProfileSchemas = {
             "date.greater": "Estimated close date must be in the future",
         }),
 
+        workArrangement: Joi.string().trim().lowercase().valid('remote', 'onsite', 'hybrid').required().messages({
+            "any.only": "Work arrangement must be one of 'remote', 'onsite', or 'hybrid'",
+            "any.required": "Work arrangement is required",
+        }),
+
         location: Joi.object({
             country: Joi.string()
                 .trim()
@@ -219,6 +224,10 @@ const jobProfileSchemas = {
         estimatedCloseDate: Joi.date().greater("now").optional().messages({
             "date.base": "Estimated close date must be a valid date",
             "date.greater": "Estimated close date must be in the future",
+        }),
+
+        workArrangement: Joi.string().trim().lowercase().valid('remote', 'onsite', 'hybrid').optional().messages({
+            "any.only": "Work arrangement must be one of 'remote', 'onsite', or 'hybrid'"
         }),
 
         positions: Joi.number().integer().positive().optional().messages({
@@ -289,19 +298,18 @@ const jobProfileSchemas = {
         status: Joi.string().trim().min(1).max(50).optional(),
         minPositions: Joi.number().integer().min(1).optional(),
         maxPositions: Joi.number().integer().min(1).optional(),
+        workArrangement: Joi.string().trim().valid('remote', 'onsite', 'hybrid').optional(),
         fromDate: Joi.date().optional(),
         toDate: Joi.date().optional(),
         limit: Joi.number().integer().min(1).max(1000).default(50).optional(),
         offset: Joi.number().integer().min(0).default(0).optional()
     }).custom((value, helpers) => {
-        // Position range validation
         if (value.minPositions !== undefined && value.maxPositions !== undefined) {
             if (value.minPositions > value.maxPositions) {
                 return helpers.error('custom.positionRange');
             }
         }
 
-        // Date range validation
         if (value.fromDate !== undefined && value.toDate !== undefined) {
             if (value.fromDate > value.toDate) {
                 return helpers.error('custom.dateRange');

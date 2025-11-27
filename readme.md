@@ -1302,6 +1302,7 @@ If a server/database error occurs during deletion:
 "departmentId":86,
 "jobProfileDescription":"Random JOB description for testing job profile",
 "jobRole": "SDE",
+"workArrangement":"onsite"
 "location": {
 "city": "Ahmedabad",
 "country": "India"
@@ -1323,6 +1324,7 @@ If a server/database error occurs during deletion:
 "positions": 4,
 "techSpecification": "NodeJS,ExpressJS",
 "locationId": 1,
+"workArrangement":"onsite"
 "statusId": 4,
 "receivedOn": "2025-11-26T11:10:40.223Z"
 }
@@ -1344,11 +1346,12 @@ If a server/database error occurs during deletion:
 "clientName": "Intuit Bangalore Headquarters",
 "departmentName": "DevOps and AIOps",
 "jobProfileDescription": "Random JOB description for testing job profile",
-"jobRole": "SDE",
+"jobRole": "SDE-3",
 "techSpecification": "NodeJS,ExpressJS",
 "positions": 4,
-"receivedOn": "2025-11-26T11:10:40.000Z",
+"receivedOn": "2025-11-26T05:40:40.000Z",
 "estimatedCloseDate": null,
+"workArrangement": "hybrid",
 "location": {
 "city": "Ahmedabad",
 "country": "India"
@@ -1363,8 +1366,9 @@ If a server/database error occurs during deletion:
 "jobRole": "Frontend",
 "techSpecification": "React",
 "positions": 2,
-"receivedOn": "2025-11-07T07:26:44.000Z",
-"estimatedCloseDate": "2025-11-24T18:30:00.000Z",
+"receivedOn": "2025-11-07T01:56:44.000Z",
+"estimatedCloseDate": "2025-11-24T13:00:00.000Z",
+"workArrangement": "onsite",
 "location": {
 "city": "Ahmedabad",
 "country": "India"
@@ -1386,14 +1390,16 @@ If a server/database error occurs during deletion:
 "message": "Job Profile retrieved successfully",
 "data": {
 "jobProfileId": 25,
+"clientId": 2,
 "clientName": "Intuit Bangalore Headquarters",
 "departmentName": "DevOps and AIOps",
 "jobProfileDescription": "Random JOB description for testing job profile",
-"jobRole": "SDE",
+"jobRole": "SDE-3",
 "techSpecification": "NodeJS,ExpressJS",
 "positions": 4,
-"receivedOn": "2025-11-26T11:10:40.000Z",
+"receivedOn": "2025-11-26T05:40:40.000Z",
 "estimatedCloseDate": null,
+"workArrangement": "hybrid",
 "location": {
 "city": "Ahmedabad",
 "country": "India"
@@ -1423,11 +1429,12 @@ If a server/database error occurs during deletion:
 "clientName": "Intuit Bangalore Headquarters",
 "departmentName": "DevOps and AIOps",
 "jobProfileDescription": "Random JOB description for testing job profile",
-"jobRole": "SDE-3",
+"jobRole": "SDE-1",
 "techSpecification": "NodeJS,ExpressJS",
 "positions": 4,
 "receivedOn": "2025-11-26T05:40:40.000Z",
 "estimatedCloseDate": null,
+"workArrangement": "hybrid",
 "location": {
 "city": "Ahmedabad",
 "country": "India"
