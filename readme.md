@@ -2035,6 +2035,27 @@ Response
 }
 }
 
+5. PATCH lookup Entry
+
+PATCH /lookup/:lookupKey
+
+URL Params
+
+lookupKey (integer, required)
+
+Example request
+PATCH /lookup/9
+
+Response
+{
+"success": true,
+"message": "Lookup entry updated successfully",
+"data": {
+"lookupKey": 9,
+"tag": "candidateStatus"
+}
+}
+
 Error Codes
 VALIDATION_ERROR – Invalid input data
 

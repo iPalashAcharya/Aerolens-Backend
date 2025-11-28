@@ -134,6 +134,10 @@ class LookupService {
                 );
             }
 
+            if (lookupData.tag !== undefined) {
+                throw new AppError("Tag cannot be updated", 400, "TAG_UPDATE_NOT_ALLOWED");
+            }
+
             const updatedLookup = await this.lookupRepository.update(lookupKey, lookupData, client);
 
             await auditLogService.logAction({

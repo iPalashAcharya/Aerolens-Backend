@@ -30,16 +30,10 @@ const lookupSchemas = {
     }),
 
     update: Joi.object({
-        tag: Joi.string()
-            .trim()
-            .min(1)
-            .max(100)
-            .optional()
-            .messages({
-                'string.base': 'Tag must be a string',
-                'string.min': 'Tag must be at least 1 character long',
-                'string.max': 'Tag cannot exceed 100 characters'
-            }),
+        tag: Joi.forbidden().messages({
+            'any.unknown': 'Tag cannot be updated'
+        }),
+
         value: Joi.string()
             .trim()
             .min(1)
@@ -50,9 +44,11 @@ const lookupSchemas = {
                 'string.min': 'Value must be at least 1 character long',
                 'string.max': 'Value cannot exceed 500 characters'
             })
-    }).min(1).messages({
-        'object.min': 'At least one field (tag or value) must be provided for update'
-    }),
+    })
+        .min(1)
+        .messages({
+            'object.min': 'At least one field must be provided for update'
+        }),
 
     params: Joi.object({
         lookupKey: Joi.number()
