@@ -2046,13 +2046,17 @@ lookupKey (integer, required)
 Example request
 PATCH /lookup/9
 
+{
+"value":"Pending"
+}
+
 Response
 {
 "success": true,
 "message": "Lookup entry updated successfully",
 "data": {
 "lookupKey": 9,
-"tag": "candidateStatus"
+"value": "Pending"
 }
 }
 
