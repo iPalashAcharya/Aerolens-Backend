@@ -14,9 +14,11 @@ const contactRoutes = require('./routes/contact');
 const candidateRoutes = require('./routes/candidateRoutes');
 const CandidateValidator = require('./validators/candidateValidator');
 const lookupRoutes = require('./routes/lookupRoutes');
+const memberRoutes = require('./routes/memberRoutes');
 const db = require('./db');
 const JobProfileValidator = require('./validators/jobProfileValidator');
 const AuthValidator = require('./validators/authValidator');
+const MemberValidator = require('./validators/memberValidator');
 const tokenCleanup = require('./jobs/tokenCleanupJob');
 
 const app = express();
@@ -105,6 +107,8 @@ app.use('/jobProfile', jobProfileRoutes);
 CandidateValidator.init(db);
 app.use('/candidate', candidateRoutes);
 app.use('/lookup', lookupRoutes);
+MemberValidator.init(db);
+app.use('/member', memberRoutes);
 
 app.use(globalErrorHandler);
 app.use((err, req, res, next) => {

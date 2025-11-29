@@ -2,9 +2,11 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('node:crypto');
 const jwtConfig = require('../config/jwt');
-const memberRepository = require('../repositories/memberRepository');
+const MemberRepository = require('../repositories/memberRepository');
 const tokenRepository = require('../repositories/tokenRepository');
 const AppError = require('../utils/appError');
+
+const memberRepository = new MemberRepository();
 
 class AuthService {
     async hashPassword(password) {

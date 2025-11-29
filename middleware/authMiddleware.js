@@ -1,7 +1,9 @@
 const authService = require('../services/authServices');
-const memberRepository = require('../repositories/memberRepository');
+const MemberRepository = require('../repositories/memberRepository');
 const AppError = require('../utils/appError');
 const rateLimit = require('express-rate-limit');
+
+const memberRepository = new MemberRepository();
 
 // JWT Authentication Middleware
 const authenticate = async (req, res, next) => {

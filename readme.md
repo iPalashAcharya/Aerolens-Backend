@@ -2072,3 +2072,303 @@ DATABASE_ERROR – Generic database error
 DATABASE_SCHEMA_ERROR – Missing table or invalid schema
 
 DATABASE_CONNECTION_ERROR – Connection timeout or reset
+
+# Member Endpoints
+
+Validation & Transformation
+Joi Schemas
+
+MemberValidator uses Joi to validate:​
+
+memberSchema.update – body for PATCH /members/:memberId
+
+memberSchema.params – memberId route param
+
+Key rules:
+
+memberName: string, 2–100 chars.
+
+memberContact: pattern for phone-like values, max 25 chars.
+
+email: valid email.
+
+designation: string, lowercased, 2–100 chars.
+
+isRecruiter, isInterviewer: booleans.
+
+client, organisation: non-empty strings, max 255 chars.
+
+skills: array of { skillName, proficiencyLevel, yearsOfExperience }.
+
+location: { cityName, country }.
+
+If validation fails, an AppError with code VALIDATION_ERROR is thrown, containing validationErrors.​
+
+Transform Helpers
+
+MemberValidatorHelper converts human-readable fields to DB IDs:​
+
+transformDesignation(designation)
+
+Queries lookup table (tag = 'designation') to get lookupKey.
+
+Uses an in-memory cache to avoid repeated queries.
+
+transformClient(clientName)
+
+Queries client table to get clientId, with caching.
+
+transformSkills(skills)
+
+For each { skillName, proficiencyLevel, yearsOfExperience }, loads lookupKey from lookup (tag = 'skill').
+
+Returns { skill, proficiencyLevel, yearsOfExperience } with skill as the ID.
+
+getLocationIdByName(location)
+
+Uses location.city (note: your schema uses cityName – adjust as needed) to find locationId in location table.
+
+All these throw AppError with meaningful codes like INVALID_SKILL, INVALID_DESIGNATION, INVALID_CLIENT_NAME, INVALID_LOCATION.​
+
+API Endpoints
+Base path (example): /api/members
+
+1. Get All Members
+
+GET /members
+
+Returns all active members with joined metadata (designation, location, client, skills).​
+
+Example request:
+
+text
+GET /members HTTP/1.1
+Host: localhost:3000
+Authorization: Bearer <token>
+Success response (200):
+
+json
+{
+"status": "success",
+"message": "Members retrieved successfully",
+"data": [
+{
+"memberId": 1,
+"memberName": "John Doe",
+"memberContact": "+1 234 567 890",
+"email": "john.doe@example.com",
+"designation": "Senior Developer",
+"isRecruiter": false,
+"isActive": true,
+"lastLogin": "2025-11-28T10:15:00.000Z",
+"createdAt": "2025-10-01T09:00:00.000Z",
+"updatedAt": "2025-11-20T12:00:00.000Z",
+"cityName": "Mumbai",
+"country": "India",
+"clientName": "Acme Corp",
+"organisation": "Aerolens",
+"isInterviewer": true,
+"interviewerCapacity": 5,
+"skills": "Node.js, React, SQL"
+}
+]
+}
+Possible errors:
+
+401 – Unauthorized (auth middleware).​
+
+500 – MEMBER_FETCH_ERROR.​
+
+2. Get Member By ID
+
+GET /members/:memberId
+
+Example request:
+
+text
+GET /members/1 HTTP/1.1
+Host: localhost:3000
+Authorization: Bearer <token>
+Success response (200):
+
+json
+{
+"status": "success",
+"message": "Member entry retrieved successfully",
+"data": {
+"memberId": 1,
+"memberName": "John Doe",
+"memberContact": "+1 234 567 890",
+"email": "john.doe@example.com",
+"designation": "Senior Developer",
+"isRecruiter": false,
+"isActive": true,
+"lastLogin": "2025-11-28T10:15:00.000Z",
+"createdAt": "2025-10-01T09:00:00.000Z",
+"updatedAt": "2025-11-20T12:00:00.000Z",
+"cityName": "Mumbai",
+"country": "India",
+"clientName": "Acme Corp",
+"organisation": "Aerolens",
+"isInterviewer": true,
+"interviewerCapacity": 5,
+"skills": "Node.js, React, SQL"
+}
+}
+Validation / error cases:
+
+400 – VALIDATION_ERROR if memberId is not a positive integer.​
+
+404 – MEMBER_ID_NOT_FOUND if the member does not exist or inactive.​
+
+3. Update Member
+
+PATCH /members/:memberId
+
+Validates params and body via Joi.​
+
+Transforms designation, client, location, and skills into IDs before updating.​
+
+Adds new interviewer skills using interviewer_skill table.​
+
+Wraps in a DB transaction and writes an audit log.​
+
+Example request:
+
+text
+PATCH /members/1 HTTP/1.1
+Host: localhost:3000
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+"memberName": "Johnathan Doe",
+"memberContact": "+1 234 567 999",
+"email": "johnathan.doe@example.com",
+"designation": "Senior Developer",
+"client": "Acme Corp",
+"organisation": "Aerolens",
+"isRecruiter": true,
+"isInterviewer": true,
+"location": {
+"cityName": "Mumbai",
+"country": "India"
+},
+"skills": [
+{
+"skillName": "Node.js",
+"proficiencyLevel": "expert",
+"yearsOfExperience": 5
+},
+{
+"skillName": "React",
+"proficiencyLevel": "advanced",
+"yearsOfExperience": 3
+}
+]
+}
+Internally, after validation and helper transformations, the body passed to MemberService.updateMember looks roughly like:​
+
+json
+{
+"memberName": "Johnathan Doe",
+"memberContact": "+1 234 567 999",
+"email": "johnathan.doe@example.com",
+"organisation": "Aerolens",
+"isRecruiter": true,
+"isInterviewer": true,
+"designationId": 12,
+"clientId": 3,
+"locationId": 5,
+"skills": [
+{
+"skill": 20,
+"proficiencyLevel": "expert",
+"yearsOfExperience": 5
+},
+{
+"skill": 21,
+"proficiencyLevel": "advanced",
+"yearsOfExperience": 3
+}
+]
+}
+Success response (200):
+
+json
+{
+"status": "success",
+"message": "Member entry updated successfully",
+"data": {
+"memberId": 1,
+"memberName": "Johnathan Doe",
+"memberContact": "+1 234 567 999",
+"email": "johnathan.doe@example.com",
+"organisation": "Aerolens",
+"isRecruiter": true,
+"isInterviewer": true,
+"designationId": 12,
+"clientId": 3,
+"locationId": 5
+}
+}
+Note: Repository updateMember only updates whitelisted fields (memberName, memberContact, email, designation, isRecruiter, locationId, clientId, organisation, isInterviewer).​
+
+Possible errors:
+
+400 – VALIDATION_ERROR (Joi) or NO_VALID_FIELDS, MISSING_UPDATE_DATA.​
+
+404 – MEMBER_NOT_FOUND.​
+
+400/404 – INVALID_SKILL, INVALID_DESIGNATION, INVALID_CLIENT_NAME, INVALID_LOCATION.​
+
+500 – MEMBER_UPDATE_ERROR for unexpected errors.​
+
+4. Delete Member (Deactivate)
+
+DELETE /members/:memberId
+
+Validates memberId.​
+
+Checks member existence.
+
+Deactivates member (isActive = FALSE) through repository and logs an audit entry.​
+
+Example request:
+
+text
+DELETE /members/1 HTTP/1.1
+Host: localhost:3000
+Authorization: Bearer <token>
+Success response (200):
+
+json
+{
+"status": "success",
+"message": "Member entry deactivated successfully and will be deleted from database in 10 days",
+"data": null
+}
+Possible errors:
+
+400 – VALIDATION_ERROR for invalid memberId.​
+
+404 – MEMBER_NOT_FOUND.​
+
+500 – MEMBER_DELETE_ERROR for unexpected failures.​
+
+Error Format
+Errors are thrown using AppError and converted to a consistent JSON response, for example:​
+
+json
+{
+"status": "error",
+"message": "Validation failed",
+"code": "VALIDATION_ERROR",
+"errors": [
+{
+"field": "email",
+"message": "Please provide a valid email address"
+}
+]
+}
+Database or service errors use informative code values like DB_ERROR, MEMBER_UPDATE_ERROR, etc.​

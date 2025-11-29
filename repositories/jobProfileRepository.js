@@ -92,7 +92,7 @@ class JobProfileRepository {
 
             // Filter only allowed fields for security
             const allowedFields = [
-                'clientId', 'departmentId', 'jobProfileDescription', 'jobRole',
+                'jobProfileDescription', 'jobRole',
                 'techSpecification', 'positions', 'estimatedCloseDate', 'locationId', 'workArrangement', 'statusId'
             ];
 
