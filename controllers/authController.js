@@ -5,6 +5,7 @@ const AppError = require('../utils/appError');
 class AuthController {
     async register(req, res, next) {
         try {
+            console.log("BODY:", req.body);
             const memberData = req.body;
             const newMember = await authService.register(memberData);
 

@@ -216,15 +216,16 @@ class MemberRepository {
         const connection = await db.getConnection();
         try {
             const [result] = await connection.execute(
-                `INSERT INTO member (memberName, memberContact, email, password, designation, isRecruiter)
-                 VALUES (?, ?, ?, ?, ?, ?)`,
+                `INSERT INTO member (memberName, memberContact, email, password, designation, isRecruiter,isInterviewer)
+                 VALUES (?, ?, ?, ?, ?, ?,?)`,
                 [
                     memberData.memberName,
                     memberData.memberContact,
                     memberData.email,
                     memberData.password,
                     memberData.designation,
-                    memberData.isRecruiter || false
+                    memberData.isRecruiter || false,
+                    memberData.isInterviewer || false
                 ]
             );
             return await this.findById(result.insertId);

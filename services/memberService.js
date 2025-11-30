@@ -156,7 +156,7 @@ class MemberService {
                 );
             }
 
-            await this.memberRepository.delete(memberId, client);
+            await this.memberRepository.deactivateAccount(memberId, client);
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'DELETE',

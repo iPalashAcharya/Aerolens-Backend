@@ -13,6 +13,7 @@ class CandidateValidatorHelper {
             ['bengaluru', 'Bangalore']
         ]);
         this.statusCache = new Map();
+        this.recruiterCache = new Map();
     }
 
     async getStatusIdByName(statusName, client = null) {
@@ -43,6 +44,31 @@ class CandidateValidatorHelper {
             return statusId;
         } finally {
             if (!client) connection.release();
+        }
+    }
+
+    async getRecruiterId(recruiterName) {
+        if (!recruiterName) return null;
+        const connection = await this.db.getConnection();
+        const cacheKey = recruiterName;
+        if (this.recruiterCache.has(cacheKey)) {
+            return this.recruiterCache.get(cacheKey);
+        }
+        try {
+            const query = `SELECT memberId FROM member WHERE LOWER(memberName)= LOWER(?) AND isRecruiter=TRUE`;
+            const [rows] = await connection.execute(query, [recruiterName.trim()]);
+            if (rows.length === 0) {
+                throw new AppError(
+                    `Invalid Recruiter Name: ${recruiterName} Does not exist in the database`,
+                    400,
+                    `INVALID_RECRUITER_NAME`
+                );
+            }
+            const recruiterId = rows[0].memberId;
+            this.recruiterCache.set(cacheKey, recruiterId);
+            return recruiterId;
+        } finally {
+            connection.release();
         }
     }
 
@@ -155,7 +181,7 @@ const candidateSchemas = {
             .trim()
             .min(2)
             .max(100)
-            .pattern(/^[a-zA-Z\s.'-()]+$/)
+            .pattern(/^[a-zA-Z\s.'-]+$/)
             .required()
             /*.custom((value, helpers) => {
                 const validRecruiters = ['jayraj', 'khushi', 'yash'];
@@ -278,6 +304,12 @@ const candidateSchemas = {
             .messages({
                 'string.min': 'Status must be at least 1 character long',
                 'string.max': 'Status cannot exceed 50 characters'
+            }),
+        notes: Joi.string()
+            .allow('')
+            .optional()
+            .messages({
+                'string.base': 'Notes must be text'
             })
     }).custom((value, helpers) => {
         if (value.expectedCTC < value.currentCTC) {
@@ -324,7 +356,7 @@ const candidateSchemas = {
             .trim()
             .min(2)
             .max(100)
-            .pattern(/^[a-zA-Z\s.'-()]+$/)
+            .pattern(/^[a-zA-Z\s.'-]+$/)
             .optional()
             .messages({
                 'string.min': 'Recruiter name must be at least 2 characters long',
@@ -433,6 +465,12 @@ const candidateSchemas = {
                     return helpers.error("any.invalid");
                 }
                 return value;
+            }),
+        notes: Joi.string()
+            .allow('')
+            .optional()
+            .messages({
+                'string.base': 'Notes must be text'
             })
     }).min(1)
         .custom((value, helpers) => {
@@ -575,6 +613,11 @@ class CandidateValidator {
                 delete value.status;
             }
 
+            if (value.recruiterName) {
+                value.recruiterId = await CandidateValidator.helper.getRecruiterId(value.recruiterName);
+                delete value.recruiterName;
+            }
+
             // Check for duplicates
             if (await CandidateValidator.helper.checkEmailExists(value.email)) {
                 // Cleanup S3 file
@@ -703,6 +746,10 @@ class CandidateValidator {
             if (value.status) {
                 value.statusId = await CandidateValidator.helper.getStatusIdByName(value.status);
                 delete value.status;
+            }
+            if (value.recruiterName) {
+                value.recruiterId = await CandidateValidator.helper.getRecruiterId(value.recruiterName);
+                delete value.recruiterName;
             }
 
             // Check for duplicates (excluding current candidate)

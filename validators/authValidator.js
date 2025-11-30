@@ -93,6 +93,8 @@ const registerSchema = Joi.object({
             'any.required': 'Designation is required'
         }),
     isRecruiter: Joi.boolean()
+        .default(false),
+    isInterviewer: Joi.boolean()
         .default(false)
 });
 

@@ -15,7 +15,8 @@ json
 "email": "john@example.com",
 "password": "Password@123",
 "designation": "software engineer",
-"isRecruiter": false
+"isRecruiter": false,
+"isInterviewer":false
 }
 designation must match existing designation values in the database lookup table (case-insensitive).
 
@@ -31,7 +32,8 @@ json
 "memberName": "John Doe",
 "email": "john@example.com",
 "designation": 4,
-"isRecruiter": false
+"isRecruiter": false,
+"isInterviewer":false
 }
 }
 }
@@ -1675,7 +1677,10 @@ GET /candidate
 "candidateName": "Yash Prajapati",
 "contactNumber": "9870654321",
 "email": "jaivals21@testing.com",
-"recruiterName": "Jayraj",
+"recruiterId": null,
+"recruiterName": null,
+"recruiterContact": null,
+"recruiterEmail": null,
 "jobRole": "SDE",
 "preferredJobLocation": "Ahmedabad",
 "currentCTC": 23,
@@ -1683,19 +1688,22 @@ GET /candidate
 "noticePeriod": 30,
 "experienceYears": 1,
 "linkedinProfileUrl": "https://www.linkedin.com/in/aksh-patel1/",
-"createdAt": "2025-09-27T11:39:13.000Z",
-"updatedAt": "2025-11-21T11:00:40.000Z",
+"createdAt": "2025-09-27T06:09:13.000Z",
+"updatedAt": "2025-11-21T05:30:40.000Z",
 "statusName": "interview pending",
 "resumeFilename": "resumes/candidate_38_1763722838929.docx",
 "resumeOriginalName": "AICTE_Internship_2024_Project_Report_Template_2.docx",
-"resumeUploadDate": "2025-11-21T11:00:40.000Z"
+"resumeUploadDate": "2025-11-21T05:30:40.000Z"
 },
 {
 "candidateId": 40,
 "candidateName": "Parth",
 "contactNumber": "9898200321",
 "email": "parth@gmail.com",
-"recruiterName": "Jayraj",
+"recruiterId": null,
+"recruiterName": null,
+"recruiterContact": null,
+"recruiterEmail": null,
 "jobRole": "Software Devloper",
 "preferredJobLocation": "Ahmedabad",
 "currentCTC": 300,
@@ -1703,8 +1711,8 @@ GET /candidate
 "noticePeriod": 60,
 "experienceYears": 3,
 "linkedinProfileUrl": "https://www.linkedin.com/in/meghana-kaki-0862b8167/",
-"createdAt": "2025-09-27T11:44:07.000Z",
-"updatedAt": "2025-09-27T11:44:07.000Z",
+"createdAt": "2025-09-27T06:14:07.000Z",
+"updatedAt": "2025-09-27T06:14:07.000Z",
 "statusName": "interview pending",
 "resumeFilename": null,
 "resumeOriginalName": null,
@@ -1724,22 +1732,25 @@ GET /candidate/:id
 "success": true,
 "message": "Candidate retrieved successfully",
 "data": {
-"candidateId": 38,
-"candidateName": "Yash Prajapati",
-"contactNumber": "9870654321",
-"email": "jaivals21@testing.com",
-"recruiterName": "Jayraj",
-"jobRole": "SDE",
+"candidateId": 70,
+"candidateName": "Palash A",
+"contactNumber": "999999999",
+"email": "random@exmaple.com",
+"recruiterId": 1,
+"recruiterName": "Palash Acharya",
+"recruiterContact": "+91-9876543210",
+"recruiterEmail": "palash.acharya@aerolens.in",
+"jobRole": "SDE-2",
 "preferredJobLocation": "Ahmedabad",
-"currentCTC": 23,
-"expectedCTC": 33,
-"noticePeriod": 30,
-"experienceYears": 1,
-"linkedinProfileUrl": "https://www.linkedin.com/in/aksh-patel1/",
-"statusName": "interview pending",
-"resumeFilename": "resumes/candidate_38_1763722838929.docx",
+"currentCTC": 10,
+"expectedCTC": 12,
+"noticePeriod": 15,
+"experienceYears": 2,
+"linkedinProfileUrl": "https://www.linkedin.com/in/palash-acharya-684732294/",
+"statusName": "Selected",
+"resumeFilename": "resumes/candidate_70_1763726746068.docx",
 "resumeOriginalName": "AICTE_Internship_2024_Project_Report_Template_2.docx",
-"resumeUploadDate": "2025-11-21T11:00:40.000Z"
+"resumeUploadDate": "2025-11-21T06:35:46.000Z"
 }
 }
 
@@ -1751,41 +1762,40 @@ POST /candidate
 Content-Type: multipart/form-data
 **Request Body (form-data):**
 
-| Field                | Type   | Description                                      |
-| -------------------- | ------ | ------------------------------------------------ |
-| candidateName        | String | Candidate full name (required)                   |
-| contactNumber        | String | Phone number (required)                          |
-| email                | String | Email address (required)                         |
-| recruiterName        | String | Recruiter name (required)                        |
-| jobRole              | String | Job title (required)                             |
-| preferredJobLocation | String | Ahmedabad / Bangalore / San Francisco (required) |
-| currentCTC           | Number | Current CTC in INR (required)                    |
-| expectedCTC          | Number | Expected CTC in INR (required)                   |
-| noticePeriod         | Number | Notice period in days (required)                 |
-| experienceYears      | Number | Years of experience (required)                   |
-| linkedinProfileUrl   | String | LinkedIn URL (optional)                          |
-| resume               | File   | PDF resume, max 5MB (optional)                   |
-| status               | String | candidate status 50 characters (optional)        |
+| Field                | Type   | Description                                         |
+| -------------------- | ------ | --------------------------------------------------- |
+| candidateName        | String | Candidate full name (required)                      |
+| contactNumber        | String | Phone number (required)                             |
+| email                | String | Email address (required)                            |
+| recruiterName        | String | Recruiter name (required) [must be in member table] |
+| jobRole              | String | Job title (required)                                |
+| preferredJobLocation | String | Ahmedabad / Bangalore / San Francisco (required)    |
+| currentCTC           | Number | Current CTC in INR (required)                       |
+| expectedCTC          | Number | Expected CTC in INR (required)                      |
+| noticePeriod         | Number | Notice period in days (required)                    |
+| experienceYears      | Number | Years of experience (required)                      |
+| linkedinProfileUrl   | String | LinkedIn URL (optional)                             |
+| resume               | File   | PDF resume, max 5MB (optional)                      |
+| status               | String | candidate status 50 characters (optional)           |
+| notes                | string | notes about candidates (optional)                   |
 
 **Response:**
 {
 "success": true,
 "message": "Candidate created successfully",
 "data": {
-"candidateId": 26,
-"candidateName": "Palash Testing",
-"contactNumber": "9999996",
-"currentCTC": 9,
-"email": "palashtest321@example.com",
-"expectedCTC": 11,
-"experienceYears": 4,
-"jobRole": "Backend Engineer",
-"linkedinProfileUrl": "https://www.linkedin.com/in/alice-johnson",
-"noticePeriod": 30,
+"candidateId": 71,
+"candidateName": "Test Candidate",
+"contactNumber": "9998989876",
+"email": "testcandidate@example.com",
+"jobRole": "Java developer",
 "preferredJobLocation": 1,
-"recruiterName": "Jayraj",
-"statusId": 9,
-"createdOn": "2025-09-26T12:11:27.615Z"
+"currentCTC": 6,
+"expectedCTC": 9,
+"noticePeriod": 60,
+"experienceYears": 1,
+"recruiterId": 420,
+"createdOn": "2025-11-30T09:29:51.088Z"
 }
 }
 
