@@ -26,41 +26,50 @@ class MemberRepository {
         try {
             const [rows] = await connection.execute(
                 `SELECT
-                m.memberId,
-                m.memberName,
-                m.memberContact,
-                m.email,
-                l.value AS designation,
-                m.isRecruiter,
-                m.isActive,
-                m.lastLogin,
-                m.createdAt,
-                m.updatedAt,
-                loc.cityName,
-                loc.country,
-                c.clientName,
-                m.organisation,
-                m.isInterviewer,
-                m.interviewerCapacity,
-                GROUP_CONCAT(ls.value ORDER BY ls.value SEPARATOR ', ') AS skills
-            FROM member m
-            INNER JOIN lookup l
-                ON m.designation = l.lookupKey
-            LEFT JOIN location loc
-                ON m.locationId = loc.locationId
-            LEFT JOIN client c
-                ON c.clientId = m.clientId
-            LEFT JOIN interviewer_skill isk
-                ON isk.interviewerId = m.memberId
-            LEFT JOIN lookup ls
-                ON ls.lookupKey = isk.skillId
+            m.memberId,
+            m.memberName,
+            m.memberContact,
+            m.email,
+            l.value AS designation,
+            m.isRecruiter,
+            m.isActive,
+            m.lastLogin,
+            m.createdAt,
+            m.updatedAt,
+            loc.cityName,
+            loc.country,
+            c.clientName,
+            m.organisation,
+            m.isInterviewer,
+            m.interviewerCapacity,
+            JSON_ARRAYAGG(
+                JSON_OBJECT(
+                    'skillId', isk.skillId,
+                    'skillName', ls.value,
+                    'proficiencyLevel', isk.proficiencyLevel,
+                    'yearsOfExperience', isk.years_of_experience
+                )
+            ) AS skills
 
-            WHERE m.memberId = ? AND m.isActive = TRUE
-            GROUP BY
-                m.memberId, m.memberName, m.memberContact, m.email, l.value,
-                m.isRecruiter, m.isActive, m.lastLogin, m.createdAt, m.updatedAt,
-                loc.cityName, loc.country, c.clientName,
-                m.organisation, m.isInterviewer, m.interviewerCapacity;`,
+        FROM member m
+        INNER JOIN lookup l
+            ON m.designation = l.lookupKey
+        LEFT JOIN location loc
+            ON m.locationId = loc.locationId
+        LEFT JOIN client c
+            ON c.clientId = m.clientId
+        LEFT JOIN interviewer_skill isk
+            ON isk.interviewerId = m.memberId
+        LEFT JOIN lookup ls
+            ON ls.lookupKey = isk.skillId
+
+        WHERE m.isActive = TRUE AND m.memberId = ?
+
+        GROUP BY
+            m.memberId, m.memberName, m.memberContact, m.email, l.value,
+            m.isRecruiter, m.isActive, m.lastLogin, m.createdAt, m.updatedAt,
+            loc.cityName, loc.country, c.clientName,
+            m.organisation, m.isInterviewer, m.interviewerCapacity;`,
                 [memberId]
             );
             return rows[0] || null;
@@ -119,33 +128,51 @@ class MemberRepository {
         const connection = client;
         try {
             const [rows] = await connection.execute(
-                `SELECT m.memberId, m.memberName, m.memberContact, m.email, l.value AS designation, m.isRecruiter, m.isActive, m.lastLogin,
-                m.createdAt,
-                m.updatedAt,
-                loc.cityName,
-                loc.country,
-                c.clientName,
-                m.organisation,
-                m.isInterviewer,
-                m.interviewerCapacity,
-                GROUP_CONCAT(ls.value ORDER BY ls.value SEPARATOR ', ') AS skills
-            FROM member m
-            INNER JOIN lookup l
-                ON m.designation = l.lookupKey
-            LEFT JOIN location loc
-                ON m.locationId = loc.locationId
-            LEFT JOIN client c
-                ON c.clientId = m.clientId
-            LEFT JOIN interviewer_skill isk
-                ON isk.interviewerId = m.memberId
-            LEFT JOIN lookup ls
-                ON ls.lookupKey = isk.skillId
-            WHERE m.isActive = TRUE
-            GROUP BY
-                m.memberId, m.memberName, m.memberContact, m.email, l.value,
-                m.isRecruiter, m.isActive, m.lastLogin, m.createdAt, m.updatedAt,
-                loc.cityName, loc.country, c.clientName,
-                m.organisation, m.isInterviewer, m.interviewerCapacity;`
+                `SELECT
+            m.memberId,
+            m.memberName,
+            m.memberContact,
+            m.email,
+            l.value AS designation,
+            m.isRecruiter,
+            m.isActive,
+            m.lastLogin,
+            m.createdAt,
+            m.updatedAt,
+            loc.cityName,
+            loc.country,
+            c.clientName,
+            m.organisation,
+            m.isInterviewer,
+            m.interviewerCapacity,
+            JSON_ARRAYAGG(
+                JSON_OBJECT(
+                    'skillId', isk.skillId,
+                    'skillName', ls.value,
+                    'proficiencyLevel', isk.proficiencyLevel,
+                    'yearsOfExperience', isk.years_of_experience
+                )
+            ) AS skills
+
+        FROM member m
+        INNER JOIN lookup l
+            ON m.designation = l.lookupKey
+        LEFT JOIN location loc
+            ON m.locationId = loc.locationId
+        LEFT JOIN client c
+            ON c.clientId = m.clientId
+        LEFT JOIN interviewer_skill isk
+            ON isk.interviewerId = m.memberId
+        LEFT JOIN lookup ls
+            ON ls.lookupKey = isk.skillId
+
+        WHERE m.isActive = TRUE
+
+        GROUP BY
+            m.memberId, m.memberName, m.memberContact, m.email, l.value,
+            m.isRecruiter, m.isActive, m.lastLogin, m.createdAt, m.updatedAt,
+            loc.cityName, loc.country, c.clientName,
+            m.organisation, m.isInterviewer, m.interviewerCapacity;`
             );
             return rows;
         } catch (error) {
@@ -225,7 +252,7 @@ class MemberRepository {
                     memberData.password,
                     memberData.designation,
                     memberData.isRecruiter || false,
-                    memberData.isInterviewer || false
+                    memberData.isInterviewer || false,
                 ]
             );
             return await this.findById(result.insertId);
@@ -262,7 +289,7 @@ class MemberRepository {
             }
 
             const allowedFields = [
-                'memberName', 'memberContact', 'email', 'designation', 'isRecruiter', 'locationId', 'clientId', 'organisation', 'isInterviewer'
+                'memberName', 'memberContact', 'email', 'designation', 'isRecruiter', 'locationId', 'clientId', 'organisation', 'isInterviewer', 'interviewerCapacity'
             ];
 
             const filteredData = {};

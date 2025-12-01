@@ -229,7 +229,11 @@ const memberSchema = {
         })
             .messages({
                 'object.base': 'Location must be an object with cityName and country'
-            })
+            }),
+        interviewerCapacity: Joi.number().integer().messages({
+            'number.base': 'interviewerCapacity must be a number',
+            'number.integer': 'interviewerCapacity must be an integer'
+        })
     }).min(1)
         .messages({
             'object.min': 'At least one field must be provided for update'
