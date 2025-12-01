@@ -2108,7 +2108,7 @@ isRecruiter, isInterviewer: booleans.
 
 client, organisation: non-empty strings, max 255 chars.
 
-skills: array of { skillName, proficiencyLevel, yearsOfExperience }.
+skills: array of { skillName, proficiencyLevel('beginner','intermediate','advanced'.'expert'), yearsOfExperience }.
 
 location: { cityName, country }.
 
@@ -2152,7 +2152,7 @@ Returns all active members with joined metadata (designation, location, client, 
 Example request:
 
 text
-GET /members HTTP/1.1
+GET /member HTTP/1.1
 Host: localhost:3000
 Authorization: Bearer <token>
 Success response (200):
@@ -2191,7 +2191,7 @@ Possible errors:
 
 2. Get Member By ID
 
-GET /members/:memberId
+GET /member/:memberId
 
 Example request:
 
@@ -2233,7 +2233,7 @@ Validation / error cases:
 
 3. Update Member
 
-PATCH /members/:memberId
+PATCH /member/:memberId
 
 Validates params and body via Joi.​
 
@@ -2246,7 +2246,7 @@ Wraps in a DB transaction and writes an audit log.​
 Example request:
 
 text
-PATCH /members/1 HTTP/1.1
+PATCH /member/1 HTTP/1.1
 Host: localhost:3000
 Authorization: Bearer <token>
 Content-Type: application/json
@@ -2336,7 +2336,7 @@ Possible errors:
 
 4. Delete Member (Deactivate)
 
-DELETE /members/:memberId
+DELETE /member/:memberId
 
 Validates memberId.​
 
@@ -2347,7 +2347,7 @@ Deactivates member (isActive = FALSE) through repository and logs an audit entry
 Example request:
 
 text
-DELETE /members/1 HTTP/1.1
+DELETE /member/1 HTTP/1.1
 Host: localhost:3000
 Authorization: Bearer <token>
 Success response (200):
