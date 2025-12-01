@@ -210,7 +210,7 @@ const memberSchema = {
                     skillName: Joi.string().trim().min(1).max(100).required(),
                     proficiencyLevel: Joi.string()
                         .trim()
-                        .valid('beginner', 'intermediate', 'advanced', 'expert')
+                        .valid('Beginner', 'Intermediate', 'Advanced', 'Expert')
                         .required(),
                     yearsOfExperience: Joi.number()
                         .integer()

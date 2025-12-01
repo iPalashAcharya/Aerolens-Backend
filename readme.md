@@ -2441,3 +2441,315 @@ Errors are thrown using AppError and converted to a consistent JSON response, fo
 ]
 }
 Database or service errors use informative code values like DB_ERROR, MEMBER_UPDATE_ERROR, etc.​
+
+# Location Endpoints
+
+Authentication
+All endpoints require a valid JWT Bearer token in the Authorization header.
+
+Header Format:
+
+Authorization: Bearer <JWT_TOKEN>
+Middleware: authenticate middleware validates the token before processing.
+
+API Endpoints
+Get All Locations
+
+Retrieves all locations in the system.
+
+Request:
+GET /api/location HTTP/1.1
+Host: api.example.com
+Authorization: Bearer <JWT_TOKEN>
+Response (200 OK):
+{
+"success": true,
+"data": {
+"data": [
+{
+"locationId": 1,
+"cityName": "Bangalore",
+"country": "India",
+"stateName": "Karnataka"
+},
+{
+"locationId": 2,
+"cityName": "San Francisco",
+"country": "United States",
+"stateName": "California"
+}
+]
+},
+"message": "All Locations retrieved successfully",
+"statusCode": 200
+}
+Get Location by ID
+Retrieves a specific location by its ID.
+
+Request:
+
+GET /api/location/:locationId HTTP/1.1
+Host: api.example.com
+Authorization: Bearer <JWT_TOKEN>
+Path Parameters:
+
+| Parameter  | Type    | Required | Description              |
+| ---------- | ------- | -------- | ------------------------ |
+| locationId | Integer | Yes      | Id of the location entry |
+
+Example:
+
+GET /api/location/1 HTTP/1.1
+Response (200 OK):
+
+{
+"success": true,
+"data": {
+"data": [
+{
+"locationId": 1,
+"cityName": "Bangalore",
+"country": "India",
+"stateName": "Karnataka"
+}
+]
+},
+"message": "Location entry retrieved successfully",
+"statusCode": 200
+}
+Error Response (404 Not Found):
+{
+"success": false,
+"message": "Location with ID 999 not found",
+"errorCode": "LOCATION_ID_NOT_FOUND",
+"statusCode": 404
+}
+Create Location
+
+Creates a new location entry.
+
+Request:
+POST /api/location HTTP/1.1
+Host: api.example.com
+Authorization: Bearer <JWT_TOKEN>
+Content-Type: application/json
+Request Body:
+
+| Field   | Type   | Required | Description                                                                     |
+| ------- | ------ | -------- | ------------------------------------------------------------------------------- |
+| city    | Stirng | Yes      | Name of the city (must be unique)                                               |
+| country | string | Yes      | Name of the Country, must be 'India' or 'United States' exactly with the casing |
+| state   | string | no       | Name of the state                                                               |
+
+Example Request:
+curl -X POST http://api.example.com/api/location \
+ -H "Authorization: Bearer <JWT_TOKEN>" \
+ -H "Content-Type: application/json" \
+ -d '{
+"city": "Mumbai",
+"country": "India",
+"state": "Maharashtra"
+}'
+Response (201 Created):
+
+{
+"success": true,
+"data": {
+"locationId": 3,
+"city": "Mumbai",
+"country": "India",
+"state": "Maharashtra"
+},
+"message": "location created successfully",
+"statusCode": 201
+}
+Error Response (409 Conflict - Duplicate):
+
+{
+"success": false,
+"message": "A location with this city name already exists",
+"errorCode": "DUPLICATE_LOCATION_VALUE",
+"statusCode": 409
+}
+Error Response (400 Validation):
+{
+"success": false,
+"message": "Validation failed",
+"errorCode": "VALIDATION_ERROR",
+"statusCode": 400,
+"validationErrors": [
+{
+"field": "city",
+"message": "city cannot be empty"
+},
+{
+"field": "country",
+"message": "country must be one of 'India' or 'United States'"
+}
+]
+}
+Update Location
+
+Updates an existing location (partial update supported).
+
+Request:
+
+PATCH /api/location/:locationId HTTP/1.1
+Host: api.example.com
+Authorization: Bearer <JWT_TOKEN>
+Content-Type: application/json
+Path Parameters:
+
+| Parameter  | Type    | Required | Description              |
+| ---------- | ------- | -------- | ------------------------ |
+| locationId | Integer | Yes      | Id of the location entry |
+
+Request Body (all fields optional, but at least one required):
+
+| Field   | Type   | Required | Description                                                                     |
+| ------- | ------ | -------- | ------------------------------------------------------------------------------- |
+| city    | Stirng | No       | Name of the city (must be unique)                                               |
+| country | string | No       | Name of the Country, must be 'India' or 'United States' exactly with the casing |
+| state   | string | No       | Name of the state                                                               |
+
+Example Request:
+
+bash
+curl -X PATCH http://api.example.com/api/location/1 \
+ -H "Authorization: Bearer <JWT_TOKEN>" \
+ -H "Content-Type: application/json" \
+ -d '{
+"state": "Tamil Nadu"
+}'
+Response (200 OK):
+{
+"success": true,
+"data": {
+"locationId": 1,
+"city": "Bangalore",
+"country": "India",
+"state": "Tamil Nadu"
+},
+"message": "location entry updated successfully",
+"statusCode": 200
+}
+Error Response (404 Not Found):
+{
+"success": false,
+"message": "Location with ID 999 does not exist",
+"errorCode": "LOCATION_NOT_FOUND",
+"statusCode": 404,
+"suggestion": "Please verify the Location Id and try again"
+}
+Error Response (400 - No Fields Provided):
+{
+"success": false,
+"message": "Validation failed",
+"errorCode": "VALIDATION_ERROR",
+"statusCode": 400,
+"validationErrors": [
+{
+"field": "object",
+"message": "At least one field must be provided for update"
+}
+]
+}
+Delete Location
+
+Deletes a location entry.
+
+Request:
+
+DELETE /api/location/:locationId HTTP/1.1
+Host: api.example.com
+Authorization: Bearer <JWT_TOKEN>
+Path Parameters:
+
+| Parameter  | Type    | Required | Description              |
+| ---------- | ------- | -------- | ------------------------ |
+| locationId | Integer | Yes      | Id of the location entry |
+
+Example Request:
+
+bash
+curl -X DELETE http://api.example.com/api/location/1 \
+ -H "Authorization: Bearer <JWT_TOKEN>"
+Response (200 OK):
+
+{
+"success": true,
+"data": null,
+"message": "Location deleted successfully",
+"statusCode": 200
+}
+Error Response (404 Not Found):
+
+{
+"success": false,
+"message": "Location with ID 999 not found",
+"errorCode": "LOCATION_NOT_FOUND",
+"statusCode": 404
+}
+Request/Response Examples
+Example 1: Create Multiple Locations
+
+Request 1:
+
+bash
+curl -X POST http://api.example.com/api/location \
+ -H "Authorization: Bearer eyJhbGc..." \
+ -H "Content-Type: application/json" \
+ -d '{"city":"Delhi","country":"India","state":"Delhi"}'
+Request 2:
+
+bash
+curl -X POST http://api.example.com/api/location \
+ -H "Authorization: Bearer eyJhbGc..." \
+ -H "Content-Type: application/json" \
+ -d '{"city":"New York","country":"United States","state":"New York"}'
+Example 2: Complete Update Workflow
+
+bash
+
+# 1. Get location
+
+GET /api/location/1
+
+# 2. Update state only
+
+PATCH /api/location/1
+{"state": "Telangana"}
+
+Validation Rules
+Create Request Validation
+
+Field Rule Error Message
+city : Required, 1-100 chars, trimmed "city cannot be empty" or "city cannot exceed 100 characters"
+country : Required, must be 'India' or 'United States' "country must be one of 'India' or 'United States'"
+state : Optional, 1-100 chars if provided "state must be at least 1 character long" or "state cannot exceed 100 characters"
+Unknown fields Stripped automatically -
+Update Request Validation
+
+Field Rule Error Message
+city Optional, 1-100 chars if provided Same as create
+country Optional, must be valid if provided Same as create
+state Optional, 1-100 chars if provided Same as create
+At least one field Required "At least one field must be provided for update"
+Unknown fields Stripped automatically -
+Path Parameter Validation
+
+Parameter Rule Error Message
+locationId Required, positive integer "Location Id must be positive" or "Location Id must be an integer"
+Error Handling
+Error Response Structure
+
+All error responses follow this format:
+
+{
+"success": false,
+"message": "Human-readable error message",
+"errorCode": "MACHINE_READABLE_CODE",
+"statusCode": 400,
+"validationErrors": [],
+"metadata": {}
+}
