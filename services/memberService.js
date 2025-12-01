@@ -102,11 +102,15 @@ class MemberService {
                 }
             }*/
 
-            const updatedMember = await this.memberRepository.updateMember(
-                memberId,
-                updateData,
-                client
-            );
+            let updatedMember = existingMember;
+
+            if (Object.keys(updateData).length > 0) {
+                updatedMember = await this.memberRepository.updateMember(
+                    memberId,
+                    updateData,
+                    client
+                );
+            }
 
             if (auditContext) {
                 await auditLogService.logAction({
