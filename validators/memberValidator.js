@@ -224,7 +224,7 @@ const memberSchema = {
             }),
 
         location: Joi.object({
-            cityName: Joi.string().trim().min(1).max(255),
+            city: Joi.string().trim().min(1).max(255),
             country: Joi.string().trim().min(1).max(255)
         })
             .messages({
