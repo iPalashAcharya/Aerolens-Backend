@@ -2141,23 +2141,21 @@ Uses location.city (note: your schema uses cityName – adjust as needed) to fin
 All these throw AppError with meaningful codes like INVALID_SKILL, INVALID_DESIGNATION, INVALID_CLIENT_NAME, INVALID_LOCATION.​
 
 API Endpoints
-Base path (example): /api/members
+Base path (example): /api/member
 
 1. Get All Members
 
-GET /members
+GET /member
 
 Returns all active members with joined metadata (designation, location, client, skills).​
 
 Example request:
 
-text
 GET /member HTTP/1.1
 Host: localhost:3000
 Authorization: Bearer <token>
 Success response (200):
 
-json
 {
 "status": "success",
 "message": "Members retrieved successfully",
@@ -2201,7 +2199,6 @@ Host: localhost:3000
 Authorization: Bearer <token>
 Success response (200):
 
-json
 {
 "status": "success",
 "message": "Member entry retrieved successfully",
@@ -2245,7 +2242,6 @@ Wraps in a DB transaction and writes an audit log.​
 
 Example request:
 
-text
 PATCH /member/1 HTTP/1.1
 Host: localhost:3000
 Authorization: Bearer <token>
@@ -2279,7 +2275,6 @@ Content-Type: application/json
 }
 Internally, after validation and helper transformations, the body passed to MemberService.updateMember looks roughly like:​
 
-json
 {
 "memberName": "Johnathan Doe",
 "memberContact": "+1 234 567 999",
@@ -2305,7 +2300,6 @@ json
 }
 Success response (200):
 
-json
 {
 "status": "success",
 "message": "Member entry updated successfully",
@@ -2346,13 +2340,11 @@ Deactivates member (isActive = FALSE) through repository and logs an audit entry
 
 Example request:
 
-text
 DELETE /member/1 HTTP/1.1
 Host: localhost:3000
 Authorization: Bearer <token>
 Success response (200):
 
-json
 {
 "status": "success",
 "message": "Member entry deactivated successfully and will be deleted from database in 10 days",
@@ -2369,7 +2361,6 @@ Possible errors:
 Error Format
 Errors are thrown using AppError and converted to a consistent JSON response, for example:​
 
-json
 {
 "status": "error",
 "message": "Validation failed",
