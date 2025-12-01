@@ -2723,23 +2723,31 @@ PATCH /api/location/1
 Validation Rules
 Create Request Validation
 
-Field Rule Error Message
-city : Required, 1-100 chars, trimmed "city cannot be empty" or "city cannot exceed 100 characters"
-country : Required, must be 'India' or 'United States' "country must be one of 'India' or 'United States'"
-state : Optional, 1-100 chars if provided "state must be at least 1 character long" or "state cannot exceed 100 characters"
+| **Field**   | **Rule**                                                | **Error Message**                                                                 |
+| ----------- | ------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| **city**    | Required, 1–100 chars, trimmed                          | "city cannot be empty" or "city cannot exceed 100 characters"                     |
+| **country** | Required, must be either **India** or **United States** | "country must be one of 'India' or 'United States'"                               |
+| **state**   | Optional, 1–100 chars if provided                       | "state must be at least 1 character long" or "state cannot exceed 100 characters" |
+
 Unknown fields Stripped automatically -
 Update Request Validation
 
-Field Rule Error Message
-city Optional, 1-100 chars if provided Same as create
-country Optional, must be valid if provided Same as create
-state Optional, 1-100 chars if provided Same as create
+| **Field**              | **Rule**                            | **Error Message**                                |
+| ---------------------- | ----------------------------------- | ------------------------------------------------ |
+| **city**               | Optional, 1–100 chars if provided   | Same as create                                   |
+| **country**            | Optional, must be valid if provided | Same as create                                   |
+| **state**              | Optional, 1–100 chars if provided   | Same as create                                   |
+| **At least one field** | Required                            | "At least one field must be provided for update" |
+| **Unknown fields**     | Stripped automatically              | –                                                |
+
 At least one field Required "At least one field must be provided for update"
 Unknown fields Stripped automatically -
 Path Parameter Validation
 
-Parameter Rule Error Message
-locationId Required, positive integer "Location Id must be positive" or "Location Id must be an integer"
+| **Parameter**  | **Rule**                   | **Error Message**                                                  |
+| -------------- | -------------------------- | ------------------------------------------------------------------ |
+| **locationId** | Required, positive integer | "Location Id must be positive" or "Location Id must be an integer" |
+
 Error Handling
 Error Response Structure
 
