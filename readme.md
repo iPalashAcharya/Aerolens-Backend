@@ -2110,7 +2110,9 @@ client, organisation: non-empty strings, max 255 chars.
 
 skills: array of { skillName, proficiencyLevel('beginner','intermediate','advanced'.'expert'), yearsOfExperience }.
 
-location: { cityName, country }.
+location: { cityName, country },
+
+interviewerCapacity : Integer (Optional)
 
 If validation fails, an AppError with code VALIDATION_ERROR is thrown, containing validationErrors.​
 
@@ -2157,27 +2159,72 @@ Authorization: Bearer <token>
 Success response (200):
 
 {
-"status": "success",
+"success": true,
 "message": "Members retrieved successfully",
 "data": [
 {
 "memberId": 1,
-"memberName": "John Doe",
-"memberContact": "+1 234 567 890",
-"email": "john.doe@example.com",
-"designation": "Senior Developer",
-"isRecruiter": false,
-"isActive": true,
-"lastLogin": "2025-11-28T10:15:00.000Z",
-"createdAt": "2025-10-01T09:00:00.000Z",
-"updatedAt": "2025-11-20T12:00:00.000Z",
-"cityName": "Mumbai",
+"memberName": "Palash Acharya",
+"memberContact": "+91-9876543210",
+"email": "palash.acharya@aerolens.in",
+"designation": "Admin",
+"isRecruiter": 1,
+"isActive": 1,
+"lastLogin": "2025-11-30T01:48:05.000Z",
+"createdAt": "2025-10-21T03:58:42.000Z",
+"updatedAt": "2025-11-30T01:48:05.000Z",
+"cityName": "Ahmedabad",
 "country": "India",
-"clientName": "Acme Corp",
-"organisation": "Aerolens",
-"isInterviewer": true,
-"interviewerCapacity": 5,
-"skills": "Node.js, React, SQL"
+"clientName": null,
+"organisation": null,
+"isInterviewer": 1,
+"interviewerCapacity": null,
+"skills": [
+{
+"skillId": 43,
+"skillName": "DBMS",
+"proficiencyLevel": "Intermediate",
+"yearsOfExperience": 1
+},
+{
+"skillId": 42,
+"skillName": "ExpressJS",
+"proficiencyLevel": "Intermediate",
+"yearsOfExperience": 1
+},
+{
+"skillId": 41,
+"skillName": "NodeJS",
+"proficiencyLevel": "Intermediate",
+"yearsOfExperience": 1
+}
+]
+},
+{
+"memberId": 420,
+"memberName": "Jaival Suthar",
+"memberContact": "+91 9999999999",
+"email": "jaival@testing.com",
+"designation": "Admin",
+"isRecruiter": 1,
+"isActive": 1,
+"lastLogin": "2025-12-01T04:33:24.000Z",
+"createdAt": "2025-10-27T04:58:41.000Z",
+"updatedAt": "2025-12-01T04:33:24.000Z",
+"cityName": "Ahmedabad",
+"country": "India",
+"clientName": null,
+"organisation": null,
+"isInterviewer": 1,
+"interviewerCapacity": null,
+"skills": [
+{
+"skillId": 41,
+"skillName": "NodeJS",
+"proficiencyLevel": "Intermediate",
+"yearsOfExperience": 1
+}
+]
 }
 ]
 }
@@ -2193,33 +2240,51 @@ GET /member/:memberId
 
 Example request:
 
-text
 GET /members/1 HTTP/1.1
 Host: localhost:3000
 Authorization: Bearer <token>
 Success response (200):
 
 {
-"status": "success",
+"success": true,
 "message": "Member entry retrieved successfully",
 "data": {
 "memberId": 1,
-"memberName": "John Doe",
-"memberContact": "+1 234 567 890",
-"email": "john.doe@example.com",
-"designation": "Senior Developer",
-"isRecruiter": false,
-"isActive": true,
-"lastLogin": "2025-11-28T10:15:00.000Z",
-"createdAt": "2025-10-01T09:00:00.000Z",
-"updatedAt": "2025-11-20T12:00:00.000Z",
-"cityName": "Mumbai",
+"memberName": "Palash Acharya",
+"memberContact": "+91-9876543210",
+"email": "palash.acharya@aerolens.in",
+"designation": "Admin",
+"isRecruiter": 1,
+"isActive": 1,
+"lastLogin": "2025-11-30T01:48:05.000Z",
+"createdAt": "2025-10-21T03:58:42.000Z",
+"updatedAt": "2025-12-01T05:06:24.000Z",
+"cityName": "Ahmedabad",
 "country": "India",
-"clientName": "Acme Corp",
-"organisation": "Aerolens",
-"isInterviewer": true,
-"interviewerCapacity": 5,
-"skills": "Node.js, React, SQL"
+"clientName": null,
+"organisation": null,
+"isInterviewer": 1,
+"interviewerCapacity": 2,
+"skills": [
+{
+"skillId": 41,
+"skillName": "NodeJS",
+"proficiencyLevel": "Intermediate",
+"yearsOfExperience": 1
+},
+{
+"skillId": 42,
+"skillName": "ExpressJS",
+"proficiencyLevel": "Intermediate",
+"yearsOfExperience": 1
+},
+{
+"skillId": 43,
+"skillName": "DBMS",
+"proficiencyLevel": "Intermediate",
+"yearsOfExperience": 1
+}
+]
 }
 }
 Validation / error cases:
@@ -2271,7 +2336,8 @@ Content-Type: application/json
 "proficiencyLevel": "advanced",
 "yearsOfExperience": 3
 }
-]
+],
+"interviewerCapacity":3
 }
 Internally, after validation and helper transformations, the body passed to MemberService.updateMember looks roughly like:​
 
@@ -2296,7 +2362,8 @@ Internally, after validation and helper transformations, the body passed to Memb
 "proficiencyLevel": "advanced",
 "yearsOfExperience": 3
 }
-]
+],
+"interviewerCapacity":3
 }
 Success response (200):
 
@@ -2313,7 +2380,8 @@ Success response (200):
 "isInterviewer": true,
 "designationId": 12,
 "clientId": 3,
-"locationId": 5
+"locationId": 5,
+"interviewerCapacity":3
 }
 }
 Note: Repository updateMember only updates whitelisted fields (memberName, memberContact, email, designation, isRecruiter, locationId, clientId, organisation, isInterviewer).​
