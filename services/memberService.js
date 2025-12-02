@@ -76,6 +76,10 @@ class MemberService {
                 );
             }
 
+            if (updateData.isInterviewer === false && existingMember.isInterviewer === true) {
+                updateData.interviewerCapacity = null;
+            }
+
             let skillsUpdateResult = null;
             if (updateData.skills !== undefined) {
                 const skillsData = updateData.skills;

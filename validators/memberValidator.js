@@ -38,9 +38,8 @@ class MemberValidatorHelper {
                     this.skillCache.set(cacheKey, skillId);
                 }
 
-                // FIXED: Use 'skill' instead of 'skillName' to match repository expectations
                 transformedSkills.push({
-                    skill: skillId,  // Changed from skillName to skill
+                    skill: skillId,
                     proficiencyLevel: skill.proficiencyLevel ?? null,
                     yearsOfExperience: skill.yearsOfExperience ?? null
                 });
@@ -73,6 +72,24 @@ class MemberValidatorHelper {
 
             return designationId;
 
+        } finally {
+            if (!client) connection.release();
+        }
+    }
+
+    async validateClientExists(clientId, client = null) {
+        const connection = client || await this.db.getConnection();
+        try {
+            const query = `SELECT clientId FROM client WHERE clientId = ? AND isActive = TRUE`;
+            const [result] = await connection.execute(query, [clientId]);
+            if (result.length === 0) {
+                throw new AppError(
+                    `Client with ID ${clientId} does not exist or is inactive`,
+                    400,
+                    'INVALID_CLIENT_ID'
+                );
+            }
+            return true;
         } finally {
             if (!client) connection.release();
         }
@@ -185,14 +202,13 @@ const memberSchema = {
 
         isInterviewer: Joi.boolean(),
 
-        client: Joi.string()
-            .trim()
-            .min(1)
-            .max(255)
+        clientId: Joi.number()
+            .integer()
+            .positive()
             .messages({
-                'string.base': 'Client must be a string',
-                'string.min': 'Client cannot be empty',
-                'string.max': 'Client cannot exceed 255 characters'
+                'number.base': 'Client ID must be a number',
+                'number.integer': 'Client ID must be an integer',
+                'number.positive': 'Client ID must be positive'
             }),
 
         organisation: Joi.string()
@@ -206,10 +222,6 @@ const memberSchema = {
                 'string.max': 'Organisation cannot exceed 255 characters'
             }),
 
-        // IMPORTANT: Skills array replaces ALL existing skills
-        // To add/update/remove skills, send the complete desired state
-        // Empty array [] will remove all skills
-        // Omitting the field will leave skills unchanged
         skills: Joi.array()
             .items(
                 Joi.object({
@@ -321,10 +333,8 @@ class MemberValidator {
                 delete value.designation;
             }
 
-            // Transform client
-            if (value.client) {
-                value.clientId = await MemberValidator.helper.transformClient(value.client);
-                delete value.client;
+            if (value.clientId) {
+                await MemberValidator.helper.validateClientExists(value.clientId);
             }
 
             // Transform location
@@ -336,6 +346,10 @@ class MemberValidator {
             // Transform skills (FIXED: now returns correct format with 'skill' property)
             if (value.skills !== undefined) {
                 value.skills = await MemberValidator.helper.transformSkills(value.skills);
+            }
+
+            if (value.isInterviewer === false) {
+                value.interviewerCapacity = null;
             }
 
             req.body = value;
