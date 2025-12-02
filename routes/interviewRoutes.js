@@ -29,9 +29,24 @@ router.patch('/:interviewId',
     interviewController.updateInterview
 );
 
+router.put('/:interviewId/rounds',
+    InterviewValidator.validateRoundUpdate,
+    interviewController.updateInterviewRounds
+);
+
+router.put('/:interviewId/finalize',
+    InterviewValidator.validateFinalize,
+    interviewController.finalizeInterview
+);
+
 router.get('/:interviewId',
     InterviewValidator.validateDelete,
     interviewController.getById
+);
+
+router.get('/:interviewId/rounds',
+    InterviewValidator.validateDelete,
+    interviewController.getInterviewRounds
 );
 
 router.delete('/:interviewId',

@@ -47,10 +47,9 @@ class CandidateRepository {
             }
 
             const query = `
-            SELECT c.candidateId,c.candidateName,c.contactNumber,c.email,c.recruiterId,m.memberName AS recruiterName,m.memberContact AS recruiterContact,m.email AS recruiterEmail,c.jobRole,loc.value AS preferredJobLocation,c.currentCTC,c.expectedCTC,c.noticePeriod,c.experienceYears,c.linkedinProfileUrl,stat.value AS statusName, c.resumeFilename, c.resumeOriginalName, c.resumeUploadDate
+            SELECT c.candidateId,c.candidateName,c.contactNumber,c.email,c.recruiterId,m.memberName AS recruiterName,m.memberContact AS recruiterContact,m.email AS recruiterEmail,c.jobRole,COALESCE((SELECT JSON_OBJECT('country',loc.country,'city',loc.cityName) FROM location loc WHERE loc.locationId = c.preferredJobLocation)) AS preferredJobLocation,c.currentCTC,c.expectedCTC,c.noticePeriod,c.experienceYears,c.linkedinProfileUrl,stat.value AS statusName, c.resumeFilename, c.resumeOriginalName, c.resumeUploadDate
             FROM candidate c
             LEFT JOIN lookup stat ON c.statusId= stat.lookupKey AND stat.tag = 'candidateStatus'
-            LEFT JOIN lookup loc ON c.preferredJobLocation = loc.lookupKey AND loc.tag = 'location'
             LEFT JOIN member m on m.memberId = c.recruiterId
             WHERE c.candidateId = ? 
             `;
@@ -414,14 +413,10 @@ class CandidateRepository {
 
         try {
             let query = `
-            SELECT c.candidateId, c.candidateName, c.contactNumber, c.email, c.recruiterId,m.memberName AS recruiterName,m.memberContact AS recruiterContact,m.email AS recruiterEmail,
-                   c.jobRole, loc.value AS preferredJobLocation, c.currentCTC, c.expectedCTC, c.noticePeriod,
-                   c.experienceYears, c.linkedinProfileUrl, c.createdAt, c.updatedAt,
-                   stat.value AS statusName, c.resumeFilename, c.resumeOriginalName, c.resumeUploadDate
+            SELECT c.candidateId,c.candidateName,c.contactNumber,c.email,c.recruiterId,m.memberName AS recruiterName,m.memberContact AS recruiterContact,m.email AS recruiterEmail,c.jobRole,COALESCE((SELECT JSON_OBJECT('country',loc.country,'city',loc.cityName) FROM location loc WHERE loc.locationId = c.preferredJobLocation)) AS preferredJobLocation,c.currentCTC,c.expectedCTC,c.noticePeriod,c.experienceYears,c.linkedinProfileUrl,stat.value AS statusName, c.resumeFilename, c.resumeOriginalName, c.resumeUploadDate
             FROM candidate c
-            LEFT JOIN lookup stat ON c.statusId = stat.lookupKey and stat.tag = 'candidateStatus'
-            LEFT JOIN lookup loc ON c.preferredJobLocation = loc.lookupKey and loc.tag = 'location'
-            LEFT JOIN member m ON m.memberId = c.recruiterId
+            LEFT JOIN lookup stat ON c.statusId= stat.lookupKey AND stat.tag = 'candidateStatus'
+            LEFT JOIN member m on m.memberId = c.recruiterId
         `;
             const params = [];
             if (limit) {

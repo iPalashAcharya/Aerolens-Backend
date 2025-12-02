@@ -7,11 +7,7 @@ const fs = require('fs');
 class CandidateValidatorHelper {
     constructor(db) {
         this.db = db;
-        this.locationMap = new Map([
-            ['ahmedabad', 'Ahmedabad'],
-            ['bangalore', 'Bangalore'],
-            ['bengaluru', 'Bangalore']
-        ]);
+        this.locationCache = new Map();
         this.statusCache = new Map();
         this.recruiterCache = new Map();
     }
@@ -72,30 +68,40 @@ class CandidateValidatorHelper {
         }
     }
 
-    async transformLocation(locationString, client = null) {
-        if (!locationString) return null;
+    async transformLocation(locationName, client = null) {
+        if (!locationName) return null;
+        if (!locationName.city) {
+            throw new AppError(
+                `Invalid location object: 'city' is required.`,
+                400,
+                'INVALID_LOCATION_OBJECT'
+            );
+        }
+
+        const locationValue = locationName.city;
+        if (!locationValue) return null;
+
+        const cacheKey = locationValue.toLowerCase().trim();
+        if (this.locationCache.has(cacheKey)) {
+            return this.locationCache.get(cacheKey);
+        }
+
         const connection = client || await this.db.getConnection();
-
         try {
-            const normalizationMap = {
-                "bengaluru": "bangalore",
-                "bangalore": "bangalore",
-                "ahmedabad": "ahmedabad",
-                "san francisco": "san francisco"
-            };
+            const query = `SELECT locationId FROM location WHERE LOWER(cityName) = LOWER(?)`;
+            const [rows] = await connection.execute(query, [locationValue.trim()]);
 
-            const normalizedLocation = normalizationMap[locationString.toLowerCase().trim()] || locationString.toLowerCase().trim();
-            const query = `SELECT lookupKey FROM lookup WHERE LOWER(value) = LOWER(?) AND tag = 'location'`;
-            const [rows] = await connection.execute(query, [normalizedLocation]);
-
-            if (!rows || rows.length == 0) {
+            if (rows.length === 0) {
                 throw new AppError(
-                    `Invalid location: '${locationString}'. Must be either Ahmedabad, Bangalore or San Francisco.`,
+                    `Invalid location: '${locationValue}'. Location does not exist.`,
                     400,
                     'INVALID_LOCATION'
                 );
             }
-            return rows[0].lookupKey;
+
+            const locationId = rows[0].locationId;
+            this.locationCache.set(cacheKey, locationId);
+            return locationId;
         } finally {
             if (!client) connection.release();
         }
@@ -208,22 +214,27 @@ const candidateSchemas = {
                 'string.max': 'Job role cannot exceed 100 characters'
             }),
 
-        preferredJobLocation: Joi.string()
-            .trim()
-            .lowercase()
-            .custom((value, helpers) => {
-                const validLocation = ['ahmedabad', 'bengaluru', 'bangalore', 'san francisco'];
-                if (!validLocation.includes(value.toLowerCase())) {
-                    return helpers.error("any.invalid");
-                }
-                return value;
-            })
-            .required()
-            .messages({
-                'string.empty': 'Preferred job location is required',
-                'any.only': 'Preferred job location must be either Ahmedabad or Bangalore'
-            }),
-
+        preferredJobLocation: Joi.object({
+            country: Joi.string()
+                .trim()
+                .lowercase()
+                .required()
+                .messages({
+                    "string.empty": "Location's country is required",
+                    "string.base": "Location's country must be a string",
+                }),
+            city: Joi.string()
+                .trim()
+                .min(2)
+                .max(100)
+                .required()
+                .messages({
+                    "string.min": "Location's city must be at least 2 characters long",
+                    "string.max": "Location's city cannot exceed 100 characters",
+                }),
+        }).required().messages({
+            "object.unknown": "Invalid location object structure",
+        }),
         currentCTC: Joi.number()
             .integer()
             .min(0)
@@ -374,20 +385,28 @@ const candidateSchemas = {
                 'string.max': 'Job role cannot exceed 100 characters'
             }),
 
-        preferredJobLocation: Joi.string()
-            .trim()
-            .lowercase()
-            .custom((value, helpers) => {
-                const validLocation = ['ahmedabad', 'bengaluru', 'bangalore', 'san francisco'];
-                if (!validLocation.includes(value.toLowerCase())) {
-                    return helpers.error("any.invalid");
-                }
-                return value;
-            })
-            .optional()
-            .messages({
-                'any.only': 'Preferred job location must be either Ahmedabad or Bangalore'
-            }),
+        preferredJobLocation: Joi.object({
+            country: Joi.string()
+                .trim()
+                .lowercase()
+                .optional()
+                .messages({
+                    "string.empty": "Location's country is required",
+                    "string.base": "Location's country must be a string",
+                }),
+            city: Joi.string()
+                .trim()
+                .min(2)
+                .max(100)
+                .optional()
+                .messages({
+                    "string.min": "Location's city must be at least 2 characters long",
+                    "string.max": "Location's city cannot exceed 100 characters",
+                }),
+        }).min(1).optional().messages({
+            "object.min": "At least one field (country or city) must be provided in location",
+            "object.unknown": "Invalid location object structure",
+        }),
 
         currentCTC: Joi.number()
             .integer()

@@ -1682,7 +1682,10 @@ GET /candidate
 "recruiterContact": null,
 "recruiterEmail": null,
 "jobRole": "SDE",
-"preferredJobLocation": "Ahmedabad",
+"preferredJobLocation":{
+"city":"Ahemedabad",
+"country":"India"
+}
 "currentCTC": 23,
 "expectedCTC": 33,
 "noticePeriod": 30,
@@ -1705,7 +1708,10 @@ GET /candidate
 "recruiterContact": null,
 "recruiterEmail": null,
 "jobRole": "Software Devloper",
-"preferredJobLocation": "Ahmedabad",
+"preferredJobLocation":{
+"city":"Ahemedabad",
+"country":"India"
+},
 "currentCTC": 300,
 "expectedCTC": 600,
 "noticePeriod": 60,
@@ -1741,7 +1747,10 @@ GET /candidate/:id
 "recruiterContact": "+91-9876543210",
 "recruiterEmail": "palash.acharya@aerolens.in",
 "jobRole": "SDE-2",
-"preferredJobLocation": "Ahmedabad",
+"preferredJobLocation":{
+"city":"Ahemedabad",
+"country":"India"
+}
 "currentCTC": 10,
 "expectedCTC": 12,
 "noticePeriod": 15,
@@ -1762,22 +1771,22 @@ POST /candidate
 Content-Type: multipart/form-data
 **Request Body (form-data):**
 
-| Field                | Type   | Description                                         |
-| -------------------- | ------ | --------------------------------------------------- |
-| candidateName        | String | Candidate full name (required)                      |
-| contactNumber        | String | Phone number (required)                             |
-| email                | String | Email address (required)                            |
-| recruiterName        | String | Recruiter name (required) [must be in member table] |
-| jobRole              | String | Job title (required)                                |
-| preferredJobLocation | String | Ahmedabad / Bangalore / San Francisco (required)    |
-| currentCTC           | Number | Current CTC in INR (required)                       |
-| expectedCTC          | Number | Expected CTC in INR (required)                      |
-| noticePeriod         | Number | Notice period in days (required)                    |
-| experienceYears      | Number | Years of experience (required)                      |
-| linkedinProfileUrl   | String | LinkedIn URL (optional)                             |
-| resume               | File   | PDF resume, max 5MB (optional)                      |
-| status               | String | candidate status 50 characters (optional)           |
-| notes                | string | notes about candidates (optional)                   |
+| Field                | Type        | Description                                            |
+| -------------------- | ----------- | ------------------------------------------------------ |
+| candidateName        | String      | Candidate full name (required)                         |
+| contactNumber        | String      | Phone number (required)                                |
+| email                | String      | Email address (required)                               |
+| recruiterName        | String      | Recruiter name (required) [must be in member table]    |
+| jobRole              | String      | Job title (required)                                   |
+| preferredJobLocation | JSON Object | must be a json object with city and country attributes |
+| currentCTC           | Number      | Current CTC in INR (required)                          |
+| expectedCTC          | Number      | Expected CTC in INR (required)                         |
+| noticePeriod         | Number      | Notice period in days (required)                       |
+| experienceYears      | Number      | Years of experience (required)                         |
+| linkedinProfileUrl   | String      | LinkedIn URL (optional)                                |
+| resume               | File        | PDF resume, max 5MB (optional)                         |
+| status               | String      | candidate status 50 characters (optional)              |
+| notes                | string      | notes about candidates (optional)                      |
 
 **Response:**
 {
@@ -2867,19 +2876,21 @@ GET /api/interview/1
   "success": true,
   "message": "Interview entry retrieved successfully",
   "data": {
-    "interviewId": 1,
-    "interviewDate": "2024-12-15T00:00:00.000Z",
-    "fromTime": "10:00",
-    "durationMinutes": 60,
-    "candidateId": 5,
-    "candidateName": "John Doe",
-    "interviewerId": 3,
-    "interviewerName": "Jane Smith",
-    "scheduledById": 2,
-    "scheduledByName": "Alice Johnson",
-    "result": "pending",
-    "recruiterNotes": "Good technical background",
-    "interviewerFeedback": null
+    "data": {
+      "interviewId": 1,
+      "interviewDate": "2024-12-15T00:00:00.000Z",
+      "fromTime": "10:00",
+      "durationMinutes": 60,
+      "candidateId": 5,
+      "candidateName": "John Doe",
+      "interviewerId": 3,
+      "interviewerName": "Jane Smith",
+      "scheduledById": 2,
+      "scheduledByName": "Alice Johnson",
+      "result": "pending",
+      "recruiterNotes": "Good technical background",
+      "interviewerFeedback": null
+    }
   },
   "statusCode": 200
 }
@@ -2898,7 +2909,74 @@ GET /api/interview/1
 
 ---
 
-### 3. Create Interview
+### 3. Get Interview Rounds
+
+Retrieve all rounds for a specific interview.
+
+**Endpoint:** `GET /api/interview/:interviewId/rounds`
+
+**Headers:**
+
+```
+Authorization: Bearer <token>
+```
+
+**URL Parameters:**
+
+| Parameter   | Type   | Required | Description  |
+| ----------- | ------ | -------- | ------------ |
+| interviewId | number | Yes      | Interview ID |
+
+**Example Request:**
+
+```
+GET /api/interview/1/rounds
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Interview Rounds retrieved successfully",
+  "data": {
+    "rounds": [
+      {
+        "roundNumber": 1,
+        "roundName": "Technical Round",
+        "roundTypeId": 101,
+        "interviewerId": 3,
+        "interviewerName": "Jane Smith",
+        "feedback": "Strong coding skills"
+      },
+      {
+        "roundNumber": 2,
+        "roundName": "HR Round",
+        "roundTypeId": 102,
+        "interviewerId": 4,
+        "interviewerName": "Bob Martin",
+        "feedback": "Good cultural fit"
+      }
+    ]
+  },
+  "statusCode": 200
+}
+```
+
+**Error Response (404):**
+
+```json
+{
+  "success": false,
+  "message": "No interview rounds found for interviewId 999",
+  "errorCode": "INTERVIEW_ROUNDS_NOT_FOUND",
+  "statusCode": 404
+}
+```
+
+---
+
+### 4. Create Interview
 
 Schedule a new interview.
 
@@ -2913,16 +2991,14 @@ Content-Type: application/json
 
 **Request Body:**
 
-| Field               | Type              | Required | Description          | Validation                  |
-| ------------------- | ----------------- | -------- | -------------------- | --------------------------- |
-| interviewDate       | string (ISO 8601) | Yes      | Interview date       | Cannot be in the past       |
-| fromTime            | string            | Yes      | Interview start time | Format: HH:MM (00:00-23:59) |
-| durationMinutes     | number            | Yes      | Interview duration   | Min: 15, Max: 480           |
-| candidateId         | number            | Yes      | Candidate ID         | Must be positive integer    |
-| interviewerId       | number            | Yes      | Interviewer ID       | Must be positive integer    |
-| scheduledById       | number            | Yes      | Scheduler ID         | Must be positive integer    |
-| recruiterNotes      | string            | No       | Recruiter notes      | Max: 1000 characters        |
-| interviewerFeedback | string            | No       | Interviewer feedback | Max: 2000 characters        |
+| Field           | Type              | Required | Description          | Validation                  |
+| --------------- | ----------------- | -------- | -------------------- | --------------------------- |
+| interviewDate   | string (ISO 8601) | Yes      | Interview date       | Cannot be in the past       |
+| fromTime        | string            | Yes      | Interview start time | Format: HH:MM (00:00-23:59) |
+| durationMinutes | number            | Yes      | Interview duration   | Min: 15, Max: 480           |
+| candidateId     | number            | Yes      | Candidate ID         | Must be positive integer    |
+| interviewerId   | number            | Yes      | Interviewer ID       | Must be positive integer    |
+| scheduledById   | number            | Yes      | Scheduler ID         | Must be positive integer    |
 
 **Example Request:**
 
@@ -2933,8 +3009,7 @@ Content-Type: application/json
   "durationMinutes": 60,
   "candidateId": 5,
   "interviewerId": 3,
-  "scheduledById": 2,
-  "recruiterNotes": "Good technical background, excited about the role"
+  "scheduledById": 2
 }
 ```
 
@@ -2954,7 +3029,7 @@ Content-Type: application/json
     "scheduledById": 2,
     "result": null,
     "interviewerFeedback": null,
-    "recruiterNotes": "Good technical background, excited about the role"
+    "recruiterNotes": null
   },
   "statusCode": 201
 }
@@ -2985,9 +3060,9 @@ Content-Type: application/json
 
 ---
 
-### 4. Update Interview
+### 5. Update Interview
 
-Update an existing interview.
+Update basic interview details (date, time, duration).
 
 **Endpoint:** `PATCH /api/interview/:interviewId`
 
@@ -3008,14 +3083,11 @@ Content-Type: application/json
 
 All fields are optional. At least one field must be provided.
 
-| Field               | Type              | Description          | Validation                                     |
-| ------------------- | ----------------- | -------------------- | ---------------------------------------------- |
-| interviewDate       | string (ISO 8601) | Interview date       | Cannot be in the past                          |
-| fromTime            | string            | Interview start time | Format: HH:MM (00:00-23:59)                    |
-| durationMinutes     | number            | Interview duration   | Min: 15, Max: 480                              |
-| result              | string            | Interview result     | One of: pending, selected, rejected, cancelled |
-| recruiterNotes      | string            | Recruiter notes      | Max: 1000 characters                           |
-| interviewerFeedback | string            | Interviewer feedback | Max: 2000 characters                           |
+| Field           | Type              | Description          | Validation                  |
+| --------------- | ----------------- | -------------------- | --------------------------- |
+| interviewDate   | string (ISO 8601) | Interview date       | Cannot be in the past       |
+| fromTime        | string            | Interview start time | Format: HH:MM (00:00-23:59) |
+| durationMinutes | number            | Interview duration   | Min: 15, Max: 480           |
 
 **Example Request:**
 
@@ -3025,8 +3097,8 @@ PATCH /api/interview/15
 
 ```json
 {
-  "result": "selected",
-  "interviewerFeedback": "Excellent technical skills and cultural fit. Strong recommendation for hire."
+  "interviewDate": "2024-12-20",
+  "fromTime": "14:30"
 }
 ```
 
@@ -3038,8 +3110,8 @@ PATCH /api/interview/15
   "message": "Interview entry updated successfully",
   "data": {
     "interviewId": 15,
-    "result": "selected",
-    "interviewerFeedback": "Excellent technical skills and cultural fit. Strong recommendation for hire."
+    "interviewDate": "2024-12-20",
+    "fromTime": "14:30"
   },
   "statusCode": 200
 }
@@ -3077,7 +3149,204 @@ PATCH /api/interview/15
 
 ---
 
-### 5. Delete Interview
+### 6. Update Interview Rounds
+
+Replace all interview rounds for an interview (complete replacement).
+
+**Endpoint:** `PUT /api/interview/:interviewId/rounds`
+
+**Headers:**
+
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**URL Parameters:**
+
+| Parameter   | Type   | Required | Description  |
+| ----------- | ------ | -------- | ------------ |
+| interviewId | number | Yes      | Interview ID |
+
+**Request Body:**
+
+| Field  | Type  | Required | Description              |
+| ------ | ----- | -------- | ------------------------ |
+| rounds | array | Yes      | Array of round objects   |
+|        |       |          | Minimum 1 round required |
+
+**Round Object:**
+
+| Field         | Type   | Required | Description                         | Validation               |
+| ------------- | ------ | -------- | ----------------------------------- | ------------------------ |
+| roundNumber   | number | Yes      | Round sequence number               | Must be positive integer |
+| roundTypeId   | number | Yes      | Round type ID (from lookup table)   | Must be positive integer |
+| interviewerId | number | Yes      | Interviewer ID for this round       | Must be positive integer |
+| feedback      | string | No       | Interviewer feedback for this round | Max: 2000 characters     |
+
+**Example Request:**
+
+```
+PUT /api/interview/15/rounds
+```
+
+```json
+{
+  "rounds": [
+    {
+      "roundNumber": 1,
+      "roundTypeId": 101,
+      "interviewerId": 3,
+      "feedback": "Strong technical skills demonstrated"
+    },
+    {
+      "roundNumber": 2,
+      "roundTypeId": 102,
+      "interviewerId": 4,
+      "feedback": "Excellent communication and team fit"
+    }
+  ]
+}
+```
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Interview Round Added Successfully",
+  "data": {
+    "success": true,
+    "interviewId": 15,
+    "roundsCount": 2,
+    "message": "Successfully updated 2 interview rounds"
+  },
+  "statusCode": 200
+}
+```
+
+**Validation Error Response (400):**
+
+```json
+{
+  "success": false,
+  "message": "Validation failed",
+  "errorCode": "VALIDATION_ERROR",
+  "details": {
+    "validationErrors": [
+      {
+        "field": "rounds",
+        "message": "At least one round must be provided"
+      }
+    ]
+  },
+  "statusCode": 400
+}
+```
+
+**Error Response - Not Found (404):**
+
+```json
+{
+  "success": false,
+  "message": "Interview with Id 999 not found",
+  "errorCode": "INTERVIEW_ENTRY_NOT_FOUND",
+  "statusCode": 404
+}
+```
+
+---
+
+### 7. Finalize Interview
+
+Finalize an interview with result, recruiter notes, and interviewer feedback.
+
+**Endpoint:** `PUT /api/interview/:interviewId/finalize`
+
+**Headers:**
+
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**URL Parameters:**
+
+| Parameter   | Type   | Required | Description  |
+| ----------- | ------ | -------- | ------------ |
+| interviewId | number | Yes      | Interview ID |
+
+**Request Body:**
+
+| Field               | Type   | Required | Description          | Validation                                     |
+| ------------------- | ------ | -------- | -------------------- | ---------------------------------------------- |
+| result              | string | Yes      | Interview result     | One of: pending, selected, rejected, cancelled |
+| recruiterNotes      | string | No       | Recruiter notes      | Max: 1000 characters                           |
+| interviewerFeedback | string | No       | Interviewer feedback | Max: 2000 characters                           |
+
+**Example Request:**
+
+```
+PUT /api/interview/15/finalize
+```
+
+```json
+{
+  "result": "selected",
+  "recruiterNotes": "Strong candidate, recommended for hire",
+  "interviewerFeedback": "Excellent technical skills and cultural fit. Strong recommendation for hire."
+}
+```
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Interview finalized successfully",
+  "data": {
+    "interviewId": 15,
+    "result": "selected",
+    "recruiterNotes": "Strong candidate, recommended for hire",
+    "interviewerFeedback": "Excellent technical skills and cultural fit. Strong recommendation for hire."
+  },
+  "statusCode": 200
+}
+```
+
+**Validation Error Response (400):**
+
+```json
+{
+  "success": false,
+  "message": "Validation failed",
+  "errorCode": "VALIDATION_ERROR",
+  "details": {
+    "validationErrors": [
+      {
+        "field": "result",
+        "message": "Result must be one of: pending, selected, rejected, cancelled"
+      }
+    ]
+  },
+  "statusCode": 400
+}
+```
+
+**Error Response - Not Found (404):**
+
+```json
+{
+  "success": false,
+  "message": "Interview with Id 999 not found",
+  "errorCode": "INTERVIEW_ENTRY_NOT_FOUND",
+  "statusCode": 404
+}
+```
+
+---
+
+### 8. Delete Interview
 
 Soft delete an interview (sets isActive to false).
 
@@ -3147,31 +3416,50 @@ DELETE /api/interview/15
 }
 ```
 
+### Round Object
+
+```typescript
+{
+  roundNumber: number,            // Round sequence number
+  roundName: string,              // Round type name (from lookup)
+  roundTypeId: number,            // Round type ID
+  interviewerId: number,
+  interviewerName: string,        // From join
+  feedback: string | null         // Interviewer feedback for this round
+}
+```
+
 ---
 
 ## Error Codes
 
-| Error Code                | Status Code | Description                      |
-| ------------------------- | ----------- | -------------------------------- |
-| VALIDATION_ERROR          | 400         | Request validation failed        |
-| INTERVIEW_ENTRY_NOT_FOUND | 404         | Interview not found              |
-| INTERVIEW_NOT_FOUND       | 404         | Interview not found for deletion |
-| INTERVIEW_CREATION_ERROR  | 500         | Failed to create interview       |
-| INTERVIEW_UPDATE_ERROR    | 500         | Failed to update interview       |
-| INTERVIEW_DELETION_ERROR  | 500         | Failed to delete interview       |
-| INTERVIEW_FETCH_ERROR     | 500         | Failed to fetch interview data   |
-| DATABASE_ERROR            | 500         | Database operation failed        |
+| Error Code                    | Status Code | Description                       |
+| ----------------------------- | ----------- | --------------------------------- |
+| VALIDATION_ERROR              | 400         | Request validation failed         |
+| INTERVIEW_ENTRY_NOT_FOUND     | 404         | Interview not found               |
+| INTERVIEW_NOT_FOUND           | 404         | Interview not found for deletion  |
+| INTERVIEW_ROUNDS_NOT_FOUND    | 404         | No interview rounds found         |
+| INTERVIEW_CREATION_ERROR      | 500         | Failed to create interview        |
+| INTERVIEW_UPDATE_ERROR        | 500         | Failed to update interview        |
+| INTERVIEW_ROUNDS_UPDATE_ERROR | 500         | Failed to update interview rounds |
+| INTERVIEW_FINALIZE_ERROR      | 500         | Failed to finalize interview      |
+| INTERVIEW_DELETION_ERROR      | 500         | Failed to delete interview        |
+| INTERVIEW_FETCH_ERROR         | 500         | Failed to fetch interview data    |
+| INTERVIEW_ROUNDS_FETCH_ERROR  | 500         | Failed to fetch interview rounds  |
+| DATABASE_ERROR                | 500         | Database operation failed         |
 
 ---
 
 ## Notes
 
 - All date/time values are stored and returned in UTC
-- The `result` field defaults to `null` on creation and can be updated later
+- The `result` field defaults to `null` on creation and can be updated via the finalize endpoint
 - Soft deletes are used - deleted interviews are marked as inactive but not removed from the database
 - All operations are logged in the audit log with user context
 - Interview dates cannot be set in the past
 - Duration must be between 15 minutes and 8 hours (480 minutes)
+- Interview rounds are completely replaced when using the PUT rounds endpoint (all existing rounds are deleted and replaced with the new ones)
+- Round types must exist in the lookup table with tag 'InterviewRound'
 
 ---
 

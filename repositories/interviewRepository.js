@@ -36,7 +36,8 @@ class InterviewRepository {
             LEFT JOIN member interviewer
                 ON i.interviewerId = interviewer.memberId
             LEFT JOIN member scheduler
-                ON i.scheduledById = scheduler.memberId;
+                ON i.scheduledById = scheduler.memberId
+            WHERE i.isActive=TRUE;
             `;
             /*const numLimit = Math.max(1, parseInt(limit, 10) ?? 10);
             const numOffset = Math.max(0, parseInt(offset, 10) ?? 0);*/
@@ -63,10 +64,10 @@ class InterviewRepository {
                 i.durationMinutes,
                 c.candidateId,
                 c.candidateName,
-                interviewer.memberId      AS interviewerId,
-                interviewer.memberName    AS interviewerName,
-                scheduler.memberId        AS scheduledById,
-                scheduler.memberName      AS scheduledByName,
+                interviewer.memberId AS interviewerId,
+                interviewer.memberName AS interviewerName,
+                scheduler.memberId AS scheduledById,
+                scheduler.memberName AS scheduledByName,
                 i.result,
                 i.recruiterNotes,
                 i.interviewerFeedback
@@ -77,7 +78,7 @@ class InterviewRepository {
                 ON i.interviewerId = interviewer.memberId
             LEFT JOIN member scheduler
                 ON i.scheduledById = scheduler.memberId
-            WHERE i.interviewId = ?;
+            WHERE i.interviewId = ? AND i.isActive=TRUE;
             `;
             const [interviewData] = await connection.query(dataQuery, [interviewId]);
             return {
@@ -85,6 +86,74 @@ class InterviewRepository {
             }
         } catch (error) {
             this._handleDatabaseError(error, 'getById');
+        }
+    }
+
+    async getInterviewRounds(interviewId, client) {
+        const connection = client;
+
+        try {
+            const query = `
+            SELECT 
+                r.roundNumber,
+                rt.value AS roundName,
+                rt.lookupKey AS roundTypeId,
+                m.memberId AS interviewerId,
+                m.memberName AS interviewerName,
+                r.feedback
+            FROM interview_rounds r
+            LEFT JOIN lookup rt 
+                ON r.roundTypeId = rt.lookupKey 
+                AND rt.tag = 'InterviewRound'
+            LEFT JOIN member m 
+                ON r.interviewerId = m.memberId
+            WHERE r.interviewId = ?;
+        `;
+
+            const [rounds] = await connection.query(query, [interviewId]);
+            return { rounds };
+
+        } catch (error) {
+            this._handleDatabaseError(error, 'getInterviewRounds');
+        }
+    }
+
+    async replaceInterviewRounds(interviewId, rounds, client) {
+        const connection = client;
+
+        try {
+            await connection.execute(
+                `DELETE FROM interview_rounds WHERE interviewId = ?`,
+                [interviewId]
+            );
+
+            if (rounds && rounds.length > 0) {
+                const values = rounds.map(round => [
+                    interviewId,
+                    round.roundNumber,
+                    round.roundTypeId,
+                    round.interviewerId,
+                    round.feedback || null
+                ]);
+
+                const placeholders = values.map(() => '(?, ?, ?, ?, ?)').join(',');
+                const flatValues = values.flat();
+
+                await connection.execute(
+                    `INSERT INTO interview_rounds (interviewId, roundNumber, roundTypeId, interviewerId, feedback) 
+                     VALUES ${placeholders}`,
+                    flatValues
+                );
+            }
+
+            return { success: true, roundsCount: rounds?.length || 0 };
+        } catch (error) {
+            throw new AppError(
+                'Database error while replacing interview rounds',
+                500,
+                'DB_ERROR',
+                error.message
+            );
         }
     }
 
@@ -118,7 +187,7 @@ class InterviewRepository {
             }
 
             const allowedFields = [
-                'interviewDate', 'fromTime', 'durationMinutes', 'candidateId', 'interviewerId', 'scheduledById', 'result', 'interviewerFeedback', 'recruiterNotes'
+                'interviewDate', 'fromTime', 'durationMinutes', 'candidateId', 'interviewerId', 'scheduledById'
             ];
 
             const filteredData = {};
@@ -153,6 +222,54 @@ class InterviewRepository {
         } catch (error) {
             if (error instanceof AppError) { throw error; }
             this._handleDatabaseError(error, 'update');
+        }
+    }
+
+    async finalize(interviewId, finalData, client) {
+        const connection = client;
+        try {
+            if (!interviewId) {
+                throw new AppError('Interview ID is required', 400, 'MISSING_INTERVIEW_ID');
+            }
+
+            if (!finalData || Object.keys(finalData).length === 0) {
+                throw new AppError('Final data is required', 400, 'MISSING_FINAL_DATA');
+            }
+
+            const allowedFields = ['result', 'recruiterNotes', 'interviewerFeedback'];
+
+            const filteredData = {};
+            Object.keys(finalData).forEach(key => {
+                if (allowedFields.includes(key)) {
+                    filteredData[key] = finalData[key];
+                }
+            });
+
+            if (Object.keys(filteredData).length === 0) {
+                throw new AppError('No valid fields to finalize', 400, 'NO_VALID_FIELDS');
+            }
+
+            const fields = Object.keys(filteredData);
+            const values = Object.values(filteredData);
+
+            const setClause = fields.map(field => `${field} = ?`).join(', ');
+            const query = `UPDATE interview SET ${setClause} WHERE interviewId = ?`;
+
+            const [result] = await connection.execute(query, [...values, interviewId]);
+            if (result.affectedRows === 0) {
+                throw new AppError(
+                    `Interview entry with Id ${interviewId} not found`,
+                    404,
+                    'INTERVIEW_ENTRY_NOT_FOUND'
+                );
+            }
+            return {
+                interviewId,
+                ...filteredData
+            }
+        } catch (error) {
+            if (error instanceof AppError) { throw error; }
+            this._handleDatabaseError(error, 'finalize');
         }
     }
 

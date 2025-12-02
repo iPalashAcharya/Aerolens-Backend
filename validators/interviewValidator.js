@@ -68,22 +68,6 @@ const interviewSchemas = {
                 'number.positive': 'Scheduled by ID must be positive',
                 'any.required': 'Scheduled by ID is required'
             }),
-        recruiterNotes: Joi.string()
-            .trim()
-            .max(1000)
-            .optional()
-            .allow('')
-            .messages({
-                'string.max': 'Recruiter notes cannot exceed 1000 characters'
-            }),
-        interviewerFeedback: Joi.string()
-            .trim()
-            .max(2000)
-            .optional()
-            .allow('')
-            .messages({
-                'string.max': 'Interviewer feedback cannot exceed 2000 characters'
-            })
     }),
 
     update: Joi.object({
@@ -119,18 +103,78 @@ const interviewSchemas = {
                 'number.integer': 'Duration must be an integer',
                 'number.min': 'Duration must be at least 15 minutes',
                 'number.max': 'Duration cannot exceed 8 hours (480 minutes)'
-            }),
+            })
+    })
+        .min(1)
+        .messages({
+            'object.min': 'At least one field must be provided for update'
+        }),
+
+    roundUpdate: Joi.object({
+        rounds: Joi.array()
+            .items(
+                Joi.object({
+                    roundNumber: Joi.number()
+                        .integer()
+                        .positive()
+                        .required()
+                        .messages({
+                            'number.base': 'Round number must be a number',
+                            'number.integer': 'Round number must be an integer',
+                            'number.positive': 'Round number must be positive',
+                            'any.required': 'Round number is required'
+                        }),
+                    roundTypeId: Joi.number()
+                        .integer()
+                        .positive()
+                        .required()
+                        .messages({
+                            'number.base': 'Round type ID must be a number',
+                            'number.integer': 'Round type ID must be an integer',
+                            'number.positive': 'Round type ID must be positive',
+                            'any.required': 'Round type ID is required'
+                        }),
+                    interviewerId: Joi.number()
+                        .integer()
+                        .positive()
+                        .required()
+                        .messages({
+                            'number.base': 'Interviewer ID must be a number',
+                            'number.integer': 'Interviewer ID must be an integer',
+                            'number.positive': 'Interviewer ID must be positive',
+                            'any.required': 'Interviewer ID is required'
+                        }),
+                    feedback: Joi.string()
+                        .trim()
+                        .max(2000)
+                        .optional()
+                        .allow('', null)
+                        .messages({
+                            'string.max': 'Feedback cannot exceed 2000 characters'
+                        })
+                })
+            )
+            .min(1)
+            .required()
+            .messages({
+                'array.min': 'At least one round must be provided',
+                'any.required': 'Rounds array is required'
+            })
+    }),
+
+    finalize: Joi.object({
         result: Joi.string()
             .valid('pending', 'selected', 'rejected', 'cancelled')
-            .optional()
+            .required()
             .messages({
-                'any.only': 'Result must be one of: pending, selected, rejected, cancelled'
+                'any.only': 'Result must be one of: pending, selected, rejected, cancelled',
+                'any.required': 'Result is required'
             }),
         recruiterNotes: Joi.string()
             .trim()
             .max(1000)
             .optional()
-            .allow('')
+            .allow('', null)
             .messages({
                 'string.max': 'Recruiter notes cannot exceed 1000 characters'
             }),
@@ -138,15 +182,11 @@ const interviewSchemas = {
             .trim()
             .max(2000)
             .optional()
-            .allow('')
+            .allow('', null)
             .messages({
                 'string.max': 'Interviewer feedback cannot exceed 2000 characters'
             })
-    })
-        .min(1)
-        .messages({
-            'object.min': 'At least one field must be provided for update'
-        }),
+    }),
 
     params: Joi.object({
         interviewId: Joi.number()
@@ -158,35 +198,6 @@ const interviewSchemas = {
                 'number.integer': 'Interview ID must be an integer',
                 'number.positive': 'Interview ID must be positive',
                 'any.required': 'Interview ID is required'
-            })
-    }),
-
-    pagination: Joi.object({
-        page: Joi.number()
-            .integer()
-            .min(1)
-            .default(1)
-            .messages({
-                'number.base': 'Page must be a number',
-                'number.integer': 'Page must be an integer',
-                'number.min': 'Page must be at least 1'
-            }),
-        limit: Joi.number()
-            .integer()
-            .min(1)
-            .max(100)
-            .default(10)
-            .messages({
-                'number.base': 'Limit must be a number',
-                'number.integer': 'Limit must be an integer',
-                'number.min': 'Limit must be at least 1',
-                'number.max': 'Limit cannot exceed 100'
-            }),
-        result: Joi.string()
-            .valid('pending', 'selected', 'rejected', 'cancelled')
-            .optional()
-            .messages({
-                'any.only': 'Result filter must be one of: pending, selected, rejected, cancelled'
             })
     })
 };
@@ -228,8 +239,26 @@ class InterviewValidator {
         next();
     }
 
-    static validateDelete(req, res, next) {
-        const { error } = interviewSchemas.params.validate(req.params, {
+    static validateRoundUpdate(req, res, next) {
+        const { value, error } = interviewSchemas.roundUpdate.validate(req.body, {
+            abortEarly: false,
+            stripUnknown: true
+        });
+        if (error) {
+            const details = error.details.map(detail => ({
+                field: detail.path.join('.'),
+                message: detail.message
+            }));
+            throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', {
+                validationErrors: details
+            });
+        }
+        req.body = value;
+        next();
+    }
+
+    static validateFinalize(req, res, next) {
+        const { value, error } = interviewSchemas.finalize.validate(req.body, {
             abortEarly: false,
             stripUnknown: true
         });
@@ -242,11 +271,12 @@ class InterviewValidator {
                 validationErrors: details
             });
         }
+        req.body = value;
         next();
     }
 
-    static validatePagination(req, res, next) {
-        const { error } = interviewSchemas.pagination.validate(req.query, {
+    static validateDelete(req, res, next) {
+        const { error } = interviewSchemas.params.validate(req.params, {
             abortEarly: false,
             stripUnknown: true
         });

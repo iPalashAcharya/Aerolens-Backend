@@ -62,14 +62,45 @@ class InterviewService {
                     'Failed to fetch Interview data by Id',
                     500,
                     'INTERVIEW_FETCH_ERROR',
-                    { operation: 'getDataById', tag }
+                    { operation: 'getInterviewById', interviewId }
                 );
             }
             throw error;
         } finally {
             client.release();
         }
+    }
 
+    async getInterviewRounds(interviewId) {
+        const client = await this.db.getConnection();
+
+        try {
+            const result = await this.interviewRepository.getInterviewRounds(interviewId, client);
+
+            if (!result || result.rounds.length === 0) {
+                throw new AppError(
+                    `No interview rounds found for interviewId ${interviewId}`,
+                    404,
+                    'INTERVIEW_ROUNDS_NOT_FOUND'
+                );
+            }
+
+            return result;
+
+        } catch (error) {
+            if (!(error instanceof AppError)) {
+                console.error('Error Fetching Interview Rounds', error.stack);
+                throw new AppError(
+                    'Failed to fetch Interview Rounds',
+                    500,
+                    'INTERVIEW_ROUNDS_FETCH_ERROR',
+                    { interviewId }
+                );
+            }
+            throw error;
+        } finally {
+            client.release();
+        }
     }
 
     async createInterview(interviewData, auditContext) {
@@ -195,6 +226,116 @@ class InterviewService {
                 500,
                 "INTERVIEW_UPDATE_ERROR",
                 { operation: "updateInterview", interviewId }
+            );
+        } finally {
+            client.release();
+        }
+    }
+
+    async updateInterviewRounds(interviewId, roundData, auditContext) {
+        const client = await this.db.getConnection();
+        try {
+            await client.beginTransaction();
+
+            const existingInterview = await this.interviewRepository.getById(interviewId, client);
+            if (!existingInterview || !existingInterview.data) {
+                throw new AppError(
+                    `Interview with Id ${interviewId} not found`,
+                    404,
+                    'INTERVIEW_ENTRY_NOT_FOUND'
+                );
+            }
+
+            const roundResult = await this.interviewRepository.replaceInterviewRounds(
+                interviewId,
+                roundData.rounds,
+                client
+            );
+
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'UPDATE',
+                previousValues: { interviewId },
+                newValues: {
+                    interviewId,
+                    roundsCount: roundResult.roundsCount || 0
+                },
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, client);
+
+
+
+            await client.commit();
+
+            return {
+                success: true,
+                interviewId,
+                roundsCount: roundResult.roundsCount,
+                message: `Successfully updated ${roundResult.roundsCount} interview rounds`
+            };
+
+        } catch (error) {
+            await client.rollback();
+            if (error instanceof AppError) {
+                throw error;
+            }
+
+            console.error("Error updating Interview Rounds:", error.stack);
+            throw new AppError(
+                "Failed to update Interview Rounds",
+                500,
+                "INTERVIEW_ROUNDS_UPDATE_ERROR",
+                { operation: "updateInterviewRounds", interviewId }
+            );
+        } finally {
+            client.release();
+        }
+    }
+
+    async finalizeInterview(interviewId, finalData, auditContext) {
+        const client = await this.db.getConnection();
+        try {
+            await client.beginTransaction();
+
+            const existingInterview = await this.interviewRepository.getById(interviewId, client);
+            if (!existingInterview || !existingInterview.data) {
+                throw new AppError(
+                    `Interview with Id ${interviewId} not found`,
+                    404,
+                    'INTERVIEW_ENTRY_NOT_FOUND'
+                );
+            }
+
+            const finalizedInterview = await this.interviewRepository.finalize(interviewId, finalData, client);
+
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'UPDATE',
+                previousValues: existingInterview.data,
+                newValues: finalizedInterview,
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, client);
+
+            await client.commit();
+
+            return finalizedInterview;
+
+        } catch (error) {
+            await client.rollback();
+            if (error instanceof AppError) {
+                throw error;
+            }
+
+            console.error("Error finalizing Interview:", error.stack);
+            throw new AppError(
+                "Failed to finalize Interview",
+                500,
+                "INTERVIEW_FINALIZE_ERROR",
+                { operation: "finalizeInterview", interviewId }
             );
         } finally {
             client.release();

@@ -33,7 +33,17 @@ class InterviewController {
             interview,
             'Interview entry retrieved successfully'
         );
-    })
+    });
+
+    getInterviewRounds = catchAsync(async (req, res) => {
+        const rounds = await this.interviewService.getInterviewRounds(parseInt(req.params.interviewId));
+
+        return ApiResponse.success(
+            res,
+            rounds,
+            'Interview Rounds retrieved successfully'
+        );
+    });
 
     createInterview = catchAsync(async (req, res) => {
         const interview = await this.interviewService.createInterview(req.body, req.auditContext);
@@ -57,6 +67,33 @@ class InterviewController {
             res,
             interview,
             'Interview entry updated successfully'
+        );
+    });
+
+    updateInterviewRounds = catchAsync(async (req, res) => {
+        const isUpdated = await this.interviewService.updateInterviewRounds(
+            parseInt(req.params.interviewId),
+            req.body,
+            req.auditContext
+        );
+
+        return ApiResponse.success(
+            res,
+            isUpdated,
+            'Interview Round Added Successfully'
+        );
+    });
+
+    finalizeInterview = catchAsync(async (req, res) => {
+        const result = await this.interviewService.finalizeInterview(
+            parseInt(req.params.interviewId),
+            req.body,
+            req.auditContext
+        );
+        return ApiResponse.success(
+            res,
+            result,
+            'Interview finalized successfully'
         );
     });
 
