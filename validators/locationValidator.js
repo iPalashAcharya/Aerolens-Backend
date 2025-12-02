@@ -19,12 +19,10 @@ const locationSchemas = {
         country: Joi.string()
             .trim()
             .required()
-            .valid('India', 'United States')
             .messages({
                 'string.base': 'country must be a string',
                 'string.empty': 'country cannot be empty',
-                'any.required': 'country is required',
-                "any.only": "country must be one of 'India' or 'United States'"
+                'any.required': 'country is required'
             }),
         state: Joi.string()
             .trim()
@@ -56,12 +54,10 @@ const locationSchemas = {
         country: Joi.string()
             .trim()
             .optional()
-            .valid('India', 'United States')
             .messages({
                 'string.base': 'country must be a string',
                 'string.empty': 'country cannot be empty',
                 'any.required': 'country is required',
-                "any.only": "country must be one of 'India' or 'United States'"
             }),
         state: Joi.string()
             .trim()
