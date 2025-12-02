@@ -76,34 +76,21 @@ class MemberService {
                 );
             }
 
-            if (updateData.skills) {
-                /*if (userRole === "admin" || userRole === "HR") {
-                    throw new AppError(
-                        "Admin or HR cannot update skillSet. Only the member can update personal skills.",
-                        403,
-                        "SKILLSET_UPDATE_FORBIDDEN"
-                    );
-                }*/
-
-                for (const skill of updateData.skills) {
-                    console.log(skill);
-                    await this.memberRepository.createInterviewerSkill(memberId, skill, client);
-                }
+            let skillsUpdateResult = null;
+            if (updateData.skills !== undefined) {
+                const skillsData = updateData.skills;
                 delete updateData.skills;
+
+                skillsUpdateResult = await this.memberRepository.replaceInterviewerSkills(
+                    memberId,
+                    skillsData,
+                    client
+                );
+
+                console.log(`Skills updated for member ${memberId}: ${skillsUpdateResult.skillsCount} skills`);
             }
 
-            /*if (updateData.designation) {
-                if (userRole !== 'HR' || userRole !== 'admin') {
-                    throw new AppError(
-                        "Only Admin or HR can modify designation. Please contact them to edit designation.",
-                        403,
-                        "DESIGNATION_UPDATE_FORBIDDEN"
-                    )
-                }
-            }*/
-
             let updatedMember = existingMember;
-
             if (Object.keys(updateData).length > 0) {
                 updatedMember = await this.memberRepository.updateMember(
                     memberId,
@@ -117,15 +104,19 @@ class MemberService {
                     userId: auditContext.userId,
                     action: 'UPDATE',
                     previousValues: existingMember,
-                    newValues: updatedMember,
+                    newValues: {
+                        ...updatedMember,
+                        ...(skillsUpdateResult && { skillsUpdated: skillsUpdateResult.skillsCount })
+                    },
                     ipAddress: auditContext.ipAddress,
                     userAgent: auditContext.userAgent,
                     timestamp: auditContext.timestamp
                 }, client);
             }
+
             await client.commit();
 
-            return updatedMember;
+            return await this.memberRepository.findMemberById(memberId, client);
 
         } catch (error) {
             await client.rollback();
@@ -144,6 +135,94 @@ class MemberService {
             client.release();
         }
     }
+
+    /*async updateMember(memberId, updateData, auditContext) {
+        const client = await this.db.getConnection();
+
+        try {
+            await client.beginTransaction();
+
+            const existingMember = await this.memberRepository.findById(memberId, client);
+            if (!existingMember) {
+                throw new AppError(
+                    `Member with ID ${memberId} does not exist`,
+                    404,
+                    "MEMBER_NOT_FOUND",
+                    {
+                        memberId,
+                        suggestion: "Please verify the Member ID and try again"
+                    }
+                );
+            }
+
+            if (updateData.skills) {
+                /*if (userRole === "admin" || userRole === "HR") {
+                    throw new AppError(
+                        "Admin or HR cannot update skillSet. Only the member can update personal skills.",
+                        403,
+                        "SKILLSET_UPDATE_FORBIDDEN"
+                    );
+                }*/
+
+    /*for (const skill of updateData.skills) {
+        console.log(skill);
+        await this.memberRepository.createInterviewerSkill(memberId, skill, client);
+    }
+    delete updateData.skills;
+}
+
+/*if (updateData.designation) {
+    if (userRole !== 'HR' || userRole !== 'admin') {
+        throw new AppError(
+            "Only Admin or HR can modify designation. Please contact them to edit designation.",
+            403,
+            "DESIGNATION_UPDATE_FORBIDDEN"
+        )
+    }
+}*/
+
+    /*let updatedMember = existingMember;
+
+    if (Object.keys(updateData).length > 0) {
+        updatedMember = await this.memberRepository.updateMember(
+            memberId,
+            updateData,
+            client
+        );
+    }
+
+    if (auditContext) {
+        await auditLogService.logAction({
+            userId: auditContext.userId,
+            action: 'UPDATE',
+            previousValues: existingMember,
+            newValues: updatedMember,
+            ipAddress: auditContext.ipAddress,
+            userAgent: auditContext.userAgent,
+            timestamp: auditContext.timestamp
+        }, client);
+    }
+    await client.commit();
+
+    return updatedMember;
+
+} catch (error) {
+    await client.rollback();
+    if (error instanceof AppError) {
+        throw error;
+    }
+
+    console.error("Error updating Member", error.stack);
+    throw new AppError(
+        "Failed to update member entry",
+        500,
+        "MEMBER_UPDATE_ERROR",
+        { operation: "updateMember", memberId }
+    );
+} finally {
+    client.release();
+}
+}*/
 
     async deleteMember(memberId, auditContext) {
         const client = await this.db.getConnection();

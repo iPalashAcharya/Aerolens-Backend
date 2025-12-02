@@ -85,7 +85,7 @@ class MemberRepository {
         try {
             const [result] = await connection.execute(
                 `INSERT INTO interviewer_skill (interviewerId,skillId,proficiencyLevel,years_of_experience,created_at,updated_at)
-                VALUES (?,?,?,?,NOW(),NOW());`, [memberId, createData.skill, createData.proficiencyLevel, createData.yearsOfExperience]
+                VALUES (?,?,?,?,NOW(),NOW());`, [memberId, createData.skillName, createData.proficiencyLevel, createData.yearsOfExperience]
             );
 
             return {
@@ -117,6 +117,127 @@ class MemberRepository {
         } catch (error) {
             throw new AppError(
                 'Database error while creating interviewer skill',
+                500,
+                'DB_ERROR',
+                error.message
+            );
+        }
+    }
+
+    async getMemberSkills(memberId, client) {
+        const connection = client;
+        try {
+            const [rows] = await connection.execute(
+                `SELECT interviewerId, skillId, proficiencyLevel, years_of_experience
+                 FROM interviewer_skill
+                 WHERE interviewerId = ?`,
+                [memberId]
+            );
+            return rows;
+        } catch (error) {
+            throw new AppError(
+                'Database error while fetching member skills',
+                500,
+                'DB_ERROR',
+                error.message
+            );
+        }
+    }
+
+    async upsertInterviewerSkill(memberId, skillData, client) {
+        const connection = client;
+        try {
+            const [result] = await connection.execute(
+                `INSERT INTO interviewer_skill (
+                    interviewerId, skillId, proficiencyLevel, years_of_experience, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, NOW(), NOW())
+                ON DUPLICATE KEY UPDATE
+                    proficiencyLevel = VALUES(proficiencyLevel),
+                    years_of_experience = VALUES(years_of_experience),
+                    updated_at = NOW()`,
+                [
+                    memberId,
+                    skillData.skill,
+                    skillData.proficiencyLevel,
+                    skillData.yearsOfExperience
+                ]
+            );
+
+            return {
+                interviewerSkillId: result.insertId || null,
+                memberId,
+                skillId: skillData.skill,
+                proficiencyLevel: skillData.proficiencyLevel,
+                yearsOfExperience: skillData.yearsOfExperience
+            };
+        } catch (error) {
+            throw new AppError(
+                'Database error while upserting interviewer skill',
+                500,
+                'DB_ERROR',
+                error.message
+            );
+        }
+    }
+
+    async deleteInterviewerSkills(memberId, skillIds, client) {
+        const connection = client;
+        try {
+            if (!skillIds || skillIds.length === 0) {
+                return { deletedCount: 0 };
+            }
+
+            const placeholders = skillIds.map(() => '?').join(',');
+            const [result] = await connection.execute(
+                `DELETE FROM interviewer_skill 
+                 WHERE interviewerId = ? AND skillId IN (${placeholders})`,
+                [memberId, ...skillIds]
+            );
+
+            return { deletedCount: result.affectedRows };
+        } catch (error) {
+            throw new AppError(
+                'Database error while deleting interviewer skills',
+                500,
+                'DB_ERROR',
+                error.message
+            );
+        }
+    }
+
+    async replaceInterviewerSkills(memberId, skillsData, client) {
+        const connection = client;
+
+        try {
+            await connection.execute(
+                `DELETE FROM interviewer_skill WHERE interviewerId = ?`,
+                [memberId]
+            );
+
+            if (skillsData && skillsData.length > 0) {
+                const values = skillsData.map(skill => [
+                    memberId,
+                    skill.skill,
+                    skill.proficiencyLevel,
+                    skill.yearsOfExperience
+                ]);
+
+                const placeholders = values.map(() => '(?, ?, ?, ?, NOW(), NOW())').join(',');
+                const flatValues = values.flat();
+
+                await connection.execute(
+                    `INSERT INTO interviewer_skill (
+                        interviewerId, skillId, proficiencyLevel, years_of_experience, created_at, updated_at
+                    ) VALUES ${placeholders}`,
+                    flatValues
+                );
+            }
+
+            return { success: true, skillsCount: skillsData?.length || 0 };
+        } catch (error) {
+            throw new AppError(
+                'Database error while replacing interviewer skills',
                 500,
                 'DB_ERROR',
                 error.message

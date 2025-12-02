@@ -38,8 +38,9 @@ class MemberValidatorHelper {
                     this.skillCache.set(cacheKey, skillId);
                 }
 
+                // FIXED: Use 'skill' instead of 'skillName' to match repository expectations
                 transformedSkills.push({
-                    skill: skillId,
+                    skill: skillId,  // Changed from skillName to skill
                     proficiencyLevel: skill.proficiencyLevel ?? null,
                     yearsOfExperience: skill.yearsOfExperience ?? null
                 });
@@ -58,17 +59,17 @@ class MemberValidatorHelper {
         }
         const connection = client || await this.db.getConnection();
         try {
-            const query = `SELECT lookupKey FROM lookup WHERE LOWER(value) = LOWER(?) AND lookup.tag = 'designation'`
+            const query = `SELECT lookupKey FROM lookup WHERE LOWER(value) = LOWER(?) AND lookup.tag = 'designation'`;
             const [result] = await connection.execute(query, [designation.trim()]);
             if (result.length === 0) {
                 throw new AppError(
                     `Invalid Designation ${designation}, Please refer lookup table for valid designations`,
                     400,
                     `INVALID_DESIGNATION`
-                )
+                );
             }
             const designationId = result[0].lookupKey;
-            this.designationCache.set(cacheKey, designationId)
+            this.designationCache.set(cacheKey, designationId);
 
             return designationId;
 
@@ -86,14 +87,14 @@ class MemberValidatorHelper {
         const connection = client || await this.db.getConnection();
 
         try {
-            const query = `SELECT clientId FROM client WHERE LOWER(clientName) = LOWER(?)`
-            const [result] = connection.execute(query, [clientName.trim()]);
+            const query = `SELECT clientId FROM client WHERE LOWER(clientName) = LOWER(?)`;
+            const [result] = await connection.execute(query, [clientName.trim()]);
             if (result.length === 0) {
                 throw new AppError(
                     `Invalid Client Name Given`,
                     400,
                     `INVALID_CLIENT_NAME`
-                )
+                );
             }
             const clientId = result[0].clientId;
             this.clientCache.set(cacheKey, clientId);
@@ -198,28 +199,50 @@ const memberSchema = {
             .trim()
             .min(1)
             .max(255)
+            .allow('')
             .messages({
                 'string.base': 'Organisation must be a string',
                 'string.min': 'Organisation cannot be empty',
                 'string.max': 'Organisation cannot exceed 255 characters'
             }),
 
+        // IMPORTANT: Skills array replaces ALL existing skills
+        // To add/update/remove skills, send the complete desired state
+        // Empty array [] will remove all skills
+        // Omitting the field will leave skills unchanged
         skills: Joi.array()
             .items(
                 Joi.object({
-                    skillName: Joi.string().trim().min(1).max(100).required(),
+                    skillName: Joi.string().trim().min(1).max(100).required()
+                        .messages({
+                            'string.base': 'Skill name must be a string',
+                            'string.empty': 'Skill name cannot be empty',
+                            'any.required': 'Skill name is required'
+                        }),
                     proficiencyLevel: Joi.string()
                         .trim()
                         .valid('Beginner', 'Intermediate', 'Advanced', 'Expert')
-                        .required(),
+                        .allow(null)
+                        .default(null)
+                        .messages({
+                            'any.only': 'Proficiency level must be one of: Beginner, Intermediate, Advanced, Expert'
+                        }),
                     yearsOfExperience: Joi.number()
                         .integer()
                         .min(0)
                         .max(60)
+                        .allow(null)
+                        .default(null)
+                        .messages({
+                            'number.base': 'Years of experience must be a number',
+                            'number.integer': 'Years of experience must be an integer',
+                            'number.min': 'Years of experience cannot be negative',
+                            'number.max': 'Years of experience cannot exceed 60'
+                        })
                 })
             )
             .messages({
-                'array.base': 'Skill set must be an array',
+                'array.base': 'Skills must be an array',
                 'array.includes': 'Each skill must be a valid skill object'
             }),
 
@@ -228,16 +251,22 @@ const memberSchema = {
             country: Joi.string().trim().min(1).max(255)
         })
             .messages({
-                'object.base': 'Location must be an object with cityName and country'
+                'object.base': 'Location must be an object with city and country'
             }),
-        interviewerCapacity: Joi.number().integer().messages({
-            'number.base': 'interviewerCapacity must be a number',
-            'number.integer': 'interviewerCapacity must be an integer'
-        })
+
+        interviewerCapacity: Joi.number()
+            .integer()
+            .min(0)
+            .messages({
+                'number.base': 'Interviewer capacity must be a number',
+                'number.integer': 'Interviewer capacity must be an integer',
+                'number.min': 'Interviewer capacity cannot be negative'
+            })
     }).min(1)
         .messages({
             'object.min': 'At least one field must be provided for update'
         }),
+
     params: Joi.object({
         memberId: Joi.number()
             .integer()
@@ -254,69 +283,103 @@ const memberSchema = {
 
 class MemberValidator {
     static helper = null;
+
     static init(db) {
         MemberValidator.helper = new MemberValidatorHelper(db);
     }
-    static async validateUpdate(req, res, next) {
-        const { value, error: bodyError } = memberSchema.update.validate(req.body, { abortEarly: false });
-        const { error: paramsError } = memberSchema.params.validate(req.params, { abortEarly: false });
 
-        if (bodyError || paramsError) {
-            const details = [];
-            if (bodyError) {
-                details.push(...bodyError.details.map(detail => ({
-                    field: detail.path[0],
-                    message: detail.message
-                })));
+    static async validateUpdate(req, res, next) {
+        try {
+            const { value, error: bodyError } = memberSchema.update.validate(req.body, {
+                abortEarly: false,
+                stripUnknown: true
+            });
+            const { error: paramsError } = memberSchema.params.validate(req.params, {
+                abortEarly: false
+            });
+
+            if (bodyError || paramsError) {
+                const details = [];
+                if (bodyError) {
+                    details.push(...bodyError.details.map(detail => ({
+                        field: detail.path.join('.'),
+                        message: detail.message
+                    })));
+                }
+                if (paramsError) {
+                    details.push(...paramsError.details.map(detail => ({
+                        field: detail.path.join('.'),
+                        message: detail.message
+                    })));
+                }
+                throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details });
             }
-            if (paramsError) {
-                details.push(...paramsError.details.map(detail => ({
-                    field: detail.path[0],
-                    message: detail.message
-                })));
+
+            // Transform designation
+            if (value.designation) {
+                value.designationId = await MemberValidator.helper.transformDesignation(value.designation);
+                delete value.designation;
             }
-            throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details });
+
+            // Transform client
+            if (value.client) {
+                value.clientId = await MemberValidator.helper.transformClient(value.client);
+                delete value.client;
+            }
+
+            // Transform location
+            if (value.location) {
+                value.locationId = await MemberValidator.helper.getLocationIdByName(value.location);
+                delete value.location;
+            }
+
+            // Transform skills (FIXED: now returns correct format with 'skill' property)
+            if (value.skills !== undefined) {
+                value.skills = await MemberValidator.helper.transformSkills(value.skills);
+            }
+
+            req.body = value;
+            next();
+        } catch (error) {
+            next(error);
         }
-        if (value.designation) {
-            value.designationId = await MemberValidator.helper.transformDesignation(value.designation);
-            delete value.designation;
-        }
-        if (value.client) {
-            value.clientId = await MemberValidator.helper.transformClient(value.client);
-            delete value.client;
-        }
-        if (value.location) {
-            value.locationId = await MemberValidator.helper.getLocationIdByName(value.location);
-            delete value.location;
-        }
-        if (value.skills) {
-            value.skills = await MemberValidator.helper.transformSkills(value.skills);
-        }
-        req.body = value;
-        next();
     }
 
     static validateDelete(req, res, next) {
-        const { error } = memberSchema.params.validate(req.params, { abortEarly: false, stripUnknown: true });
-        if (error) {
-            const details = error.details.map(detail => ({
-                field: detail.path[0],
-                message: detail.message
-            }));
-            throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details });
+        try {
+            const { error } = memberSchema.params.validate(req.params, {
+                abortEarly: false,
+                stripUnknown: true
+            });
+
+            if (error) {
+                const details = error.details.map(detail => ({
+                    field: detail.path.join('.'),
+                    message: detail.message
+                }));
+                throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details });
+            }
+            next();
+        } catch (error) {
+            next(error);
         }
-        next();
     }
+
     static validateParams(req, res, next) {
-        const { error } = memberSchema.params.validate(req.params);
-        if (error) {
-            const details = error.details.map(detail => ({
-                field: detail.path[0],
-                message: detail.message
-            }));
-            throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details });
+        try {
+            const { error } = memberSchema.params.validate(req.params);
+
+            if (error) {
+                const details = error.details.map(detail => ({
+                    field: detail.path.join('.'),
+                    message: detail.message
+                }));
+                throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details });
+            }
+            next();
+        } catch (error) {
+            next(error);
         }
-        next();
     }
 }
 
