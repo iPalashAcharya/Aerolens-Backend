@@ -28,7 +28,7 @@ const locationSchemas = {
             .trim()
             .min(1)
             .max(100)
-            .allow('')
+            .allow('', null)
             .optional()
             .messages({
                 'string.base': 'state must be a string',
@@ -63,7 +63,7 @@ const locationSchemas = {
             .trim()
             .min(1)
             .max(100)
-            .allow('')
+            .allow('', null)
             .optional()
             .messages({
                 'string.base': 'state must be a string',

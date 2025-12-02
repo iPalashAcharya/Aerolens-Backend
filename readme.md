@@ -2468,15 +2468,15 @@ Response (200 OK):
 "data": [
 {
 "locationId": 1,
-"cityName": "Bangalore",
+"city": "Bangalore",
 "country": "India",
-"stateName": "Karnataka"
+"state": "Karnataka"
 },
 {
 "locationId": 2,
-"cityName": "San Francisco",
+"city": "San Francisco",
 "country": "United States",
-"stateName": "California"
+"state": "California"
 }
 ]
 },
@@ -2508,9 +2508,9 @@ Response (200 OK):
 "data": [
 {
 "locationId": 1,
-"cityName": "Bangalore",
+"city": "Bangalore",
 "country": "India",
-"stateName": "Karnataka"
+"state": "Karnataka"
 }
 ]
 },
@@ -2761,3 +2761,427 @@ All error responses follow this format:
 "validationErrors": [],
 "metadata": {}
 }
+
+# Interview API Documentation
+
+Base URL: `/api/interview`
+
+All endpoints require authentication via JWT token in the Authorization header.
+
+## Authentication
+
+Include the JWT token in all requests:
+
+```
+Authorization: Bearer <your_jwt_token>
+```
+
+---
+
+## Endpoints
+
+### 1. Get All Interviews
+
+Retrieve a list of all interviews with candidate, interviewer, and scheduler details.
+
+**Endpoint:** `GET /api/interview`
+
+**Headers:**
+
+```
+Authorization: Bearer <token>
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Interview entries retrieved successfully",
+  "data": [
+    {
+      "interviewId": 1,
+      "interviewDate": "2024-12-15T00:00:00.000Z",
+      "fromTime": "10:00",
+      "durationMinutes": 60,
+      "candidateId": 5,
+      "candidateName": "John Doe",
+      "interviewerId": 3,
+      "interviewerName": "Jane Smith",
+      "scheduledById": 2,
+      "scheduledByName": "Alice Johnson",
+      "result": "pending",
+      "recruiterNotes": "Good technical background",
+      "interviewerFeedback": null
+    },
+    {
+      "interviewId": 2,
+      "interviewDate": "2024-12-20T00:00:00.000Z",
+      "fromTime": "14:30",
+      "durationMinutes": 45,
+      "candidateId": 8,
+      "candidateName": "Sarah Williams",
+      "interviewerId": 4,
+      "interviewerName": "Bob Martin",
+      "scheduledById": 2,
+      "scheduledByName": "Alice Johnson",
+      "result": "selected",
+      "recruiterNotes": "Senior position candidate",
+      "interviewerFeedback": "Excellent problem-solving skills"
+    }
+  ],
+  "statusCode": 200
+}
+```
+
+---
+
+### 2. Get Interview by ID
+
+Retrieve details of a specific interview.
+
+**Endpoint:** `GET /api/interview/:interviewId`
+
+**Headers:**
+
+```
+Authorization: Bearer <token>
+```
+
+**URL Parameters:**
+
+| Parameter   | Type   | Required | Description  |
+| ----------- | ------ | -------- | ------------ |
+| interviewId | number | Yes      | Interview ID |
+
+**Example Request:**
+
+```
+GET /api/interview/1
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Interview entry retrieved successfully",
+  "data": {
+    "interviewId": 1,
+    "interviewDate": "2024-12-15T00:00:00.000Z",
+    "fromTime": "10:00",
+    "durationMinutes": 60,
+    "candidateId": 5,
+    "candidateName": "John Doe",
+    "interviewerId": 3,
+    "interviewerName": "Jane Smith",
+    "scheduledById": 2,
+    "scheduledByName": "Alice Johnson",
+    "result": "pending",
+    "recruiterNotes": "Good technical background",
+    "interviewerFeedback": null
+  },
+  "statusCode": 200
+}
+```
+
+**Error Response (404):**
+
+```json
+{
+  "success": false,
+  "message": "Interview Entry with 999 not found",
+  "errorCode": "INTERVIEW_ENTRY_NOT_FOUND",
+  "statusCode": 404
+}
+```
+
+---
+
+### 3. Create Interview
+
+Schedule a new interview.
+
+**Endpoint:** `POST /api/interview`
+
+**Headers:**
+
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**Request Body:**
+
+| Field               | Type              | Required | Description          | Validation                  |
+| ------------------- | ----------------- | -------- | -------------------- | --------------------------- |
+| interviewDate       | string (ISO 8601) | Yes      | Interview date       | Cannot be in the past       |
+| fromTime            | string            | Yes      | Interview start time | Format: HH:MM (00:00-23:59) |
+| durationMinutes     | number            | Yes      | Interview duration   | Min: 15, Max: 480           |
+| candidateId         | number            | Yes      | Candidate ID         | Must be positive integer    |
+| interviewerId       | number            | Yes      | Interviewer ID       | Must be positive integer    |
+| scheduledById       | number            | Yes      | Scheduler ID         | Must be positive integer    |
+| recruiterNotes      | string            | No       | Recruiter notes      | Max: 1000 characters        |
+| interviewerFeedback | string            | No       | Interviewer feedback | Max: 2000 characters        |
+
+**Example Request:**
+
+```json
+{
+  "interviewDate": "2024-12-15",
+  "fromTime": "10:00",
+  "durationMinutes": 60,
+  "candidateId": 5,
+  "interviewerId": 3,
+  "scheduledById": 2,
+  "recruiterNotes": "Good technical background, excited about the role"
+}
+```
+
+**Success Response (201):**
+
+```json
+{
+  "success": true,
+  "message": "interview created successfully",
+  "data": {
+    "interviewId": 15,
+    "interviewDate": "2024-12-15",
+    "fromTime": "10:00",
+    "durationMinutes": 60,
+    "candidateId": 5,
+    "interviewerId": 3,
+    "scheduledById": 2,
+    "result": null,
+    "interviewerFeedback": null,
+    "recruiterNotes": "Good technical background, excited about the role"
+  },
+  "statusCode": 201
+}
+```
+
+**Validation Error Response (400):**
+
+```json
+{
+  "success": false,
+  "message": "Validation failed",
+  "errorCode": "VALIDATION_ERROR",
+  "details": {
+    "validationErrors": [
+      {
+        "field": "interviewDate",
+        "message": "Interview date cannot be in the past"
+      },
+      {
+        "field": "fromTime",
+        "message": "From time must be in HH:MM format (00:00-23:59)"
+      }
+    ]
+  },
+  "statusCode": 400
+}
+```
+
+---
+
+### 4. Update Interview
+
+Update an existing interview.
+
+**Endpoint:** `PATCH /api/interview/:interviewId`
+
+**Headers:**
+
+```
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+**URL Parameters:**
+
+| Parameter   | Type   | Required | Description  |
+| ----------- | ------ | -------- | ------------ |
+| interviewId | number | Yes      | Interview ID |
+
+**Request Body:**
+
+All fields are optional. At least one field must be provided.
+
+| Field               | Type              | Description          | Validation                                     |
+| ------------------- | ----------------- | -------------------- | ---------------------------------------------- |
+| interviewDate       | string (ISO 8601) | Interview date       | Cannot be in the past                          |
+| fromTime            | string            | Interview start time | Format: HH:MM (00:00-23:59)                    |
+| durationMinutes     | number            | Interview duration   | Min: 15, Max: 480                              |
+| result              | string            | Interview result     | One of: pending, selected, rejected, cancelled |
+| recruiterNotes      | string            | Recruiter notes      | Max: 1000 characters                           |
+| interviewerFeedback | string            | Interviewer feedback | Max: 2000 characters                           |
+
+**Example Request:**
+
+```
+PATCH /api/interview/15
+```
+
+```json
+{
+  "result": "selected",
+  "interviewerFeedback": "Excellent technical skills and cultural fit. Strong recommendation for hire."
+}
+```
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Interview entry updated successfully",
+  "data": {
+    "interviewId": 15,
+    "result": "selected",
+    "interviewerFeedback": "Excellent technical skills and cultural fit. Strong recommendation for hire."
+  },
+  "statusCode": 200
+}
+```
+
+**Error Response - No Fields (400):**
+
+```json
+{
+  "success": false,
+  "message": "Validation failed",
+  "errorCode": "VALIDATION_ERROR",
+  "details": {
+    "validationErrors": [
+      {
+        "field": "_",
+        "message": "At least one field must be provided for update"
+      }
+    ]
+  },
+  "statusCode": 400
+}
+```
+
+**Error Response - Not Found (404):**
+
+```json
+{
+  "success": false,
+  "message": "Interview with Id 999 not found",
+  "errorCode": "INTERVIEW_ENTRY_NOT_FOUND",
+  "statusCode": 404
+}
+```
+
+---
+
+### 5. Delete Interview
+
+Soft delete an interview (sets isActive to false).
+
+**Endpoint:** `DELETE /api/interview/:interviewId`
+
+**Headers:**
+
+```
+Authorization: Bearer <token>
+```
+
+**URL Parameters:**
+
+| Parameter   | Type   | Required | Description  |
+| ----------- | ------ | -------- | ------------ |
+| interviewId | number | Yes      | Interview ID |
+
+**Example Request:**
+
+```
+DELETE /api/interview/15
+```
+
+**Success Response (200):**
+
+```json
+{
+  "success": true,
+  "message": "Interview entry deleted successfully",
+  "data": null,
+  "statusCode": 200
+}
+```
+
+**Error Response (404):**
+
+```json
+{
+  "success": false,
+  "message": "Interview entry with 999 not found",
+  "errorCode": "INTERVIEW_NOT_FOUND",
+  "statusCode": 404
+}
+```
+
+---
+
+## Data Models
+
+### Interview Object
+
+```typescript
+{
+  interviewId: number,           // Auto-generated
+  interviewDate: string,          // ISO 8601 date format
+  fromTime: string,               // HH:MM format
+  durationMinutes: number,        // 15-480
+  candidateId: number,
+  candidateName: string,          // From join
+  interviewerId: number,
+  interviewerName: string,        // From join
+  scheduledById: number,
+  scheduledByName: string,        // From join
+  result: string | null,          // 'pending' | 'selected' | 'rejected' | 'cancelled'
+  recruiterNotes: string | null,
+  interviewerFeedback: string | null
+}
+```
+
+---
+
+## Error Codes
+
+| Error Code                | Status Code | Description                      |
+| ------------------------- | ----------- | -------------------------------- |
+| VALIDATION_ERROR          | 400         | Request validation failed        |
+| INTERVIEW_ENTRY_NOT_FOUND | 404         | Interview not found              |
+| INTERVIEW_NOT_FOUND       | 404         | Interview not found for deletion |
+| INTERVIEW_CREATION_ERROR  | 500         | Failed to create interview       |
+| INTERVIEW_UPDATE_ERROR    | 500         | Failed to update interview       |
+| INTERVIEW_DELETION_ERROR  | 500         | Failed to delete interview       |
+| INTERVIEW_FETCH_ERROR     | 500         | Failed to fetch interview data   |
+| DATABASE_ERROR            | 500         | Database operation failed        |
+
+---
+
+## Notes
+
+- All date/time values are stored and returned in UTC
+- The `result` field defaults to `null` on creation and can be updated later
+- Soft deletes are used - deleted interviews are marked as inactive but not removed from the database
+- All operations are logged in the audit log with user context
+- Interview dates cannot be set in the past
+- Duration must be between 15 minutes and 8 hours (480 minutes)
+
+---
+
+## Audit Logging
+
+All create, update, and delete operations are automatically logged with:
+
+- User ID
+- Action type (CREATE, UPDATE, DELETE)
+- Previous and new values (for updates)
+- IP address
+- User agent
+- Timestamp
