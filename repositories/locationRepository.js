@@ -8,7 +8,7 @@ class LookupRepository {
         const connection = client;
         try {
             const dataQuery = `
-                SELECT locationId,cityName,country,stateName FROM location 
+                SELECT locationId,cityName AS city,country,stateName AS state FROM location 
             `;
             const [locationData] = await connection.query(dataQuery);
             return {
@@ -22,7 +22,7 @@ class LookupRepository {
     async getById(locationId, client) {
         const connection = client;
         try {
-            const dataQuery = `SELECT locationId, cityName, stateName, country FROM location WHERE locationId=?`;
+            const dataQuery = `SELECT locationId, cityName AS city, stateName AS state, country FROM location WHERE locationId=?`;
             const [locationData] = await connection.query(dataQuery, [locationId]);
             return {
                 data: locationData
