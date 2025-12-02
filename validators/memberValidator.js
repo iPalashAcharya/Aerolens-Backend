@@ -80,11 +80,11 @@ class MemberValidatorHelper {
     async validateClientExists(clientId, client = null) {
         const connection = client || await this.db.getConnection();
         try {
-            const query = `SELECT clientId FROM client WHERE clientId = ? AND isActive = TRUE`;
+            const query = `SELECT clientId FROM client WHERE clientId = ?`;
             const [result] = await connection.execute(query, [clientId]);
             if (result.length === 0) {
                 throw new AppError(
-                    `Client with ID ${clientId} does not exist or is inactive`,
+                    `Client with ID ${clientId} does not exist`,
                     400,
                     'INVALID_CLIENT_ID'
                 );
