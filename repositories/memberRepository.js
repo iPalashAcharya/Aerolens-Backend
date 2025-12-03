@@ -73,6 +73,11 @@ class MemberRepository {
             m.organisation, m.isInterviewer, m.interviewerCapacity;`,
                 [memberId]
             );
+            rows.forEach(row => {
+                if (typeof row.skills === 'string') {
+                    row.skills = JSON.parse(row.skills);
+                }
+            });
             return rows[0] || null;
         } catch (error) {
             throw new AppError('Database error while finding member', 500, 'DB_ERROR', error.message);
@@ -297,6 +302,11 @@ class MemberRepository {
             loc.cityName, loc.country, c.clientName,
             m.organisation, m.isInterviewer, m.interviewerCapacity;`
             );
+            rows.forEach(row => {
+                if (typeof row.skills === 'string') {
+                    row.skills = JSON.parse(row.skills);
+                }
+            });
             return rows;
         } catch (error) {
             throw new AppError('Database Error while fetching members', 500, 'DB_ERROR', error.message);
