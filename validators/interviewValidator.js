@@ -71,6 +71,37 @@ const interviewSchemas = {
     }),
 
     update: Joi.object({
+        interviewerId: Joi.number()
+            .integer()
+            .positive()
+            .optional()
+            .messages({
+                'number.base': 'Interviewer Id Must be a Number',
+                'number.integer': 'Interviewer ID must be an Integer',
+                'number.positive': 'Interviewer ID must be Positive'
+            }),
+        scheduledById: Joi.number()
+            .integer()
+            .positive()
+            .optional()
+            .messages({
+                'number.base': 'Scheduled by ID must be a number',
+                'number.integer': 'Scheduled by ID must be an integer',
+                'number.positive': 'Scheduled by ID must be positive',
+                'any.required': 'Scheduled by ID is required'
+            }),
+
+        candidateId: Joi.number()
+            .integer()
+            .positive()
+            .optional()
+            .messages({
+                'number.base': 'Candidate ID must be a number',
+                'number.integer': 'Candidate ID must be an integer',
+                'number.positive': 'Candidate ID must be positive',
+                'any.required': 'Candidate ID is required'
+            }),
+
         interviewDate: Joi.date()
             .iso()
             .optional()

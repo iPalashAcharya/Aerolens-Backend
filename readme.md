@@ -3363,6 +3363,9 @@ All fields are optional. At least one field must be provided.
 | interviewDate   | string (ISO 8601) | Interview date       | Cannot be in the past       |
 | fromTime        | string            | Interview start time | Format: HH:MM (00:00-23:59) |
 | durationMinutes | number            | Interview duration   | Min: 15, Max: 480           |
+| candidateId     | number            | Candidate ID         | Must be positive integer    |
+| interviewerId   | number            | Interviewer ID       | Must be positive integer    |
+| scheduledById   | number            | Scheduler ID         | Must be positive integer    |
 
 **Example Request:**
 
