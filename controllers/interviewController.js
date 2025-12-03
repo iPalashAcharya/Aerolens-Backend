@@ -45,6 +45,30 @@ class InterviewController {
         );
     });
 
+    getCreateData = catchAsync(async (req, res) => {
+        const formData = await this.interviewService.getFormData();
+        res.status(200).json({
+            success: true,
+            message: "Interview Form Data retrieved successfully",
+            data: {
+                interview: formData.interview,
+                interviewers: formData.interviewers,
+                recruiters: formData.recruiters,
+                candidates: formData.candidates
+            }
+        });
+    });
+
+    getEditData = catchAsync(async (req, res) => {
+        const data = await this.interviewService.getFormData(parseInt(req.params.interviewId));
+
+        return ApiResponse.success(
+            res,
+            data,
+            'Interview Edit Form Data retrieved successfully'
+        );
+    });
+
     createInterview = catchAsync(async (req, res) => {
         const interview = await this.interviewService.createInterview(req.body, req.auditContext);
 

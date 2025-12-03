@@ -19,6 +19,10 @@ router.get('/',
     interviewController.getAll
 );
 
+router.get('/create-data',
+    interviewController.getCreateData
+);
+
 router.post('/',
     InterviewValidator.validateCreate,
     interviewController.createInterview

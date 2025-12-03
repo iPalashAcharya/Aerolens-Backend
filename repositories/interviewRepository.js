@@ -118,6 +118,70 @@ class InterviewRepository {
         }
     }
 
+    async getFormData(client, interviewId = null) {
+        const connection = client;
+
+        /*const interviewPromise = interviewId
+            ? connection.query(
+                `SELECT
+                i.interviewId,
+                i.interviewDate,
+                i.fromTime,
+                i.durationMinutes,
+                c.candidateId,
+                c.candidateName,
+                interviewer.memberId AS interviewerId,
+                interviewer.memberName AS interviewerName,
+                scheduler.memberId AS scheduledById,
+                scheduler.memberName AS scheduledByName,
+                i.result,
+                i.recruiterNotes,
+                i.interviewerFeedback
+            FROM interview i
+            LEFT JOIN candidate c
+                ON i.candidateId = c.candidateId
+            LEFT JOIN member interviewer
+                ON i.interviewerId = interviewer.memberId
+            LEFT JOIN member scheduler
+                ON i.scheduledById = scheduler.memberId
+            WHERE i.interviewId = ? AND i.isActive=TRUE;`,
+                [interviewId]
+            )
+            // FIX: return mysql2-like structure [rows, fields]
+            : Promise.resolve([[], []]);*/
+
+        const interviewersPromise = connection.query(`
+        SELECT memberId AS interviewerId, memberName AS interviewerName
+        FROM member
+        WHERE isInterviewer=TRUE;
+    `);
+
+        const recruitersPromise = connection.query(`
+        SELECT memberId AS recruiterId, memberName AS recruiterName
+        FROM member
+        WHERE isRecruiter=TRUE
+    `);
+
+        const candidatesPromise = connection.query(`
+        SELECT candidateId, candidateName
+        FROM candidate
+    `);
+
+        const [interviewers, recruiters, candidates] =
+            await Promise.all([
+                //interviewPromise,
+                interviewersPromise,
+                recruitersPromise,
+                candidatesPromise
+            ]);
+
+        return {
+            //interview: null,
+            interviewers: interviewers[0],
+            recruiters: recruiters[0],
+            candidates: candidates[0]
+        };
+    }
     async replaceInterviewRounds(interviewId, rounds, client) {
         const connection = client;
 

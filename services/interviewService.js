@@ -71,6 +71,34 @@ class InterviewService {
         }
     }
 
+    async getFormData(interviewId = null) {
+        const client = await this.db.getConnection();
+        try {
+            const result = await this.interviewRepository.getFormData(client, interviewId);
+            /*if (interviewId && !result.interview) {
+                throw new AppError(
+                    `Interview with ID ${interviewId} not found`,
+                    404,
+                    'INTERVIEW_DATA_NOT_FOUND'
+                );
+            }*/
+            return result;
+        } catch (error) {
+            if (!(error instanceof AppError)) {
+                console.error('Error Fetching Interview Data By Id', error.stack);
+                throw new AppError(
+                    'Failed to fetch Interview data by Id',
+                    500,
+                    'INTERVIEW_DATA_FETCH_ERROR',
+                    { operation: 'getFormData', interviewId }
+                );
+            }
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
     async getInterviewRounds(interviewId) {
         const client = await this.db.getConnection();
 

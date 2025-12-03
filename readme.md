@@ -2976,6 +2976,187 @@ GET /api/interview/1/rounds
 
 ---
 
+### 3. Get Form data
+
+Retrieve all rounds for a specific interview.
+
+**Endpoint:** `GET /api/interview/create-data`
+
+**Headers:**
+
+```
+Authorization: Bearer <token>
+```
+
+**Example Request:**
+
+```
+GET /api/interview/create-data
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Interview Form Data retrieved successfully",
+  "data": {
+    "interviewers": [
+      {
+        "interviewerId": 445,
+        "interviewerName": "Bhavin Trivedi"
+      },
+      {
+        "interviewerId": 454,
+        "interviewerName": "Test User"
+      }
+    ],
+    "recruiters": [
+      {
+        "recruiterId": 1,
+        "recruiterName": "Palash Acharya"
+      },
+      {
+        "recruiterId": 420,
+        "recruiterName": "Jaival Suthar"
+      },
+      {
+        "recruiterId": 445,
+        "recruiterName": "Bhavin Trivedi"
+      },
+      {
+        "recruiterId": 447,
+        "recruiterName": "Random User"
+      },
+      {
+        "recruiterId": 454,
+        "recruiterName": "Test User"
+      },
+      {
+        "recruiterId": 455,
+        "recruiterName": "Testing New Field"
+      }
+    ],
+    "candidates": [
+      {
+        "candidateId": 38,
+        "candidateName": "Yash Prajapati"
+      },
+      {
+        "candidateId": 40,
+        "candidateName": "Parth"
+      },
+      {
+        "candidateId": 42,
+        "candidateName": "keyur"
+      },
+      {
+        "candidateId": 43,
+        "candidateName": "Devarsh"
+      },
+      {
+        "candidateId": 44,
+        "candidateName": "Temport"
+      },
+      {
+        "candidateId": 45,
+        "candidateName": "Rijul"
+      },
+      {
+        "candidateId": 46,
+        "candidateName": "Mohit"
+      },
+      {
+        "candidateId": 47,
+        "candidateName": "JaivalSutharTesting"
+      },
+      {
+        "candidateId": 48,
+        "candidateName": "Aksh Patel"
+      },
+      {
+        "candidateId": 50,
+        "candidateName": "ajim"
+      },
+      {
+        "candidateId": 51,
+        "candidateName": "Naren Majeti"
+      },
+      {
+        "candidateId": 52,
+        "candidateName": "Rawat"
+      },
+      {
+        "candidateId": 53,
+        "candidateName": "partfefe"
+      },
+      {
+        "candidateId": 54,
+        "candidateName": "erere"
+      },
+      {
+        "candidateId": 58,
+        "candidateName": "ramesh aroda"
+      },
+      {
+        "candidateId": 59,
+        "candidateName": "Elon Musk"
+      },
+      {
+        "candidateId": 60,
+        "candidateName": "Mark Manson"
+      },
+      {
+        "candidateId": 61,
+        "candidateName": "Testing Optimised"
+      },
+      {
+        "candidateId": 65,
+        "candidateName": "radom"
+      },
+      {
+        "candidateId": 66,
+        "candidateName": "Pankaj"
+      },
+      {
+        "candidateId": 67,
+        "candidateName": "Aksh P. Patel"
+      },
+      {
+        "candidateId": 68,
+        "candidateName": "Akish Patel"
+      },
+      {
+        "candidateId": 69,
+        "candidateName": "Akish Patel"
+      },
+      {
+        "candidateId": 70,
+        "candidateName": "Palash A"
+      }
+    ]
+  },
+  "statusCode": 200
+}
+```
+
+**Error Response (500):**
+
+```json
+{
+  "success": false,
+  "message": "Failed to fetch Interview data by Id",
+  "errorCode": "INTERVIEW_DATA_FETCH_ERROR",
+  "details": {
+    "operation": "getFormData",
+    "interviewId": 999
+  },
+  "statusCode": 500
+}
+```
+
+---
+
 ### 4. Create Interview
 
 Schedule a new interview.
