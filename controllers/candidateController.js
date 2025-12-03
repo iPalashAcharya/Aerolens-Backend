@@ -79,6 +79,20 @@ class CandidateController {
         );
     });
 
+    getCreateData = catchAsync(async (req, res) => {
+        const formData = await this.candidateService.getFormData();
+        res.status(200).json({
+            success: true,
+            message: "Interview Form Data retrieved successfully",
+            data: {
+                recruiters: formData.recruiters,
+                status: formData.status,
+                locations: formData.locations
+            }
+        });
+    });
+
+
     getAllCandidates = catchAsync(async (req, res) => {
         const page = Math.max(1, parseInt(req.query.page, 10) || 1);
         const pageSize = Math.max(1, Math.min(100, parseInt(req.query.limit, 10) || 10));

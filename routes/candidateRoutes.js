@@ -26,6 +26,10 @@ router.get('/',
     candidateController.getAllCandidates
 );
 
+router.get('/create-data',
+    candidateController.getCreateData
+);
+
 router.post('/',
     candidateService.upload.single('resume'),
     (req, res, next) => {

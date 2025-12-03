@@ -683,12 +683,12 @@ class CandidateValidator {
                 convert: true
             });
 
-            // ✅ If no body fields but req.file exists, set value to empty object
+            // If no body fields but req.file exists, set value to empty object
             if (bodyError) {
                 const hasMinOneError = bodyError.details.some(d => d.type === 'object.min');
                 if (hasMinOneError && req.file) {
                     bodyError = null;
-                    value = {};  // ✅ Set to empty object instead of leaving undefined
+                    value = {};  // Set to empty object instead of leaving undefined
                 }
             }
 

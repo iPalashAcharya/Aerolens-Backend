@@ -1765,6 +1765,98 @@ GET /candidate/:id
 
 ---
 
+### GET candidate form data
+
+GET /candidate/create-data
+
+**Response:**
+{
+"success": true,
+"message": "Interview Form Data retrieved successfully",
+"data": {
+"recruiters": [
+{
+"recruiterId": 1,
+"recruiterName": "Palash Acharya"
+},
+{
+"recruiterId": 420,
+"recruiterName": "Jaival Suthar"
+},
+{
+"recruiterId": 445,
+"recruiterName": "Bhavin Trivedi"
+},
+{
+"recruiterId": 447,
+"recruiterName": "Random User"
+},
+{
+"recruiterId": 454,
+"recruiterName": "Test User"
+},
+{
+"recruiterId": 455,
+"recruiterName": "Testing New Field"
+}
+],
+"status": [
+{
+"lookupKey": 8,
+"value": "Selected"
+},
+{
+"lookupKey": 9,
+"value": "Interview pending"
+},
+{
+"lookupKey": 10,
+"value": "Rejected"
+}
+],
+"locations": [
+{
+"locationId": 1,
+"city": "Ahmedabad",
+"country": "India",
+"state": "Gujarat"
+},
+{
+"locationId": 2,
+"city": "Bangalore",
+"country": "India",
+"state": "Karnataka"
+},
+{
+"locationId": 3,
+"city": "Mountain View",
+"country": "United States",
+"state": "California"
+},
+{
+"locationId": 4,
+"city": "San Francisco",
+"country": "United States",
+"state": "California"
+},
+{
+"locationId": 6,
+"city": "Hyderabad",
+"country": "India",
+"state": "Telangana"
+},
+{
+"locationId": 8,
+"city": "Vancouver",
+"country": "Canada",
+"state": "British Columbia"
+}
+]
+}
+}
+
+---
+
 ### Create Candidate (with optional resume upload)
 
 POST /candidate

@@ -592,6 +592,28 @@ class CandidateService {
         }
     }
 
+    async getFormData() {
+        const client = await this.db.getConnection();
+        try {
+            const data = await this.candidateRepository.getFormData(client);
+            return data;
+        }
+        catch (error) {
+            if (!(error instanceof AppError)) {
+                console.error('Error Fetching Candidae Data', error.stack);
+                throw new AppError(
+                    'Failed to fetch Candidate data',
+                    500,
+                    'CANDIDATE_DATA_FETCH_ERROR',
+                    { operation: 'getFormData' }
+                );
+            }
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
     async updateCandidate(candidateId, updateData, auditContext) {
         const client = await this.db.getConnection();
 

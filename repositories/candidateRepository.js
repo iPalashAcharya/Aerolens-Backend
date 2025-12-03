@@ -4,6 +4,42 @@ class CandidateRepository {
     constructor(db) {
         this.db = db;
     }
+
+    async getFormData(client) {
+        const connection = client;
+
+        const statusPromise = connection.query(`
+        SELECT lookupKey, value
+        FROM lookup
+        WHERE tag='candidateStatus'
+    `);
+
+        const recruitersPromise = connection.query(`
+        SELECT memberId AS recruiterId, memberName AS recruiterName
+        FROM member
+        WHERE isRecruiter=TRUE
+    `);
+
+        const locationPromise = connection.query(`
+        SELECT locationId,cityName AS city,country,stateName AS state FROM location
+    `);
+
+        const [recruiters, status, locations] =
+            await Promise.all([
+                //interviewPromise,
+                recruitersPromise,
+                statusPromise,
+                locationPromise
+            ]);
+
+        return {
+            //interview: null,
+            recruiters: recruiters[0],
+            status: status[0],
+            locations: locations[0]
+        };
+    }
+
     async create(candidateData, client) {
         const connection = client;
         try {
