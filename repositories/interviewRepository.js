@@ -19,7 +19,8 @@ class InterviewRepository {
                 SELECT
                 i.interviewId,
                 i.interviewDate,
-                i.fromTime,
+                TIME_FORMAT(i.fromTime, '%H:%i') AS fromTime,
+                TIME_FORMAT(i.toTime,'%H:%i') AS toTime,
                 i.durationMinutes,
                 c.candidateId,
                 c.candidateName,
@@ -60,7 +61,8 @@ class InterviewRepository {
                 SELECT
                 i.interviewId,
                 i.interviewDate,
-                i.fromTime,
+                TIME_FORMAT(i.fromTime, '%H:%i') AS fromTime,
+                TIME_FORMAT(i.toTime,'%H:%i') AS toTime,
                 i.durationMinutes,
                 c.candidateId,
                 c.candidateName,
@@ -225,7 +227,7 @@ class InterviewRepository {
         const connection = client;
         try {
             const [result] = await connection.execute(
-                `INSERT INTO interview(interviewDate,fromTime,durationMinutes,candidateId,interviewerId,scheduledById,result,interviewerFeedback,recruiterNotes) 
+                `INSERT INTO interview(interviewDate,fromTime,candidateId,interviewerId,scheduledById,result,interviewerFeedback,recruiterNotes) 
                  VALUES(?,?,?,?,?,?,?,?,?)`,
                 [interviewData.interviewDate, interviewData.fromTime, interviewData.durationMinutes, interviewData.candidateId, interviewData.interviewerId, interviewData.scheduledById, interviewData.result || null, interviewData.interviewerFeedback || null, interviewData.recruiterNotes || null]
             );
