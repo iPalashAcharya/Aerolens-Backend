@@ -7,11 +7,31 @@ class InterviewService {
         this.interviewRepository = interviewRepository;
     }
 
+    static capitalizeFirstLetter(string) {
+        if (typeof string !== "string" || string.length === 0) {
+            return "";
+        }
+        return string.charAt(0).toUpperCase() + string.slice(1).toLowerCase();
+    }
+
+
+    static capitalizeField(obj, fieldName) {
+        if (!obj || typeof obj[fieldName] !== "string") return;
+
+        obj[fieldName] = InterviewService.capitalizeFirstLetter(obj[fieldName]);
+    }
+
+
     async getAll() {
         //const { limit = 10, page = 1 } = options || {};
         const client = await this.db.getConnection();
         try {
             const result = await this.interviewRepository.getAll(null, null, client);
+            const interviews = result.data;
+
+            for (const interview of interviews) {
+                InterviewService.capitalizeField(interview, "result");
+            }
             /*const totalPages = Math.ceil(result.totalRecords / limit);
             const pagination = {
                 currentPage: page,
@@ -24,7 +44,7 @@ class InterviewService {
                 prevPage: page > 1 ? page - 1 : null
             };*/
             return {
-                data: result.data
+                data: interviews
                 //pagination
             };
         } catch (error) {
@@ -54,7 +74,15 @@ class InterviewService {
                     'INTERVIEW_ENTRY_NOT_FOUND'
                 );
             }
-            return result;
+            const data = result.data;
+
+            if (Array.isArray(data)) {
+                data.forEach(item => InterviewService.capitalizeField(item, "result"));
+            } else {
+                InterviewService.capitalizeField(data, "result");
+            }
+
+            return { data };
         } catch (error) {
             if (!(error instanceof AppError)) {
                 console.error('Error Fetching Interview Data By Id', error.stack);
@@ -75,11 +103,24 @@ class InterviewService {
         const client = await this.db.getConnection();
         try {
             const interviews = await this.interviewRepository.getInterviewsByCandidateId(candidateId, client);
+            const data = interviews;
+
+            if (Array.isArray(data)) {
+                data.forEach(item => InterviewService.capitalizeField(item, "result"));
+            } else {
+                InterviewService.capitalizeField(data, "result");
+            }
+
             return {
+                candidateId,
+                totalRounds: data.length,
+                data
+            };
+            /*return {
                 candidateId,
                 totalRounds: interviews.length,
                 interviews
-            };
+            };*/
         } catch (error) {
             if (!(error instanceof AppError)) {
                 console.error('Error Fetching Interviews By Candidate Id', error.stack);
@@ -100,6 +141,8 @@ class InterviewService {
         const client = await this.db.getConnection();
         try {
             const result = await this.interviewRepository.getFormData(client, interviewId);
+
+            return result;
             /*if (interviewId && !result.interview) {
                 throw new AppError(
                     `Interview with ID ${interviewId} not found`,
@@ -107,7 +150,6 @@ class InterviewService {
                     'INTERVIEW_DATA_NOT_FOUND'
                 );
             }*/
-            return result;
         } catch (error) {
             if (!(error instanceof AppError)) {
                 console.error('Error Fetching Interview Data By Id', error.stack);

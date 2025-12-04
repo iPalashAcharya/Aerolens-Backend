@@ -4,6 +4,7 @@ class InterviewRepository {
     constructor(db) {
         this.db = db;
     }
+
     async getAll(limit, page, client) {
         const connection = client;
         try {
