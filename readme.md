@@ -2865,13 +2865,19 @@ All error responses follow this format:
 
 # Interview API Documentation
 
-Base URL: `/api/interview`
+## Overview
 
-All endpoints require authentication via JWT token in the Authorization header.
+The Interview API manages candidate interview scheduling, tracking, and finalization. It supports multiple interview rounds per candidate with automatic round numbering and comprehensive audit logging.
+
+## Base URL
+
+```
+/api/interview
+```
 
 ## Authentication
 
-Include the JWT token in all requests:
+All endpoints require authentication via JWT token in the Authorization header:
 
 ```
 Authorization: Bearer <your_jwt_token>
@@ -2883,13 +2889,14 @@ Authorization: Bearer <your_jwt_token>
 
 ### 1. Get All Interviews
 
-Retrieve a list of all interviews with candidate, interviewer, and scheduler details.
+Retrieves all active interviews with candidate and interviewer details.
 
-**Endpoint:** `GET /api/interview`
+**Endpoint:** `GET /`
 
-**Headers:**
+**Request:**
 
-```
+```http
+GET /api/interview
 Authorization: Bearer <token>
 ```
 
@@ -2902,37 +2909,41 @@ Authorization: Bearer <token>
   "data": [
     {
       "interviewId": 1,
-      "interviewDate": "2024-12-15T00:00:00.000Z",
+      "roundNumber": 1,
+      "totalInterviews": 2,
+      "interviewDate": "2024-12-10T00:00:00.000Z",
       "fromTime": "10:00",
+      "toTime": "11:00",
       "durationMinutes": 60,
-      "candidateId": 5,
+      "candidateId": 123,
       "candidateName": "John Doe",
-      "interviewerId": 3,
+      "interviewerId": 5,
       "interviewerName": "Jane Smith",
       "scheduledById": 2,
-      "scheduledByName": "Alice Johnson",
+      "scheduledByName": "Admin User",
       "result": "pending",
-      "recruiterNotes": "Good technical background",
+      "recruiterNotes": null,
       "interviewerFeedback": null
     },
     {
       "interviewId": 2,
-      "interviewDate": "2024-12-20T00:00:00.000Z",
-      "fromTime": "14:30",
-      "toTime": "15:15",
+      "roundNumber": 2,
+      "totalInterviews": 2,
+      "interviewDate": "2024-12-15T00:00:00.000Z",
+      "fromTime": "14:00",
+      "toTime": "14:45",
       "durationMinutes": 45,
-      "candidateId": 8,
-      "candidateName": "Sarah Williams",
-      "interviewerId": 4,
-      "interviewerName": "Bob Martin",
+      "candidateId": 123,
+      "candidateName": "John Doe",
+      "interviewerId": 7,
+      "interviewerName": "Bob Johnson",
       "scheduledById": 2,
-      "scheduledByName": "Alice Johnson",
-      "result": "selected",
-      "recruiterNotes": "Senior position candidate",
-      "interviewerFeedback": "Excellent problem-solving skills"
+      "scheduledByName": "Admin User",
+      "result": "pending",
+      "recruiterNotes": null,
+      "interviewerFeedback": null
     }
-  ],
-  "statusCode": 200
+  ]
 }
 ```
 
@@ -2940,26 +2951,15 @@ Authorization: Bearer <token>
 
 ### 2. Get Interview by ID
 
-Retrieve details of a specific interview.
+Retrieves a specific interview by its ID.
 
-**Endpoint:** `GET /api/interview/:interviewId`
+**Endpoint:** `GET /:interviewId`
 
-**Headers:**
+**Request:**
 
-```
-Authorization: Bearer <token>
-```
-
-**URL Parameters:**
-
-| Parameter   | Type   | Required | Description  |
-| ----------- | ------ | -------- | ------------ |
-| interviewId | number | Yes      | Interview ID |
-
-**Example Request:**
-
-```
+```http
 GET /api/interview/1
+Authorization: Bearer <token>
 ```
 
 **Response:**
@@ -2969,62 +2969,39 @@ GET /api/interview/1
   "success": true,
   "message": "Interview entry retrieved successfully",
   "data": {
-    "data": {
-      "interviewId": 1,
-      "interviewDate": "2024-12-15T00:00:00.000Z",
-      "fromTime": "10:00",
-      "toTime": "11:00",
-      "durationMinutes": 60,
-      "candidateId": 5,
-      "candidateName": "John Doe",
-      "interviewerId": 3,
-      "interviewerName": "Jane Smith",
-      "scheduledById": 2,
-      "scheduledByName": "Alice Johnson",
-      "result": "pending",
-      "recruiterNotes": "Good technical background",
-      "interviewerFeedback": null
-    }
-  },
-  "statusCode": 200
-}
-```
-
-**Error Response (404):**
-
-```json
-{
-  "success": false,
-  "message": "Interview Entry with 999 not found",
-  "errorCode": "INTERVIEW_ENTRY_NOT_FOUND",
-  "statusCode": 404
+    "interviewId": 1,
+    "roundNumber": 1,
+    "totalInterviews": 2,
+    "interviewDate": "2024-12-10T00:00:00.000Z",
+    "fromTime": "10:00",
+    "toTime": "11:00",
+    "durationMinutes": 60,
+    "candidateId": 123,
+    "candidateName": "John Doe",
+    "interviewerId": 5,
+    "interviewerName": "Jane Smith",
+    "scheduledById": 2,
+    "scheduledByName": "Admin User",
+    "result": "pending",
+    "recruiterNotes": null,
+    "interviewerFeedback": null
+  }
 }
 ```
 
 ---
 
-### 3. Get Interview Rounds
+### 3. Get Interviews by Candidate ID
 
-Retrieve all rounds for a specific interview.
+Retrieves all interviews for a specific candidate.
 
-**Endpoint:** `GET /api/interview/:interviewId/rounds`
+**Endpoint:** `GET /candidate/:candidateId`
 
-**Headers:**
+**Request:**
 
-```
+```http
+GET /api/interview/candidate/123
 Authorization: Bearer <token>
-```
-
-**URL Parameters:**
-
-| Parameter   | Type   | Required | Description  |
-| ----------- | ------ | -------- | ------------ |
-| interviewId | number | Yes      | Interview ID |
-
-**Example Request:**
-
-```
-GET /api/interview/1/rounds
 ```
 
 **Response:**
@@ -3032,60 +3009,53 @@ GET /api/interview/1/rounds
 ```json
 {
   "success": true,
-  "message": "Interview Rounds retrieved successfully",
+  "message": "Candidate interviews retrieved successfully",
   "data": {
-    "rounds": [
+    "candidateId": 123,
+    "totalRounds": 2,
+    "interviews": [
       {
+        "interviewId": 1,
         "roundNumber": 1,
-        "roundName": "Technical Round",
-        "roundTypeId": 101,
-        "interviewerId": 3,
-        "interviewerName": "Jane Smith",
-        "feedback": "Strong coding skills"
+        "totalInterviews": 2,
+        "interviewDate": "2024-12-10T00:00:00.000Z",
+        "fromTime": "10:00",
+        "toTime": "11:00",
+        "durationMinutes": 60,
+        "result": "selected",
+        "interviewerId": 5,
+        "interviewerName": "Jane Smith"
       },
       {
+        "interviewId": 2,
         "roundNumber": 2,
-        "roundName": "HR Round",
-        "roundTypeId": 102,
-        "interviewerId": 4,
-        "interviewerName": "Bob Martin",
-        "feedback": "Good cultural fit"
+        "totalInterviews": 2,
+        "interviewDate": "2024-12-15T00:00:00.000Z",
+        "fromTime": "14:00",
+        "toTime": "14:45",
+        "durationMinutes": 45,
+        "result": "pending",
+        "interviewerId": 7,
+        "interviewerName": "Bob Johnson"
       }
     ]
-  },
-  "statusCode": 200
-}
-```
-
-**Error Response (404):**
-
-```json
-{
-  "success": false,
-  "message": "No interview rounds found for interviewId 999",
-  "errorCode": "INTERVIEW_ROUNDS_NOT_FOUND",
-  "statusCode": 404
+  }
 }
 ```
 
 ---
 
-### 3. Get Form data
+### 4. Get Form Data for Creating Interviews
 
-Retrieve all rounds for a specific interview.
+Retrieves lists of interviewers, recruiters for populating interview creation forms.
 
-**Endpoint:** `GET /api/interview/create-data`
+**Endpoint:** `GET /create-data`
 
-**Headers:**
+**Request:**
 
-```
-Authorization: Bearer <token>
-```
-
-**Example Request:**
-
-```
+```http
 GET /api/interview/create-data
+Authorization: Bearer <token>
 ```
 
 **Response:**
@@ -3097,657 +3067,468 @@ GET /api/interview/create-data
   "data": {
     "interviewers": [
       {
-        "interviewerId": 445,
-        "interviewerName": "Bhavin Trivedi"
+        "interviewerId": 5,
+        "interviewerName": "Jane Smith"
       },
       {
-        "interviewerId": 454,
-        "interviewerName": "Test User"
+        "interviewerId": 7,
+        "interviewerName": "Bob Johnson"
       }
     ],
     "recruiters": [
       {
-        "recruiterId": 1,
-        "recruiterName": "Palash Acharya"
+        "recruiterId": 2,
+        "recruiterName": "Admin User"
       },
       {
-        "recruiterId": 420,
-        "recruiterName": "Jaival Suthar"
-      },
-      {
-        "recruiterId": 445,
-        "recruiterName": "Bhavin Trivedi"
-      },
-      {
-        "recruiterId": 447,
-        "recruiterName": "Random User"
-      },
-      {
-        "recruiterId": 454,
-        "recruiterName": "Test User"
-      },
-      {
-        "recruiterId": 455,
-        "recruiterName": "Testing New Field"
-      }
-    ],
-    "candidates": [
-      {
-        "candidateId": 38,
-        "candidateName": "Yash Prajapati"
-      },
-      {
-        "candidateId": 40,
-        "candidateName": "Parth"
-      },
-      {
-        "candidateId": 42,
-        "candidateName": "keyur"
-      },
-      {
-        "candidateId": 43,
-        "candidateName": "Devarsh"
-      },
-      {
-        "candidateId": 44,
-        "candidateName": "Temport"
-      },
-      {
-        "candidateId": 45,
-        "candidateName": "Rijul"
-      },
-      {
-        "candidateId": 46,
-        "candidateName": "Mohit"
-      },
-      {
-        "candidateId": 47,
-        "candidateName": "JaivalSutharTesting"
-      },
-      {
-        "candidateId": 48,
-        "candidateName": "Aksh Patel"
-      },
-      {
-        "candidateId": 50,
-        "candidateName": "ajim"
-      },
-      {
-        "candidateId": 51,
-        "candidateName": "Naren Majeti"
-      },
-      {
-        "candidateId": 52,
-        "candidateName": "Rawat"
-      },
-      {
-        "candidateId": 53,
-        "candidateName": "partfefe"
-      },
-      {
-        "candidateId": 54,
-        "candidateName": "erere"
-      },
-      {
-        "candidateId": 58,
-        "candidateName": "ramesh aroda"
-      },
-      {
-        "candidateId": 59,
-        "candidateName": "Elon Musk"
-      },
-      {
-        "candidateId": 60,
-        "candidateName": "Mark Manson"
-      },
-      {
-        "candidateId": 61,
-        "candidateName": "Testing Optimised"
-      },
-      {
-        "candidateId": 65,
-        "candidateName": "radom"
-      },
-      {
-        "candidateId": 66,
-        "candidateName": "Pankaj"
-      },
-      {
-        "candidateId": 67,
-        "candidateName": "Aksh P. Patel"
-      },
-      {
-        "candidateId": 68,
-        "candidateName": "Akish Patel"
-      },
-      {
-        "candidateId": 69,
-        "candidateName": "Akish Patel"
-      },
-      {
-        "candidateId": 70,
-        "candidateName": "Palash A"
+        "recruiterId": 3,
+        "recruiterName": "Sarah Williams"
       }
     ]
-  },
-  "statusCode": 200
-}
-```
-
-**Error Response (500):**
-
-```json
-{
-  "success": false,
-  "message": "Failed to fetch Interview data by Id",
-  "errorCode": "INTERVIEW_DATA_FETCH_ERROR",
-  "details": {
-    "operation": "getFormData",
-    "interviewId": 999
-  },
-  "statusCode": 500
+  }
 }
 ```
 
 ---
 
-### 4. Create Interview
+### 5. Create Interview (First Round)
 
-Schedule a new interview.
+Creates the first interview for a candidate. Round number starts at 1.
 
-**Endpoint:** `POST /api/interview`
+**Endpoint:** `POST /:candidateId`
 
-**Headers:**
+**Request:**
 
-```
+```http
+POST /api/interview/123
 Authorization: Bearer <token>
 Content-Type: application/json
-```
 
-**Request Body:**
-
-| Field           | Type              | Required | Description          | Validation                  |
-| --------------- | ----------------- | -------- | -------------------- | --------------------------- |
-| interviewDate   | string (ISO 8601) | Yes      | Interview date       | Cannot be in the past       |
-| fromTime        | string            | Yes      | Interview start time | Format: HH:MM (00:00-23:59) |
-| durationMinutes | number            | Yes      | Interview duration   | Min: 15, Max: 480           |
-| candidateId     | number            | Yes      | Candidate ID         | Must be positive integer    |
-| interviewerId   | number            | Yes      | Interviewer ID       | Must be positive integer    |
-| scheduledById   | number            | Yes      | Scheduler ID         | Must be positive integer    |
-
-**Example Request:**
-
-```json
 {
-  "interviewDate": "2024-12-15",
+  "interviewDate": "2024-12-10",
   "fromTime": "10:00",
   "durationMinutes": 60,
-  "candidateId": 5,
-  "interviewerId": 3,
-  "scheduledById": 2
+  "interviewerId": 5,
+  "scheduledById": 2,
+  "result": "pending",
+  "recruiterNotes": "Initial technical screening",
+  "interviewerFeedback": ""
 }
 ```
 
-**Success Response (201):**
+**Response:**
 
 ```json
 {
   "success": true,
   "message": "interview created successfully",
   "data": {
-    "interviewId": 15,
-    "interviewDate": "2024-12-15",
+    "interviewId": 1,
+    "candidateId": 123,
+    "roundNumber": 1,
+    "totalInterviews": 1,
+    "interviewDate": "2024-12-10",
     "fromTime": "10:00",
     "durationMinutes": 60,
-    "candidateId": 5,
-    "interviewerId": 3,
+    "interviewerId": 5,
     "scheduledById": 2,
-    "result": null,
-    "interviewerFeedback": null,
-    "recruiterNotes": null
-  },
-  "statusCode": 201
+    "result": "pending",
+    "recruiterNotes": "Initial technical screening",
+    "interviewerFeedback": ""
+  }
 }
 ```
 
-**Validation Error Response (400):**
+**Validation Rules:**
 
-```json
-{
-  "success": false,
-  "message": "Validation failed",
-  "errorCode": "VALIDATION_ERROR",
-  "details": {
-    "validationErrors": [
-      {
-        "field": "interviewDate",
-        "message": "Interview date cannot be in the past"
-      },
-      {
-        "field": "fromTime",
-        "message": "From time must be in HH:MM format (00:00-23:59)"
-      }
-    ]
-  },
-  "statusCode": 400
-}
-```
+- `interviewDate`: Required, ISO date format, cannot be in the past
+- `fromTime`: Required, HH:MM format (00:00-23:59)
+- `durationMinutes`: Required, integer, 15-480 minutes
+- `interviewerId`: Required, positive integer
+- `scheduledById`: Required, positive integer
+- `result`: Optional, one of: `pending`, `selected`, `rejected`, `cancelled` (default: `pending`)
+- `recruiterNotes`: Optional, max 1000 characters
+- `interviewerFeedback`: Optional, max 2000 characters
 
 ---
 
-### 5. Update Interview
+### 6. Schedule Next Round
 
-Update basic interview details (date, time, duration).
+Creates a new interview entry for the next round. Round number automatically increments.
 
-**Endpoint:** `PATCH /api/interview/:interviewId`
+**Endpoint:** `POST /:candidateId/rounds`
 
-**Headers:**
+**Request:**
 
-```
+```http
+POST /api/interview/123/rounds
 Authorization: Bearer <token>
 Content-Type: application/json
-```
 
-**URL Parameters:**
-
-| Parameter   | Type   | Required | Description  |
-| ----------- | ------ | -------- | ------------ |
-| interviewId | number | Yes      | Interview ID |
-
-**Request Body:**
-
-All fields are optional. At least one field must be provided.
-
-| Field           | Type              | Description          | Validation                  |
-| --------------- | ----------------- | -------------------- | --------------------------- |
-| interviewDate   | string (ISO 8601) | Interview date       | Cannot be in the past       |
-| fromTime        | string            | Interview start time | Format: HH:MM (00:00-23:59) |
-| durationMinutes | number            | Interview duration   | Min: 15, Max: 480           |
-| candidateId     | number            | Candidate ID         | Must be positive integer    |
-| interviewerId   | number            | Interviewer ID       | Must be positive integer    |
-| scheduledById   | number            | Scheduler ID         | Must be positive integer    |
-
-**Example Request:**
-
-```
-PATCH /api/interview/15
-```
-
-```json
 {
-  "interviewDate": "2024-12-20",
-  "fromTime": "14:30"
+  "interviewDate": "2024-12-15",
+  "fromTime": "14:00",
+  "durationMinutes": 45,
+  "interviewerId": 7,
+  "scheduledById": 2
 }
 ```
 
-**Success Response (200):**
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Successfully scheduled round 2 for candidate",
+  "data": {
+    "interviewId": 2,
+    "candidateId": 123,
+    "roundNumber": 2,
+    "totalInterviews": 2,
+    "interviewDate": "2024-12-15",
+    "fromTime": "14:00",
+    "durationMinutes": 45,
+    "interviewerId": 7,
+    "scheduledById": 2,
+    "result": "pending",
+    "recruiterNotes": null,
+    "interviewerFeedback": null
+  }
+}
+```
+
+**Notes:**
+
+- Requires at least one existing interview for the candidate
+- Automatically calculates and assigns the next round number
+- Updates `totalInterviews` for all candidate's interview records
+
+**Validation Rules:**
+
+- `interviewDate`: Required, ISO date format, cannot be in the past
+- `fromTime`: Required, HH:MM format (00:00-23:59)
+- `durationMinutes`: Required, integer, 15-480 minutes
+- `interviewerId`: Required, positive integer
+- `scheduledById`: Required, positive integer
+
+---
+
+### 7. Update Interview
+
+Updates basic interview details (date, time, interviewer, scheduler).
+
+**Endpoint:** `PATCH /:interviewId`
+
+**Request:**
+
+```http
+PATCH /api/interview/1
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "interviewDate": "2024-12-12",
+  "fromTime": "11:00",
+  "durationMinutes": 90,
+  "interviewerId": 8
+}
+```
+
+**Response:**
 
 ```json
 {
   "success": true,
   "message": "Interview entry updated successfully",
   "data": {
-    "interviewId": 15,
-    "interviewDate": "2024-12-20",
-    "fromTime": "14:30"
-  },
-  "statusCode": 200
+    "interviewId": 1,
+    "interviewDate": "2024-12-12",
+    "fromTime": "11:00",
+    "durationMinutes": 90,
+    "interviewerId": 8
+  }
 }
 ```
 
-**Error Response - No Fields (400):**
+**Updatable Fields:**
 
-```json
-{
-  "success": false,
-  "message": "Validation failed",
-  "errorCode": "VALIDATION_ERROR",
-  "details": {
-    "validationErrors": [
-      {
-        "field": "_",
-        "message": "At least one field must be provided for update"
-      }
-    ]
-  },
-  "statusCode": 400
-}
-```
+- `interviewDate`: Optional, ISO date format, cannot be in the past
+- `fromTime`: Optional, HH:MM format (00:00-23:59)
+- `durationMinutes`: Optional, integer, 15-480 minutes
+- `interviewerId`: Optional, positive integer
+- `scheduledById`: Optional, positive integer
 
-**Error Response - Not Found (404):**
-
-```json
-{
-  "success": false,
-  "message": "Interview with Id 999 not found",
-  "errorCode": "INTERVIEW_ENTRY_NOT_FOUND",
-  "statusCode": 404
-}
-```
+**Note:** At least one field must be provided for update.
 
 ---
 
-### 6. Update Interview Rounds
+### 8. Finalize Interview
 
-Replace all interview rounds for an interview (complete replacement).
+Updates the interview result and adds final feedback. Used to mark interview completion.
 
-**Endpoint:** `PUT /api/interview/:interviewId/rounds`
+**Endpoint:** `PUT /:interviewId/finalize`
 
-**Headers:**
+**Request:**
 
-```
+```http
+PUT /api/interview/1/finalize
 Authorization: Bearer <token>
 Content-Type: application/json
-```
 
-**URL Parameters:**
-
-| Parameter   | Type   | Required | Description  |
-| ----------- | ------ | -------- | ------------ |
-| interviewId | number | Yes      | Interview ID |
-
-**Request Body:**
-
-| Field  | Type  | Required | Description              |
-| ------ | ----- | -------- | ------------------------ |
-| rounds | array | Yes      | Array of round objects   |
-|        |       |          | Minimum 1 round required |
-
-**Round Object:**
-
-| Field         | Type   | Required | Description                         | Validation               |
-| ------------- | ------ | -------- | ----------------------------------- | ------------------------ |
-| roundNumber   | number | Yes      | Round sequence number               | Must be positive integer |
-| roundTypeId   | number | Yes      | Round type ID (from lookup table)   | Must be positive integer |
-| interviewerId | number | Yes      | Interviewer ID for this round       | Must be positive integer |
-| feedback      | string | No       | Interviewer feedback for this round | Max: 2000 characters     |
-
-**Example Request:**
-
-```
-PUT /api/interview/15/rounds
-```
-
-```json
 {
-  "rounds": [
-    {
-      "roundNumber": 1,
-      "roundTypeId": 101,
-      "interviewerId": 3,
-      "feedback": "Strong technical skills demonstrated"
-    },
-    {
-      "roundNumber": 2,
-      "roundTypeId": 102,
-      "interviewerId": 4,
-      "feedback": "Excellent communication and team fit"
-    }
-  ]
+  "result": "Selected",
+  "recruiterNotes": "Strong technical skills, good communication",
+  "interviewerFeedback": "Excellent problem-solving abilities. Recommended for next round."
 }
 ```
 
-**Success Response (200):**
-
-```json
-{
-  "success": true,
-  "message": "Interview Round Added Successfully",
-  "data": {
-    "success": true,
-    "interviewId": 15,
-    "roundsCount": 2,
-    "message": "Successfully updated 2 interview rounds"
-  },
-  "statusCode": 200
-}
-```
-
-**Validation Error Response (400):**
-
-```json
-{
-  "success": false,
-  "message": "Validation failed",
-  "errorCode": "VALIDATION_ERROR",
-  "details": {
-    "validationErrors": [
-      {
-        "field": "rounds",
-        "message": "At least one round must be provided"
-      }
-    ]
-  },
-  "statusCode": 400
-}
-```
-
-**Error Response - Not Found (404):**
-
-```json
-{
-  "success": false,
-  "message": "Interview with Id 999 not found",
-  "errorCode": "INTERVIEW_ENTRY_NOT_FOUND",
-  "statusCode": 404
-}
-```
-
----
-
-### 7. Finalize Interview
-
-Finalize an interview with result, recruiter notes, and interviewer feedback.
-
-**Endpoint:** `PUT /api/interview/:interviewId/finalize`
-
-**Headers:**
-
-```
-Authorization: Bearer <token>
-Content-Type: application/json
-```
-
-**URL Parameters:**
-
-| Parameter   | Type   | Required | Description  |
-| ----------- | ------ | -------- | ------------ |
-| interviewId | number | Yes      | Interview ID |
-
-**Request Body:**
-
-| Field               | Type   | Required | Description          | Validation                                     |
-| ------------------- | ------ | -------- | -------------------- | ---------------------------------------------- |
-| result              | string | Yes      | Interview result     | One of: pending, selected, rejected, cancelled |
-| recruiterNotes      | string | No       | Recruiter notes      | Max: 1000 characters                           |
-| interviewerFeedback | string | No       | Interviewer feedback | Max: 2000 characters                           |
-
-**Example Request:**
-
-```
-PUT /api/interview/15/finalize
-```
-
-```json
-{
-  "result": "selected",
-  "recruiterNotes": "Strong candidate, recommended for hire",
-  "interviewerFeedback": "Excellent technical skills and cultural fit. Strong recommendation for hire."
-}
-```
-
-**Success Response (200):**
+**Response:**
 
 ```json
 {
   "success": true,
   "message": "Interview finalized successfully",
   "data": {
-    "interviewId": 15,
-    "result": "selected",
-    "recruiterNotes": "Strong candidate, recommended for hire",
-    "interviewerFeedback": "Excellent technical skills and cultural fit. Strong recommendation for hire."
-  },
-  "statusCode": 200
+    "interviewId": 1,
+    "result": "Selected",
+    "recruiterNotes": "Strong technical skills, good communication",
+    "interviewerFeedback": "Excellent problem-solving abilities. Recommended for next round."
+  }
 }
 ```
 
-**Validation Error Response (400):**
+**Validation Rules:**
 
-```json
-{
-  "success": false,
-  "message": "Validation failed",
-  "errorCode": "VALIDATION_ERROR",
-  "details": {
-    "validationErrors": [
-      {
-        "field": "result",
-        "message": "Result must be one of: pending, selected, rejected, cancelled"
-      }
-    ]
-  },
-  "statusCode": 400
-}
-```
-
-**Error Response - Not Found (404):**
-
-```json
-{
-  "success": false,
-  "message": "Interview with Id 999 not found",
-  "errorCode": "INTERVIEW_ENTRY_NOT_FOUND",
-  "statusCode": 404
-}
-```
+- `result`: Required, one of: `Pending`, `Selected`, `Rejected`, `Cancelled`
+- `recruiterNotes`: Optional, max 1000 characters
+- `interviewerFeedback`: Optional, max 2000 characters
 
 ---
 
-### 8. Delete Interview
+### 9. Delete Interview
 
-Soft delete an interview (sets isActive to false).
+Soft deletes an interview (sets `isActive` to false).
 
-**Endpoint:** `DELETE /api/interview/:interviewId`
+**Endpoint:** `DELETE /:interviewId`
 
-**Headers:**
+**Request:**
 
-```
+```http
+DELETE /api/interview/1
 Authorization: Bearer <token>
 ```
 
-**URL Parameters:**
-
-| Parameter   | Type   | Required | Description  |
-| ----------- | ------ | -------- | ------------ |
-| interviewId | number | Yes      | Interview ID |
-
-**Example Request:**
-
-```
-DELETE /api/interview/15
-```
-
-**Success Response (200):**
+**Response:**
 
 ```json
 {
   "success": true,
   "message": "Interview entry deleted successfully",
-  "data": null,
-  "statusCode": 200
+  "data": null
 }
 ```
 
-**Error Response (404):**
+---
+
+## Error Responses
+
+### Validation Error
 
 ```json
 {
   "success": false,
-  "message": "Interview entry with 999 not found",
-  "errorCode": "INTERVIEW_NOT_FOUND",
-  "statusCode": 404
+  "message": "Validation failed",
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "details": {
+      "validationErrors": [
+        {
+          "field": "interviewDate",
+          "message": "Interview date is required"
+        },
+        {
+          "field": "durationMinutes",
+          "message": "Duration must be at least 15 minutes"
+        }
+      ]
+    }
+  }
 }
 ```
 
----
+### Not Found Error
 
-## Data Models
-
-### Interview Object
-
-```typescript
+```json
 {
-  interviewId: number,           // Auto-generated
-  interviewDate: string,          // ISO 8601 date format
-  fromTime: string,               // HH:MM format
-  durationMinutes: number,        // 15-480
-  candidateId: number,
-  candidateName: string,          // From join
-  interviewerId: number,
-  interviewerName: string,        // From join
-  scheduledById: number,
-  scheduledByName: string,        // From join
-  result: string | null,          // 'pending' | 'selected' | 'rejected' | 'cancelled'
-  recruiterNotes: string | null,
-  interviewerFeedback: string | null
+  "success": false,
+  "message": "Interview Entry with 999 not found",
+  "error": {
+    "code": "INTERVIEW_ENTRY_NOT_FOUND"
+  }
 }
 ```
 
-### Round Object
+### No Previous Interviews Error
 
-```typescript
+```json
 {
-  roundNumber: number,            // Round sequence number
-  roundName: string,              // Round type name (from lookup)
-  roundTypeId: number,            // Round type ID
-  interviewerId: number,
-  interviewerName: string,        // From join
-  feedback: string | null         // Interviewer feedback for this round
+  "success": false,
+  "message": "No previous interviews found for candidate 123. Please create an initial interview first.",
+  "error": {
+    "code": "NO_PREVIOUS_INTERVIEWS"
+  }
+}
+```
+
+### Database Error
+
+```json
+{
+  "success": false,
+  "message": "Database operation failed",
+  "error": {
+    "code": "DATABASE_ERROR",
+    "details": {
+      "operation": "create",
+      "code": "ER_DUP_ENTRY"
+    }
+  }
 }
 ```
 
 ---
 
-## Error Codes
+## Database Schema
 
-| Error Code                    | Status Code | Description                       |
-| ----------------------------- | ----------- | --------------------------------- |
-| VALIDATION_ERROR              | 400         | Request validation failed         |
-| INTERVIEW_ENTRY_NOT_FOUND     | 404         | Interview not found               |
-| INTERVIEW_NOT_FOUND           | 404         | Interview not found for deletion  |
-| INTERVIEW_ROUNDS_NOT_FOUND    | 404         | No interview rounds found         |
-| INTERVIEW_CREATION_ERROR      | 500         | Failed to create interview        |
-| INTERVIEW_UPDATE_ERROR        | 500         | Failed to update interview        |
-| INTERVIEW_ROUNDS_UPDATE_ERROR | 500         | Failed to update interview rounds |
-| INTERVIEW_FINALIZE_ERROR      | 500         | Failed to finalize interview      |
-| INTERVIEW_DELETION_ERROR      | 500         | Failed to delete interview        |
-| INTERVIEW_FETCH_ERROR         | 500         | Failed to fetch interview data    |
-| INTERVIEW_ROUNDS_FETCH_ERROR  | 500         | Failed to fetch interview rounds  |
-| DATABASE_ERROR                | 500         | Database operation failed         |
+### Interview Table
+
+```sql
+CREATE TABLE `interview` (
+  `interviewId` int NOT NULL AUTO_INCREMENT,
+  `roundNumber` int NOT NULL DEFAULT 1,
+  `totalInterviews` int NOT NULL DEFAULT 1,
+  `interviewDate` date NOT NULL,
+  `fromTime` time NOT NULL,
+  `durationMinutes` int NOT NULL,
+  `candidateId` int NOT NULL,
+  `interviewerId` int NOT NULL,
+  `scheduledById` int NOT NULL,
+  `result` enum('Pending','Selected','Rejected','Cancelled') DEFAULT 'Pending',
+  `interviewerFeedback` text,
+  `recruiterNotes` text,
+  `createdAt` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `isActive` tinyint(1) DEFAULT '1',
+  `toTime` time GENERATED ALWAYS AS (`fromTime` + interval `durationMinutes` minute) STORED,
+  PRIMARY KEY (`interviewId`),
+  KEY `idx_interviewDate` (`interviewDate`),
+  KEY `idx_candidate` (`candidateId`),
+  KEY `idx_interviewer` (`interviewerId`),
+  KEY `idx_scheduledBy` (`scheduledById`),
+  KEY `idx_result` (`result`),
+  KEY `idx_candidate_round` (`candidateId`, `roundNumber`),
+  CONSTRAINT `fk_interview_candidate` FOREIGN KEY (`candidateId`) REFERENCES `candidate` (`candidateId`) ON DELETE RESTRICT,
+  CONSTRAINT `interview_ibfk_2` FOREIGN KEY (`interviewerId`) REFERENCES `member` (`memberId`) ON DELETE RESTRICT,
+  CONSTRAINT `interview_ibfk_3` FOREIGN KEY (`scheduledById`) REFERENCES `member` (`memberId`) ON DELETE RESTRICT
+);
+```
 
 ---
 
-## Notes
+## Features
 
-- All date/time values are stored and returned in UTC
-- The `result` field defaults to `null` on creation and can be updated via the finalize endpoint
-- Soft deletes are used - deleted interviews are marked as inactive but not removed from the database
-- All operations are logged in the audit log with user context
-- Interview dates cannot be set in the past
-- Duration must be between 15 minutes and 8 hours (480 minutes)
-- Interview rounds are completely replaced when using the PUT rounds endpoint (all existing rounds are deleted and replaced with the new ones)
-- Round types must exist in the lookup table with tag 'InterviewRound'
+### Automatic Round Management
 
----
+- **First Interview**: Creates Round 1 with `totalInterviews = 1`
+- **Next Rounds**: Automatically increments round number and updates `totalInterviews` for all candidate's interviews
+- **Example**: After scheduling Round 3, all previous rounds (1 & 2) will have `totalInterviews = 3`
 
-## Audit Logging
+### Audit Logging
 
 All create, update, and delete operations are automatically logged with:
 
 - User ID
 - Action type (CREATE, UPDATE, DELETE)
-- Previous and new values (for updates)
+- Previous and new values
 - IP address
 - User agent
 - Timestamp
+
+### Data Integrity
+
+- Soft deletes maintain historical records
+- Foreign key constraints prevent orphaned records
+- Transaction support ensures data consistency
+- Automatic `toTime` calculation based on `fromTime` and `durationMinutes`
+
+---
+
+## Usage Examples
+
+### Complete Interview Workflow
+
+#### Step 1: Create First Interview
+
+```bash
+curl -X POST http://localhost:3000/api/interview/123 \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "interviewDate": "2024-12-10",
+    "fromTime": "10:00",
+    "durationMinutes": 60,
+    "interviewerId": 5,
+    "scheduledById": 2
+  }'
+```
+
+#### Step 2: Finalize First Round
+
+```bash
+curl -X PUT http://localhost:3000/api/interview/1/finalize \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "result": "Selected",
+    "interviewerFeedback": "Strong candidate, proceed to next round"
+  }'
+```
+
+#### Step 3: Schedule Second Round
+
+```bash
+curl -X POST http://localhost:3000/api/interview/123/rounds \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "interviewDate": "2024-12-15",
+    "fromTime": "14:00",
+    "durationMinutes": 45,
+    "interviewerId": 7,
+    "scheduledById": 2
+  }'
+```
+
+#### Step 4: View All Candidate Interviews
+
+```bash
+curl -X GET http://localhost:3000/api/interview/candidate/123 \
+  -H "Authorization: Bearer <token>"
+```
+
+---
+
+## Notes
+
+- All timestamps are stored in UTC
+- `toTime` is automatically calculated and cannot be manually set
+- Round numbers are sequential and managed automatically
+- Deleted interviews (`isActive = false`) are not returned in queries
+- Interview dates cannot be in the past
+- Duration must be between 15 minutes and 8 hours (480 minutes)
+
+---
+
+## Support
+
+For issues or questions, please contact the development team or create an issue in the project repository.

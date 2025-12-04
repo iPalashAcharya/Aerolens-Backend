@@ -214,17 +214,11 @@ class InterviewRepository {
         WHERE isRecruiter=TRUE
     `);
 
-        const candidatesPromise = connection.query(`
-        SELECT candidateId, candidateName
-        FROM candidate
-    `);
-
-        const [interviewers, recruiters, candidates] =
+        const [interviewers, recruiters] =
             await Promise.all([
                 //interviewPromise,
                 interviewersPromise,
                 recruitersPromise,
-                candidatesPromise
             ]);
 
         return {
