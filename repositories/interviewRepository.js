@@ -224,8 +224,7 @@ class InterviewRepository {
         return {
             //interview: null,
             interviewers: interviewers[0],
-            recruiters: recruiters[0],
-            candidates: candidates[0]
+            recruiters: recruiters[0]
         };
     }
     /*async replaceInterviewRounds(interviewId, rounds, client) {
