@@ -5,6 +5,7 @@ services:
     container_name: aerolens-portal-backend
     ports:
       - "3000:3000"
-    env_file:
-      - .env
+    environment:
+      - AWS_REGION=ap-south-1
+      - SECRET_NAME=/myapp/prod/env
     restart: always
