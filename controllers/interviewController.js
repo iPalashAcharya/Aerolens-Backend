@@ -35,7 +35,18 @@ class InterviewController {
         );
     });
 
-    getInterviewRounds = catchAsync(async (req, res) => {
+    getInterviewsByCandidateId = catchAsync(async (req, res) => {
+        const interviews = await this.interviewService.getInterviewsByCandidateId(
+            parseInt(req.params.candidateId)
+        );
+        return ApiResponse.success(
+            res,
+            interviews,
+            'Candidate interviews retrieved successfully'
+        );
+    });
+
+    /*getInterviewRounds = catchAsync(async (req, res) => {
         const rounds = await this.interviewService.getInterviewRounds(parseInt(req.params.interviewId));
 
         return ApiResponse.success(
@@ -43,7 +54,7 @@ class InterviewController {
             rounds,
             'Interview Rounds retrieved successfully'
         );
-    });
+    });*/
 
     getCreateData = catchAsync(async (req, res) => {
         const formData = await this.interviewService.getFormData();
@@ -59,23 +70,31 @@ class InterviewController {
         });
     });
 
-    getEditData = catchAsync(async (req, res) => {
-        const data = await this.interviewService.getFormData(parseInt(req.params.interviewId));
-
-        return ApiResponse.success(
-            res,
-            data,
-            'Interview Edit Form Data retrieved successfully'
-        );
-    });
-
     createInterview = catchAsync(async (req, res) => {
-        const interview = await this.interviewService.createInterview(req.body, req.auditContext);
+        const interview = await this.interviewService.createInterview(
+            parseInt(req.params.candidateId),
+            req.body,
+            req.auditContext
+        );
 
         return ApiResponse.success(
             res,
             interview,
             'interview created successfully',
+            201
+        );
+    });
+
+    scheduleNextRound = catchAsync(async (req, res) => {
+        const result = await this.interviewService.scheduleNextRound(
+            parseInt(req.params.candidateId),
+            req.body,
+            req.auditContext
+        );
+        return ApiResponse.success(
+            res,
+            result.data,
+            result.message,
             201
         );
     });
@@ -91,20 +110,6 @@ class InterviewController {
             res,
             interview,
             'Interview entry updated successfully'
-        );
-    });
-
-    updateInterviewRounds = catchAsync(async (req, res) => {
-        const isUpdated = await this.interviewService.updateInterviewRounds(
-            parseInt(req.params.interviewId),
-            req.body,
-            req.auditContext
-        );
-
-        return ApiResponse.success(
-            res,
-            isUpdated,
-            'Interview Round Added Successfully'
         );
     });
 

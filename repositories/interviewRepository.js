@@ -18,6 +18,8 @@ class InterviewRepository {
             const dataQuery = `
                 SELECT
                 i.interviewId,
+                i.roundNumber,
+                i.totalInterviews,
                 i.interviewDate,
                 TIME_FORMAT(i.fromTime, '%H:%i') AS fromTime,
                 TIME_FORMAT(i.toTime,'%H:%i') AS toTime,
@@ -60,6 +62,8 @@ class InterviewRepository {
             const dataQuery = `
                 SELECT
                 i.interviewId,
+                i.roundNumber,
+                i.totalInterviews,
                 i.interviewDate,
                 TIME_FORMAT(i.fromTime, '%H:%i') AS fromTime,
                 TIME_FORMAT(i.toTime,'%H:%i') AS toTime,
@@ -88,6 +92,52 @@ class InterviewRepository {
             }
         } catch (error) {
             this._handleDatabaseError(error, 'getById');
+        }
+    }
+
+    async getInterviewsByCandidateId(candidateId, client) {
+        const connection = client;
+        try {
+            const query = `
+                SELECT
+                i.interviewId,
+                i.roundNumber,
+                i.totalInterviews,
+                i.interviewDate,
+                TIME_FORMAT(i.fromTime, '%H:%i') AS fromTime,
+                TIME_FORMAT(i.toTime,'%H:%i') AS toTime,
+                i.durationMinutes,
+                i.result,
+                interviewer.memberId AS interviewerId,
+                interviewer.memberName AS interviewerName
+            FROM interview i
+            LEFT JOIN member interviewer
+                ON i.interviewerId = interviewer.memberId
+            WHERE i.candidateId = ? AND i.isActive=TRUE
+            ORDER BY i.roundNumber;
+            `;
+            const [interviews] = await connection.query(query, [candidateId]);
+            return interviews;
+        } catch (error) {
+            this._handleDatabaseError(error, 'getInterviewsByCandidateId');
+        }
+    }
+
+    async getLatestRoundNumber(candidateId, client) {
+        const connection = client;
+        try {
+            const query = `
+                SELECT MAX(roundNumber) as latestRound, MAX(totalInterviews) as totalInterviews
+                FROM interview
+                WHERE candidateId = ? AND isActive=TRUE;
+            `;
+            const [result] = await connection.query(query, [candidateId]);
+            return {
+                latestRound: result[0]?.latestRound || 0,
+                totalInterviews: result[0]?.totalInterviews || 0
+            };
+        } catch (error) {
+            this._handleDatabaseError(error, 'getLatestRoundNumber');
         }
     }
 
@@ -184,7 +234,7 @@ class InterviewRepository {
             candidates: candidates[0]
         };
     }
-    async replaceInterviewRounds(interviewId, rounds, client) {
+    /*async replaceInterviewRounds(interviewId, rounds, client) {
         const connection = client;
 
         try {
@@ -221,28 +271,59 @@ class InterviewRepository {
                 error.message
             );
         }
-    }
+    }*/
 
-    async create(interviewData, client) {
+    async create(candidateId, interviewData, client) {
         const connection = client;
         try {
+            // Get the latest round number for this candidate
+            const { latestRound, totalInterviews } = await this.getLatestRoundNumber(candidateId, client);
+
+            const newRoundNumber = latestRound + 1;
+            const newTotalInterviews = totalInterviews + 1;
+
             const [result] = await connection.execute(
                 `INSERT INTO interview(
+                candidateId,
+                roundNumber,
+                totalInterviews,
                 interviewDate,
                 fromTime,
                 durationMinutes,
-                candidateId,
                 interviewerId,
                 scheduledById,
                 result,
                 interviewerFeedback,
                 recruiterNotes
                 )
-            VALUES (?,?,?,?,?,?,?,?,?)`,
-                [interviewData.interviewDate, interviewData.fromTime, interviewData.durationMinutes, interviewData.candidateId, interviewData.interviewerId, interviewData.scheduledById, interviewData.result || null, interviewData.interviewerFeedback || null, interviewData.recruiterNotes || null]
+            VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+                [
+                    candidateId,
+                    newRoundNumber,
+                    newTotalInterviews,
+                    interviewData.interviewDate,
+                    interviewData.fromTime,
+                    interviewData.durationMinutes,
+                    interviewData.interviewerId,
+                    interviewData.scheduledById,
+                    interviewData.result || 'pending',
+                    interviewData.interviewerFeedback || null,
+                    interviewData.recruiterNotes || null
+                ]
             );
+
+            await connection.execute(
+                `UPDATE interview 
+                SET totalInterviews = ? 
+                WHERE candidateId = ? AND interviewId != ?`,
+                [newTotalInterviews, candidateId, result.insertId]
+            );
+
             return {
                 interviewId: result.insertId,
+                candidateId,
+                roundNumber: newRoundNumber,
+                totalInterviews: newTotalInterviews,
                 ...interviewData
             };
         } catch (error) {
@@ -263,7 +344,7 @@ class InterviewRepository {
             }
 
             const allowedFields = [
-                'interviewDate', 'fromTime', 'durationMinutes', 'candidateId', 'interviewerId', 'scheduledById'
+                'interviewDate', 'fromTime', 'durationMinutes', 'interviewerId', 'scheduledById'
             ];
 
             const filteredData = {};

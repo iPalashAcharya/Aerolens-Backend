@@ -71,6 +71,31 @@ class InterviewService {
         }
     }
 
+    async getInterviewsByCandidateId(candidateId) {
+        const client = await this.db.getConnection();
+        try {
+            const interviews = await this.interviewRepository.getInterviewsByCandidateId(candidateId, client);
+            return {
+                candidateId,
+                totalRounds: interviews.length,
+                interviews
+            };
+        } catch (error) {
+            if (!(error instanceof AppError)) {
+                console.error('Error Fetching Interviews By Candidate Id', error.stack);
+                throw new AppError(
+                    'Failed to fetch interviews by candidate Id',
+                    500,
+                    'INTERVIEW_FETCH_ERROR',
+                    { operation: 'getInterviewsByCandidateId', candidateId }
+                );
+            }
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
     async getFormData(interviewId = null) {
         const client = await this.db.getConnection();
         try {
@@ -99,7 +124,7 @@ class InterviewService {
         }
     }
 
-    async getInterviewRounds(interviewId) {
+    /*async getInterviewRounds(interviewId) {
         const client = await this.db.getConnection();
 
         try {
@@ -129,14 +154,15 @@ class InterviewService {
         } finally {
             client.release();
         }
-    }
+    }*/
 
-    async createInterview(interviewData, auditContext) {
+    async createInterview(candidateId, interviewData, auditContext) {
         const client = await this.db.getConnection();
         try {
             await client.beginTransaction();
 
-            const result = await this.interviewRepository.create(interviewData, client);
+            const result = await this.interviewRepository.create(candidateId, interviewData, client);
+
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'CREATE',
@@ -145,6 +171,7 @@ class InterviewService {
                 userAgent: auditContext.userAgent,
                 timestamp: auditContext.timestamp
             }, client);
+
             await client.commit();
 
             return result;
@@ -159,7 +186,7 @@ class InterviewService {
                 "Failed to create interview entry",
                 500,
                 "INTERVIEW_CREATION_ERROR",
-                { operation: "createINterview", interviewData }
+                { operation: "createInterview", interviewData }
             );
         } finally {
             client.release();
@@ -260,48 +287,39 @@ class InterviewService {
         }
     }
 
-    async updateInterviewRounds(interviewId, roundData, auditContext) {
+    async scheduleNextRound(candidateId, interviewData, auditContext) {
         const client = await this.db.getConnection();
         try {
             await client.beginTransaction();
 
-            const existingInterview = await this.interviewRepository.getById(interviewId, client);
-            if (!existingInterview || !existingInterview.data) {
+            const previousInterviews = await this.interviewRepository.getInterviewsByCandidateId(candidateId, client);
+
+            if (!previousInterviews || previousInterviews.length === 0) {
                 throw new AppError(
-                    `Interview with Id ${interviewId} not found`,
-                    404,
-                    'INTERVIEW_ENTRY_NOT_FOUND'
+                    `No previous interviews found for candidate ${candidateId}. Please create an initial interview first.`,
+                    400,
+                    'NO_PREVIOUS_INTERVIEWS'
                 );
             }
 
-            const roundResult = await this.interviewRepository.replaceInterviewRounds(
-                interviewId,
-                roundData.rounds,
-                client
-            );
+            const result = await this.interviewRepository.create(candidateId, interviewData, client);
 
             await auditLogService.logAction({
                 userId: auditContext.userId,
-                action: 'UPDATE',
-                previousValues: { interviewId },
-                newValues: {
-                    interviewId,
-                    roundsCount: roundResult.roundsCount || 0
-                },
+                action: 'CREATE',
+                newValues: result,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
                 timestamp: auditContext.timestamp
             }, client);
 
-
-
             await client.commit();
 
             return {
                 success: true,
-                interviewId,
-                roundsCount: roundResult.roundsCount,
-                message: `Successfully updated ${roundResult.roundsCount} interview rounds`
+                candidateId,
+                data: result,
+                message: `Successfully scheduled round ${result.roundNumber} for candidate`
             };
 
         } catch (error) {
@@ -310,12 +328,12 @@ class InterviewService {
                 throw error;
             }
 
-            console.error("Error updating Interview Rounds:", error.stack);
+            console.error("Error scheduling next interview round:", error.stack);
             throw new AppError(
-                "Failed to update Interview Rounds",
+                "Failed to schedule next interview round",
                 500,
-                "INTERVIEW_ROUNDS_UPDATE_ERROR",
-                { operation: "updateInterviewRounds", interviewId }
+                "INTERVIEW_ROUND_SCHEDULE_ERROR",
+                { operation: "scheduleNextRound", candidateId }
             );
         } finally {
             client.release();
@@ -374,6 +392,7 @@ class InterviewService {
         const client = await this.db.getConnection();
         try {
             await client.beginTransaction();
+
             const exists = await this.interviewRepository.exists(interviewId, client);
             if (!exists) {
                 throw new AppError(
@@ -382,6 +401,7 @@ class InterviewService {
                     'INTERVIEW_NOT_FOUND'
                 );
             }
+
             const deleted = await this.interviewRepository.delete(interviewId, client);
 
             if (deleted !== true) {
@@ -395,6 +415,7 @@ class InterviewService {
                     }
                 );
             }
+
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'DELETE',
@@ -402,6 +423,7 @@ class InterviewService {
                 userAgent: auditContext.userAgent,
                 timestamp: auditContext.timestamp
             }, client);
+
             await client.commit();
 
             return {
@@ -425,6 +447,8 @@ class InterviewService {
                 "INTERVIEW_DELETION_ERROR",
                 { interviewId, operation: "deleteInterview" }
             );
+        } finally {
+            client.release();
         }
     }
 }

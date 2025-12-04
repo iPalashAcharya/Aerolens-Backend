@@ -12,6 +12,7 @@ const router = express.Router();
 const interviewRepository = new InterviewRepository(db);
 const interviewService = new InterviewService(interviewRepository, db);
 const interviewController = new InterviewController(interviewService);
+
 router.use(authenticate);
 router.use(auditContextMiddleware);
 
@@ -23,38 +24,42 @@ router.get('/create-data',
     interviewController.getCreateData
 );
 
-router.post('/',
+router.get('/candidate/:candidateId',
+    InterviewValidator.validateParams,
+    interviewController.getInterviewsByCandidateId
+);
+
+router.get('/:interviewId',
+    InterviewValidator.validateParams,
+    interviewController.getById
+);
+
+router.post('/:candidateId',
+    InterviewValidator.validateParams,
     InterviewValidator.validateCreate,
     interviewController.createInterview
 );
 
+router.post('/:candidateId/rounds',
+    InterviewValidator.validateParams,
+    InterviewValidator.validateScheduleRound,
+    interviewController.scheduleNextRound
+);
+
 router.patch('/:interviewId',
+    InterviewValidator.validateParams,
     InterviewValidator.validateUpdate,
     interviewController.updateInterview
 );
 
-router.put('/:interviewId/rounds',
-    InterviewValidator.validateRoundUpdate,
-    interviewController.updateInterviewRounds
-);
-
 router.put('/:interviewId/finalize',
+    InterviewValidator.validateParams,
     InterviewValidator.validateFinalize,
     interviewController.finalizeInterview
 );
 
-router.get('/:interviewId',
-    InterviewValidator.validateDelete,
-    interviewController.getById
-);
-
-router.get('/:interviewId/rounds',
-    InterviewValidator.validateDelete,
-    interviewController.getInterviewRounds
-);
-
 router.delete('/:interviewId',
-    InterviewValidator.validateDelete,
+    InterviewValidator.validateParams,
     interviewController.deleteInterview
 );
 
