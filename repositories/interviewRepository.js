@@ -206,13 +206,13 @@ class InterviewRepository {
         const interviewersPromise = connection.query(`
         SELECT memberId AS interviewerId, memberName AS interviewerName
         FROM member
-        WHERE isInterviewer=TRUE;
+        WHERE isInterviewer=TRUE AND isActive = TRUE;
     `);
 
         const recruitersPromise = connection.query(`
         SELECT memberId AS recruiterId, memberName AS recruiterName
         FROM member
-        WHERE isRecruiter=TRUE
+        WHERE isRecruiter=TRUE AND isActive = TRUE
     `);
 
         const [interviewers, recruiters] =
