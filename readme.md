@@ -2921,7 +2921,7 @@ Authorization: Bearer <token>
       "interviewerName": "Jane Smith",
       "scheduledById": 2,
       "scheduledByName": "Admin User",
-      "result": "pending",
+      "result": "Pending",
       "recruiterNotes": null,
       "interviewerFeedback": null
     },
@@ -2939,7 +2939,7 @@ Authorization: Bearer <token>
       "interviewerName": "Bob Johnson",
       "scheduledById": 2,
       "scheduledByName": "Admin User",
-      "result": "pending",
+      "result": "Pending",
       "recruiterNotes": null,
       "interviewerFeedback": null
     }
@@ -2982,7 +2982,7 @@ Authorization: Bearer <token>
     "interviewerName": "Jane Smith",
     "scheduledById": 2,
     "scheduledByName": "Admin User",
-    "result": "pending",
+    "result": "Pending",
     "recruiterNotes": null,
     "interviewerFeedback": null
   }
@@ -3022,7 +3022,7 @@ Authorization: Bearer <token>
         "fromTime": "10:00",
         "toTime": "11:00",
         "durationMinutes": 60,
-        "result": "selected",
+        "result": "Selected",
         "interviewerId": 5,
         "interviewerName": "Jane Smith"
       },
@@ -3034,7 +3034,7 @@ Authorization: Bearer <token>
         "fromTime": "14:00",
         "toTime": "14:45",
         "durationMinutes": 45,
-        "result": "pending",
+        "result": "Pending",
         "interviewerId": 7,
         "interviewerName": "Bob Johnson"
       }
@@ -3132,7 +3132,7 @@ Content-Type: application/json
     "durationMinutes": 60,
     "interviewerId": 5,
     "scheduledById": 2,
-    "result": "pending",
+    "result": "Pending",
     "recruiterNotes": "Initial technical screening",
     "interviewerFeedback": ""
   }
@@ -3146,7 +3146,7 @@ Content-Type: application/json
 - `durationMinutes`: Required, integer, 15-480 minutes
 - `interviewerId`: Required, positive integer
 - `scheduledById`: Required, positive integer
-- `result`: Optional, one of: `pending`, `selected`, `rejected`, `cancelled` (default: `pending`)
+- `result`: Optional, one of: `Pending`, `Selected`, `Rejected`, `Cancelled` (default: `Pending`)
 - `recruiterNotes`: Optional, max 1000 characters
 - `interviewerFeedback`: Optional, max 2000 characters
 
