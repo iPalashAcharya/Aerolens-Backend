@@ -1,4 +1,3 @@
-// For local development only - load .env file if MODE is LOCAL
 if (process.env.MODE === 'LOCAL') {
     require('dotenv').config();
     console.log('Running in LOCAL mode - using .env file');
@@ -6,11 +5,7 @@ if (process.env.MODE === 'LOCAL') {
 
 const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client-secrets-manager');
 
-/**
- * Fetch secrets from AWS Secrets Manager
- */
 async function fetchSecrets() {
-    // Skip AWS Secrets Manager in local mode
     if (process.env.MODE === 'LOCAL') {
         console.log('✓ Skipping AWS Secrets Manager (LOCAL mode)');
         return;
@@ -19,7 +14,6 @@ async function fetchSecrets() {
     try {
         console.log('Fetching secrets from AWS Secrets Manager...');
 
-        // You only need to set these two via environment variables
         const secretName = process.env.SECRET_NAME || '/myapp/prod/env';
         const region = process.env.AWS_REGION || 'ap-south-1';
 
@@ -27,7 +21,6 @@ async function fetchSecrets() {
             throw new Error('SECRET_NAME and AWS_REGION must be set');
         }
 
-        // Configure AWS SDK - it will automatically use the EC2 IAM role
         const client = new SecretsManagerClient({ region });
 
         const response = await client.send(
@@ -38,12 +31,10 @@ async function fetchSecrets() {
         if (response.SecretString) {
             secrets = JSON.parse(response.SecretString);
         } else {
-            // Handle binary secret if needed
             const buff = Buffer.from(response.SecretBinary, 'base64');
             secrets = JSON.parse(buff.toString('ascii'));
         }
 
-        // Set secrets as environment variables
         Object.keys(secrets).forEach(key => {
             process.env[key] = secrets[key];
         });
@@ -54,7 +45,6 @@ async function fetchSecrets() {
     } catch (error) {
         console.error('✗ Error fetching secrets from AWS Secrets Manager:', error.message);
 
-        // Check for common errors
         if (error.name === 'ResourceNotFoundException') {
             console.error('The requested secret was not found');
         } else if (error.name === 'InvalidRequestException') {
@@ -65,21 +55,15 @@ async function fetchSecrets() {
             console.error('Access denied - check IAM role permissions');
         }
 
-        // Exit the process if secrets cannot be loaded
         console.error('Cannot start server without secrets. Exiting...');
         process.exit(1);
     }
 }
 
-/**
- * Initialize and start the Express server
- */
 async function startServer() {
     try {
-        // Fetch secrets BEFORE importing any modules that need them
         await fetchSecrets();
 
-        // Now import the rest of the modules (they can use process.env values)
         const express = require('express');
         const cookieParser = require('cookie-parser');
         const passport = require('./config/passport');
@@ -114,12 +98,25 @@ async function startServer() {
             process.env.FRONTEND_URL
         ];
 
+        app.use(helmet({
+            contentSecurityPolicy: {
+                directives: {
+                    defaultSrc: ["'self'"],
+                    styleSrc: ["'self'", "'unsafe-inline'"],
+                    scriptSrc: ["'self'"],
+                    imgSrc: ["'self'", "data:", "https:"],
+                },
+            },
+            hsts: {
+                maxAge: 31536000,
+                includeSubDomains: true,
+                preload: true
+            }
+        }));
+
         app.use(cors({
             origin: function (origin, callback) {
-                // Allow requests with no origin (like Postman or mobile apps)
                 if (!origin) return callback(null, true);
-
-                // Check if the origin is in the allowed list
                 if (allowedOrigins.includes(origin)) {
                     callback(null, true);
                 } else {
@@ -130,21 +127,152 @@ async function startServer() {
             allowedHeaders: ['Content-Type', 'Authorization'],
             credentials: true
         }));
-        app.use(helmet());
-        app.use(compression());
 
+        app.use(compression());
         app.set('trust proxy', 1);
 
-        const limiter = rateLimit({
-            windowMs: 15 * 60 * 1000,
-            max: 500,
+
+        const globalLimiter = rateLimit({
+            windowMs: 1 * 60 * 1000, // 1 minute
+            max: 50, // 50 requests per minute
             message: {
                 success: false,
                 error: 'RATE_LIMIT_EXCEEDED',
-                message: 'Too many requests from this IP, please try again later.'
-            }
+                message: 'Too many requests. Please slow down.'
+            },
+            standardHeaders: true,
+            legacyHeaders: false,
+            skip: (req) => req.path === '/health'
         });
-        app.use(limiter);
+
+        const strictLimiter = rateLimit({
+            windowMs: 15 * 60 * 1000, // 15 minutes
+            max: 10, // 10 requests per 15 minutes
+            message: {
+                success: false,
+                error: 'TOO_MANY_ATTEMPTS',
+                message: 'Too many attempts. Please try again later.'
+            },
+            standardHeaders: true,
+            legacyHeaders: false
+        });
+
+        const loginLimiter = rateLimit({
+            windowMs: 15 * 60 * 1000, // 15 minutes
+            max: 5, // 5 login attempts per 15 minutes
+            message: {
+                success: false,
+                error: 'LOGIN_ATTEMPTS_EXCEEDED',
+                message: 'Too many login attempts. Please try again in 15 minutes.'
+            },
+            standardHeaders: true,
+            legacyHeaders: false,
+            skipSuccessfulRequests: true
+        });
+
+        app.use(globalLimiter);
+
+        // Block suspicious user agents (common bot signatures)
+        app.use((req, res, next) => {
+            const userAgent = req.get('user-agent') || '';
+            const suspiciousAgents = [
+                'bot', 'crawler', 'spider', 'scraper', 'curl', 'wget',
+                'python-requests', 'axios', 'go-http-client', 'java'
+            ];
+
+            if (req.path === '/health') {
+                return next();
+            }
+
+            const isSuspicious = suspiciousAgents.some(agent =>
+                userAgent.toLowerCase().includes(agent)
+            );
+
+            if (isSuspicious && !userAgent) {
+                console.warn(`⚠️ Blocked suspicious request from ${req.ip}: No user agent`);
+                return res.status(403).json({
+                    success: false,
+                    error: 'FORBIDDEN',
+                    message: 'Access denied'
+                });
+            }
+
+            if (isSuspicious) {
+                console.warn(`⚠️ Suspicious user agent from ${req.ip}: ${userAgent}`);
+                // Optionally block or just log
+                // return res.status(403).json({ success: false, error: 'FORBIDDEN' });
+            }
+
+            next();
+        });
+
+        const requestTracker = new Map();
+        const RAPID_FIRE_THRESHOLD = 10; // requests
+        const RAPID_FIRE_WINDOW = 5000; // 5 seconds
+        const BLOCK_DURATION = 60000; // 1 minute
+
+        app.use((req, res, next) => {
+            if (req.path === '/health') return next();
+
+            const ip = req.ip;
+            const now = Date.now();
+
+            if (!requestTracker.has(ip)) {
+                requestTracker.set(ip, {
+                    requests: [],
+                    blocked: false,
+                    blockedUntil: 0
+                });
+            }
+
+            const tracker = requestTracker.get(ip);
+
+            if (tracker.blocked && now < tracker.blockedUntil) {
+                console.warn(`🚫 Blocked IP ${ip} attempting access`);
+                return res.status(429).json({
+                    success: false,
+                    error: 'BLOCKED',
+                    message: 'Your IP has been temporarily blocked due to suspicious activity'
+                });
+            }
+
+            if (tracker.blocked && now >= tracker.blockedUntil) {
+                tracker.blocked = false;
+                tracker.requests = [];
+            }
+
+            tracker.requests.push(now);
+
+            tracker.requests = tracker.requests.filter(time =>
+                now - time < RAPID_FIRE_WINDOW
+            );
+
+            if (tracker.requests.length > RAPID_FIRE_THRESHOLD) {
+                tracker.blocked = true;
+                tracker.blockedUntil = now + BLOCK_DURATION;
+                console.error(`IP ${ip} BLOCKED: ${tracker.requests.length} requests in ${RAPID_FIRE_WINDOW / 1000}s`);
+
+                return res.status(429).json({
+                    success: false,
+                    error: 'RATE_LIMIT_EXCEEDED',
+                    message: 'Too many requests. Your IP has been temporarily blocked.'
+                });
+            }
+
+            next();
+        });
+
+        setInterval(() => {
+            const now = Date.now();
+            for (const [ip, tracker] of requestTracker.entries()) {
+                if (!tracker.blocked && tracker.requests.length === 0) {
+                    requestTracker.delete(ip);
+                } else if (tracker.blocked && now >= tracker.blockedUntil) {
+                    requestTracker.delete(ip);
+                }
+            }
+        }, 5 * 60 * 1000);
+
 
         app.disable('x-powered-by');
         app.use((req, res, next) => {
@@ -152,8 +280,8 @@ async function startServer() {
             next();
         });
 
-        app.use(express.json());
-        app.use(express.urlencoded({ extended: true }));
+        app.use(express.json({ limit: '10mb' }));
+        app.use(express.urlencoded({ extended: true, limit: '10mb' }));
         app.use(cookieParser());
 
         app.use(passport.initialize());
@@ -165,7 +293,8 @@ async function startServer() {
             console.log("==== Incoming Request ====");
             console.log("URL:", req.originalUrl);
             console.log("Method:", req.method);
-            console.log("Headers:", req.headers);
+            console.log("IP:", req.ip);
+            console.log("User-Agent:", req.get('user-agent'));
 
             if (!req.originalUrl.startsWith('/auth/')) {
                 if (req.is("application/json") || req.is("application/x-www-form-urlencoded")) {
@@ -181,17 +310,23 @@ async function startServer() {
         });
 
         AuthValidator.init(db);
+        JobProfileValidator.init(db);
+        CandidateValidator.init(db);
+        MemberValidator.init(db);
         tokenCleanup.initializeAll();
+
+        app.use('/auth/login', loginLimiter);
+        app.use('/auth/register', strictLimiter);
+        app.use('/auth/forgot-password', strictLimiter);
+        app.use('/auth/reset-password', strictLimiter);
+
         app.use('/auth', authRoutes);
         app.use('/client', clientRoutes);
         app.use('/department', departmentRoutes);
         app.use('/contact', contactRoutes);
-        JobProfileValidator.init(db);
         app.use('/jobProfile', jobProfileRoutes);
-        CandidateValidator.init(db);
         app.use('/candidate', candidateRoutes);
         app.use('/lookup', lookupRoutes);
-        MemberValidator.init(db);
         app.use('/member', memberRoutes);
         app.use('/location', locationRoutes);
         app.use('/interview', interviewRoutes);
@@ -210,15 +345,12 @@ async function startServer() {
             res.status(200).send('OK');
         });
 
-        if (process.env.MODE === 'LOCAL') {
-            app.listen(PORT, () => {
-                console.log(`✓ Server started successfully on port ${PORT}`);
-            });
-        } else {
-            app.listen(PORT, () => {
-                console.log(`✓ Server started successfully on port ${PORT}`);
-            });
-        }
+        app.listen(PORT, () => {
+            console.log(`✓ Server started successfully`);
+            console.log(`✓ Global rate limit: 50 requests/minute per IP`);
+            console.log(`✓ Rapid-fire protection: ${RAPID_FIRE_THRESHOLD} requests/${RAPID_FIRE_WINDOW / 1000}s`);
+            console.log(`✓ Auth endpoints: 5-10 attempts/15min`);
+        });
 
     } catch (error) {
         console.error('✗ Failed to start server:', error);
@@ -226,5 +358,4 @@ async function startServer() {
     }
 }
 
-// Start the server
 startServer();
