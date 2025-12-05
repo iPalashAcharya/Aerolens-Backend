@@ -450,6 +450,17 @@ class InterviewRepository {
         }
     }
 
+    async cleanupInactiveInterviews() {
+        const connection = await this.db.getConnection();
+        try {
+            const [result] = await connection.execute(`DELETE FROM interview WHERE isActive=FALSE`);
+        } catch (error) {
+            this._handleDatabaseError(error, 'cleanupInactiveInterviews');
+        } finally {
+            connection.release();
+        }
+    }
+
     _handleDatabaseError(error, operation) {
         const errorMappings = {
             'ER_BAD_FIELD_ERROR': {

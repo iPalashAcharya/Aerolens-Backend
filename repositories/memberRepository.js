@@ -508,6 +508,20 @@ class MemberRepository {
             connection.release();
         }
     }
+
+    async deleteAccount() {
+        const connection = await db.getConnection();
+        try {
+            const [result] = await connection.execute(
+                `DELETE FROM member WHERE isActive=FALSE`
+            );
+            return result.affectedRows;
+        } catch (error) {
+            throw new AppError(`Database error when trying to delete account`, 500, 'DB_ERROR', error.message);
+        } finally {
+            connection.release();
+        }
+    }
 }
 
 module.exports = MemberRepository;

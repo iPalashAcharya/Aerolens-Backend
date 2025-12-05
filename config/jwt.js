@@ -7,7 +7,7 @@ module.exports = {
         algorithm: 'HS256',
         issuer: 'aerolens-hr-management-system',
         audience: 'hr-app-users',
-        refreshGracePeriod: 7 * 24 * 60 * 60 // 7 days in seconds - max age for token refresh
+        refreshGracePeriod: 7 * 24 * 60 * 60
     },
     bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS) || 12
 };

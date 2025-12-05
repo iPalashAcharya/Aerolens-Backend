@@ -87,7 +87,7 @@ async function startServer() {
         const JobProfileValidator = require('./validators/jobProfileValidator');
         const AuthValidator = require('./validators/authValidator');
         const MemberValidator = require('./validators/memberValidator');
-        const tokenCleanup = require('./jobs/tokenCleanupJob');
+        const scheduledJobs = require('./jobs/scheduledJobs');
 
         const app = express();
         const PORT = process.env.PORT || 3000;
@@ -313,7 +313,7 @@ async function startServer() {
         JobProfileValidator.init(db);
         CandidateValidator.init(db);
         MemberValidator.init(db);
-        tokenCleanup.initializeAll();
+        scheduledJobs.initializeAll();
 
         app.use('/auth/login', loginLimiter);
         app.use('/auth/register', strictLimiter);
