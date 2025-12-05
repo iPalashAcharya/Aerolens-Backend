@@ -1,6 +1,11 @@
+require('dotenv').config();
+
+console.log("MODE:", process.env.MODE);
+
 if (process.env.MODE === 'LOCAL') {
-    require('dotenv').config();
     console.log('Running in LOCAL mode - using .env file');
+} else {
+    console.log('Running in NON-LOCAL mode:', process.env.MODE);
 }
 
 const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client-secrets-manager');

@@ -444,9 +444,11 @@ class InterviewService {
                 );
             }
 
-            const deleted = await this.interviewRepository.delete(interviewId, client);
+            const candidateId = exists.candidateId;
 
-            if (deleted !== true) {
+            const deleteResult = await this.interviewRepository.delete(interviewId, client);
+
+            if (!deleteResult.success) {
                 throw new AppError(
                     `Interview with Interview ID ${interviewId} not found`,
                     404,
@@ -457,6 +459,8 @@ class InterviewService {
                     }
                 );
             }
+
+            await this.interviewRepository.renumberCandidateRounds(candidateId, client);
 
             await auditLogService.logAction({
                 userId: auditContext.userId,

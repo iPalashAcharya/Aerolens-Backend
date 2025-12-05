@@ -128,7 +128,7 @@ class InterviewRepository {
         const connection = client;
         try {
             const query = `
-                SELECT MAX(roundNumber) as latestRound, MAX(totalInterviews) as totalInterviews
+                SELECT MAX(roundNumber) as latestRound, COUNT(*) as totalInterviews
                 FROM interview
                 WHERE candidateId = ? AND isActive=TRUE;
             `;
@@ -267,6 +267,35 @@ class InterviewRepository {
         }
     }*/
 
+    async renumberCandidateRounds(candidateId, client) {
+        const connection = client;
+
+        // Get all active interviews for this candidate, ordered by date and time
+        const [rows] = await connection.query(
+            `SELECT interviewId
+             FROM interview
+             WHERE candidateId = ? AND isActive = TRUE
+             ORDER BY interviewDate ASC, fromTime ASC, interviewId ASC`,
+            [candidateId]
+        );
+
+        const totalInterviews = rows.length;
+
+        // Update each interview with correct round number and total
+        let roundNumber = 1;
+        for (const row of rows) {
+            await connection.execute(
+                `UPDATE interview
+                 SET roundNumber = ?, totalInterviews = ?
+                 WHERE interviewId = ?`,
+                [roundNumber, totalInterviews, row.interviewId]
+            );
+            roundNumber++;
+        }
+
+        return totalInterviews;
+    }
+
     async create(candidateId, interviewData, client) {
         const connection = client;
         try {
@@ -366,8 +395,15 @@ class InterviewRepository {
                     'INTERVIEW_ENTRY_NOT_FOUND',
                 );
             }
+
+            const [interviewRow] = await connection.query(
+                `SELECT candidateId FROM interview WHERE interviewId = ?`,
+                [interviewId]
+            );
+
             return {
                 interviewId,
+                candidateId: interviewRow[0]?.candidateId,
                 ...interviewData
             }
         } catch (error) {
@@ -426,12 +462,20 @@ class InterviewRepository {
 
     async delete(interviewId, client) {
         try {
-            const [result] = await client.execute(`UPDATE interview SET isActive=FALSE WHERE interviewId=?`, [interviewId]);
-            if (result.affectedRows === 0) {
-                await client.rollback();
-                return false;
-            }
-            return true;
+            const [interviewRow] = await client.query(
+                `SELECT candidateId FROM interview WHERE interviewId = ?`,
+                [interviewId]
+            );
+
+            const [result] = await client.execute(
+                `UPDATE interview SET isActive=FALSE WHERE interviewId=?`,
+                [interviewId]
+            );
+
+            return {
+                success: result.affectedRows > 0,
+                candidateId: interviewRow[0]?.candidateId
+            };
         } catch (error) {
             this._handleDatabaseError(error, 'delete');
         }
@@ -441,7 +485,7 @@ class InterviewRepository {
         const connection = client;
         try {
             const [result] = await connection.execute(
-                `SELECT interviewId FROM interview WHERE interviewId = ?`,
+                `SELECT interviewId, candidateId FROM interview WHERE interviewId = ?`,
                 [interviewId]
             );
             return result.length > 0 ? result[0] : null;
