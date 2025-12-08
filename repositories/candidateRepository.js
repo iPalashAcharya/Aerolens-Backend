@@ -91,6 +91,11 @@ class CandidateRepository {
             `;
 
             const [rows] = await connection.execute(query, [candidateId]);
+            rows.forEach(row => {
+                if (typeof row.preferredJobLocation === 'string') {
+                    row.preferredJobLocation = JSON.parse(row.preferredJobLocation);
+                }
+            });
             return rows[0] || null;
         } catch (error) {
             if (error instanceof AppError) { throw error; }
@@ -486,6 +491,11 @@ class CandidateRepository {
             }
 
             const [rows] = await connection.execute(query, params);
+            rows.forEach(row => {
+                if (typeof row.preferredJobLocation === 'string') {
+                    row.preferredJobLocation = JSON.parse(row.preferredJobLocation);
+                }
+            });
             return rows;
         } catch (error) {
             this._handleDatabaseError(error);
