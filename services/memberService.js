@@ -258,13 +258,19 @@ class MemberService {
                 );
             }
 
-            // Soft delete interviews where member is interviewer (critical role)
             const [interviewerResult] = await client.execute(
-                `UPDATE interview 
-             SET deletedAt = NOW() 
+                `SELECT COUNT(*) as count FROM interview
              WHERE interviewerId = ? AND deletedAt IS NULL`,
                 [memberId]
             );
+            if (interviewerResult[0].count > 0) {
+                throw new AppError(
+                    `Cannot delete member. They are the interviewer for ${interviewerResult[0].count} active interview(s). Please reassign or delete interviews first.`,
+                    400,
+                    'MEMBER_HAS_INTERVIEWS',
+                    { memberId, interviewerResult: interviewerResult[0].count }
+                );
+            }
 
             // Set scheduledById to NULL where member is scheduler (just metadata)
             const [schedulerResult] = await client.execute(
@@ -274,10 +280,8 @@ class MemberService {
                 [memberId]
             );
 
-            console.log(`Soft deleted ${interviewerResult.affectedRows} interviews where member was interviewer`);
             console.log(`Unlinked ${schedulerResult.affectedRows} interviews where member was scheduler`);
 
-            // Soft delete the member
             await this.memberRepository.deactivateAccount(memberId, client);
 
             await auditLogService.logAction({
