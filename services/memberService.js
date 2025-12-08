@@ -243,6 +243,13 @@ class MemberService {
                 );
             }
 
+            await client.execute(
+                `UPDATE interview 
+             SET deletedAt = NOW() 
+             WHERE interviewerId = ? AND deletedAt IS NULL`,
+                [memberId]
+            );
+
             await this.memberRepository.deactivateAccount(memberId, client);
             await auditLogService.logAction({
                 userId: auditContext.userId,
@@ -266,6 +273,52 @@ class MemberService {
                 );
             }
             throw error;
+        } finally {
+            client.release();
+        }
+    }
+
+    async permanentlyDeleteOldMembers() {
+        const client = await this.db.getConnection();
+        try {
+            await client.beginTransaction();
+
+            const [members] = await client.execute(
+                `SELECT memberId 
+             FROM member 
+             WHERE isActive = FALSE 
+             AND deletedAt IS NOT NULL 
+             AND deletedAt <= DATE_SUB(NOW(), INTERVAL 15 DAY)`,
+                []
+            );
+
+            if (members.length === 0) {
+                await client.commit();
+                console.log('No members to permanently delete');
+                return 0;
+            }
+
+            console.log(`Found ${members.length} members to permanently delete`);
+
+            const deletedCount = await this.memberRepository.permanentlyDeleteBatch(
+                members.map(m => m.memberId),
+                client
+            );
+
+            await client.commit();
+
+            console.log(`${deletedCount} member records permanently deleted from database`);
+            return deletedCount;
+
+        } catch (error) {
+            await client.rollback();
+            console.error('Error in permanentlyDeleteOldMembers:', error);
+            throw new AppError(
+                'Failed to permanently delete old members',
+                500,
+                'PERMANENT_DELETE_ERROR',
+                { operation: 'permanentlyDeleteOldMembers' }
+            );
         } finally {
             client.release();
         }

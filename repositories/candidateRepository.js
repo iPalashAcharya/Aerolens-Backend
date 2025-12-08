@@ -87,7 +87,7 @@ class CandidateRepository {
             FROM candidate c
             LEFT JOIN lookup stat ON c.statusId= stat.lookupKey AND stat.tag = 'candidateStatus'
             LEFT JOIN member m on m.memberId = c.recruiterId
-            WHERE c.candidateId = ? 
+            WHERE c.candidateId = ? AND c.isActive = TRUE
             `;
 
             const [rows] = await connection.execute(query, [candidateId]);
@@ -113,7 +113,7 @@ class CandidateRepository {
             FROM candidate c
             LEFT JOIN lookup stat ON c.statusId = stat.lookupKey and stat.tag = 'candidateStatus'
             LEFT JOIN lookup loc ON c.preferredJobLocation = loc.lookupKey and loc.tag = 'location'
-            WHERE c.email = ?`;
+            WHERE c.email = ? AND c.isActive = TRUE`;
 
             const [rows] = await connection.execute(query, [email]);
             return rows[0] || null;
@@ -138,7 +138,7 @@ class CandidateRepository {
             FROM candidate c
             LEFT JOIN lookup stat ON c.statusId = stat.lookupKey and stat.tag = 'candidateStatus'
             LEFT JOIN lookup loc ON c.preferredJobLocation = loc.lookupKey and loc.tag = 'location'
-            WHERE c.contactNumber = ?`;
+            WHERE c.contactNumber = ? AND c.isActive = TRUE`;
 
             const [rows] = await connection.execute(query, [contactNumber]);
             return rows[0] || null;
@@ -163,7 +163,7 @@ class CandidateRepository {
             FROM candidate c
             LEFT JOIN lookup stat ON c.statusId = stat.lookupKey and stat.tag = 'candidateStatus'
             LEFT JOIN lookup loc ON c.preferredJobLocation = loc.lookupKey and loc.tag = 'location'
-            WHERE c.statusId = ?
+            WHERE c.statusId = ? AND c.isActive = TRUE
             ORDER BY c.createdAt DESC`;
 
             const params = [statusId];
@@ -426,7 +426,7 @@ class CandidateRepository {
                 throw new AppError('Candidate ID is required', 400, 'MISSING_CANDIDATE_ID');
             }
 
-            const query = `DELETE FROM candidate WHERE candidateId = ?`;
+            const query = `UPDATE candidate SET isActive=FALSE WHERE candidateId=?`;
             const [result] = await connection.execute(query, [candidateId]);
 
             if (result.affectedRows === 0) {
@@ -444,6 +444,25 @@ class CandidateRepository {
         }
     }
 
+    async permanentlyDeleteBatch(candidateIds, client) {
+        const connection = client;
+        try {
+            if (!candidateIds || candidateIds.length === 0) {
+                return 0;
+            }
+
+            const placeholders = candidateIds.map(() => '?').join(',');
+            const query = `DELETE FROM candidate WHERE candidateId IN (${placeholders})`;
+
+            const [result] = await connection.execute(query, candidateIds);
+
+            return result.affectedRows;
+        } catch (error) {
+            if (error instanceof AppError) { throw error; }
+            this._handleDatabaseError(error);
+        }
+    }
+
     async findAll(limit = null, offset = null, client) {
         const connection = client;
 
@@ -453,6 +472,7 @@ class CandidateRepository {
             FROM candidate c
             LEFT JOIN lookup stat ON c.statusId= stat.lookupKey AND stat.tag = 'candidateStatus'
             LEFT JOIN member m on m.memberId = c.recruiterId
+            WHERE c.isActive = TRUE
         `;
             const params = [];
             if (limit) {

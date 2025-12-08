@@ -1,14 +1,15 @@
 const cron = require('node-cron');
 const tokenRepository = require('../repositories/tokenRepository');
-const interviewRepository = require('../repositories/interviewRepository');
-const memberRepository = require('../repositories/memberRepository');
+const candidateService = require('../services/candidateService');
+const interviewService = require('../services/interviewService');
+const memberService = require('../services/memberService');
 
 class ScheduledJobs {
     static initializeAll() {
         this.scheduleTokenCleanup();
-        this.scheduleInterviewCleanup();
-        this.scheduleMemberCleanup();
-
+        this.scheduleCandidateCleanup();
+        this.schedulePermanentInterviewCleanup();
+        this.schedulePermanentMemberCleanup();
         console.log('✅ All cron jobs initialized');
     }
 
@@ -19,31 +20,46 @@ class ScheduledJobs {
                 const deletedCount = await tokenRepository.cleanupExpiredTokens();
                 console.log(`✅ Token cleanup completed: ${deletedCount} tokens removed`);
             } catch (error) {
-                console.error('❌ Token cleanup job failed:', error);
+                console.error('Token cleanup job failed:', error);
             }
         });
     }
 
-    static scheduleInterviewCleanup() {
-        cron.schedule('0 3 * * *', async () => {
+    static scheduleCandidateCleanup() {
+        // Run daily at 5 AM - Permanent deletion of soft-deleted candidates
+        cron.schedule('0 5 * * *', async () => {
             try {
-                console.log('🧹 Running interview cleanup job...');
-                const deletedCount = await interviewRepository.cleanupInactiveInterviews();
-                console.log(`✅ Interview cleanup completed: ${deletedCount} interviews removed`);
+                console.log('🧹 Running candidate permanent cleanup job...');
+                const deletedCount = await candidateService.permanentlyDeleteOldCandidates();
+                console.log(`Candidate permanent cleanup completed: ${deletedCount} candidates permanently removed`);
             } catch (error) {
-                console.error('❌ Interview cleanup job failed:', error);
+                console.error('Candidate permanent cleanup job failed:', error);
             }
         });
     }
 
-    static scheduleMemberCleanup() {
-        cron.schedule('0 4 * * 0', async () => {
+    static schedulePermanentInterviewCleanup() {
+        // Run daily at 6 AM - Permanent deletion of soft-deleted interviews
+        cron.schedule('0 6 * * *', async () => {
             try {
-                console.log('🧹 Running member cleanup job...');
-                const deletedCount = await memberRepository.deleteAccount();
-                console.log(`✅ Member cleanup completed: ${deletedCount} members removed`);
+                console.log('Running interview permanent cleanup job...');
+                const deletedCount = await interviewService.permanentlyDeleteOldInterviews();
+                console.log(`Interview permanent cleanup completed: ${deletedCount} interviews permanently removed`);
             } catch (error) {
-                console.error('❌ Member cleanup job failed:', error);
+                console.error('Interview permanent cleanup job failed:', error);
+            }
+        });
+    }
+
+    static schedulePermanentMemberCleanup() {
+        // Run weekly on Sunday at 7 AM - Permanent deletion of deactivated members
+        cron.schedule('0 7 * * 0', async () => {
+            try {
+                console.log('Running member permanent cleanup job...');
+                const deletedCount = await memberService.permanentlyDeleteOldMembers();
+                console.log(`Member permanent cleanup completed: ${deletedCount} members permanently removed`);
+            } catch (error) {
+                console.error('Member permanent cleanup job failed:', error);
             }
         });
     }

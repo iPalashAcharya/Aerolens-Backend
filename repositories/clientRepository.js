@@ -101,6 +101,12 @@ class ClientRepository {
             const [clientData] = await connection.query(clientQuery);
             const [locationData] = await connection.query(locationQuery);
 
+            clientData.forEach(client => {
+                if (typeof client.departments === 'string') {
+                    client.departments = JSON.parse(client.departments);
+                }
+            });
+
             if (clientData.length === 0) return null;
 
             return {

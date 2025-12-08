@@ -497,6 +497,52 @@ class InterviewService {
             client.release();
         }
     }
+
+    async permanentlyDeleteOldInterviews() {
+        const client = await this.db.getConnection();
+        try {
+            await client.beginTransaction();
+
+            const [interviews] = await client.execute(
+                `SELECT interviewId 
+             FROM interview 
+             WHERE deletedAt IS NOT NULL AND isActive = FALSE
+             AND deletedAt <= DATE_SUB(NOW(), INTERVAL 15 DAY)`,
+                []
+            );
+
+            if (interviews.length === 0) {
+                await client.commit();
+                console.log('No interviews to permanently delete');
+                return 0;
+            }
+
+            console.log(`Found ${interviews.length} interviews to permanently delete`);
+
+            // Permanently delete interviews from database
+            const deletedCount = await this.interviewRepository.permanentlyDeleteBatch(
+                interviews.map(i => i.interviewId),
+                client
+            );
+
+            await client.commit();
+
+            console.log(`${deletedCount} interview records permanently deleted from database`);
+            return deletedCount;
+
+        } catch (error) {
+            await client.rollback();
+            console.error('Error in permanentlyDeleteOldInterviews:', error);
+            throw new AppError(
+                'Failed to permanently delete old interviews',
+                500,
+                'PERMANENT_DELETE_ERROR',
+                { operation: 'permanentlyDeleteOldInterviews' }
+            );
+        } finally {
+            client.release();
+        }
+    }
 }
 
 module.exports = InterviewService;

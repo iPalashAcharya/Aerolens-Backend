@@ -10,7 +10,7 @@ class MemberRepository {
                         m.isRecruiter, m.isActive, m.lastLogin, m.createdAt, m.updatedAt
                  FROM member m INNER JOIN lookup l
                  ON m.designation = l.lookupKey
-                 WHERE memberId = ?`,
+                 WHERE m.memberId = ? AND m.isActive=TRUE`,
                 [memberId]
             );
             return rows[0] || null;
@@ -509,17 +509,22 @@ class MemberRepository {
         }
     }
 
-    async deleteAccount() {
-        const connection = await db.getConnection();
+    async permanentlyDeleteBatch(memberIds, client) {
+        const connection = client;
         try {
-            const [result] = await connection.execute(
-                `DELETE FROM member WHERE isActive=FALSE`
-            );
+            if (!memberIds || memberIds.length === 0) {
+                return 0;
+            }
+
+            const placeholders = memberIds.map(() => '?').join(',');
+            const query = `DELETE FROM member WHERE memberId IN (${placeholders})`;
+
+            const [result] = await connection.execute(query, memberIds);
+
             return result.affectedRows;
         } catch (error) {
-            throw new AppError(`Database error when trying to delete account`, 500, 'DB_ERROR', error.message);
-        } finally {
-            connection.release();
+            if (error instanceof AppError) { throw error; }
+            this._handleDatabaseError(error);
         }
     }
 }

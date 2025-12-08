@@ -33,7 +33,8 @@ class InterviewRepository {
                 scheduler.memberName AS scheduledByName,
                 i.result,
                 i.recruiterNotes,
-                i.interviewerFeedback
+                i.interviewerFeedback,
+                i.isActive
             FROM interview i
             LEFT JOIN candidate c
                 ON i.candidateId = c.candidateId
@@ -41,7 +42,7 @@ class InterviewRepository {
                 ON i.interviewerId = interviewer.memberId
             LEFT JOIN member scheduler
                 ON i.scheduledById = scheduler.memberId
-            WHERE i.isActive=TRUE;
+            WHERE i.isActive=TRUE AND i.deletedAt IS NULL;
             `;
             /*const numLimit = Math.max(1, parseInt(limit, 10) ?? 10);
             const numOffset = Math.max(0, parseInt(offset, 10) ?? 0);*/
@@ -494,14 +495,48 @@ class InterviewRepository {
         }
     }
 
-    async cleanupInactiveInterviews() {
-        const connection = await this.db.getConnection();
+    async softDeleteByCandidateId(candidateId, client) {
+        const connection = client;
         try {
-            const [result] = await connection.execute(`DELETE FROM interview WHERE isActive=FALSE`);
+            const query = `UPDATE interview 
+                       SET deletedAt = NOW(),isActive = FALSE 
+                       WHERE candidateId = ? AND deletedAt IS NULL`;
+            const [result] = await connection.execute(query, [candidateId]);
+            return result.affectedRows;
         } catch (error) {
-            this._handleDatabaseError(error, 'cleanupInactiveInterviews');
-        } finally {
-            connection.release();
+            this._handleDatabaseError(error);
+        }
+    }
+
+    async softDeleteByInterviewerId(interviewerId, client) {
+        const connection = client;
+        try {
+            const query = `UPDATE interview 
+                       SET deletedAt = NOW() , isActive = FALSE
+                       WHERE interviewerId = ? AND deletedAt IS NULL`;
+            const [result] = await connection.execute(query, [interviewerId]);
+            return result.affectedRows;
+        } catch (error) {
+            this._handleDatabaseError(error);
+        }
+    }
+
+    async permanentlyDeleteBatch(interviewIds, client) {
+        const connection = client;
+        try {
+            if (!interviewIds || interviewIds.length === 0) {
+                return 0;
+            }
+
+            const placeholders = interviewIds.map(() => '?').join(',');
+            const query = `DELETE FROM interview WHERE interviewId IN (${placeholders})`;
+
+            const [result] = await connection.execute(query, interviewIds);
+
+            return result.affectedRows;
+        } catch (error) {
+            if (error instanceof AppError) { throw error; }
+            this._handleDatabaseError(error);
         }
     }
 

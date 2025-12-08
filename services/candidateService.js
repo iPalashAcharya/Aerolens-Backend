@@ -691,6 +691,13 @@ class CandidateService {
                 );
             }
 
+            await client.execute(
+                `UPDATE interview 
+             SET deletedAt = NOW() 
+             WHERE candidateId = ? AND deletedAt IS NULL`,
+                [candidateId]
+            );
+
             await this.candidateRepository.delete(candidateId, client);
             await auditLogService.logAction({
                 userId: auditContext.userId,
@@ -714,6 +721,65 @@ class CandidateService {
                 500,
                 "CANDIDATE_DELETE_ERROR",
                 { candidateId, operation: "deleteCandidate" }
+            );
+        } finally {
+            client.release();
+        }
+    }
+
+    async permanentlyDeleteOldCandidates() {
+        const client = await this.db.getConnection();
+        try {
+            await client.beginTransaction();
+
+            const [candidates] = await client.execute(
+                `SELECT candidateId, resumeFileName 
+             FROM candidate 
+             WHERE isActive = FALSE 
+             AND deletedAt <= DATE_SUB(NOW(), INTERVAL 15 DAY)`,
+                []
+            );
+
+            if (candidates.length === 0) {
+                await client.commit();
+                console.log('No candidates to permanently delete');
+                return 0;
+            }
+
+            let resumeDeleteCount = 0;
+            for (const candidate of candidates) {
+                try {
+                    const resumeInfo = await this.getResumeInfo(candidate.candidateId);
+                    if (resumeInfo.hasResume) {
+                        await this.deleteResume(candidate.candidateId);
+                        resumeDeleteCount++;
+                        console.log(`✅ Deleted resume for candidate ${candidate.candidateId}`);
+                    }
+                } catch (s3Error) {
+                    console.error(`⚠️ Failed to delete resume for candidate ${candidate.candidateId}:`, s3Error.message);
+                }
+            }
+
+            console.log(`${resumeDeleteCount} resumes deleted from S3`);
+
+            const deletedCount = await this.candidateRepository.permanentlyDeleteBatch(
+                candidates.map(c => c.candidateId),
+                client
+            );
+
+            await client.commit();
+
+            console.log(`${deletedCount} candidate records permanently deleted from database`);
+            return deletedCount;
+
+        } catch (error) {
+            await client.rollback();
+            console.error('Error in permanentlyDeleteOldCandidates:', error);
+            throw new AppError(
+                'Failed to permanently delete old candidates',
+                500,
+                'PERMANENT_DELETE_ERROR',
+                { operation: 'permanentlyDeleteOldCandidates' }
             );
         } finally {
             client.release();
