@@ -30,7 +30,7 @@ class InterviewRepository {
                 interviewer.memberId AS interviewerId,
                 interviewer.memberName AS interviewerName,
                 scheduler.memberId AS scheduledById,
-                scheduler.memberName AS scheduledByName,
+                COALESCE(scheduler.memberName, 'Unknown') AS scheduledByName,
                 i.result,
                 i.recruiterNotes,
                 i.interviewerFeedback,
@@ -75,7 +75,7 @@ class InterviewRepository {
                 interviewer.memberId AS interviewerId,
                 interviewer.memberName AS interviewerName,
                 scheduler.memberId AS scheduledById,
-                scheduler.memberName AS scheduledByName,
+                COALESCE(scheduler.memberName, 'Unknown') AS scheduledByName,
                 i.result,
                 i.recruiterNotes,
                 i.interviewerFeedback

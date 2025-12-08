@@ -7,8 +7,8 @@ const memberService = require('../services/memberService');
 class ScheduledJobs {
     static initializeAll() {
         this.scheduleTokenCleanup();
-        this.scheduleCandidateCleanup();
         this.schedulePermanentInterviewCleanup();
+        this.schedulePermanentCandidateCleanup();
         this.schedulePermanentMemberCleanup();
         console.log('✅ All cron jobs initialized');
     }
@@ -25,41 +25,41 @@ class ScheduledJobs {
         });
     }
 
-    static scheduleCandidateCleanup() {
-        // Run daily at 5 AM - Permanent deletion of soft-deleted candidates
+    static schedulePermanentInterviewCleanup() {
+        // Run daily at 5 AM - Delete interviews FIRST
         cron.schedule('0 5 * * *', async () => {
             try {
-                console.log('🧹 Running candidate permanent cleanup job...');
-                const deletedCount = await candidateService.permanentlyDeleteOldCandidates();
-                console.log(`Candidate permanent cleanup completed: ${deletedCount} candidates permanently removed`);
+                console.log('🧹 Running interview permanent cleanup job...');
+                const deletedCount = await interviewService.permanentlyDeleteOldInterviews();
+                console.log(`✅ Interview permanent cleanup completed: ${deletedCount} interviews permanently removed`);
             } catch (error) {
-                console.error('Candidate permanent cleanup job failed:', error);
+                console.error('❌ Interview permanent cleanup job failed:', error);
             }
         });
     }
 
-    static schedulePermanentInterviewCleanup() {
-        // Run daily at 6 AM - Permanent deletion of soft-deleted interviews
+    static schedulePermanentCandidateCleanup() {
+        // Run daily at 6 AM - Delete candidates SECOND
         cron.schedule('0 6 * * *', async () => {
             try {
-                console.log('Running interview permanent cleanup job...');
-                const deletedCount = await interviewService.permanentlyDeleteOldInterviews();
-                console.log(`Interview permanent cleanup completed: ${deletedCount} interviews permanently removed`);
+                console.log('🧹 Running candidate permanent cleanup job...');
+                const deletedCount = await candidateService.permanentlyDeleteOldCandidates();
+                console.log(`✅ Candidate permanent cleanup completed: ${deletedCount} candidates permanently removed`);
             } catch (error) {
-                console.error('Interview permanent cleanup job failed:', error);
+                console.error('❌ Candidate permanent cleanup job failed:', error);
             }
         });
     }
 
     static schedulePermanentMemberCleanup() {
-        // Run weekly on Sunday at 7 AM - Permanent deletion of deactivated members
-        cron.schedule('0 7 * * 0', async () => {
+        // Run daily at 7 AM - Delete members LAST
+        cron.schedule('0 7 * * *', async () => {
             try {
-                console.log('Running member permanent cleanup job...');
+                console.log('🧹 Running member permanent cleanup job...');
                 const deletedCount = await memberService.permanentlyDeleteOldMembers();
-                console.log(`Member permanent cleanup completed: ${deletedCount} members permanently removed`);
+                console.log(`✅ Member permanent cleanup completed: ${deletedCount} members permanently removed`);
             } catch (error) {
-                console.error('Member permanent cleanup job failed:', error);
+                console.error('❌ Member permanent cleanup job failed:', error);
             }
         });
     }

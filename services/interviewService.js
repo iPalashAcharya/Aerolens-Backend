@@ -504,10 +504,14 @@ class InterviewService {
             await client.beginTransaction();
 
             const [interviews] = await client.execute(
-                `SELECT interviewId 
-             FROM interview 
-             WHERE deletedAt IS NOT NULL AND isActive = FALSE
-             AND deletedAt <= DATE_SUB(NOW(), INTERVAL 15 DAY)`,
+                `SELECT i.interviewId 
+             FROM interview i
+             LEFT JOIN candidate c ON i.candidateId = c.candidateId
+             LEFT JOIN member m ON i.interviewerId = m.memberId
+             WHERE i.deletedAt IS NOT NULL 
+             AND i.deletedAt <= DATE_SUB(NOW(), INTERVAL 15 DAY)
+             AND (c.deletedAt IS NOT NULL OR c.candidateId IS NULL)
+             AND (m.deletedAt IS NOT NULL OR m.memberId IS NULL)`,
                 []
             );
 

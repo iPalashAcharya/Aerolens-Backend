@@ -136,148 +136,110 @@ async function startServer() {
         app.use(compression());
         app.set('trust proxy', 1);
 
+        // ============================================
+        // SIMPLE ENTERPRISE RATE LIMITING
+        // ============================================
 
+        // Global rate limiter - VERY RELAXED for office environments
         const globalLimiter = rateLimit({
-            windowMs: 1 * 60 * 1000, // 1 minute
-            max: 50, // 50 requests per minute
-            message: {
-                success: false,
-                error: 'RATE_LIMIT_EXCEEDED',
-                message: 'Too many requests. Please slow down.'
-            },
+            windowMs: 1 * 60 * 1000,
+            max: 500, // Very high limit
             standardHeaders: true,
             legacyHeaders: false,
             skip: (req) => req.path === '/health'
         });
 
+        // Login attempts - tracks by email in request body
+        const loginLimiter = rateLimit({
+            windowMs: 15 * 60 * 1000,
+            max: 20, // 20 attempts per 15 minutes
+            standardHeaders: true,
+            legacyHeaders: false,
+            skipSuccessfulRequests: true,
+            handler: (req, res) => {
+                const email = req.body.email || req.body.username || 'unknown';
+                console.warn(`⚠️ Login rate limit hit for: ${email}`);
+                res.status(429).json({
+                    success: false,
+                    error: 'LOGIN_ATTEMPTS_EXCEEDED',
+                    message: 'Too many login attempts. Please try again in 15 minutes.'
+                });
+            }
+        });
+
+        // Strict limiter for registration/password reset
         const strictLimiter = rateLimit({
-            windowMs: 15 * 60 * 1000, // 15 minutes
-            max: 10, // 10 requests per 15 minutes
-            message: {
-                success: false,
-                error: 'TOO_MANY_ATTEMPTS',
-                message: 'Too many attempts. Please try again later.'
-            },
+            windowMs: 15 * 60 * 1000,
+            max: 10,
             standardHeaders: true,
             legacyHeaders: false
         });
 
-        const loginLimiter = rateLimit({
-            windowMs: 15 * 60 * 1000, // 15 minutes
-            max: 5, // 5 login attempts per 15 minutes
-            message: {
-                success: false,
-                error: 'LOGIN_ATTEMPTS_EXCEEDED',
-                message: 'Too many login attempts. Please try again in 15 minutes.'
-            },
-            standardHeaders: true,
-            legacyHeaders: false,
-            skipSuccessfulRequests: true
-        });
-
         app.use(globalLimiter);
 
-        // Block suspicious user agents (common bot signatures)
+        // Only block truly malicious scanners
         app.use((req, res, next) => {
-            const userAgent = req.get('user-agent') || '';
-            const suspiciousAgents = [
-                'bot', 'crawler', 'spider', 'scraper', 'curl', 'wget',
-                'python-requests', 'axios', 'go-http-client', 'java'
-            ];
+            if (req.path === '/health') return next();
 
-            if (req.path === '/health') {
-                return next();
-            }
+            const userAgent = (req.get('user-agent') || '').toLowerCase();
+            const malicious = ['masscan', 'nmap', 'nikto', 'sqlmap', 'metasploit', 'burpsuite'];
 
-            const isSuspicious = suspiciousAgents.some(agent =>
-                userAgent.toLowerCase().includes(agent)
-            );
-
-            if (isSuspicious && !userAgent) {
-                console.warn(`⚠️ Blocked suspicious request from ${req.ip}: No user agent`);
-                return res.status(403).json({
-                    success: false,
-                    error: 'FORBIDDEN',
-                    message: 'Access denied'
-                });
-            }
-
-            if (isSuspicious) {
-                console.warn(`⚠️ Suspicious user agent from ${req.ip}: ${userAgent}`);
-                // Optionally block or just log
-                // return res.status(403).json({ success: false, error: 'FORBIDDEN' });
+            if (malicious.some(bot => userAgent.includes(bot))) {
+                console.warn(`🚫 BLOCKED malicious scanner: ${userAgent}`);
+                return res.status(403).json({ success: false, error: 'FORBIDDEN' });
             }
 
             next();
         });
 
-        const requestTracker = new Map();
-        const RAPID_FIRE_THRESHOLD = 10; // requests
-        const RAPID_FIRE_WINDOW = 5000; // 5 seconds
-        const BLOCK_DURATION = 60000; // 1 minute
+        // Simple burst protection - only for unauthenticated requests
+        const burstTracker = new Map();
 
         app.use((req, res, next) => {
             if (req.path === '/health') return next();
 
+            // Skip if authenticated
+            if (req.headers.authorization?.startsWith('Bearer ')) {
+                return next();
+            }
+
             const ip = req.ip;
             const now = Date.now();
 
-            if (!requestTracker.has(ip)) {
-                requestTracker.set(ip, {
-                    requests: [],
-                    blocked: false,
-                    blockedUntil: 0
-                });
+            if (!burstTracker.has(ip)) {
+                burstTracker.set(ip, []);
             }
 
-            const tracker = requestTracker.get(ip);
+            const requests = burstTracker.get(ip);
 
-            if (tracker.blocked && now < tracker.blockedUntil) {
-                console.warn(`🚫 Blocked IP ${ip} attempting access`);
+            // Keep only requests from last 10 seconds
+            const recentRequests = requests.filter(time => now - time < 10000);
+            burstTracker.set(ip, recentRequests);
+
+            // Allow 100 requests per 10 seconds (very generous)
+            if (recentRequests.length > 100) {
+                console.warn(`⚠️ Burst limit for ${ip}: ${recentRequests.length} requests/10s`);
                 return res.status(429).json({
                     success: false,
-                    error: 'BLOCKED',
-                    message: 'Your IP has been temporarily blocked due to suspicious activity'
+                    error: 'TOO_MANY_REQUESTS',
+                    message: 'Please slow down your requests'
                 });
             }
 
-            if (tracker.blocked && now >= tracker.blockedUntil) {
-                tracker.blocked = false;
-                tracker.requests = [];
-            }
-
-            tracker.requests.push(now);
-
-            tracker.requests = tracker.requests.filter(time =>
-                now - time < RAPID_FIRE_WINDOW
-            );
-
-            if (tracker.requests.length > RAPID_FIRE_THRESHOLD) {
-                tracker.blocked = true;
-                tracker.blockedUntil = now + BLOCK_DURATION;
-                console.error(`IP ${ip} BLOCKED: ${tracker.requests.length} requests in ${RAPID_FIRE_WINDOW / 1000}s`);
-
-                return res.status(429).json({
-                    success: false,
-                    error: 'RATE_LIMIT_EXCEEDED',
-                    message: 'Too many requests. Your IP has been temporarily blocked.'
-                });
-            }
-
+            recentRequests.push(now);
             next();
         });
 
+        // Cleanup every 5 minutes
         setInterval(() => {
             const now = Date.now();
-            for (const [ip, tracker] of requestTracker.entries()) {
-                if (!tracker.blocked && tracker.requests.length === 0) {
-                    requestTracker.delete(ip);
-                } else if (tracker.blocked && now >= tracker.blockedUntil) {
-                    requestTracker.delete(ip);
+            for (const [ip, requests] of burstTracker.entries()) {
+                const recent = requests.filter(time => now - time < 10000);
+                if (recent.length === 0) {
+                    burstTracker.delete(ip);
                 }
             }
         }, 5 * 60 * 1000);
-
 
         app.disable('x-powered-by');
         app.use((req, res, next) => {
@@ -351,10 +313,11 @@ async function startServer() {
         });
 
         app.listen(PORT, () => {
-            console.log(`✓ Server started successfully`);
-            console.log(`✓ Global rate limit: 50 requests/minute per IP`);
-            console.log(`✓ Rapid-fire protection: ${RAPID_FIRE_THRESHOLD} requests/${RAPID_FIRE_WINDOW / 1000}s`);
-            console.log(`✓ Auth endpoints: 5-10 attempts/15min`);
+            console.log(`✓ Server started successfully on port ${PORT}`);
+            console.log(`✓ Global rate limit: 500 requests/minute per IP`);
+            console.log(`✓ Burst protection: 100 requests/10 seconds (unauthenticated only)`);
+            console.log(`✓ Login limit: 20 attempts/15 minutes`);
+            console.log(`✓ Authenticated users bypass burst limits`);
         });
 
     } catch (error) {

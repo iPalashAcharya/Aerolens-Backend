@@ -230,7 +230,6 @@ class MemberService {
 
     async deleteMember(memberId, auditContext) {
         const client = await this.db.getConnection();
-
         try {
             await client.beginTransaction();
 
@@ -243,14 +242,44 @@ class MemberService {
                 );
             }
 
-            await client.execute(
+            // Check if member has active candidates as recruiter
+            const [candidateCount] = await client.execute(
+                `SELECT COUNT(*) as count FROM candidate 
+             WHERE recruiterId = ? AND deletedAt IS NULL`,
+                [memberId]
+            );
+
+            if (candidateCount[0].count > 0) {
+                throw new AppError(
+                    `Cannot delete member. They are the recruiter for ${candidateCount[0].count} active candidate(s). Please reassign or delete candidates first.`,
+                    400,
+                    'MEMBER_HAS_CANDIDATES',
+                    { memberId, candidateCount: candidateCount[0].count }
+                );
+            }
+
+            // Soft delete interviews where member is interviewer (critical role)
+            const [interviewerResult] = await client.execute(
                 `UPDATE interview 
              SET deletedAt = NOW() 
              WHERE interviewerId = ? AND deletedAt IS NULL`,
                 [memberId]
             );
 
+            // Set scheduledById to NULL where member is scheduler (just metadata)
+            const [schedulerResult] = await client.execute(
+                `UPDATE interview 
+             SET scheduledById = NULL 
+             WHERE scheduledById = ? AND deletedAt IS NULL`,
+                [memberId]
+            );
+
+            console.log(`Soft deleted ${interviewerResult.affectedRows} interviews where member was interviewer`);
+            console.log(`Unlinked ${schedulerResult.affectedRows} interviews where member was scheduler`);
+
+            // Soft delete the member
             await this.memberRepository.deactivateAccount(memberId, client);
+
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'DELETE',
@@ -258,9 +287,13 @@ class MemberService {
                 userAgent: auditContext.userAgent,
                 timestamp: auditContext.timestamp
             }, client);
-            await client.commit();
 
-            return { deletedMember: member };
+            await client.commit();
+            return {
+                deletedMember: member,
+                interviewsDeleted: interviewerResult.affectedRows,
+                interviewsUnlinked: schedulerResult.affectedRows
+            };
         } catch (error) {
             await client.rollback();
             if (!(error instanceof AppError)) {
@@ -284,11 +317,20 @@ class MemberService {
             await client.beginTransaction();
 
             const [members] = await client.execute(
-                `SELECT memberId 
-             FROM member 
-             WHERE isActive = FALSE 
-             AND deletedAt IS NOT NULL 
-             AND deletedAt <= DATE_SUB(NOW(), INTERVAL 15 DAY)`,
+                `SELECT m.memberId 
+             FROM member m
+             WHERE m.isActive = FALSE 
+             AND m.deletedAt IS NOT NULL 
+             AND m.deletedAt <= DATE_SUB(NOW(), INTERVAL 15 DAY)
+             AND NOT EXISTS (
+                 SELECT 1 FROM candidate c 
+                 WHERE c.recruiterId = m.memberId AND c.deletedAt IS NULL
+             )
+             AND NOT EXISTS (
+                 SELECT 1 FROM interview i 
+                 WHERE (i.interviewerId = m.memberId OR i.scheduledById = m.memberId) 
+                 AND i.deletedAt IS NULL
+             )`,
                 []
             );
 
