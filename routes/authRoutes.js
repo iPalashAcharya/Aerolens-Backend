@@ -13,8 +13,8 @@ const {
 } = require('../middleware/authMiddleware');
 
 router.post('/register',
-    authenticate,
-    authorize(process.env.ALLOWED_ROLES),
+    //authenticate,
+    //authorize(process.env.ALLOWED_ROLES),
     AuthValidator.validateRegister,
     authController.register
 );
