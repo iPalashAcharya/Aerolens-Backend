@@ -1,0 +1,69 @@
+name: CI/CD — Prod
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "release/*"
+
+permissions:
+  contents: read
+  id-token: write
+  packages: write
+  actions: read
+
+concurrency:
+  group: aerolens-prod-deploy
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::${{vars.AWS_ACCOUNT_ID}}:role/GitHubActions-Prod-Role
+          aws-region: ${{vars.AWS_REGION}}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build and push image
+        run: |
+          IMAGE="${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/aerolens-portal-backend:${{ github.sha }}"
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+        env:
+          DOCKER_BUILDKIT: 1
+
+      - name: Deploy via SSM to prod instance(s)
+        run: |
+          INSTANCE_ID="${{vars.INSTANCE_ID}}"
+          COMPOSE_FILE="${{vars.PROD_COMPOSE_FILE}}"
+          SERVICE="backend"
+          aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Prod deploy ${GITHUB_SHA}" \
+            --parameters commands="[ 'cd ${{vars.PROD_FOLDER_LOCATION}} && docker-compose -f ${COMPOSE_FILE} pull ${SERVICE} && docker-compose -f ${COMPOSE_FILE} up -d --remove-orphans ${SERVICE}' ]" \
+            --region ${{vars.AWS_REGION}}

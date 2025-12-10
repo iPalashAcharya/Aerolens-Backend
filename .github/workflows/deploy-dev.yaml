@@ -1,0 +1,69 @@
+name: CI/CD — Dev
+
+on:
+  push:
+    branches: ["development"]
+
+permissions:
+  contents: read
+  id-token: write
+  packages: write
+  actions: read
+
+concurrency:
+  group: aerolens-dev-deploy
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: development
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::${{vars.AWS_ACCOUNT_ID}}:role/GitHubActions-Dev-Role
+          aws-region: ${{vars.AWS_REGION}}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build Docker image
+        run: |
+          IMAGE="${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/aerolens-portal-backend-dev:${{ github.sha }}"
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+        env:
+          DOCKER_BUILDKIT: 1
+
+      - name: Send SSM command to deploy (dev instance)
+        run: |
+          INSTANCE_ID="${{vars.INSTANCE_ID}}"
+          COMPOSE_FILE="${{vars.DEV_COMPOSE_FILE}}"
+          SERVICE="backend-dev" 
+          IMAGE_TAG="${{ github.sha }}"
+          # send a command to run the deploy script which does docker-compose pull & recreate
+          aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Deploy dev ${IMAGE_TAG}" \
+            --parameters commands="[ 'cd ${{vars.DEV_FOLDER_LOCATION}} && docker-compose -f ${COMPOSE_FILE} pull ${SERVICE} && docker-compose -f ${COMPOSE_FILE} up -d --remove-orphans ${SERVICE}' ]" \
+            --region ${{vars.AWS_REGION}}
