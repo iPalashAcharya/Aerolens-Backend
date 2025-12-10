@@ -36,6 +36,26 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Debug OIDC token (print payload)
+        shell: bash
+        run: |
+          echo "Requesting OIDC token for audience sts.amazonaws.com..."
+          TOKEN_URL="${ACTIONS_ID_TOKEN_REQUEST_URL}?audience=sts.amazonaws.com"
+          OIDC_TOKEN=$(curl -s -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$TOKEN_URL")
+          echo "==== BEGIN OIDC TOKEN PAYLOAD (JSON) ===="
+          PAYLOAD=$(echo "$OIDC_TOKEN" | awk -F '.' '{print $2}')
+
+          # Fix base64 padding
+          mod4=$(( ${#PAYLOAD} % 4 ))
+          if [ "$mod4" -ne 0 ]; then
+          PAD=$((4 - mod4))
+          for i in $(seq 1 $PAD); do PAYLOAD="${PAYLOAD}="; done
+          fi
+
+          echo "$PAYLOAD" | base64 --decode 2>/dev/null || echo "FAILED to decode payload"
+          echo
+          echo "==== END OIDC TOKEN PAYLOAD ===="
+
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v2
         with:
