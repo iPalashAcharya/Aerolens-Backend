@@ -46,9 +46,6 @@ class CandidateRepository {
             const query = `INSERT INTO candidate(candidateName,contactNumber,email,recruiterId,jobRole,preferredJobLocation,currentCTC,expectedCTC,noticePeriod,experienceYears,linkedinProfileUrl,statusId, resumeFilename, resumeOriginalName, resumeUploadDate,notes)
             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`
 
-            console.log("FINAL INSERT PAYLOAD statusId =", candidateData.statusId);
-            console.log("FULL PAYLOAD =", candidateData);
-
             const [result] = await connection.execute(query, [
                 candidateData.candidateName,
                 candidateData.contactNumber,
