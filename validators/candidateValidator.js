@@ -300,7 +300,7 @@ const candidateSchemas = {
                 'string.max': 'LinkedIn profile URL cannot exceed 500 characters'
             }),
 
-        statusName: Joi.string()
+        status: Joi.string()
             .trim()
             .min(1)
             .max(50)
@@ -627,9 +627,9 @@ class CandidateValidator {
             }
 
             // Transform status
-            if (value.status) {
+            if (value.statusName) {
                 value.statusId = await CandidateValidator.helper.getStatusIdByName(value.status);
-                delete value.status;
+                delete value.statusName;
             }
 
             if (value.recruiterName) {
