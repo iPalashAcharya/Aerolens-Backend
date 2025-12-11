@@ -627,9 +627,9 @@ class CandidateValidator {
             }
 
             // Transform status
-            if (value.statusName) {
+            if (value.status) {
                 value.statusId = await CandidateValidator.helper.getStatusIdByName(value.status);
-                delete value.statusName;
+                delete value.status;
             }
 
             if (value.recruiterName) {
