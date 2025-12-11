@@ -48,7 +48,7 @@ jobs:
 
       - name: Build Docker image
         run: |
-          IMAGE="${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/aerolens-portal-backend-dev:${{ github.sha }}"
+          IMAGE="${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/aerolens-portal-backend-dev:${{ github.sha }}"
           docker build -t "$IMAGE" .
           docker push "$IMAGE"
         env:
@@ -58,12 +58,17 @@ jobs:
         run: |
           INSTANCE_ID="${{vars.INSTANCE_ID}}"
           COMPOSE_FILE="${{vars.DEV_COMPOSE_FILE}}"
-          SERVICE="backend-dev" 
+          SERVICE="backend-dev"
           IMAGE_TAG="${{ github.sha }}"
-          # send a command to run the deploy script which does docker-compose pull & recreate
+          ECR_REG="${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com"
+
           aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
             --comment "Deploy dev ${IMAGE_TAG}" \
-            --parameters commands="[ 'cd ${{vars.DEV_FOLDER_LOCATION}} && docker-compose -f ${COMPOSE_FILE} pull ${SERVICE} && docker-compose -f ${COMPOSE_FILE} up -d --remove-orphans ${SERVICE}' ]" \
+            --parameters commands="[ 'cd ${{vars.DEV_FOLDER_LOCATION}} && \
+              aws ecr get-login-password --region ${{vars.AWS_REGION}} | docker login --username AWS --password-stdin ${ECR_REG} && \
+              docker pull ${ECR_REG}/aerolens-portal-backend-dev:${IMAGE_TAG} && \
+              docker tag ${ECR_REG}/aerolens-portal-backend-dev:${IMAGE_TAG} aerolens-portal-backend-dev:latest && \
+              docker-compose -f ${COMPOSE_FILE} up -d --remove-orphans ${SERVICE}' ]" \
             --region ${{vars.AWS_REGION}}
