@@ -46,6 +46,35 @@ class InterviewController {
         );
     });
 
+    getTotalSummary = catchAsync(async (req, res) => {
+        const interviewerData = await this.interviewService.getTotalSummary();
+        return ApiResponse.success(
+            res,
+            interviewerData,
+            'Total Interviewer Data Retrieved Successfully'
+        );
+    });
+
+    getMonthlySummary = catchAsync(async (req, res) => {
+        const { startDate, endDate } = req.validatedQuery;
+        const summaryData = await this.interviewService.getMonthlySummary(startDate, endDate);
+        return ApiResponse.success(
+            res,
+            summaryData,
+            'Total Monthly Summary Data Retrieved Successfully'
+        );
+    });
+
+    getDailySummary = catchAsync(async (req, res) => {
+        const { date } = req.validatedQuery;
+        const summaryData = await this.interviewService.getDailySummary(date);
+        return ApiResponse.success(
+            res,
+            summaryData,
+            'Total Daily Summary Data Retrieved Sucessfully'
+        );
+    });
+
     /*getInterviewRounds = catchAsync(async (req, res) => {
         const rounds = await this.interviewService.getInterviewRounds(parseInt(req.params.interviewId));
 

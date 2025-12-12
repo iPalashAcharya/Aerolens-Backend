@@ -5,6 +5,172 @@ class InterviewRepository {
         this.db = db;
     }
 
+    _getDateRange(dateString) {
+        const startDate = dateString;
+
+        const dateParts = dateString.split('-');
+        const nextDay = new Date(Date.UTC(
+            parseInt(dateParts[0]),
+            parseInt(dateParts[1]) - 1,
+            parseInt(dateParts[2]) + 1
+        ));
+
+        const year = nextDay.getUTCFullYear();
+        const month = String(nextDay.getUTCMonth() + 1).padStart(2, '0');
+        const day = String(nextDay.getUTCDate()).padStart(2, '0');
+        const endDate = `${year}-${month}-${day}`;
+
+        return { startDate, endDate };
+    }
+
+    async getSummary(client) {
+        const connection = client;
+
+        try {
+            const interviewerQuery = `
+            SELECT
+            i.interviewerId,
+            m.memberName AS interviewerName,
+            COUNT(i.interviewId) AS total,
+
+            SUM(CASE WHEN i.result = 'selected' THEN 1 ELSE 0 END) AS selected,
+            SUM(CASE WHEN i.result = 'rejected' THEN 1 ELSE 0 END) AS rejected,
+            SUM(CASE WHEN i.result = 'pending' THEN 1 ELSE 0 END) AS pending,
+            SUM(CASE WHEN i.result = 'cancelled' THEN 1 ELSE 0 END) AS cancelled,
+
+            AVG(i.durationMinutes) AS avgDuration,
+            SUM(i.durationMinutes) AS totalMinutes
+            FROM interview i
+            JOIN member m ON m.memberId = i.interviewerId
+            WHERE i.deletedAt IS NULL
+            GROUP BY i.interviewerId, m.memberName
+            ORDER BY interviewerName;
+        `;
+
+            const [interviewerData] = await connection.query(interviewerQuery);
+
+            return {
+                interviewers: interviewerData
+            };
+
+        } catch (error) {
+            this._handleDatabaseError(error, "getSummary");
+        }
+    }
+
+    async getMonthlySummary(client, startDate, endDate) {
+        const connection = client;
+
+        try {
+            // Use inclusive date range for monthly summary
+            const summaryQuery = `
+            SELECT
+                COUNT(interviewId) AS total,
+                SUM(CASE WHEN result = 'selected' THEN 1 ELSE 0 END) AS selected,
+                SUM(CASE WHEN result = 'rejected' THEN 1 ELSE 0 END) AS rejected,
+                SUM(CASE WHEN result = 'pending' THEN 1 ELSE 0 END) AS pending,
+                SUM(CASE WHEN result = 'cancelled' THEN 1 ELSE 0 END) AS cancelled
+            FROM interview
+            WHERE interviewDate >= ? AND interviewDate <= ? AND deletedAt IS NULL;
+            `;
+
+            const [summaryData] = await connection.query(summaryQuery, [
+                startDate,
+                endDate
+            ]);
+
+            const interviewerQuery = `
+            SELECT
+                m.memberId AS interviewerId,
+                m.memberName AS interviewerName,
+
+                COUNT(i.interviewId) AS total,
+                SUM(CASE WHEN i.result = 'selected' THEN 1 ELSE 0 END) AS selected,
+                SUM(CASE WHEN i.result = 'rejected' THEN 1 ELSE 0 END) AS rejected,
+                SUM(CASE WHEN i.result = 'pending' THEN 1 ELSE 0 END) AS pending,
+                SUM(CASE WHEN i.result = 'cancelled' THEN 1 ELSE 0 END) AS cancelled,
+
+                AVG(i.durationMinutes) AS avgDuration,
+                SUM(i.durationMinutes) AS totalMinutes
+
+            FROM member m
+            LEFT JOIN interview i
+                ON i.interviewerId = m.memberId
+                AND i.interviewDate >= ? AND i.interviewDate <= ? AND i.deletedAt IS NULL
+
+            GROUP BY m.memberId, m.memberName
+            HAVING total > 0
+            ORDER BY interviewerName;
+            `;
+
+            const [interviewerData] = await connection.query(interviewerQuery, [
+                startDate,
+                endDate
+            ]);
+
+            const dateQuery = `
+            SELECT DISTINCT interviewDate
+            FROM interview
+            WHERE interviewDate >= ? AND interviewDate <= ? AND deletedAt IS NULL
+            ORDER BY interviewDate;
+            `;
+
+            const [datesData] = await connection.query(dateQuery, [
+                startDate,
+                endDate
+            ]);
+
+            return {
+                summary: summaryData[0],
+                interviewers: interviewerData,
+                interviewDates: datesData
+            };
+
+        } catch (error) {
+            this._handleDatabaseError(error, "getMonthlySummary");
+        }
+    }
+
+    async getDailySummary(client, date) {
+        const connection = client;
+
+        try {
+            const query = `
+            SELECT
+                m.memberId AS interviewerId,
+                m.memberName AS interviewerName,
+
+                i.interviewId,
+                i.candidateId,
+                c.candidateName,
+                i.interviewDate,
+                TIME_FORMAT(i.fromTime, '%H:%i') AS fromTime,
+                TIME_FORMAT(i.toTime, '%H:%i') AS toTime,
+                i.roundNumber,
+                i.totalInterviews,
+                i.durationMinutes,
+                i.recruiterNotes,
+                i.result
+
+            FROM interview i
+            JOIN member m ON m.memberId = i.interviewerId
+            LEFT JOIN candidate c ON c.candidateId = i.candidateId
+
+            WHERE i.interviewDate = ?
+              AND i.deletedAt IS NULL
+
+            ORDER BY m.memberName, i.fromTime;
+        `;
+
+            const [rows] = await connection.query(query, [date]);
+
+            return { interviews: rows };
+
+        } catch (error) {
+            this._handleDatabaseError(error, "getDailySummary");
+        }
+    }
+
     async getAll(limit, page, client) {
         const connection = client;
         try {
@@ -300,7 +466,6 @@ class InterviewRepository {
     async create(candidateId, interviewData, client) {
         const connection = client;
         try {
-            // Get the latest round number for this candidate
             const { latestRound, totalInterviews } = await this.getLatestRoundNumber(candidateId, client);
 
             const newRoundNumber = latestRound + 1;
