@@ -1,206 +1,360 @@
-# Authentication Endpoints
+# Authentication API Documentation
 
-### Endpoints
+This module provides JWT-based authentication with token family tracking, refresh with grace period, and active session management. All endpoints use JSON for request and response bodies.
 
-## POST /auth/register
+## Base URL
 
-Registers a new user.
+- Recommended mount path: `/api/auth` (examples assume this path).
+- All protected routes require a valid `Authorization: Bearer <token>` header.
 
-## Request Body (JSON)
+## Response Format
 
-json
+All successful responses use a common envelope:
+
+```json
 {
-"memberName": "John Doe",
-"memberContact": "+91 9999999999",
-"email": "john@example.com",
-"password": "Password@123",
-"designation": "software engineer",
-"isRecruiter": false,
-"isInterviewer":false
+  "success": true,
+  "message": "Human readable message",
+  "data": {},
+  "statusCode": 200
 }
-designation must match existing designation values in the database lookup table (case-insensitive).
+```
 
-## Response
+All errors are thrown using a central `AppError` class and should be serialized consistently by your global error handler, typically as:
 
-json
+```json
 {
-"success": true,
-"message": "Registration successful",
-"data": {
-"member": {
-"memberId": 1,
-"memberName": "John Doe",
-"email": "john@example.com",
-"designation": 4,
-"isRecruiter": false,
-"isInterviewer":false
+  "success": false,
+  "message": "Error message",
+  "code": "ERROR_CODE",
+  "details": [],
+  "statusCode": 400
 }
-}
-}
-
-## POST /auth/login
-
-Logs in the user and returns a JWT token.
-
-## Request Body (JSON)
-
-json
-{
-"email": "john@example.com",
-"password": "Password@123"
-}
-
-## Response
-
-json
-{
-"success": true,
-"message": "Login successful",
-"data": {
-"member": {
-"memberId": 1,
-"memberName": "John Doe",
-"email": "john@example.com",
-"designation": 4,
-"isRecruiter": false
-},
-"token": "<JWT_ACCESS_TOKEN>",
-"expiresIn": "2h"
-}
-}
-The JWT access token includes jti (unique token ID) and family claims.
-
-Use this token in the Authorization header for all subsequent authenticated requests:
-
-text
-Authorization: Bearer <JWT_ACCESS_TOKEN>
-
-## POST /auth/refresh
-
-(Optional) Refreshes the current JWT token before expiry.
-
-## Request
-
-Accepts the current token either in request body or Authorization header.
-
-## optional Request body:
-
-{
-"token":"jwt_token"
-}
-
-## Response
-
-json
-{
-"success": true,
-"message": "Token refreshed successfully",
-"data": {
-"token": "<NEW_JWT_ACCESS_TOKEN>",
-"expiresIn": "2h"
-}
-}
-Revokes the old token identified by jti and issues a new token in the same token family.
-
-## POST /auth/logout
-
-Revokes the current token.
-
-## Request
-
-Token sent in Authorization header or optionally in request body.
-
-## Response
-
-json
-{
-"success": true,
-"message": "Logout successful"
-}
-The token's jti is marked revoked to invalidate it.
-
-## POST /auth/logout-all
-
-Revokes all tokens for the authenticated user across devices.
-
-Headers
-
-text
-Authorization: Bearer <JWT_ACCESS_TOKEN>
-
-## Response
-
-json
-{
-"success": true,
-"message": "Logged out from all devices successfully"
-}
-
-## GET /auth/sessions
-
-Fetches all active non-revoked sessions (tokens) for the authenticated user with details.
-
-## Headers
-
-text
-Authorization: Bearer <JWT_ACCESS_TOKEN>
-
-## Response
-
-json
-{
-"success": true,
-"data": {
-"sessions": [
-{
-"id": 10,
-"userAgent": "Mozilla/5.0 Chrome/120.0.0",
-"ipAddress": "192.168.1.2",
-"createdAt": "2025-10-20T10:35:24.000Z",
-"expiresAt": "2025-10-27T10:35:24.000Z",
-"tokenFamily": "c693a76a-90a8-4441-b229-bb57cc4f3f70"
-}
-]
-}
-}
-
-## GET /auth/profile
-
-Returns the profile of the authenticated user.
-
-Headers
-
-text
-Authorization: Bearer <JWT_ACCESS_TOKEN>
-
-## Response
-
-json
-{
-"success": true,
-"data": {
-"member": {
-"memberId": 1,
-"email": "john@example.com",
-"designation": 4,
-"isRecruiter": false
-}
-}
-}
-
-## NOTES
+```
 
 ---
 
-Authorization Requirement for Endpoints
-All API endpoints below require the client to include a valid Access Token in the HTTP Authorization header for authentication and authorization, except for the explicitly public endpoints (/register, /login, /refresh, /logout).
+## Authentication Endpoints
 
-The Access Token must be supplied as a Bearer token:
+### Register Member
 
-Authorization: Bearer <ACCESS_TOKEN>
-Failure to provide a valid token in the Authorization header will result in a 401 Unauthorized response.
+**URL:** `POST /api/auth/register`  
+**Auth:** Required – caller must be authenticated and authorized with an allowed role (`authenticate` + `authorize(process.env.ALLOWED_ROLES)`).
+
+#### Request Body
+
+```json
+{
+  "memberName": "John Doe",
+  "memberContact": "+91-9876543210",
+  "email": "john.doe@example.com",
+  "password": "StrongP@ssw0rd",
+  "designation": "senior developer",
+  "isRecruiter": false,
+  "isInterviewer": false
+}
+```
+
+- `designation` is a human-readable value that is transformed to an internal `lookupKey` before persistence.
+- Password must be at least 8 characters and contain uppercase, lowercase, number and special character.
+
+#### Success Response `201`
+
+```json
+{
+  "success": true,
+  "message": "Registration successful",
+  "statusCode": 201,
+  "data": {
+    "member": {
+      "memberId": 1,
+      "memberName": "John Doe",
+      "memberContact": "+91-9876543210",
+      "email": "john.doe@example.com",
+      "designation": "Senior Developer",
+      "isRecruiter": false,
+      "isInterviewer": false,
+      "isActive": true,
+      "lastLogin": null,
+      "createdAt": "2025-01-01T10:00:00.000Z",
+      "updatedAt": "2025-01-01T10:00:00.000Z"
+    }
+  }
+}
+```
+
+#### Possible Error Codes
+
+- `EMAIL_EXISTS` – email already registered.
+- `VALIDATION_ERROR` – invalid body fields.
 
 ---
+
+### Login
+
+**URL:** `POST /api/auth/login`  
+**Auth:** Public  
+**Middlewares:** `loginRateLimiter`, `AuthValidator.validateLogin`.
+
+#### Request Body
+
+```json
+{
+  "email": "john.doe@example.com",
+  "password": "StrongP@ssw0rd"
+}
+```
+
+#### Success Response `200`
+
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "statusCode": 200,
+  "data": {
+    "member": {
+      "memberId": 1,
+      "memberName": "John Doe",
+      "email": "john.doe@example.com",
+      "designation": "Senior Developer",
+      "isRecruiter": false
+    },
+    "token": "<jwt-access-token>",
+    "expiresIn": "15m"
+  }
+}
+```
+
+- `token` is a signed JWT containing `memberId`, `email`, `jti`, `family`, and `type: "access"`.
+- A record is stored in `active_token` with JTI, token family, user agent, IP and expiry for revocation and session tracking.
+
+#### Possible Error Codes
+
+- `INVALID_CREDENTIALS` – email not found or wrong password.
+- `ACCOUNT_INACTIVE` – member exists but is inactive.
+- `VALIDATION_ERROR` – invalid body.
+
+---
+
+### Change Password
+
+**URL:** `POST /api/auth/change-password`  
+**Auth:** Required – authenticated user (`authenticate`).
+**Middlewares:** `AuthValidator.validateResetPassword`.
+
+#### Request Body
+
+```json
+{
+  "currentPassword": "OldP@ssw0rd",
+  "newPassword": "NewStr0ngP@ss"
+}
+```
+
+- `newPassword` must be at least 8 chars, max 128, and must differ from `currentPassword` with required complexity.
+
+#### Success Response `200`
+
+```json
+{
+  "success": true,
+  "message": "Password changed successfully",
+  "statusCode": 200,
+  "data": null
+}
+```
+
+- All existing tokens for the member are revoked (`logout from all devices`).
+
+#### Possible Error Codes
+
+- `INVALID_CURRENT_PASSWORD` – current password does not match.
+- `VALIDATION_ERROR` – invalid body.
+
+---
+
+### Refresh Token
+
+**URL:** `POST /api/auth/refresh`  
+**Auth:** Required – provide existing (possibly expired) token in `Authorization` header.
+**Middlewares:** `refreshRateLimiter`.
+
+#### Headers
+
+```text
+Authorization: Bearer <jwt-access-token>
+User-Agent: <client user agent>   // optional
+```
+
+#### Request Body
+
+Empty body.
+
+#### Success Response `200`
+
+```json
+{
+  "success": true,
+  "message": "Token refreshed successfully",
+  "statusCode": 200,
+  "data": {
+    "token": "<new-jwt-access-token>",
+    "expiresIn": "15m"
+  }
+}
+```
+
+- The old token’s JTI is revoked.
+- A new token with the same token family is generated and stored in `active_token`.
+
+#### Possible Error Codes
+
+- `TOKEN_MISSING` – missing or invalid `Authorization` header format.
+- `INVALID_TOKEN` – invalid structure or signature.
+- `TOKEN_TOO_OLD` – token age exceeds configured `refreshGracePeriod`.
+- `TOKEN_REVOKED` – token or token family revoked.
+- `INVALID_MEMBER` – member not found or inactive.
+
+---
+
+### Logout (Current Device)
+
+**URL:** `POST /api/auth/logout`  
+**Auth:** Token recommended – `Authorization: Bearer <jwt-access-token>`.[1]
+
+#### Headers
+
+```text
+Authorization: Bearer <jwt-access-token>
+```
+
+#### Request Body
+
+Empty body.
+
+#### Success Response `200`
+
+```json
+{
+  "success": true,
+  "message": "Logout successful",
+  "statusCode": 200,
+  "data": null
+}
+```
+
+- If a valid token is provided, its JTI is marked revoked in `active_token`.
+- Logout always returns success, even if token is invalid or missing.
+
+---
+
+### Logout From All Devices
+
+**URL:** `POST /api/auth/logout-all`  
+**Auth:** Required – authenticated user (`authenticate`).
+
+#### Request Body
+
+Empty body.
+
+#### Success Response `200`
+
+```json
+{
+  "success": true,
+  "message": "Logged out from all devices successfully",
+  "statusCode": 200,
+  "data": null
+}
+```
+
+- All active tokens for the authenticated member are marked revoked.
+
+---
+
+### Get Active Sessions
+
+**URL:** `GET /api/auth/sessions`  
+**Auth:** Required – authenticated user (`authenticate`).
+
+#### Success Response `200`
+
+```json
+{
+  "success": true,
+  "message": "Active sessions retrieved successfully",
+  "statusCode": 200,
+  "data": {
+    "sessions": [
+      {
+        "id": 10,
+        "jti": "c7b5c5fd-8b0e-4f27-9c1b-8ad0f1c3a1ef",
+        "userAgent": "Mozilla/5.0 ...",
+        "ipAddress": "192.168.1.10",
+        "createdAt": "2025-01-01T10:00:00.000Z",
+        "expiresAt": "2025-01-01T10:15:00.000Z",
+        "tokenFamily": "2e4fe47c-0c9e-4af0-97aa-5a4f91e83b9f"
+      }
+    ]
+  }
+}
+```
+
+- Only non-revoked tokens with `expiresAt > NOW()` are returned.
+
+---
+
+### Get Profile (Current User)
+
+**URL:** `GET /api/auth/profile`  
+**Auth:** Required – authenticated user (`authenticate`).
+
+#### Success Response `200`
+
+```json
+{
+  "success": true,
+  "message": "Profile retrieved successfully",
+  "statusCode": 200,
+  "data": {
+    "member": {
+      "memberId": 1,
+      "memberName": "John Doe",
+      "memberContact": "+91-9876543210",
+      "email": "john.doe@example.com",
+      "designation": "Senior Developer",
+      "isRecruiter": false,
+      "isInterviewer": false,
+      "isActive": true,
+      "lastLogin": "2025-01-01T10:00:00.000Z",
+      "createdAt": "2025-01-01T09:00:00.000Z",
+      "updatedAt": "2025-01-01T09:00:00.000Z"
+    }
+  }
+}
+```
+
+- Data is taken from `req.user`, which is populated by the authentication middleware after token verification.
+
+---
+
+## Token Structure & Security
+
+- Algorithm, secret, expiry and issuer/audience are configured in `jwtConfig.token` (e.g. `expiresIn`, `issuer`, `audience`, `algorithm`).
+- Each token includes:
+  - `sub` / `memberId`
+  - `email`
+  - `jti` (unique token ID)
+  - `family` (token family UUID)
+  - `type: "access"`
+  - `iat` (issued at)
+
+On each authenticated request, the middleware:
+
+1. Verifies the JWT signature and expiration.
+2. Checks `active_token.isRevoked` for the corresponding JTI.
+3. Throws `TOKEN_REVOKED`, `TOKEN_EXPIRED`, or `INVALID_TOKEN` via `AppError` if invalid.
 
 # Client API Endpoints
 

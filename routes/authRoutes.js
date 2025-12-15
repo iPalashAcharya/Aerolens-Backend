@@ -25,6 +25,12 @@ router.post('/login',
     authController.login
 );
 
+router.post('/change-password',
+    authenticate,
+    AuthValidator.validateResetPassword,
+    authController.changePassword
+);
+
 router.post('/refresh',
     refreshRateLimiter,
     authController.refreshToken
