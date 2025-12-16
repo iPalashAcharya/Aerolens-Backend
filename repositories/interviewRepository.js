@@ -62,7 +62,6 @@ class InterviewRepository {
         const connection = client;
 
         try {
-            // Use inclusive date range for monthly summary
             const summaryQuery = `
             SELECT
                 COUNT(interviewId) AS total,
@@ -71,13 +70,10 @@ class InterviewRepository {
                 SUM(CASE WHEN result = 'pending' THEN 1 ELSE 0 END) AS pending,
                 SUM(CASE WHEN result = 'cancelled' THEN 1 ELSE 0 END) AS cancelled
             FROM interview
-            WHERE interviewDate >= ? AND interviewDate <= ? AND deletedAt IS NULL;
+            WHERE deletedAt IS NULL;
             `;
 
-            const [summaryData] = await connection.query(summaryQuery, [
-                startDate,
-                endDate
-            ]);
+            const [summaryData] = await connection.query(summaryQuery);
 
             const interviewerQuery = `
             SELECT
@@ -102,6 +98,8 @@ class InterviewRepository {
             HAVING total > 0
             ORDER BY interviewerName;
             `;
+            console.log('startDate:', startDate, typeof startDate);
+            console.log('endDate:', endDate, typeof endDate);
 
             const [interviewerData] = await connection.query(interviewerQuery, [
                 startDate,

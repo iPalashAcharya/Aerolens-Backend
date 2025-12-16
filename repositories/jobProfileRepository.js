@@ -27,7 +27,7 @@ class JobProfileRepository {
                 jobProfileData.estimatedCloseDate || null,
                 jobProfileData.locationId,
                 jobProfileData.workArrangement,
-                jobProfileData.statusId || 7
+                jobProfileData.statusId
             ]);
 
             return {
@@ -52,8 +52,9 @@ class JobProfileRepository {
 
             const query = `
             SELECT jp.jobProfileId, c.clientId ,c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
-                   jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate, jp.workArrangement,
-                   COALESCE((SELECT JSON_OBJECT('country',l.country,'city',l.cityName) FROM location l WHERE l.locationId = jp.locationId)) AS location, stat.value AS status
+                   jp.techSpecification, jp.positions, DATE(jp.receivedOn) AS receivedOn, jp.estimatedCloseDate, jp.workArrangement,
+                   COALESCE((SELECT JSON_OBJECT('country',l.country,'city',l.cityName) FROM location l WHERE l.locationId = jp.locationId)) AS location, stat.value AS status,
+                   jp.jdFileName, jp.jdOriginalName, jp.jdUploadDate
             FROM jobProfile jp
             LEFT JOIN client c ON jp.clientId=c.clientId
             LEFT JOIN department d ON jp.departmentId = d.departmentId
@@ -87,7 +88,7 @@ class JobProfileRepository {
             }
 
             if (!updateData || Object.keys(updateData).length === 0) {
-                throw new AppError('Update data is required', 400, 'MISSING_UPDATE_DATA');
+                return { jobProfileId };
             }
 
             // Filter only allowed fields for security
@@ -306,8 +307,9 @@ class JobProfileRepository {
         try {
             let query = `
             SELECT jp.jobProfileId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
-                   jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,jp.workArrangement,
-                   COALESCE((SELECT JSON_OBJECT('country',l.country,'city',l.cityName) FROM location l WHERE l.locationId = jp.locationId)) AS location, stat.value AS status
+                   jp.techSpecification, jp.positions, DATE(jp.receivedOn) AS receivedOn, jp.estimatedCloseDate,jp.workArrangement,
+                   COALESCE((SELECT JSON_OBJECT('country',l.country,'city',l.cityName) FROM location l WHERE l.locationId = jp.locationId)) AS location, stat.value AS status,
+                   jp.jdFileName, jp.jdOriginalName, jp.jdUploadDate
             FROM jobProfile jp
             LEFT JOIN client c ON jp.clientId=c.clientId
             LEFT JOIN department d ON jp.departmentId = d.departmentId
@@ -335,6 +337,94 @@ class JobProfileRepository {
             });
             return rows.length > 0 ? rows : null;
         } catch (error) {
+            this._handleDatabaseError(error);
+        }
+    }
+
+    async updateJDInfo(jobProfileId, jdFilename, jdOriginalName, client) {
+        const connection = client;
+
+        try {
+            if (!jobProfileId) {
+                throw new AppError('Job Profile ID is required', 400, 'MISSING_JOB_PROFILE_ID');
+            }
+
+            const query = `
+            UPDATE jobProfile 
+            SET jdFileName = ?, 
+                jdOriginalName = ?, 
+                jdUploadDate = NOW()
+            WHERE jobProfileId = ?
+        `;
+
+            const [result] = await connection.execute(query, [jdFilename, jdOriginalName, jobProfileId]);
+
+            if (result.affectedRows === 0) {
+                throw new AppError(
+                    `Job Profile with ID ${jobProfileId} not found`,
+                    404,
+                    'JOB_PROFILE_NOT_FOUND'
+                );
+            }
+
+            return result.affectedRows;
+        } catch (error) {
+            if (error instanceof AppError) { throw error; }
+            this._handleDatabaseError(error);
+        }
+    }
+
+    async getJDInfo(jobProfileId, client) {
+        const connection = client;
+
+        try {
+            if (!jobProfileId) {
+                throw new AppError('Job Profile ID is required', 400, 'MISSING_JOB_PROFILE_ID');
+            }
+
+            const query = `
+            SELECT jdFileName, jdOriginalName, jdUploadDate
+            FROM jobProfile 
+            WHERE jobProfileId = ?
+        `;
+
+            const [rows] = await connection.execute(query, [jobProfileId]);
+            return rows[0] || null;
+        } catch (error) {
+            if (error instanceof AppError) { throw error; }
+            this._handleDatabaseError(error);
+        }
+    }
+
+    async deleteJDInfo(jobProfileId, client) {
+        const connection = client;
+
+        try {
+            if (!jobProfileId) {
+                throw new AppError('JOb Profile ID is required', 400, 'MISSING_JOB_PROFILE_ID');
+            }
+
+            const query = `
+            UPDATE jobProfile 
+            SET jdFileName = NULL, 
+                jdOriginalName = NULL, 
+                jdUploadDate = NULL
+            WHERE jobProfileId = ?
+        `;
+
+            const [result] = await connection.execute(query, [jobProfileId]);
+
+            if (result.affectedRows === 0) {
+                throw new AppError(
+                    `Job Profile with ID ${jobProfileId} not found`,
+                    404,
+                    'JOB_PROFILE_NOT_FOUND'
+                );
+            }
+
+            return result.affectedRows;
+        } catch (error) {
+            if (error instanceof AppError) { throw error; }
             this._handleDatabaseError(error);
         }
     }

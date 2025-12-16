@@ -1583,217 +1583,665 @@ If a server/database error occurs during deletion:
 "message": "Internal server error during client contact deletion"
 }
 
-# Job Profile API CRUD
+# Job Profile API Documentation
+
+## Overview
+
+The Job Profile API provides endpoints for managing job profiles, including creating, updating, retrieving, and deleting job profiles, as well as managing job description (JD) file uploads.
+
+## Base URL
+
+```
+/api/jobProfile
+```
+
+## Authentication
+
+All endpoints require authentication via the `authenticate` middleware. Include authentication token in the request headers.
 
 ---
 
-## API Endpoints
+## Endpoints
 
-### Base URL
+### 1. Get All Job Profiles
 
-/jobProfile
+Retrieves all job profiles in the system.
 
-### Endpoints
+**Endpoint:** `GET /`
 
-#### 1. Create Job Profile
+**Request Headers:**
 
-**POST** `/jobProfile`
-
-**Request Body:**
+```json
 {
-"clientId":2,
-"departmentId":86,
-"jobProfileDescription":"Random JOB description for testing job profile",
-"jobRole": "SDE",
-"workArrangement":"onsite"
-"location": {
-"city": "Ahmedabad",
-"country": "India"
-},
-"positions": 4,
-"techSpecification": "NodeJS,ExpressJS"
+  "Authorization": "Bearer <token>"
 }
+```
 
-**Response:**
+**Response:** `200 OK`
+
+```json
 {
-"success": true,
-"message": "Job Profile created successfully",
-"data": {
-"jobProfileId": 25,
-"clientId": 2,
-"departmentId": 86,
-"jobProfileDescription": "Random JOB description for testing job profile",
-"jobRole": "SDE",
-"positions": 4,
-"techSpecification": "NodeJS,ExpressJS",
-"locationId": 1,
-"workArrangement":"onsite"
-"statusId": 4,
-"receivedOn": "2025-11-26T11:10:40.223Z"
+  "success": true,
+  "message": "Job Profiles retrieved successfully",
+  "data": [
+    {
+      "jobProfileId": 1,
+      "clientName": "Tech Corp",
+      "departmentName": "Engineering",
+      "jobProfileDescription": "Senior software engineer position",
+      "jobRole": "Senior Software Engineer",
+      "techSpecification": "React, Node.js, MongoDB",
+      "positions": 3,
+      "receivedOn": "2024-01-15",
+      "estimatedCloseDate": "2024-03-15",
+      "workArrangement": "hybrid",
+      "location": {
+        "country": "india",
+        "city": "Bangalore"
+      },
+      "status": "in progress",
+      "jdFileName": "jd-descriptions/jobProfile_1_1234567890.pdf",
+      "jdOriginalName": "Senior_Engineer_JD.pdf",
+      "jdUploadDate": "2024-01-15T10:30:00.000Z"
+    }
+  ]
 }
-}
+```
 
 ---
 
-#### 2. Get All Job Profiles
+### 2. Get Job Profile by ID
 
-**GET** `/jobProfile`
+Retrieves a specific job profile by its ID.
 
-**Response:**
+**Endpoint:** `GET /:id`
+
+**URL Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| id | integer | Job profile ID (positive integer) |
+
+**Request Headers:**
+
+```json
 {
-"success": true,
-"message": "Job Profiles retrieved successfully",
-"data": [
-{
-"jobProfileId": 25,
-"clientName": "Intuit Bangalore Headquarters",
-"departmentName": "DevOps and AIOps",
-"jobProfileDescription": "Random JOB description for testing job profile",
-"jobRole": "SDE-3",
-"techSpecification": "NodeJS,ExpressJS",
-"positions": 4,
-"receivedOn": "2025-11-26T05:40:40.000Z",
-"estimatedCloseDate": null,
-"workArrangement": "hybrid",
-"location": {
-"city": "Ahmedabad",
-"country": "India"
-},
-"status": "In Progress"
-},
-{
-"jobProfileId": 23,
-"clientName": "IBM Company",
-"departmentName": "Software",
-"jobProfileDescription": "Continuous integration/deployment, and monitoring of Intuit's cloud infrastructure. Teams responsible for operational monitoring of Intuit's cloud infrastructure.",
-"jobRole": "Frontend",
-"techSpecification": "React",
-"positions": 2,
-"receivedOn": "2025-11-07T01:56:44.000Z",
-"estimatedCloseDate": "2025-11-24T13:00:00.000Z",
-"workArrangement": "onsite",
-"location": {
-"city": "Ahmedabad",
-"country": "India"
-},
-"status": "Closed"
+  "Authorization": "Bearer <token>"
 }
-]
+```
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Job Profile retrieved successfully",
+  "data": {
+    "jobProfileId": 1,
+    "clientId": 10,
+    "clientName": "Tech Corp",
+    "departmentName": "Engineering",
+    "jobProfileDescription": "Senior software engineer position",
+    "jobRole": "Senior Software Engineer",
+    "techSpecification": "React, Node.js, MongoDB",
+    "positions": 3,
+    "receivedOn": "2024-01-15",
+    "estimatedCloseDate": "2024-03-15",
+    "workArrangement": "hybrid",
+    "location": {
+      "country": "india",
+      "city": "Bangalore"
+    },
+    "status": "in progress",
+    "jdFileName": "jd-descriptions/jobProfile_1_1234567890.pdf",
+    "jdOriginalName": "Senior_Engineer_JD.pdf",
+    "jdUploadDate": "2024-01-15T10:30:00.000Z"
+  }
 }
+```
+
+**Error Response:** `404 Not Found`
+
+```json
+{
+  "success": false,
+  "message": "Job profile with ID 1 not found",
+  "errorCode": "JOB_PROFILE_NOT_FOUND"
+}
+```
 
 ---
 
-#### 3. Get Job Profile by ID
+### 3. Create Job Profile
 
-**GET** `/jobProfile/:id`
+Creates a new job profile with optional JD file upload.
 
-**Response:**
+**Endpoint:** `POST /`
+
+**Request Headers:**
+
+```json
 {
-"success": true,
-"message": "Job Profile retrieved successfully",
-"data": {
-"jobProfileId": 25,
-"clientId": 2,
-"clientName": "Intuit Bangalore Headquarters",
-"departmentName": "DevOps and AIOps",
-"jobProfileDescription": "Random JOB description for testing job profile",
-"jobRole": "SDE-3",
-"techSpecification": "NodeJS,ExpressJS",
-"positions": 4,
-"receivedOn": "2025-11-26T05:40:40.000Z",
-"estimatedCloseDate": null,
-"workArrangement": "hybrid",
-"location": {
-"city": "Ahmedabad",
-"country": "India"
-},
-"status": "In Progress"
+  "Authorization": "Bearer <token>",
+  "Content-Type": "multipart/form-data"
 }
+```
+
+**Request Body (multipart/form-data):**
+
+| Field                 | Type    | Required | Description                                                                  |
+| --------------------- | ------- | -------- | ---------------------------------------------------------------------------- |
+| clientId              | integer | Yes      | Client ID (positive integer)                                                 |
+| departmentId          | integer | Yes      | Department ID (positive integer)                                             |
+| jobProfileDescription | string  | Yes      | Job description (10-500 characters)                                          |
+| jobRole               | string  | Yes      | Job role title (2-100 characters)                                            |
+| techSpecification     | string  | Yes      | Comma-separated technologies (e.g., "React, Node.js")                        |
+| positions             | integer | Yes      | Number of open positions (positive integer)                                  |
+| estimatedCloseDate    | string  | Yes      | Close date in YYYY-MM-DD format (cannot be in past)                          |
+| workArrangement       | string  | Yes      | One of: `remote`, `onsite`, `hybrid`                                         |
+| location              | string  | Yes      | JSON string: `{"country": "india", "city": "Bangalore"}`                     |
+| status                | string  | No       | One of: `pending`, `in progress`, `closed`, `cancelled` (default: `pending`) |
+| JD                    | file    | No       | Job description file (PDF, DOC, DOCX; max 5MB)                               |
+
+**Example Request Body:**
+
+```
+clientId=10
+departmentId=5
+jobProfileDescription=We are looking for a senior software engineer
+jobRole=Senior Software Engineer
+techSpecification=React, Node.js, MongoDB
+positions=3
+estimatedCloseDate=2024-12-31
+workArrangement=hybrid
+location={"country":"india","city":"Bangalore"}
+status=pending
+JD=<file>
+```
+
+**Response:** `201 Created`
+
+```json
+{
+  "success": true,
+  "message": "Job Profile created successfully",
+  "data": {
+    "jobProfileId": 1,
+    "clientId": 10,
+    "departmentId": 5,
+    "jobProfileDescription": "We are looking for a senior software engineer",
+    "jobRole": "Senior Software Engineer",
+    "techSpecification": "React, Node.js, MongoDB",
+    "positions": 3,
+    "estimatedCloseDate": "2024-12-31",
+    "workArrangement": "hybrid",
+    "locationId": 15,
+    "statusId": 4,
+    "receivedOn": "2024-01-15T10:30:00.000Z"
+  }
 }
+```
+
+**Error Response:** `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "Validation failed",
+  "errorCode": "VALIDATION_ERROR",
+  "details": {
+    "validationErrors": [
+      {
+        "field": "clientId",
+        "message": "Client ID is required"
+      }
+    ]
+  }
+}
+```
+
+**Error Response:** `409 Conflict`
+
+```json
+{
+  "success": false,
+  "message": "A job profile with this role already exists for this client",
+  "errorCode": "DUPLICATE_JOB_ROLE"
+}
+```
 
 ---
 
-#### 4. Update Job Profile
+### 4. Update Job Profile
 
-**PATCH** `/jobProfile/:id`
+Updates an existing job profile with optional JD file upload.
 
-**Request Body:**
+**Endpoint:** `PATCH /:id`
+
+**URL Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| id | integer | Job profile ID (positive integer) |
+
+**Request Headers:**
+
+```json
 {
-"jobRole":"SDE-2"
+  "Authorization": "Bearer <token>",
+  "Content-Type": "multipart/form-data"
 }
+```
 
-**Response:**
+**Request Body (multipart/form-data):**
+
+All fields are optional. Include only the fields you want to update.
+
+| Field                 | Type    | Description                                              |
+| --------------------- | ------- | -------------------------------------------------------- |
+| jobProfileDescription | string  | Job description (10-500 characters)                      |
+| jobRole               | string  | Job role title (2-100 characters)                        |
+| techSpecification     | string  | Comma-separated technologies                             |
+| positions             | integer | Number of open positions (positive integer)              |
+| estimatedCloseDate    | string  | Close date in YYYY-MM-DD format (cannot be in past)      |
+| workArrangement       | string  | One of: `remote`, `onsite`, `hybrid`                     |
+| location              | string  | JSON string: `{"country": "india", "city": "Bangalore"}` |
+| status                | string  | One of: `pending`, `in progress`, `closed`, `cancelled`  |
+| JD                    | file    | Job description file (PDF, DOC, DOCX; max 5MB)           |
+
+**Example Request Body:**
+
+```
+positions=5
+status=in progress
+JD=<file>
+```
+
+**Response:** `200 OK`
+
+```json
 {
-"success": true,
-"message": "Job profile updated successfully",
-"data": {
-"jobProfileId": 25,
-"clientId": 2,
-"clientName": "Intuit Bangalore Headquarters",
-"departmentName": "DevOps and AIOps",
-"jobProfileDescription": "Random JOB description for testing job profile",
-"jobRole": "SDE-1",
-"techSpecification": "NodeJS,ExpressJS",
-"positions": 4,
-"receivedOn": "2025-11-26T05:40:40.000Z",
-"estimatedCloseDate": null,
-"workArrangement": "hybrid",
-"location": {
-"city": "Ahmedabad",
-"country": "India"
-},
-"status": "In Progress"
+  "success": true,
+  "message": "Job Profile updated successfully",
+  "data": {
+    "jobProfileId": 1,
+    "clientId": 10,
+    "clientName": "Tech Corp",
+    "departmentName": "Engineering",
+    "jobProfileDescription": "Senior software engineer position",
+    "jobRole": "Senior Software Engineer",
+    "techSpecification": "React, Node.js, MongoDB",
+    "positions": 5,
+    "receivedOn": "2024-01-15",
+    "estimatedCloseDate": "2024-03-15",
+    "workArrangement": "hybrid",
+    "location": {
+      "country": "india",
+      "city": "Bangalore"
+    },
+    "status": "in progress"
+  }
 }
+```
+
+**Error Response:** `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "Cannot update a job profile that is closed",
+  "errorCode": "JOB_PROFILE_UPDATE_NOT_ALLOWED"
 }
+```
+
+**Error Response:** `404 Not Found`
+
+```json
+{
+  "success": false,
+  "message": "Job profile with ID 1 not found",
+  "errorCode": "JOB_PROFILE_NOT_FOUND"
+}
+```
 
 ---
 
-#### 5. Delete Job Profile
+### 5. Delete Job Profile
 
-**DELETE** `/jobProfile/:id`
+Deletes a job profile by ID.
 
-**Response:**
+**Endpoint:** `DELETE /:id`
+
+**URL Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| id | integer | Job profile ID (positive integer) |
+
+**Request Headers:**
+
+```json
 {
-"success": true,
-"message": "Job Profile deleted successfully",
-"data": null
+  "Authorization": "Bearer <token>"
 }
+```
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Job Profile deleted successfully",
+  "data": null
+}
+```
+
+**Error Response:** `404 Not Found`
+
+```json
+{
+  "success": false,
+  "message": "Job profile with ID 1 not found",
+  "errorCode": "JOB_PROFILE_NOT_FOUND"
+}
+```
+
+---
+
+## Job Description (JD) File Management
+
+### 6. Upload JD File
+
+Uploads or replaces a JD file for an existing job profile.
+
+**Endpoint:** `POST /:id/upload-JD`
+
+**URL Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| id | integer | Job profile ID (positive integer) |
+
+**Request Headers:**
+
+```json
+{
+  "Authorization": "Bearer <token>",
+  "Content-Type": "multipart/form-data"
+}
+```
+
+**Request Body (multipart/form-data):**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| JD | file | Yes | Job description file (PDF, DOC, DOCX; max 5MB) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "JD uploaded successfully",
+  "data": {
+    "jobProfileId": 1,
+    "filename": "jd-descriptions/jobProfile_1_1234567890.pdf",
+    "originalName": "Senior_Engineer_JD.pdf",
+    "size": 245678,
+    "location": "https://s3.amazonaws.com/bucket/jd-descriptions/jobProfile_1_1234567890.pdf",
+    "uploadDate": "2024-01-15T10:30:00.000Z"
+  }
+}
+```
+
+**Error Response:** `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "No JD file uploaded",
+  "errorCode": "NO_FILE_UPLOADED"
+}
+```
+
+**Error Response:** `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "Invalid JD file type. Only PDF, DOC, and DOCX are allowed.",
+  "errorCode": "INVALID_JD_FILE_TYPE"
+}
+```
+
+---
+
+### 7. Download JD File
+
+Downloads the JD file for a job profile.
+
+**Endpoint:** `GET /:id/get-JD`
+
+**URL Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| id | integer | Job profile ID (positive integer) |
+
+**Request Headers:**
+
+```json
+{
+  "Authorization": "Bearer <token>"
+}
+```
+
+**Response:** `200 OK`
+
+- Returns the file as a downloadable attachment
+- Content-Type header set to file's MIME type
+- Content-Disposition header set to `attachment; filename="<original_filename>"`
+
+**Error Response:** `404 Not Found`
+
+```json
+{
+  "success": false,
+  "message": "No JD found for this Job Profile",
+  "errorCode": "JD_NOT_FOUND"
+}
+```
+
+---
+
+### 8. Preview JD File
+
+Previews the JD file in the browser (PDF only).
+
+**Endpoint:** `GET /:id/get-JD/preview`
+
+**URL Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| id | integer | Job profile ID (positive integer) |
+
+**Request Headers:**
+
+```json
+{
+  "Authorization": "Bearer <token>"
+}
+```
+
+**Response:** `200 OK`
+
+- Returns the PDF file for inline preview
+- Content-Type header set to `application/pdf`
+- Content-Disposition header set to `inline; filename="<original_filename>"`
+
+**Error Response:** `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "Preview is only supported for PDF files. Please download the file instead.",
+  "errorCode": "PREVIEW_NOT_SUPPORTED",
+  "details": {
+    "fileType": ".docx",
+    "supportedTypes": [".pdf"]
+  }
+}
+```
+
+---
+
+### 9. Get JD File Information
+
+Retrieves metadata about the JD file without downloading it.
+
+**Endpoint:** `GET /:id/JD/info`
+
+**URL Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| id | integer | Job profile ID (positive integer) |
+
+**Request Headers:**
+
+```json
+{
+  "Authorization": "Bearer <token>"
+}
+```
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "JD information retrieved successfully",
+  "data": {
+    "hasJD": true,
+    "originalName": "Senior_Engineer_JD.pdf",
+    "uploadDate": "2024-01-15T10:30:00.000Z",
+    "s3Key": "jd-descriptions/jobProfile_1_1234567890.pdf",
+    "fileExtension": ".pdf",
+    "mimeType": "application/pdf",
+    "supportsPreview": true
+  }
+}
+```
+
+**Response (No JD):** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "JD information retrieved successfully",
+  "data": {
+    "hasJD": false,
+    "originalName": null,
+    "uploadDate": null,
+    "s3Key": null
+  }
+}
+```
+
+---
+
+### 10. Delete JD File
+
+Deletes the JD file from a job profile.
+
+**Endpoint:** `DELETE /:id/delete-JD`
+
+**URL Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| id | integer | Job profile ID (positive integer) |
+
+**Request Headers:**
+
+```json
+{
+  "Authorization": "Bearer <token>"
+}
+```
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "JD deleted successfully",
+  "data": {
+    "message": "JD deleted successfully",
+    "deletedFile": "jd-descriptions/jobProfile_1_1234567890.pdf"
+  }
+}
+```
+
+**Error Response:** `404 Not Found`
+
+```json
+{
+  "success": false,
+  "message": "No JD found for this Job Profile",
+  "errorCode": "JD_NOT_FOUND"
+}
+```
 
 ---
 
 ## Validation Rules
 
-Handled via Joi:
+### Job Profile Fields
 
-- `clientId`, `departmentId`, `positions`: positive integers
-- `jobProfileDescription`: minimum 10, maximum 500 characters
-- `jobRole`: 2–100 characters
-- `techSpecification`: comma-separated list, min 2 chars each
-- `estimatedCloseDate`: must be a valid date in the future
-- `location` : must be a json object with city and country attributes
+| Field                 | Type    | Validation                                                        |
+| --------------------- | ------- | ----------------------------------------------------------------- |
+| clientId              | integer | Required, positive integer                                        |
+| departmentId          | integer | Required, positive integer                                        |
+| jobProfileDescription | string  | Required, 10-500 characters                                       |
+| jobRole               | string  | Required, 2-100 characters, unique per client                     |
+| techSpecification     | string  | Required, comma-separated values (min 2 chars each)               |
+| positions             | integer | Required, positive integer                                        |
+| estimatedCloseDate    | string  | Required, YYYY-MM-DD format, cannot be in past                    |
+| workArrangement       | string  | Required, one of: `remote`, `onsite`, `hybrid`                    |
+| location              | object  | Required, must contain `country` and `city` fields                |
+| location.country      | string  | Required                                                          |
+| location.city         | string  | Required, 2-100 characters                                        |
+| status                | string  | Optional, one of: `pending`, `in progress`, `closed`, `cancelled` |
 
-**Example Error:**
-{
-"success": false,
-"error": "VALIDATION_ERROR",
-"message": "Validation failed",
-"details": [
-{ "field": "jobRole", "message": "Job role is required" }
-]
-}
+### JD File Requirements
+
+- **Allowed formats:** PDF, DOC, DOCX
+- **Maximum size:** 5MB
+- **Preview support:** PDF only
 
 ---
 
-## Error Handling
+## Common Error Codes
 
-Uses `AppError` with centralized response formatting.
+| Error Code                     | HTTP Status | Description                            |
+| ------------------------------ | ----------- | -------------------------------------- |
+| VALIDATION_ERROR               | 400         | Request validation failed              |
+| INVALID_JOB_PROFILE_ID         | 400         | Invalid job profile ID format          |
+| DUPLICATE_JOB_ROLE             | 409         | Job role already exists for client     |
+| JOB_PROFILE_NOT_FOUND          | 404         | Job profile not found                  |
+| JOB_PROFILE_UPDATE_NOT_ALLOWED | 400         | Cannot update closed/cancelled profile |
+| INVALID_LOCATION               | 400         | Location does not exist                |
+| INVALID_STATUS                 | 400         | Status does not exist                  |
+| NO_FILE_UPLOADED               | 400         | JD file was not provided               |
+| INVALID_JD_FILE_TYPE           | 400         | Invalid file format for JD             |
+| JD_FILE_TOO_LARGE              | 400         | JD file exceeds 5MB limit              |
+| JD_NOT_FOUND                   | 404         | No JD file found for job profile       |
+| PREVIEW_NOT_SUPPORTED          | 400         | Preview only supported for PDF files   |
 
-**Example Database Error:**
-{
-"success": false,
-"error": "FOREIGN_KEY_CONSTRAINT",
-"message": "Invalid foreign key provided - referenced record does not exist"
-}
+---
+
+## Notes
+
+1. All endpoints require authentication
+2. Dates are in ISO 8601 format
+3. File uploads use multipart/form-data encoding
+4. JSON objects in multipart requests must be sent as strings
+5. Closed and cancelled job profiles cannot be updated
+6. Uploading a new JD file will replace any existing JD file
+7. Job roles must be unique per client
 
 # Candidate API CRUD
 

@@ -13,7 +13,9 @@ class CandidateValidatorHelper {
     }
 
     async getStatusIdByName(statusName, client = null) {
-        if (!statusName) return null;
+        if (!statusName) {
+            statusName = 'pending';
+        }
 
         const cacheKey = statusName.toLowerCase().trim();
         if (this.statusCache.has(cacheKey)) {
