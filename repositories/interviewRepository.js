@@ -435,30 +435,43 @@ class InterviewRepository {
     async renumberCandidateRounds(candidateId, client) {
         const connection = client;
 
-        // Get all active interviews for this candidate, ordered by date and time
-        const [rows] = await connection.query(
-            `SELECT interviewId
-             FROM interview
-             WHERE candidateId = ? AND isActive = TRUE
-             ORDER BY interviewDate ASC, fromTime ASC, interviewId ASC`,
+        if (!candidateId) {
+            throw new AppError(
+                'Candidate ID is required for renumbering',
+                400,
+                'MISSING_CANDIDATE_ID'
+            );
+        }
+
+        // Get total active interviews for this candidate
+        const [[{ total }]] = await connection.query(
+            `SELECT COUNT(*) AS total
+         FROM interview
+         WHERE candidateId = ? AND isActive = TRUE`,
             [candidateId]
         );
 
-        const totalInterviews = rows.length;
-
-        // Update each interview with correct round number and total
-        let roundNumber = 1;
-        for (const row of rows) {
-            await connection.execute(
-                `UPDATE interview
-                 SET roundNumber = ?, totalInterviews = ?
-                 WHERE interviewId = ?`,
-                [roundNumber, totalInterviews, row.interviewId]
-            );
-            roundNumber++;
+        if (total === 0) {
+            return 0;
         }
 
-        return totalInterviews;
+        // Reset round numbers atomically (NO collisions)
+        await connection.query(
+            `
+        SET @r := 0;
+
+        UPDATE interview
+        SET
+            roundNumber = (@r := @r + 1),
+            totalInterviews = ?
+        WHERE candidateId = ?
+          AND isActive = TRUE
+        ORDER BY interviewDate ASC, fromTime ASC, interviewId ASC;
+        `,
+            [total, candidateId]
+        );
+
+        return total;
     }
 
     async create(candidateId, interviewData, client) {
