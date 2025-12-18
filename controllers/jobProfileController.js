@@ -288,8 +288,12 @@ class JobProfileController {
     });
 
     deleteJobProfile = catchAsync(async (req, res) => {
-        await this.jobProfileService.deleteJobProfile(parseInt(req.params.id), req.auditContext);
+        const jdInfo = await this.jobProfileService.getJDInfo(parseInt(req.params.id));
+        if (jdInfo.hasJD && jdInfo.s3Key) {
+            await this.jobProfileService.deleteJD(parseInt(req.params.id));
+        }
 
+        await this.jobProfileService.deleteJobProfile(parseInt(req.params.id), req.auditContext);
         return ApiResponse.success(
             res,
             null,
