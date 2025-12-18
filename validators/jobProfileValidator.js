@@ -5,16 +5,51 @@ class JobProfileValidatorHelper {
         this.db = db;
         this.statusCache = new Map();
         this.locationCache = new Map();
+        this.CACHE_TTL_MS = 5 * 60 * 1000;
+        this.cacheInitializedAt = Date.now();
+    }
+
+    _isCacheExpired() {
+        return Date.now() - this.cacheInitializedAt > this.CACHE_TTL_MS;
+    }
+
+    _resetCacheIfNeeded() {
+        if (this._isCacheExpired()) {
+            this.statusCache.clear();
+            this.locationCache.clear();
+            this.cacheInitializedAt = Date.now();
+        }
+    }
+
+    async _validateLookupKeyExists(lookupKey, client = null) {
+        const connection = client || await this.db.getConnection();
+        try {
+            const [rows] = await connection.execute(
+                'SELECT 1 FROM lookup WHERE lookupKey = ?',
+                [lookupKey]
+            );
+            return rows.length > 0;
+        } finally {
+            if (!client) connection.release();
+        }
     }
 
     async getStatusIdByName(statusName, client = null) {
+        this._resetCacheIfNeeded();
         if (!statusName) {
             statusName = 'pending';
         }
 
         const cacheKey = statusName.toLowerCase().trim();
         if (this.statusCache.has(cacheKey)) {
-            return this.statusCache.get(cacheKey);
+            const cachedId = this.statusCache.get(cacheKey);
+
+            const isValid = await this._validateLookupKeyExists(cachedId, client);
+            if (isValid) {
+                return cachedId;
+            }
+
+            this.statusCache.delete(cacheKey);
         }
 
         const connection = client || await this.db.getConnection();
@@ -41,6 +76,7 @@ class JobProfileValidatorHelper {
     }
 
     async getLocationIdByName(locationName, client = null) {
+        this._resetCacheIfNeeded();
         if (!locationName) return null;
         if (!locationName.city) {
             throw new AppError(
@@ -55,8 +91,16 @@ class JobProfileValidatorHelper {
 
         const cacheKey = locationValue.toLowerCase().trim();
         if (this.locationCache.has(cacheKey)) {
-            return this.locationCache.get(cacheKey);
+            const cachedId = this.locationCache.get(cacheKey);
+
+            const isValid = await this._validateLookupKeyExists(cachedId, client);
+            if (isValid) {
+                return cachedId;
+            }
+
+            this.locationCache.delete(cacheKey);
         }
+
 
         const connection = client || await this.db.getConnection();
         try {
@@ -387,7 +431,7 @@ class JobProfileValidator {
                 delete value.status;
             } else {
                 // Set default status if not provided
-                value.statusId = 4;
+                value.statusId = await JobProfileValidator.helper.getStatusIdByName('pending');
             }
 
             // Check for duplicate job role for the same client

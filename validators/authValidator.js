@@ -144,7 +144,7 @@ class AuthValidator {
                 field: detail.path.join('.'),
                 message: detail.message
             }));
-            return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR', details));
+            return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details }));
         }
         next();
     }
@@ -157,7 +157,7 @@ class AuthValidator {
                 field: detail.path.join('.'),
                 message: detail.message
             }));
-            return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR', details));
+            return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details }));
         }
 
         if (value.designation) {
@@ -178,7 +178,7 @@ class AuthValidator {
                     field: detail.path.join('.'),
                     message: detail.message
                 }));
-                return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR', details));
+                return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details }));
             }
 
             req.body = value;
