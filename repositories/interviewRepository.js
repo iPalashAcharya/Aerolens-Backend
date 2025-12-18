@@ -435,7 +435,7 @@ class InterviewRepository {
     async renumberCandidateRounds(candidateId, client) {
         const connection = client;
 
-        // Get active interviews ordered deterministically
+        // Fetch active interviews in deterministic order
         const [rows] = await connection.query(
             `
         SELECT interviewId
@@ -449,15 +449,34 @@ class InterviewRepository {
         const total = rows.length;
         if (total === 0) return 0;
 
-        // Assign round numbers safely in JS
-        for (let i = 0; i < rows.length; i++) {
+        /*
+         * PHASE 1: Break uniqueness
+         * Move roundNumber into a safe negative range
+         */
+        let temp = -1;
+        for (const row of rows) {
+            await connection.execute(
+                `
+            UPDATE interview
+            SET roundNumber = ?
+            WHERE interviewId = ?
+            `,
+                [temp--, row.interviewId]
+            );
+        }
+
+        /*
+         * PHASE 2: Assign correct round numbers
+         */
+        let round = 1;
+        for (const row of rows) {
             await connection.execute(
                 `
             UPDATE interview
             SET roundNumber = ?, totalInterviews = ?
             WHERE interviewId = ?
             `,
-                [i + 1, total, rows[i].interviewId]
+                [round++, total, row.interviewId]
             );
         }
 
