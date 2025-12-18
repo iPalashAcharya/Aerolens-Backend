@@ -627,12 +627,12 @@ class InterviewRepository {
     async delete(interviewId, client) {
         try {
             const [interviewRow] = await client.query(
-                `SELECT candidateId FROM interview WHERE interviewId = ?`,
+                `SELECT candidateId FROM interview WHERE interviewId = ? AND isActive=TRUE`,
                 [interviewId]
             );
 
             const [result] = await client.execute(
-                `UPDATE interview SET isActive=FALSE WHERE interviewId=?`,
+                `UPDATE interview SET isActive=FALSE,deletedAt=NOW() WHERE interviewId=?`,
                 [interviewId]
             );
 

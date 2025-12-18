@@ -519,7 +519,7 @@ class InterviewService {
                 );
             }
 
-            const candidateId = exists.candidateId;
+            //const candidateId = exists.candidateId;
 
             const deleteResult = await this.interviewRepository.delete(interviewId, client);
 
@@ -535,7 +535,7 @@ class InterviewService {
                 );
             }
 
-            await this.interviewRepository.renumberCandidateRounds(candidateId, client);
+            await this.interviewRepository.renumberCandidateRounds(deleteResult.candidateId, client);
 
             await auditLogService.logAction({
                 userId: auditContext.userId,
