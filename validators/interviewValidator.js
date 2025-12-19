@@ -3,20 +3,21 @@ const AppError = require('../utils/appError');
 
 const interviewSchemas = {
     create: Joi.object({
-        interviewDate: Joi.date()
-            .iso()
+        interviewDate: Joi.string()
+            .pattern(/^\d{4}-\d{2}-\d{2}$/)
             .required()
             .custom((value, helpers) => {
+                const inputDate = new Date(value + 'T00:00:00');
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
-                if (value < today) {
-                    return helpers.error('date.min', { limit: today.toISOString().split('T')[0] });
+                if (inputDate < today) {
+                    return helpers.error('date.min');
                 }
                 return value;
             })
             .messages({
+                'string.pattern.base': 'Interview date must be in YYYY-MM-DD format',
                 'date.min': 'Interview date cannot be in the past',
-                'date.base': 'Interview date must be a valid date',
                 'any.required': 'Interview date is required'
             }),
         fromTime: Joi.string()
@@ -84,20 +85,21 @@ const interviewSchemas = {
     }),
 
     scheduleRound: Joi.object({
-        interviewDate: Joi.date()
-            .iso()
+        interviewDate: Joi.string()
+            .pattern(/^\d{4}-\d{2}-\d{2}$/)
             .required()
             .custom((value, helpers) => {
+                const inputDate = new Date(value + 'T00:00:00');
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
-                if (value < today) {
-                    return helpers.error('date.min', { limit: today.toISOString().split('T')[0] });
+                if (inputDate < today) {
+                    return helpers.error('date.min');
                 }
                 return value;
             })
             .messages({
+                'string.pattern.base': 'Interview date must be in YYYY-MM-DD format',
                 'date.min': 'Interview date cannot be in the past',
-                'date.base': 'Interview date must be a valid date',
                 'any.required': 'Interview date is required'
             }),
         fromTime: Joi.string()
@@ -160,20 +162,21 @@ const interviewSchemas = {
                 'number.integer': 'Scheduled by ID must be an integer',
                 'number.positive': 'Scheduled by ID must be positive'
             }),
-        interviewDate: Joi.date()
-            .iso()
+        interviewDate: Joi.string()
+            .pattern(/^\d{4}-\d{2}-\d{2}$/)
             .optional()
             .custom((value, helpers) => {
+                const inputDate = new Date(value + 'T00:00:00');
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
-                if (value < today) {
+                if (inputDate < today) {
                     return helpers.error('date.min');
                 }
                 return value;
             })
             .messages({
-                'date.min': 'Interview date cannot be in the past',
-                'date.base': 'Interview date must be a valid date'
+                'string.pattern.base': 'Interview date must be in YYYY-MM-DD format',
+                'date.min': 'Interview date cannot be in the past'
             }),
         fromTime: Joi.string()
             .pattern(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
@@ -244,6 +247,39 @@ const interviewSchemas = {
                 'number.integer': 'Candidate ID must be an integer',
                 'number.positive': 'Candidate ID must be positive',
                 'any.required': 'Candidate ID is required'
+            })
+    }),
+    query: Joi.object({
+        startDate: Joi.string()
+            .pattern(/^\d{4}-\d{2}-\d{2}$/)
+            .required()
+            .messages({
+                'string.pattern.base': 'startDate must be in YYYY-MM-DD format',
+                'any.required': 'startDate is required'
+            }),
+        endDate: Joi.string()
+            .pattern(/^\d{4}-\d{2}-\d{2}$/)
+            .required()
+            .custom((value, helpers) => {
+                const { startDate } = helpers.state.ancestors[0];
+                if (startDate && value <= startDate) {
+                    return helpers.error('date.greater');
+                }
+                return value;
+            })
+            .messages({
+                'string.pattern.base': 'endDate must be in YYYY-MM-DD format',
+                'date.greater': 'endDate must be greater than startDate',
+                'any.required': 'endDate is required'
+            })
+    }),
+    dailyQuery: Joi.object({
+        date: Joi.string()
+            .pattern(/^\d{4}-\d{2}-\d{2}$/)
+            .required()
+            .messages({
+                "string.pattern.base": "date must be in YYYY-MM-DD format",
+                "any.required": "date is required"
             })
     })
 };
@@ -330,6 +366,44 @@ class InterviewValidator {
                 }))
             });
         }
+        next();
+    }
+
+    static validateQuery(req, res, next) {
+        const { value, error } = interviewSchemas.query.validate(req.query, {
+            abortEarly: false,
+            stripUnknown: true
+        });
+
+        if (error) {
+            throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', {
+                validationErrors: error.details.map(detail => ({
+                    field: detail.path[0],
+                    message: detail.message
+                }))
+            });
+        }
+
+        req.validatedQuery = value;
+        next();
+    }
+
+    static validateDailyQuery(req, res, next) {
+        const { value, error } = interviewSchemas.dailyQuery.validate(req.query, {
+            abortEarly: false,
+            stripUnknown: true
+        });
+
+        if (error) {
+            throw new AppError("Validation failed", 400, "VALIDATION_ERROR", {
+                validationErrors: error.details.map(d => ({
+                    field: d.path[0],
+                    message: d.message
+                }))
+            });
+        }
+
+        req.validatedQuery = value;
         next();
     }
 }

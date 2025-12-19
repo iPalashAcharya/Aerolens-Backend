@@ -98,6 +98,37 @@ const registerSchema = Joi.object({
         .default(false)
 });
 
+const changePasswordSchema = Joi.object({
+    currentPassword: Joi.string()
+        .required()
+        .messages({
+            'any.required': 'Current password is required',
+            'string.empty': 'Current password cannot be empty'
+        }),
+    newPassword: Joi.string()
+        .required()
+        .min(8)
+        .max(128)
+        .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+        .invalid(Joi.ref('currentPassword'))
+        .messages({
+            'any.required': 'New password is required',
+            'string.min': 'New password must be at least 8 characters',
+            'string.max': 'New password cannot exceed 128 characters',
+            'string.empty': 'New password cannot be empty',
+            'string.pattern.base': 'New password must contain at least one uppercase letter, one lowercase letter, one number and one special character (@$!%*?&)',
+            'any.invalid': 'New password must be different from current password'
+        }),
+    /*confirmPassword: Joi.string()
+        .required()
+        .valid(Joi.ref('newPassword'))
+        .messages({
+            'any.required': 'Password confirmation is required',
+            'any.only': 'Passwords do not match',
+            'string.empty': 'Password confirmation cannot be empty'
+        })*/
+});
+
 class AuthValidator {
     static helper = null;
 
@@ -113,7 +144,7 @@ class AuthValidator {
                 field: detail.path.join('.'),
                 message: detail.message
             }));
-            return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR', details));
+            return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details }));
         }
         next();
     }
@@ -126,7 +157,7 @@ class AuthValidator {
                 field: detail.path.join('.'),
                 message: detail.message
             }));
-            return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR', details));
+            return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details }));
         }
 
         if (value.designation) {
@@ -134,6 +165,27 @@ class AuthValidator {
         }
         req.body = value;
         next();
+    }
+    static async validateResetPassword(req, res, next) {
+        try {
+            const { error, value } = changePasswordSchema.validate(req.body, {
+                abortEarly: false,
+                stripUnknown: true
+            });
+
+            if (error) {
+                const details = error.details.map(detail => ({
+                    field: detail.path.join('.'),
+                    message: detail.message
+                }));
+                return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details }));
+            }
+
+            req.body = value;
+            next();
+        } catch (err) {
+            next(new AppError('Validation error occurred', 500, 'VALIDATION_SYSTEM_ERROR', err.message));
+        }
     }
 }
 

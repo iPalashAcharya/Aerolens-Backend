@@ -1,11 +1,11 @@
 services:
-  backend:
+  backend-dev:
     build: .
-    image: aerolens-portal-backend:latest
-    container_name: aerolens-portal-backend
+    image: aerolens-portal-backend-dev:latest
+    container_name: aerolens-portal-backend-dev
     ports:
-      - "3000:3000"
+      - "3001:3000"
     environment:
       - AWS_REGION=ap-south-1
-      - SECRET_NAME=/myapp/prod/env
+      - SECRET_NAME=dev/myapp/secrets
     restart: always

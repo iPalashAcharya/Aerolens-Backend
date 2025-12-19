@@ -137,6 +137,19 @@ class AuthService {
         };
     }
 
+    async changePassword(memberId, currentPassword, newPassword) {
+        const member = await memberRepository.findById(memberId);
+        const isValid = await this.comparePassword(currentPassword, member.password);
+        if (!isValid) {
+            throw new AppError('Current password is incorrect', 401, 'INVALID_CURRENT_PASSWORD');
+        }
+        const hashedNewPassword = await this.hashPassword(newPassword);
+        await memberRepository.updatePassword(memberId, hashedNewPassword);
+        // Revoke all existing tokens
+        await tokenRepository.revokeAllTokensByMember(memberId);
+        return { success: true };
+    }
+
     async refreshToken(currentToken, userAgent, ipAddress) {
         let decoded;
 

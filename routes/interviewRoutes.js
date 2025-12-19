@@ -34,6 +34,22 @@ router.get('/:interviewId',
     interviewController.getById
 );
 
+router.get('/report/overall',
+    interviewController.getTotalSummary
+);
+
+router.get(
+    '/report/monthly',
+    InterviewValidator.validateQuery,
+    interviewController.getMonthlySummary
+);
+
+router.get(
+    '/report/daily',
+    InterviewValidator.validateDailyQuery,
+    interviewController.getDailySummary
+);
+
 router.post('/:candidateId',
     InterviewValidator.validateParams,
     InterviewValidator.validateCreate,

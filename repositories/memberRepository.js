@@ -6,7 +6,7 @@ class MemberRepository {
         const connection = await db.getConnection();
         try {
             const [rows] = await connection.execute(
-                `SELECT m.memberId, m.memberName, m.memberContact, m.email, l.value AS designation,
+                `SELECT m.memberId, m.memberName, m.memberContact, m.email, m.password, l.value AS designation,
                         m.isRecruiter, m.isActive, m.lastLogin, m.createdAt, m.updatedAt
                  FROM member m INNER JOIN lookup l
                  ON m.designation = l.lookupKey

@@ -136,14 +136,10 @@ async function startServer() {
         app.use(compression());
         app.set('trust proxy', 1);
 
-        // ============================================
-        // SIMPLE ENTERPRISE RATE LIMITING
-        // ============================================
-
         // Global rate limiter - VERY RELAXED for office environments
         const globalLimiter = rateLimit({
             windowMs: 1 * 60 * 1000,
-            max: 500, // Very high limit
+            max: 500,
             standardHeaders: true,
             legacyHeaders: false,
             skip: (req) => req.path === '/health'
@@ -285,7 +281,7 @@ async function startServer() {
         app.use('/auth/login', loginLimiter);
         app.use('/auth/register', strictLimiter);
         app.use('/auth/forgot-password', strictLimiter);
-        app.use('/auth/reset-password', strictLimiter);
+        app.use('/auth/change-password', strictLimiter);
 
         app.use('/auth', authRoutes);
         app.use('/client', clientRoutes);
@@ -313,15 +309,15 @@ async function startServer() {
         });
 
         app.listen(PORT, () => {
-            console.log(`✓ Server started successfully on port ${PORT}`);
-            console.log(`✓ Global rate limit: 500 requests/minute per IP`);
-            console.log(`✓ Burst protection: 100 requests/10 seconds (unauthenticated only)`);
-            console.log(`✓ Login limit: 20 attempts/15 minutes`);
-            console.log(`✓ Authenticated users bypass burst limits`);
+            console.log(`Server started successfully on port ${PORT}`);
+            console.log(`Global rate limit: 500 requests/minute per IP`);
+            console.log(`Burst protection: 100 requests/10 seconds (unauthenticated only)`);
+            console.log(`Login limit: 20 attempts/15 minutes`);
+            console.log(`Authenticated users bypass burst limits`);
         });
 
     } catch (error) {
-        console.error('✗ Failed to start server:', error);
+        console.error('Failed to start server:', error);
         process.exit(1);
     }
 }

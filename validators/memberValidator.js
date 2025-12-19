@@ -8,9 +8,50 @@ class MemberValidatorHelper {
         this.clientCache = new Map();
         this.locationCache = new Map();
         this.skillCache = new Map();
+        this.CACHE_TTL_MS = 5 * 60 * 1000;
+        this.cacheInitializedAt = Date.now();
+    }
+
+    _isCacheExpired() {
+        return Date.now() - this.cacheInitializedAt > this.CACHE_TTL_MS;
+    }
+
+    _resetCacheIfNeeded() {
+        if (this._isCacheExpired()) {
+            this.designationCache.clear();
+            this.clientCache.clear();
+            this.locationCache.clear();
+            this.skillCache.clear();
+            this.cacheInitializedAt = Date.now();
+        }
+    }
+
+    async _validateIdExists(table, column, id, client = null) {
+        const connection = client || await this.db.getConnection();
+        const ALLOWED = {
+            lookup: ['lookupKey'],
+            member: ['memberId'],
+            location: ['locationId'],
+            client: ['clientId'],
+            candidate: ['candidateId']
+        };
+
+        if (!ALLOWED[table]?.includes(column)) {
+            throw new AppError('Invalid lookup reference', 500, 'INTERNAL_ERROR');
+        }
+        try {
+            const [rows] = await connection.execute(
+                `SELECT 1 FROM ${table} WHERE ${column} = ?`,
+                [id]
+            );
+            return rows.length > 0;
+        } finally {
+            if (!client) connection.release();
+        }
     }
 
     async transformSkills(skills, client = null) {
+        this._resetCacheIfNeeded();
         if (!skills || !Array.isArray(skills)) return [];
 
         const connection = client || await this.db.getConnection();
@@ -21,6 +62,19 @@ class MemberValidatorHelper {
                 const cacheKey = skill.skillName.toLowerCase().trim();
 
                 let skillId = this.skillCache.get(cacheKey);
+                if (skillId) {
+                    const isValid = await this._validateIdExists(
+                        'lookup',
+                        'lookupKey',
+                        skillId,
+                        client
+                    );
+
+                    if (!isValid) {
+                        this.skillCache.delete(cacheKey);
+                        skillId = null;
+                    }
+                }
                 if (!skillId) {
                     const query = `
                         SELECT lookupKey FROM lookup 
@@ -51,11 +105,25 @@ class MemberValidatorHelper {
     }
 
     async transformDesignation(designation, client = null) {
+        this._resetCacheIfNeeded();
         if (!designation) return null;
         const cacheKey = designation.toLowerCase().trim();
         if (this.designationCache.has(cacheKey)) {
-            return this.designationCache.get(cacheKey);
+            const cachedId = this.designationCache.get(cacheKey);
+
+            const isValid = await this._validateIdExists(
+                'lookup',
+                'lookupKey',
+                cachedId,
+                client
+            );
+
+            if (isValid) return cachedId;
+
+            // self-heal
+            this.designationCache.delete(cacheKey);
         }
+
         const connection = client || await this.db.getConnection();
         try {
             const query = `SELECT lookupKey FROM lookup WHERE LOWER(value) = LOWER(?) AND lookup.tag = 'designation'`;
@@ -96,11 +164,24 @@ class MemberValidatorHelper {
     }
 
     async transformClient(clientName, client = null) {
+        this._resetCacheIfNeeded();
         if (!clientName) return null;
         const cacheKey = clientName.trim().toLowerCase();
         if (this.clientCache.has(cacheKey)) {
-            return this.clientCache.get(cacheKey);
+            const cachedId = this.clientCache.get(cacheKey);
+
+            const isValid = await this._validateIdExists(
+                'client',
+                'clientId',
+                cachedId,
+                client
+            );
+
+            if (isValid) return cachedId;
+
+            this.clientCache.delete(cacheKey);
         }
+
         const connection = client || await this.db.getConnection();
 
         try {
@@ -123,6 +204,7 @@ class MemberValidatorHelper {
     }
 
     async getLocationIdByName(locationName, client = null) {
+        this._resetCacheIfNeeded();
         if (!locationName) return null;
         if (!locationName.city) {
             throw new AppError(
@@ -137,7 +219,18 @@ class MemberValidatorHelper {
 
         const cacheKey = locationValue.toLowerCase().trim();
         if (this.locationCache.has(cacheKey)) {
-            return this.locationCache.get(cacheKey);
+            const cachedId = this.locationCache.get(cacheKey);
+
+            const isValid = await this._validateIdExists(
+                'location',
+                'locationId',
+                cachedId,
+                client
+            );
+
+            if (isValid) return cachedId;
+
+            this.locationCache.delete(cacheKey);
         }
 
         const connection = client || await this.db.getConnection();

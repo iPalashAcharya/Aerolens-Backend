@@ -58,7 +58,7 @@ class CandidateRepository {
                 candidateData.noticePeriod,
                 candidateData.experienceYears,
                 candidateData.linkedinProfileUrl !== undefined ? candidateData.linkedinProfileUrl : null,
-                candidateData.statusId !== undefined ? candidateData.statusId : 9,
+                candidateData.statusId,
                 null,
                 null,
                 null,

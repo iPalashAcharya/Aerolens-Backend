@@ -5,14 +5,51 @@ class JobProfileValidatorHelper {
         this.db = db;
         this.statusCache = new Map();
         this.locationCache = new Map();
+        this.CACHE_TTL_MS = 5 * 60 * 1000;
+        this.cacheInitializedAt = Date.now();
+    }
+
+    _isCacheExpired() {
+        return Date.now() - this.cacheInitializedAt > this.CACHE_TTL_MS;
+    }
+
+    _resetCacheIfNeeded() {
+        if (this._isCacheExpired()) {
+            this.statusCache.clear();
+            this.locationCache.clear();
+            this.cacheInitializedAt = Date.now();
+        }
+    }
+
+    async _validateLookupKeyExists(lookupKey, client = null) {
+        const connection = client || await this.db.getConnection();
+        try {
+            const [rows] = await connection.execute(
+                'SELECT 1 FROM lookup WHERE lookupKey = ?',
+                [lookupKey]
+            );
+            return rows.length > 0;
+        } finally {
+            if (!client) connection.release();
+        }
     }
 
     async getStatusIdByName(statusName, client = null) {
-        if (!statusName) return null;
+        this._resetCacheIfNeeded();
+        if (!statusName) {
+            statusName = 'pending';
+        }
 
         const cacheKey = statusName.toLowerCase().trim();
         if (this.statusCache.has(cacheKey)) {
-            return this.statusCache.get(cacheKey);
+            const cachedId = this.statusCache.get(cacheKey);
+
+            const isValid = await this._validateLookupKeyExists(cachedId, client);
+            if (isValid) {
+                return cachedId;
+            }
+
+            this.statusCache.delete(cacheKey);
         }
 
         const connection = client || await this.db.getConnection();
@@ -39,6 +76,7 @@ class JobProfileValidatorHelper {
     }
 
     async getLocationIdByName(locationName, client = null) {
+        this._resetCacheIfNeeded();
         if (!locationName) return null;
         if (!locationName.city) {
             throw new AppError(
@@ -53,8 +91,16 @@ class JobProfileValidatorHelper {
 
         const cacheKey = locationValue.toLowerCase().trim();
         if (this.locationCache.has(cacheKey)) {
-            return this.locationCache.get(cacheKey);
+            const cachedId = this.locationCache.get(cacheKey);
+
+            const isValid = await this._validateLookupKeyExists(cachedId, client);
+            if (isValid) {
+                return cachedId;
+            }
+
+            this.locationCache.delete(cacheKey);
         }
+
 
         const connection = client || await this.db.getConnection();
         try {
@@ -154,10 +200,23 @@ const jobProfileSchemas = {
             "any.required": "Positions is required",
         }),
 
-        estimatedCloseDate: Joi.date().greater("now").optional().messages({
-            "date.base": "Estimated close date must be a valid date",
-            "date.greater": "Estimated close date must be in the future",
-        }),
+        estimatedCloseDate: Joi.string()
+            .pattern(/^\d{4}-\d{2}-\d{2}$/)
+            .required()
+            .custom((value, helpers) => {
+                const inputDate = new Date(value + 'T00:00:00');
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                if (inputDate < today) {
+                    return helpers.error('date.min');
+                }
+                return value;
+            })
+            .messages({
+                'string.pattern.base': 'Close date must be in YYYY-MM-DD format',
+                'date.min': 'Close date cannot be in the past',
+                'any.required': 'Close date is required'
+            }),
 
         workArrangement: Joi.string().trim().lowercase().valid('remote', 'onsite', 'hybrid').required().messages({
             "any.only": "Work arrangement must be one of 'remote', 'onsite', or 'hybrid'",
@@ -221,10 +280,23 @@ const jobProfileSchemas = {
             }, "Comma-separated validation")
             .message("Tech specification must be comma separated values"),
 
-        estimatedCloseDate: Joi.date().greater("now").optional().messages({
-            "date.base": "Estimated close date must be a valid date",
-            "date.greater": "Estimated close date must be in the future",
-        }),
+        estimatedCloseDate: Joi.string()
+            .pattern(/^\d{4}-\d{2}-\d{2}$/)
+            .optional()
+            .custom((value, helpers) => {
+                const inputDate = new Date(value + 'T00:00:00');
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                if (inputDate < today) {
+                    return helpers.error('date.min');
+                }
+                return value;
+            })
+            .messages({
+                'string.pattern.base': 'Close date must be in YYYY-MM-DD format',
+                'date.min': 'Close date cannot be in the past',
+                'any.required': 'Close date is required'
+            }),
 
         workArrangement: Joi.string().trim().lowercase().valid('remote', 'onsite', 'hybrid').optional().messages({
             "any.only": "Work arrangement must be one of 'remote', 'onsite', or 'hybrid'"
@@ -359,7 +431,7 @@ class JobProfileValidator {
                 delete value.status;
             } else {
                 // Set default status if not provided
-                value.statusId = 4;
+                value.statusId = await JobProfileValidator.helper.getStatusIdByName('pending');
             }
 
             // Check for duplicate job role for the same client
@@ -386,11 +458,19 @@ class JobProfileValidator {
             const { error: paramsError } = jobProfileSchemas.params.validate(req.params, { abortEarly: false });
 
             // Validate body
-            const { error: bodyError, value } = jobProfileSchemas.update.validate(req.body, {
+            let { error: bodyError, value } = jobProfileSchemas.update.validate(req.body, {
                 abortEarly: false,
                 stripUnknown: true,
                 convert: true
             });
+
+            if (bodyError) {
+                const hasMinOneError = bodyError.details.some(d => d.type === 'object.min');
+                if (hasMinOneError && req.file) {
+                    bodyError = null;
+                    value = {};  // Set to empty object instead of leaving undefined
+                }
+            }
 
             if (paramsError || bodyError) {
                 const details = [];
@@ -523,6 +603,58 @@ class JobProfileValidator {
         } catch (error) {
             next(error);
         }
+    }
+    static validateJDUpload(req, res, next) {
+        if (!req.file) {
+            return next();
+        }
+
+        const allowedMimeTypes = [
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        ];
+
+        if (!allowedMimeTypes.includes(req.file.mimetype)) {
+            throw new AppError(
+                'Invalid JD file type. Only PDF, DOC, and DOCX are allowed.',
+                400,
+                'INVALID_JD_FILE_TYPE',
+                {
+                    allowedTypes: ['pdf', 'doc', 'docx'],
+                    receivedType: req.file.mimetype
+                }
+            );
+        }
+
+        const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
+
+        if (req.file.size > MAX_SIZE) {
+            throw new AppError(
+                'JD file size exceeds the 5MB limit',
+                400,
+                'JD_FILE_TOO_LARGE',
+                {
+                    maxSizeMB: 5
+                }
+            );
+        }
+
+        next();
+    }
+    static normalizeMultipartBody(req, res, next) {
+        if (req.body.location && typeof req.body.location === 'string') {
+            try {
+                req.body.location = JSON.parse(req.body.location);
+            } catch {
+                throw new AppError(
+                    'Invalid JSON in location field',
+                    400,
+                    'INVALID_LOCATION_JSON'
+                );
+            }
+        }
+        next();
     }
 }
 

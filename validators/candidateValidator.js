@@ -10,14 +10,69 @@ class CandidateValidatorHelper {
         this.locationCache = new Map();
         this.statusCache = new Map();
         this.recruiterCache = new Map();
+        this.CACHE_TTL_MS = 5 * 60 * 1000;
+        this.cacheInitializedAt = Date.now();
+    }
+
+    _isCacheExpired() {
+        return Date.now() - this.cacheInitializedAt > this.CACHE_TTL_MS;
+    }
+
+    _resetCacheIfNeeded() {
+        if (this._isCacheExpired()) {
+            this.statusCache.clear();
+            this.locationCache.clear();
+            this.recruiterCache.clear();
+            this.cacheInitializedAt = Date.now();
+        }
+    }
+
+    async _validateIdExists(table, column, id, client = null) {
+        const ALLOWED = {
+            lookup: ['lookupKey'],
+            member: ['memberId'],
+            location: ['locationId'],
+            client: ['clientId'],
+            candidate: ['candidateId']
+        };
+
+        if (!ALLOWED[table]?.includes(column)) {
+            throw new AppError('Invalid lookup reference', 500, 'INTERNAL_ERROR');
+        }
+        const connection = client || await this.db.getConnection();
+        try {
+            const [rows] = await connection.execute(
+                `SELECT 1 FROM ${table} WHERE ${column} = ?`,
+                [id]
+            );
+            return rows.length > 0;
+        } finally {
+            if (!client) connection.release();
+        }
     }
 
     async getStatusIdByName(statusName, client = null) {
-        if (!statusName) return null;
+        this._resetCacheIfNeeded();
+        if (!statusName) {
+            statusName = 'interview pending';
+        }
 
         const cacheKey = statusName.toLowerCase().trim();
         if (this.statusCache.has(cacheKey)) {
-            return this.statusCache.get(cacheKey);
+            const cachedId = this.statusCache.get(cacheKey);
+
+            const isValid = await this._validateIdExists(
+                'lookup',
+                'lookupKey',
+                cachedId,
+                client
+            );
+
+            if (isValid) {
+                return cachedId;
+            }
+
+            this.statusCache.delete(cacheKey);
         }
 
         const connection = client || await this.db.getConnection();
@@ -43,13 +98,25 @@ class CandidateValidatorHelper {
         }
     }
 
-    async getRecruiterId(recruiterName) {
+    async getRecruiterId(recruiterName, client = null) {
+        this._resetCacheIfNeeded();
         if (!recruiterName) return null;
-        const connection = await this.db.getConnection();
-        const cacheKey = recruiterName;
+        const connection = client || await this.db.getConnection();
+        const cacheKey = recruiterName.toLowerCase().trim();
         if (this.recruiterCache.has(cacheKey)) {
-            return this.recruiterCache.get(cacheKey);
+            const cachedId = this.recruiterCache.get(cacheKey);
+
+            const isValid = await this._validateIdExists(
+                'member',
+                'memberId',
+                cachedId,
+                client
+            );
+
+            if (isValid) return cachedId;
+            this.recruiterCache.delete(cacheKey);
         }
+
         try {
             const query = `SELECT memberId FROM member WHERE LOWER(memberName)= LOWER(?) AND isRecruiter=TRUE`;
             const [rows] = await connection.execute(query, [recruiterName.trim()]);
@@ -64,11 +131,14 @@ class CandidateValidatorHelper {
             this.recruiterCache.set(cacheKey, recruiterId);
             return recruiterId;
         } finally {
-            connection.release();
+            if (!client) {
+                connection.release();
+            }
         }
     }
 
     async transformLocation(locationName, client = null) {
+        this._resetCacheIfNeeded();
         if (!locationName) return null;
         if (!locationName.city) {
             throw new AppError(
@@ -83,7 +153,14 @@ class CandidateValidatorHelper {
 
         const cacheKey = locationValue.toLowerCase().trim();
         if (this.locationCache.has(cacheKey)) {
-            return this.locationCache.get(cacheKey);
+            const cachedId = this.locationCache.get(cacheKey);
+
+            const isValid = await this._validateIdExists('location', 'locationId', cachedId)
+            if (isValid) {
+                return cachedId;
+            }
+
+            this.locationCache.delete(cacheKey);
         }
 
         const connection = client || await this.db.getConnection();
@@ -300,7 +377,7 @@ const candidateSchemas = {
                 'string.max': 'LinkedIn profile URL cannot exceed 500 characters'
             }),
 
-        statusName: Joi.string()
+        status: Joi.string()
             .trim()
             .min(1)
             .max(50)
@@ -630,6 +707,8 @@ class CandidateValidator {
             if (value.status) {
                 value.statusId = await CandidateValidator.helper.getStatusIdByName(value.status);
                 delete value.status;
+            } else {
+                value.statusId = await CandidateValidator.helper.getStatusIdByName('interview pending');
             }
 
             if (value.recruiterName) {

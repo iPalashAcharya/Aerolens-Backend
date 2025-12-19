@@ -166,6 +166,81 @@ class InterviewService {
         }
     }
 
+    async getTotalSummary() {
+        const client = await this.db.getConnection();
+        try {
+            const result = await this.interviewRepository.getSummary(client);
+
+            return result;
+
+        } catch (error) {
+            if (!(error instanceof AppError)) {
+                console.error('Error Fetching total Interviewer data', error.stack);
+                throw new AppError(
+                    'Failed to Fetch Total Interviewer Data',
+                    500,
+                    'INTERVIEWER_DATA_FETCH_ERROR',
+                    { operation: 'getTotalSummary' }
+                );
+            }
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
+    async getMonthlySummary(startDate, endDate) {
+        const client = await this.db.getConnection();
+
+        try {
+            const result = await this.interviewRepository.getMonthlySummary(
+                client,
+                startDate,
+                endDate
+            );
+            return result;
+        } catch (error) {
+
+            if (!(error instanceof AppError)) {
+                console.error('Error Fetching total Monthly Report Data', error.stack);
+                throw new AppError(
+                    'Failed to Fetch Monthly Report Data',
+                    500,
+                    'MONTHLY_DATA_FETCH_ERROR',
+                    { operation: 'getMonthlySummary' }
+                );
+            }
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
+    async getDailySummary(date) {
+        const client = await this.db.getConnection();
+
+        try {
+
+            return await this.interviewRepository.getDailySummary(
+                client,
+                date
+            );
+
+        } catch (error) {
+            if (!(error instanceof AppError)) {
+                console.error('Error Fetching Daily Summary', error.stack);
+                throw new AppError(
+                    'Failed to Fetch Daily Report Data',
+                    500,
+                    'DAILY_DATA_FETCH_ERROR'
+                );
+            }
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
     /*async getInterviewRounds(interviewId) {
         const client = await this.db.getConnection();
 
@@ -444,7 +519,7 @@ class InterviewService {
                 );
             }
 
-            const candidateId = exists.candidateId;
+            //const candidateId = exists.candidateId;
 
             const deleteResult = await this.interviewRepository.delete(interviewId, client);
 
@@ -460,7 +535,7 @@ class InterviewService {
                 );
             }
 
-            await this.interviewRepository.renumberCandidateRounds(candidateId, client);
+            await this.interviewRepository.renumberCandidateRounds(deleteResult.candidateId, client);
 
             await auditLogService.logAction({
                 userId: auditContext.userId,

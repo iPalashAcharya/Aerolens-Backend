@@ -1,206 +1,360 @@
-# Authentication Endpoints
+# Authentication API Documentation
 
-### Endpoints
+This module provides JWT-based authentication with token family tracking, refresh with grace period, and active session management. All endpoints use JSON for request and response bodies.
 
-## POST /auth/register
+## Base URL
 
-Registers a new user.
+- Recommended mount path: `/api/auth` (examples assume this path).
+- All protected routes require a valid `Authorization: Bearer <token>` header.
 
-## Request Body (JSON)
+## Response Format
 
-json
+All successful responses use a common envelope:
+
+```json
 {
-"memberName": "John Doe",
-"memberContact": "+91 9999999999",
-"email": "john@example.com",
-"password": "Password@123",
-"designation": "software engineer",
-"isRecruiter": false,
-"isInterviewer":false
+  "success": true,
+  "message": "Human readable message",
+  "data": {},
+  "statusCode": 200
 }
-designation must match existing designation values in the database lookup table (case-insensitive).
+```
 
-## Response
+All errors are thrown using a central `AppError` class and should be serialized consistently by your global error handler, typically as:
 
-json
+```json
 {
-"success": true,
-"message": "Registration successful",
-"data": {
-"member": {
-"memberId": 1,
-"memberName": "John Doe",
-"email": "john@example.com",
-"designation": 4,
-"isRecruiter": false,
-"isInterviewer":false
+  "success": false,
+  "message": "Error message",
+  "code": "ERROR_CODE",
+  "details": [],
+  "statusCode": 400
 }
-}
-}
-
-## POST /auth/login
-
-Logs in the user and returns a JWT token.
-
-## Request Body (JSON)
-
-json
-{
-"email": "john@example.com",
-"password": "Password@123"
-}
-
-## Response
-
-json
-{
-"success": true,
-"message": "Login successful",
-"data": {
-"member": {
-"memberId": 1,
-"memberName": "John Doe",
-"email": "john@example.com",
-"designation": 4,
-"isRecruiter": false
-},
-"token": "<JWT_ACCESS_TOKEN>",
-"expiresIn": "2h"
-}
-}
-The JWT access token includes jti (unique token ID) and family claims.
-
-Use this token in the Authorization header for all subsequent authenticated requests:
-
-text
-Authorization: Bearer <JWT_ACCESS_TOKEN>
-
-## POST /auth/refresh
-
-(Optional) Refreshes the current JWT token before expiry.
-
-## Request
-
-Accepts the current token either in request body or Authorization header.
-
-## optional Request body:
-
-{
-"token":"jwt_token"
-}
-
-## Response
-
-json
-{
-"success": true,
-"message": "Token refreshed successfully",
-"data": {
-"token": "<NEW_JWT_ACCESS_TOKEN>",
-"expiresIn": "2h"
-}
-}
-Revokes the old token identified by jti and issues a new token in the same token family.
-
-## POST /auth/logout
-
-Revokes the current token.
-
-## Request
-
-Token sent in Authorization header or optionally in request body.
-
-## Response
-
-json
-{
-"success": true,
-"message": "Logout successful"
-}
-The token's jti is marked revoked to invalidate it.
-
-## POST /auth/logout-all
-
-Revokes all tokens for the authenticated user across devices.
-
-Headers
-
-text
-Authorization: Bearer <JWT_ACCESS_TOKEN>
-
-## Response
-
-json
-{
-"success": true,
-"message": "Logged out from all devices successfully"
-}
-
-## GET /auth/sessions
-
-Fetches all active non-revoked sessions (tokens) for the authenticated user with details.
-
-## Headers
-
-text
-Authorization: Bearer <JWT_ACCESS_TOKEN>
-
-## Response
-
-json
-{
-"success": true,
-"data": {
-"sessions": [
-{
-"id": 10,
-"userAgent": "Mozilla/5.0 Chrome/120.0.0",
-"ipAddress": "192.168.1.2",
-"createdAt": "2025-10-20T10:35:24.000Z",
-"expiresAt": "2025-10-27T10:35:24.000Z",
-"tokenFamily": "c693a76a-90a8-4441-b229-bb57cc4f3f70"
-}
-]
-}
-}
-
-## GET /auth/profile
-
-Returns the profile of the authenticated user.
-
-Headers
-
-text
-Authorization: Bearer <JWT_ACCESS_TOKEN>
-
-## Response
-
-json
-{
-"success": true,
-"data": {
-"member": {
-"memberId": 1,
-"email": "john@example.com",
-"designation": 4,
-"isRecruiter": false
-}
-}
-}
-
-## NOTES
+```
 
 ---
 
-Authorization Requirement for Endpoints
-All API endpoints below require the client to include a valid Access Token in the HTTP Authorization header for authentication and authorization, except for the explicitly public endpoints (/register, /login, /refresh, /logout).
+## Authentication Endpoints
 
-The Access Token must be supplied as a Bearer token:
+### Register Member
 
-Authorization: Bearer <ACCESS_TOKEN>
-Failure to provide a valid token in the Authorization header will result in a 401 Unauthorized response.
+**URL:** `POST /api/auth/register`  
+**Auth:** Required – caller must be authenticated and authorized with an allowed role (`authenticate` + `authorize(process.env.ALLOWED_ROLES)`).
+
+#### Request Body
+
+```json
+{
+  "memberName": "John Doe",
+  "memberContact": "+91-9876543210",
+  "email": "john.doe@example.com",
+  "password": "StrongP@ssw0rd",
+  "designation": "senior developer",
+  "isRecruiter": false,
+  "isInterviewer": false
+}
+```
+
+- `designation` is a human-readable value that is transformed to an internal `lookupKey` before persistence.
+- Password must be at least 8 characters and contain uppercase, lowercase, number and special character.
+
+#### Success Response `201`
+
+```json
+{
+  "success": true,
+  "message": "Registration successful",
+  "statusCode": 201,
+  "data": {
+    "member": {
+      "memberId": 1,
+      "memberName": "John Doe",
+      "memberContact": "+91-9876543210",
+      "email": "john.doe@example.com",
+      "designation": "Senior Developer",
+      "isRecruiter": false,
+      "isInterviewer": false,
+      "isActive": true,
+      "lastLogin": null,
+      "createdAt": "2025-01-01T10:00:00.000Z",
+      "updatedAt": "2025-01-01T10:00:00.000Z"
+    }
+  }
+}
+```
+
+#### Possible Error Codes
+
+- `EMAIL_EXISTS` – email already registered.
+- `VALIDATION_ERROR` – invalid body fields.
 
 ---
+
+### Login
+
+**URL:** `POST /api/auth/login`  
+**Auth:** Public  
+**Middlewares:** `loginRateLimiter`, `AuthValidator.validateLogin`.
+
+#### Request Body
+
+```json
+{
+  "email": "john.doe@example.com",
+  "password": "StrongP@ssw0rd"
+}
+```
+
+#### Success Response `200`
+
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "statusCode": 200,
+  "data": {
+    "member": {
+      "memberId": 1,
+      "memberName": "John Doe",
+      "email": "john.doe@example.com",
+      "designation": "Senior Developer",
+      "isRecruiter": false
+    },
+    "token": "<jwt-access-token>",
+    "expiresIn": "15m"
+  }
+}
+```
+
+- `token` is a signed JWT containing `memberId`, `email`, `jti`, `family`, and `type: "access"`.
+- A record is stored in `active_token` with JTI, token family, user agent, IP and expiry for revocation and session tracking.
+
+#### Possible Error Codes
+
+- `INVALID_CREDENTIALS` – email not found or wrong password.
+- `ACCOUNT_INACTIVE` – member exists but is inactive.
+- `VALIDATION_ERROR` – invalid body.
+
+---
+
+### Change Password
+
+**URL:** `POST /api/auth/change-password`  
+**Auth:** Required – authenticated user (`authenticate`).
+**Middlewares:** `AuthValidator.validateResetPassword`.
+
+#### Request Body
+
+```json
+{
+  "currentPassword": "OldP@ssw0rd",
+  "newPassword": "NewStr0ngP@ss"
+}
+```
+
+- `newPassword` must be at least 8 chars, max 128, and must differ from `currentPassword` with required complexity.
+
+#### Success Response `200`
+
+```json
+{
+  "success": true,
+  "message": "Password changed successfully",
+  "statusCode": 200,
+  "data": null
+}
+```
+
+- All existing tokens for the member are revoked (`logout from all devices`).
+
+#### Possible Error Codes
+
+- `INVALID_CURRENT_PASSWORD` – current password does not match.
+- `VALIDATION_ERROR` – invalid body.
+
+---
+
+### Refresh Token
+
+**URL:** `POST /api/auth/refresh`  
+**Auth:** Required – provide existing (possibly expired) token in `Authorization` header.
+**Middlewares:** `refreshRateLimiter`.
+
+#### Headers
+
+```text
+Authorization: Bearer <jwt-access-token>
+User-Agent: <client user agent>   // optional
+```
+
+#### Request Body
+
+Empty body.
+
+#### Success Response `200`
+
+```json
+{
+  "success": true,
+  "message": "Token refreshed successfully",
+  "statusCode": 200,
+  "data": {
+    "token": "<new-jwt-access-token>",
+    "expiresIn": "15m"
+  }
+}
+```
+
+- The old token’s JTI is revoked.
+- A new token with the same token family is generated and stored in `active_token`.
+
+#### Possible Error Codes
+
+- `TOKEN_MISSING` – missing or invalid `Authorization` header format.
+- `INVALID_TOKEN` – invalid structure or signature.
+- `TOKEN_TOO_OLD` – token age exceeds configured `refreshGracePeriod`.
+- `TOKEN_REVOKED` – token or token family revoked.
+- `INVALID_MEMBER` – member not found or inactive.
+
+---
+
+### Logout (Current Device)
+
+**URL:** `POST /api/auth/logout`  
+**Auth:** Token recommended – `Authorization: Bearer <jwt-access-token>`.[1]
+
+#### Headers
+
+```text
+Authorization: Bearer <jwt-access-token>
+```
+
+#### Request Body
+
+Empty body.
+
+#### Success Response `200`
+
+```json
+{
+  "success": true,
+  "message": "Logout successful",
+  "statusCode": 200,
+  "data": null
+}
+```
+
+- If a valid token is provided, its JTI is marked revoked in `active_token`.
+- Logout always returns success, even if token is invalid or missing.
+
+---
+
+### Logout From All Devices
+
+**URL:** `POST /api/auth/logout-all`  
+**Auth:** Required – authenticated user (`authenticate`).
+
+#### Request Body
+
+Empty body.
+
+#### Success Response `200`
+
+```json
+{
+  "success": true,
+  "message": "Logged out from all devices successfully",
+  "statusCode": 200,
+  "data": null
+}
+```
+
+- All active tokens for the authenticated member are marked revoked.
+
+---
+
+### Get Active Sessions
+
+**URL:** `GET /api/auth/sessions`  
+**Auth:** Required – authenticated user (`authenticate`).
+
+#### Success Response `200`
+
+```json
+{
+  "success": true,
+  "message": "Active sessions retrieved successfully",
+  "statusCode": 200,
+  "data": {
+    "sessions": [
+      {
+        "id": 10,
+        "jti": "c7b5c5fd-8b0e-4f27-9c1b-8ad0f1c3a1ef",
+        "userAgent": "Mozilla/5.0 ...",
+        "ipAddress": "192.168.1.10",
+        "createdAt": "2025-01-01T10:00:00.000Z",
+        "expiresAt": "2025-01-01T10:15:00.000Z",
+        "tokenFamily": "2e4fe47c-0c9e-4af0-97aa-5a4f91e83b9f"
+      }
+    ]
+  }
+}
+```
+
+- Only non-revoked tokens with `expiresAt > NOW()` are returned.
+
+---
+
+### Get Profile (Current User)
+
+**URL:** `GET /api/auth/profile`  
+**Auth:** Required – authenticated user (`authenticate`).
+
+#### Success Response `200`
+
+```json
+{
+  "success": true,
+  "message": "Profile retrieved successfully",
+  "statusCode": 200,
+  "data": {
+    "member": {
+      "memberId": 1,
+      "memberName": "John Doe",
+      "memberContact": "+91-9876543210",
+      "email": "john.doe@example.com",
+      "designation": "Senior Developer",
+      "isRecruiter": false,
+      "isInterviewer": false,
+      "isActive": true,
+      "lastLogin": "2025-01-01T10:00:00.000Z",
+      "createdAt": "2025-01-01T09:00:00.000Z",
+      "updatedAt": "2025-01-01T09:00:00.000Z"
+    }
+  }
+}
+```
+
+- Data is taken from `req.user`, which is populated by the authentication middleware after token verification.
+
+---
+
+## Token Structure & Security
+
+- Algorithm, secret, expiry and issuer/audience are configured in `jwtConfig.token` (e.g. `expiresIn`, `issuer`, `audience`, `algorithm`).
+- Each token includes:
+  - `sub` / `memberId`
+  - `email`
+  - `jti` (unique token ID)
+  - `family` (token family UUID)
+  - `type: "access"`
+  - `iat` (issued at)
+
+On each authenticated request, the middleware:
+
+1. Verifies the JWT signature and expiration.
+2. Checks `active_token.isRevoked` for the corresponding JTI.
+3. Throws `TOKEN_REVOKED`, `TOKEN_EXPIRED`, or `INVALID_TOKEN` via `AppError` if invalid.
 
 # Client API Endpoints
 
@@ -1429,217 +1583,665 @@ If a server/database error occurs during deletion:
 "message": "Internal server error during client contact deletion"
 }
 
-# Job Profile API CRUD
+# Job Profile API Documentation
+
+## Overview
+
+The Job Profile API provides endpoints for managing job profiles, including creating, updating, retrieving, and deleting job profiles, as well as managing job description (JD) file uploads.
+
+## Base URL
+
+```
+/api/jobProfile
+```
+
+## Authentication
+
+All endpoints require authentication via the `authenticate` middleware. Include authentication token in the request headers.
 
 ---
 
-## API Endpoints
+## Endpoints
 
-### Base URL
+### 1. Get All Job Profiles
 
-/jobProfile
+Retrieves all job profiles in the system.
 
-### Endpoints
+**Endpoint:** `GET /`
 
-#### 1. Create Job Profile
+**Request Headers:**
 
-**POST** `/jobProfile`
-
-**Request Body:**
+```json
 {
-"clientId":2,
-"departmentId":86,
-"jobProfileDescription":"Random JOB description for testing job profile",
-"jobRole": "SDE",
-"workArrangement":"onsite"
-"location": {
-"city": "Ahmedabad",
-"country": "India"
-},
-"positions": 4,
-"techSpecification": "NodeJS,ExpressJS"
+  "Authorization": "Bearer <token>"
 }
+```
 
-**Response:**
+**Response:** `200 OK`
+
+```json
 {
-"success": true,
-"message": "Job Profile created successfully",
-"data": {
-"jobProfileId": 25,
-"clientId": 2,
-"departmentId": 86,
-"jobProfileDescription": "Random JOB description for testing job profile",
-"jobRole": "SDE",
-"positions": 4,
-"techSpecification": "NodeJS,ExpressJS",
-"locationId": 1,
-"workArrangement":"onsite"
-"statusId": 4,
-"receivedOn": "2025-11-26T11:10:40.223Z"
+  "success": true,
+  "message": "Job Profiles retrieved successfully",
+  "data": [
+    {
+      "jobProfileId": 1,
+      "clientName": "Tech Corp",
+      "departmentName": "Engineering",
+      "jobProfileDescription": "Senior software engineer position",
+      "jobRole": "Senior Software Engineer",
+      "techSpecification": "React, Node.js, MongoDB",
+      "positions": 3,
+      "receivedOn": "2024-01-15",
+      "estimatedCloseDate": "2024-03-15",
+      "workArrangement": "hybrid",
+      "location": {
+        "country": "india",
+        "city": "Bangalore"
+      },
+      "status": "in progress",
+      "jdFileName": "jd-descriptions/jobProfile_1_1234567890.pdf",
+      "jdOriginalName": "Senior_Engineer_JD.pdf",
+      "jdUploadDate": "2024-01-15T10:30:00.000Z"
+    }
+  ]
 }
-}
+```
 
 ---
 
-#### 2. Get All Job Profiles
+### 2. Get Job Profile by ID
 
-**GET** `/jobProfile`
+Retrieves a specific job profile by its ID.
 
-**Response:**
+**Endpoint:** `GET /:id`
+
+**URL Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| id | integer | Job profile ID (positive integer) |
+
+**Request Headers:**
+
+```json
 {
-"success": true,
-"message": "Job Profiles retrieved successfully",
-"data": [
-{
-"jobProfileId": 25,
-"clientName": "Intuit Bangalore Headquarters",
-"departmentName": "DevOps and AIOps",
-"jobProfileDescription": "Random JOB description for testing job profile",
-"jobRole": "SDE-3",
-"techSpecification": "NodeJS,ExpressJS",
-"positions": 4,
-"receivedOn": "2025-11-26T05:40:40.000Z",
-"estimatedCloseDate": null,
-"workArrangement": "hybrid",
-"location": {
-"city": "Ahmedabad",
-"country": "India"
-},
-"status": "In Progress"
-},
-{
-"jobProfileId": 23,
-"clientName": "IBM Company",
-"departmentName": "Software",
-"jobProfileDescription": "Continuous integration/deployment, and monitoring of Intuit's cloud infrastructure. Teams responsible for operational monitoring of Intuit's cloud infrastructure.",
-"jobRole": "Frontend",
-"techSpecification": "React",
-"positions": 2,
-"receivedOn": "2025-11-07T01:56:44.000Z",
-"estimatedCloseDate": "2025-11-24T13:00:00.000Z",
-"workArrangement": "onsite",
-"location": {
-"city": "Ahmedabad",
-"country": "India"
-},
-"status": "Closed"
+  "Authorization": "Bearer <token>"
 }
-]
+```
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Job Profile retrieved successfully",
+  "data": {
+    "jobProfileId": 1,
+    "clientId": 10,
+    "clientName": "Tech Corp",
+    "departmentName": "Engineering",
+    "jobProfileDescription": "Senior software engineer position",
+    "jobRole": "Senior Software Engineer",
+    "techSpecification": "React, Node.js, MongoDB",
+    "positions": 3,
+    "receivedOn": "2024-01-15",
+    "estimatedCloseDate": "2024-03-15",
+    "workArrangement": "hybrid",
+    "location": {
+      "country": "india",
+      "city": "Bangalore"
+    },
+    "status": "in progress",
+    "jdFileName": "jd-descriptions/jobProfile_1_1234567890.pdf",
+    "jdOriginalName": "Senior_Engineer_JD.pdf",
+    "jdUploadDate": "2024-01-15T10:30:00.000Z"
+  }
 }
+```
+
+**Error Response:** `404 Not Found`
+
+```json
+{
+  "success": false,
+  "message": "Job profile with ID 1 not found",
+  "errorCode": "JOB_PROFILE_NOT_FOUND"
+}
+```
 
 ---
 
-#### 3. Get Job Profile by ID
+### 3. Create Job Profile
 
-**GET** `/jobProfile/:id`
+Creates a new job profile with optional JD file upload.
 
-**Response:**
+**Endpoint:** `POST /`
+
+**Request Headers:**
+
+```json
 {
-"success": true,
-"message": "Job Profile retrieved successfully",
-"data": {
-"jobProfileId": 25,
-"clientId": 2,
-"clientName": "Intuit Bangalore Headquarters",
-"departmentName": "DevOps and AIOps",
-"jobProfileDescription": "Random JOB description for testing job profile",
-"jobRole": "SDE-3",
-"techSpecification": "NodeJS,ExpressJS",
-"positions": 4,
-"receivedOn": "2025-11-26T05:40:40.000Z",
-"estimatedCloseDate": null,
-"workArrangement": "hybrid",
-"location": {
-"city": "Ahmedabad",
-"country": "India"
-},
-"status": "In Progress"
+  "Authorization": "Bearer <token>",
+  "Content-Type": "multipart/form-data"
 }
+```
+
+**Request Body (multipart/form-data):**
+
+| Field                 | Type    | Required | Description                                                                  |
+| --------------------- | ------- | -------- | ---------------------------------------------------------------------------- |
+| clientId              | integer | Yes      | Client ID (positive integer)                                                 |
+| departmentId          | integer | Yes      | Department ID (positive integer)                                             |
+| jobProfileDescription | string  | Yes      | Job description (10-500 characters)                                          |
+| jobRole               | string  | Yes      | Job role title (2-100 characters)                                            |
+| techSpecification     | string  | Yes      | Comma-separated technologies (e.g., "React, Node.js")                        |
+| positions             | integer | Yes      | Number of open positions (positive integer)                                  |
+| estimatedCloseDate    | string  | Yes      | Close date in YYYY-MM-DD format (cannot be in past)                          |
+| workArrangement       | string  | Yes      | One of: `remote`, `onsite`, `hybrid`                                         |
+| location              | string  | Yes      | JSON string: `{"country": "india", "city": "Bangalore"}`                     |
+| status                | string  | No       | One of: `pending`, `in progress`, `closed`, `cancelled` (default: `pending`) |
+| JD                    | file    | No       | Job description file (PDF, DOC, DOCX; max 5MB)                               |
+
+**Example Request Body:**
+
+```
+clientId=10
+departmentId=5
+jobProfileDescription=We are looking for a senior software engineer
+jobRole=Senior Software Engineer
+techSpecification=React, Node.js, MongoDB
+positions=3
+estimatedCloseDate=2024-12-31
+workArrangement=hybrid
+location={"country":"india","city":"Bangalore"}
+status=pending
+JD=<file>
+```
+
+**Response:** `201 Created`
+
+```json
+{
+  "success": true,
+  "message": "Job Profile created successfully",
+  "data": {
+    "jobProfileId": 1,
+    "clientId": 10,
+    "departmentId": 5,
+    "jobProfileDescription": "We are looking for a senior software engineer",
+    "jobRole": "Senior Software Engineer",
+    "techSpecification": "React, Node.js, MongoDB",
+    "positions": 3,
+    "estimatedCloseDate": "2024-12-31",
+    "workArrangement": "hybrid",
+    "locationId": 15,
+    "statusId": 4,
+    "receivedOn": "2024-01-15T10:30:00.000Z"
+  }
 }
+```
+
+**Error Response:** `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "Validation failed",
+  "errorCode": "VALIDATION_ERROR",
+  "details": {
+    "validationErrors": [
+      {
+        "field": "clientId",
+        "message": "Client ID is required"
+      }
+    ]
+  }
+}
+```
+
+**Error Response:** `409 Conflict`
+
+```json
+{
+  "success": false,
+  "message": "A job profile with this role already exists for this client",
+  "errorCode": "DUPLICATE_JOB_ROLE"
+}
+```
 
 ---
 
-#### 4. Update Job Profile
+### 4. Update Job Profile
 
-**PATCH** `/jobProfile/:id`
+Updates an existing job profile with optional JD file upload.
 
-**Request Body:**
+**Endpoint:** `PATCH /:id`
+
+**URL Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| id | integer | Job profile ID (positive integer) |
+
+**Request Headers:**
+
+```json
 {
-"jobRole":"SDE-2"
+  "Authorization": "Bearer <token>",
+  "Content-Type": "multipart/form-data"
 }
+```
 
-**Response:**
+**Request Body (multipart/form-data):**
+
+All fields are optional. Include only the fields you want to update.
+
+| Field                 | Type    | Description                                              |
+| --------------------- | ------- | -------------------------------------------------------- |
+| jobProfileDescription | string  | Job description (10-500 characters)                      |
+| jobRole               | string  | Job role title (2-100 characters)                        |
+| techSpecification     | string  | Comma-separated technologies                             |
+| positions             | integer | Number of open positions (positive integer)              |
+| estimatedCloseDate    | string  | Close date in YYYY-MM-DD format (cannot be in past)      |
+| workArrangement       | string  | One of: `remote`, `onsite`, `hybrid`                     |
+| location              | string  | JSON string: `{"country": "india", "city": "Bangalore"}` |
+| status                | string  | One of: `pending`, `in progress`, `closed`, `cancelled`  |
+| JD                    | file    | Job description file (PDF, DOC, DOCX; max 5MB)           |
+
+**Example Request Body:**
+
+```
+positions=5
+status=in progress
+JD=<file>
+```
+
+**Response:** `200 OK`
+
+```json
 {
-"success": true,
-"message": "Job profile updated successfully",
-"data": {
-"jobProfileId": 25,
-"clientId": 2,
-"clientName": "Intuit Bangalore Headquarters",
-"departmentName": "DevOps and AIOps",
-"jobProfileDescription": "Random JOB description for testing job profile",
-"jobRole": "SDE-1",
-"techSpecification": "NodeJS,ExpressJS",
-"positions": 4,
-"receivedOn": "2025-11-26T05:40:40.000Z",
-"estimatedCloseDate": null,
-"workArrangement": "hybrid",
-"location": {
-"city": "Ahmedabad",
-"country": "India"
-},
-"status": "In Progress"
+  "success": true,
+  "message": "Job Profile updated successfully",
+  "data": {
+    "jobProfileId": 1,
+    "clientId": 10,
+    "clientName": "Tech Corp",
+    "departmentName": "Engineering",
+    "jobProfileDescription": "Senior software engineer position",
+    "jobRole": "Senior Software Engineer",
+    "techSpecification": "React, Node.js, MongoDB",
+    "positions": 5,
+    "receivedOn": "2024-01-15",
+    "estimatedCloseDate": "2024-03-15",
+    "workArrangement": "hybrid",
+    "location": {
+      "country": "india",
+      "city": "Bangalore"
+    },
+    "status": "in progress"
+  }
 }
+```
+
+**Error Response:** `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "Cannot update a job profile that is closed",
+  "errorCode": "JOB_PROFILE_UPDATE_NOT_ALLOWED"
 }
+```
+
+**Error Response:** `404 Not Found`
+
+```json
+{
+  "success": false,
+  "message": "Job profile with ID 1 not found",
+  "errorCode": "JOB_PROFILE_NOT_FOUND"
+}
+```
 
 ---
 
-#### 5. Delete Job Profile
+### 5. Delete Job Profile
 
-**DELETE** `/jobProfile/:id`
+Deletes a job profile by ID.
 
-**Response:**
+**Endpoint:** `DELETE /:id`
+
+**URL Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| id | integer | Job profile ID (positive integer) |
+
+**Request Headers:**
+
+```json
 {
-"success": true,
-"message": "Job Profile deleted successfully",
-"data": null
+  "Authorization": "Bearer <token>"
 }
+```
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Job Profile deleted successfully",
+  "data": null
+}
+```
+
+**Error Response:** `404 Not Found`
+
+```json
+{
+  "success": false,
+  "message": "Job profile with ID 1 not found",
+  "errorCode": "JOB_PROFILE_NOT_FOUND"
+}
+```
+
+---
+
+## Job Description (JD) File Management
+
+### 6. Upload JD File
+
+Uploads or replaces a JD file for an existing job profile.
+
+**Endpoint:** `POST /:id/upload-JD`
+
+**URL Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| id | integer | Job profile ID (positive integer) |
+
+**Request Headers:**
+
+```json
+{
+  "Authorization": "Bearer <token>",
+  "Content-Type": "multipart/form-data"
+}
+```
+
+**Request Body (multipart/form-data):**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| JD | file | Yes | Job description file (PDF, DOC, DOCX; max 5MB) |
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "JD uploaded successfully",
+  "data": {
+    "jobProfileId": 1,
+    "filename": "jd-descriptions/jobProfile_1_1234567890.pdf",
+    "originalName": "Senior_Engineer_JD.pdf",
+    "size": 245678,
+    "location": "https://s3.amazonaws.com/bucket/jd-descriptions/jobProfile_1_1234567890.pdf",
+    "uploadDate": "2024-01-15T10:30:00.000Z"
+  }
+}
+```
+
+**Error Response:** `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "No JD file uploaded",
+  "errorCode": "NO_FILE_UPLOADED"
+}
+```
+
+**Error Response:** `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "Invalid JD file type. Only PDF, DOC, and DOCX are allowed.",
+  "errorCode": "INVALID_JD_FILE_TYPE"
+}
+```
+
+---
+
+### 7. Download JD File
+
+Downloads the JD file for a job profile.
+
+**Endpoint:** `GET /:id/get-JD`
+
+**URL Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| id | integer | Job profile ID (positive integer) |
+
+**Request Headers:**
+
+```json
+{
+  "Authorization": "Bearer <token>"
+}
+```
+
+**Response:** `200 OK`
+
+- Returns the file as a downloadable attachment
+- Content-Type header set to file's MIME type
+- Content-Disposition header set to `attachment; filename="<original_filename>"`
+
+**Error Response:** `404 Not Found`
+
+```json
+{
+  "success": false,
+  "message": "No JD found for this Job Profile",
+  "errorCode": "JD_NOT_FOUND"
+}
+```
+
+---
+
+### 8. Preview JD File
+
+Previews the JD file in the browser (PDF only).
+
+**Endpoint:** `GET /:id/get-JD/preview`
+
+**URL Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| id | integer | Job profile ID (positive integer) |
+
+**Request Headers:**
+
+```json
+{
+  "Authorization": "Bearer <token>"
+}
+```
+
+**Response:** `200 OK`
+
+- Returns the PDF file for inline preview
+- Content-Type header set to `application/pdf`
+- Content-Disposition header set to `inline; filename="<original_filename>"`
+
+**Error Response:** `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "Preview is only supported for PDF files. Please download the file instead.",
+  "errorCode": "PREVIEW_NOT_SUPPORTED",
+  "details": {
+    "fileType": ".docx",
+    "supportedTypes": [".pdf"]
+  }
+}
+```
+
+---
+
+### 9. Get JD File Information
+
+Retrieves metadata about the JD file without downloading it.
+
+**Endpoint:** `GET /:id/JD/info`
+
+**URL Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| id | integer | Job profile ID (positive integer) |
+
+**Request Headers:**
+
+```json
+{
+  "Authorization": "Bearer <token>"
+}
+```
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "JD information retrieved successfully",
+  "data": {
+    "hasJD": true,
+    "originalName": "Senior_Engineer_JD.pdf",
+    "uploadDate": "2024-01-15T10:30:00.000Z",
+    "s3Key": "jd-descriptions/jobProfile_1_1234567890.pdf",
+    "fileExtension": ".pdf",
+    "mimeType": "application/pdf",
+    "supportsPreview": true
+  }
+}
+```
+
+**Response (No JD):** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "JD information retrieved successfully",
+  "data": {
+    "hasJD": false,
+    "originalName": null,
+    "uploadDate": null,
+    "s3Key": null
+  }
+}
+```
+
+---
+
+### 10. Delete JD File
+
+Deletes the JD file from a job profile.
+
+**Endpoint:** `DELETE /:id/delete-JD`
+
+**URL Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| id | integer | Job profile ID (positive integer) |
+
+**Request Headers:**
+
+```json
+{
+  "Authorization": "Bearer <token>"
+}
+```
+
+**Response:** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "JD deleted successfully",
+  "data": {
+    "message": "JD deleted successfully",
+    "deletedFile": "jd-descriptions/jobProfile_1_1234567890.pdf"
+  }
+}
+```
+
+**Error Response:** `404 Not Found`
+
+```json
+{
+  "success": false,
+  "message": "No JD found for this Job Profile",
+  "errorCode": "JD_NOT_FOUND"
+}
+```
 
 ---
 
 ## Validation Rules
 
-Handled via Joi:
+### Job Profile Fields
 
-- `clientId`, `departmentId`, `positions`: positive integers
-- `jobProfileDescription`: minimum 10, maximum 500 characters
-- `jobRole`: 2–100 characters
-- `techSpecification`: comma-separated list, min 2 chars each
-- `estimatedCloseDate`: must be a valid date in the future
-- `location` : must be a json object with city and country attributes
+| Field                 | Type    | Validation                                                        |
+| --------------------- | ------- | ----------------------------------------------------------------- |
+| clientId              | integer | Required, positive integer                                        |
+| departmentId          | integer | Required, positive integer                                        |
+| jobProfileDescription | string  | Required, 10-500 characters                                       |
+| jobRole               | string  | Required, 2-100 characters, unique per client                     |
+| techSpecification     | string  | Required, comma-separated values (min 2 chars each)               |
+| positions             | integer | Required, positive integer                                        |
+| estimatedCloseDate    | string  | Required, YYYY-MM-DD format, cannot be in past                    |
+| workArrangement       | string  | Required, one of: `remote`, `onsite`, `hybrid`                    |
+| location              | object  | Required, must contain `country` and `city` fields                |
+| location.country      | string  | Required                                                          |
+| location.city         | string  | Required, 2-100 characters                                        |
+| status                | string  | Optional, one of: `pending`, `in progress`, `closed`, `cancelled` |
 
-**Example Error:**
-{
-"success": false,
-"error": "VALIDATION_ERROR",
-"message": "Validation failed",
-"details": [
-{ "field": "jobRole", "message": "Job role is required" }
-]
-}
+### JD File Requirements
+
+- **Allowed formats:** PDF, DOC, DOCX
+- **Maximum size:** 5MB
+- **Preview support:** PDF only
 
 ---
 
-## Error Handling
+## Common Error Codes
 
-Uses `AppError` with centralized response formatting.
+| Error Code                     | HTTP Status | Description                            |
+| ------------------------------ | ----------- | -------------------------------------- |
+| VALIDATION_ERROR               | 400         | Request validation failed              |
+| INVALID_JOB_PROFILE_ID         | 400         | Invalid job profile ID format          |
+| DUPLICATE_JOB_ROLE             | 409         | Job role already exists for client     |
+| JOB_PROFILE_NOT_FOUND          | 404         | Job profile not found                  |
+| JOB_PROFILE_UPDATE_NOT_ALLOWED | 400         | Cannot update closed/cancelled profile |
+| INVALID_LOCATION               | 400         | Location does not exist                |
+| INVALID_STATUS                 | 400         | Status does not exist                  |
+| NO_FILE_UPLOADED               | 400         | JD file was not provided               |
+| INVALID_JD_FILE_TYPE           | 400         | Invalid file format for JD             |
+| JD_FILE_TOO_LARGE              | 400         | JD file exceeds 5MB limit              |
+| JD_NOT_FOUND                   | 404         | No JD file found for job profile       |
+| PREVIEW_NOT_SUPPORTED          | 400         | Preview only supported for PDF files   |
 
-**Example Database Error:**
-{
-"success": false,
-"error": "FOREIGN_KEY_CONSTRAINT",
-"message": "Invalid foreign key provided - referenced record does not exist"
-}
+---
+
+## Notes
+
+1. All endpoints require authentication
+2. Dates are in ISO 8601 format
+3. File uploads use multipart/form-data encoding
+4. JSON objects in multipart requests must be sent as strings
+5. Closed and cancelled job profiles cannot be updated
+6. Uploading a new JD file will replace any existing JD file
+7. Job roles must be unique per client
 
 # Candidate API CRUD
 
@@ -2863,11 +3465,11 @@ All error responses follow this format:
 "metadata": {}
 }
 
-# Interview API Documentation
+# Interview Management API
 
-## Overview
+This API provides endpoints to manage interviews in an HRMS system, including scheduling, updating, finalizing, and reporting on interviews.
 
-The Interview API manages candidate interview scheduling, tracking, and finalization. It supports multiple interview rounds per candidate with automatic round numbering and comprehensive audit logging.
+---
 
 ## Base URL
 
@@ -2875,13 +3477,7 @@ The Interview API manages candidate interview scheduling, tracking, and finaliza
 /api/interview
 ```
 
-## Authentication
-
-All endpoints require authentication via JWT token in the Authorization header:
-
-```
-Authorization: Bearer <your_jwt_token>
-```
+All endpoints require authentication via the `authenticate` middleware and audit context via `auditContextMiddleware`.
 
 ---
 
@@ -2889,20 +3485,13 @@ Authorization: Bearer <your_jwt_token>
 
 ### 1. Get All Interviews
 
-Retrieves all active interviews with candidate and interviewer details.
+Fetch all active interviews.
 
-**Endpoint:** `GET /`
+- **Method:** `GET`
+- **Path:** `/`
+- **Response:**
 
-**Request:**
-
-```http
-GET /api/interview
-Authorization: Bearer <token>
 ```
-
-**Response:**
-
-```json
 {
   "success": true,
   "message": "Interview entries retrieved successfully",
@@ -2911,37 +3500,20 @@ Authorization: Bearer <token>
       "interviewId": 1,
       "roundNumber": 1,
       "totalInterviews": 2,
-      "interviewDate": "2024-12-10T00:00:00.000Z",
+      "interviewDate": "2025-12-15",
       "fromTime": "10:00",
-      "toTime": "11:00",
-      "durationMinutes": 60,
-      "candidateId": 123,
-      "candidateName": "John Doe",
-      "interviewerId": 5,
-      "interviewerName": "Jane Smith",
-      "scheduledById": 2,
-      "scheduledByName": "Admin User",
-      "result": "Pending",
-      "recruiterNotes": null,
-      "interviewerFeedback": null
-    },
-    {
-      "interviewId": 2,
-      "roundNumber": 2,
-      "totalInterviews": 2,
-      "interviewDate": "2024-12-15T00:00:00.000Z",
-      "fromTime": "14:00",
-      "toTime": "14:45",
+      "toTime": "10:45",
       "durationMinutes": 45,
-      "candidateId": 123,
+      "candidateId": 101,
       "candidateName": "John Doe",
-      "interviewerId": 7,
-      "interviewerName": "Bob Johnson",
-      "scheduledById": 2,
-      "scheduledByName": "Admin User",
-      "result": "Pending",
-      "recruiterNotes": null,
-      "interviewerFeedback": null
+      "interviewerId": 201,
+      "interviewerName": "Alice Smith",
+      "scheduledById": 301,
+      "scheduledByName": "Bob Johnson",
+      "result": "pending",
+      "recruiterNotes": "Initial screening",
+      "interviewerFeedback": null,
+      "isActive": true
     }
   ]
 }
@@ -2949,22 +3521,95 @@ Authorization: Bearer <token>
 
 ---
 
-### 2. Get Interview by ID
+### 2. Get Interview Form Data
 
-Retrieves a specific interview by its ID.
+Get data needed to render the interview creation form (interviewers, recruiters, etc.).
 
-**Endpoint:** `GET /:interviewId`
+- **Method:** `GET`
+- **Path:** `/create-data`
+- **Response:**
 
-**Request:**
-
-```http
-GET /api/interview/1
-Authorization: Bearer <token>
+```
+{
+  "success": true,
+  "message": "Interview Form Data retrieved successfully",
+  "data": {
+    "interview": null,
+    "interviewers": [
+      {
+        "interviewerId": 201,
+        "interviewerName": "Alice Smith"
+      }
+    ],
+    "recruiters": [
+      {
+        "recruiterId": 301,
+        "recruiterName": "Bob Johnson"
+      }
+    ],
+    "candidates": []
+  }
+}
 ```
 
-**Response:**
+---
 
-```json
+### 3. Get Interviews by Candidate
+
+Fetch all interviews for a specific candidate.
+
+- **Method:** `GET`
+- **Path:** `/candidate/:candidateId`
+- **Params:**
+
+| Field         | Type   | Required | Description         |
+| ------------- | ------ | -------- | ------------------- |
+| `candidateId` | number | Yes      | ID of the candidate |
+
+- **Response:**
+
+```
+{
+  "success": true,
+  "message": "Candidate interviews retrieved successfully",
+  "data": {
+    "candidateId": 101,
+    "totalRounds": 2,
+    "data": [
+      {
+        "interviewId": 1,
+        "roundNumber": 1,
+        "totalInterviews": 2,
+        "interviewDate": "2025-12-15",
+        "fromTime": "10:00",
+        "toTime": "10:45",
+        "durationMinutes": 45,
+        "result": "pending",
+        "interviewerId": 201,
+        "interviewerName": "Alice Smith"
+      }
+    ]
+  }
+}
+```
+
+---
+
+### 4. Get Interview by ID
+
+Fetch a single interview by its ID.
+
+- **Method:** `GET`
+- **Path:** `/:interviewId`
+- **Params:**
+
+| Field         | Type   | Required | Description         |
+| ------------- | ------ | -------- | ------------------- |
+| `interviewId` | number | Yes      | ID of the interview |
+
+- **Response:**
+
+```
 {
   "success": true,
   "message": "Interview entry retrieved successfully",
@@ -2972,18 +3617,18 @@ Authorization: Bearer <token>
     "interviewId": 1,
     "roundNumber": 1,
     "totalInterviews": 2,
-    "interviewDate": "2024-12-10T00:00:00.000Z",
+    "interviewDate": "2025-12-15",
     "fromTime": "10:00",
-    "toTime": "11:00",
-    "durationMinutes": 60,
-    "candidateId": 123,
+    "toTime": "10:45",
+    "durationMinutes": 45,
+    "candidateId": 101,
     "candidateName": "John Doe",
-    "interviewerId": 5,
-    "interviewerName": "Jane Smith",
-    "scheduledById": 2,
-    "scheduledByName": "Admin User",
-    "result": "Pending",
-    "recruiterNotes": null,
+    "interviewerId": 201,
+    "interviewerName": "Alice Smith",
+    "scheduledById": 301,
+    "scheduledByName": "Bob Johnson",
+    "result": "pending",
+    "recruiterNotes": "Initial screening",
     "interviewerFeedback": null
   }
 }
@@ -2991,350 +3636,369 @@ Authorization: Bearer <token>
 
 ---
 
-### 3. Get Interviews by Candidate ID
+### 5. Create Interview
 
-Retrieves all interviews for a specific candidate.
+Schedule a new interview for a candidate.
 
-**Endpoint:** `GET /candidate/:candidateId`
+- **Method:** `POST`
+- **Path:** `/:candidateId`
+- **Params:**
 
-**Request:**
+| Field         | Type   | Required | Description         |
+| ------------- | ------ | -------- | ------------------- |
+| `candidateId` | number | Yes      | ID of the candidate |
 
-```http
-GET /api/interview/candidate/123
-Authorization: Bearer <token>
+- **Request Body:**
+
 ```
-
-**Response:**
-
-```json
 {
-  "success": true,
-  "message": "Candidate interviews retrieved successfully",
-  "data": {
-    "candidateId": 123,
-    "totalRounds": 2,
-    "interviews": [
-      {
-        "interviewId": 1,
-        "roundNumber": 1,
-        "totalInterviews": 2,
-        "interviewDate": "2024-12-10T00:00:00.000Z",
-        "fromTime": "10:00",
-        "toTime": "11:00",
-        "durationMinutes": 60,
-        "result": "Selected",
-        "interviewerId": 5,
-        "interviewerName": "Jane Smith"
-      },
-      {
-        "interviewId": 2,
-        "roundNumber": 2,
-        "totalInterviews": 2,
-        "interviewDate": "2024-12-15T00:00:00.000Z",
-        "fromTime": "14:00",
-        "toTime": "14:45",
-        "durationMinutes": 45,
-        "result": "Pending",
-        "interviewerId": 7,
-        "interviewerName": "Bob Johnson"
-      }
-    ]
-  }
-}
-```
-
----
-
-### 4. Get Form Data for Creating Interviews
-
-Retrieves lists of interviewers, recruiters for populating interview creation forms.
-
-**Endpoint:** `GET /create-data`
-
-**Request:**
-
-```http
-GET /api/interview/create-data
-Authorization: Bearer <token>
-```
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "message": "Interview Form Data retrieved successfully",
-  "data": {
-    "interviewers": [
-      {
-        "interviewerId": 5,
-        "interviewerName": "Jane Smith"
-      },
-      {
-        "interviewerId": 7,
-        "interviewerName": "Bob Johnson"
-      }
-    ],
-    "recruiters": [
-      {
-        "recruiterId": 2,
-        "recruiterName": "Admin User"
-      },
-      {
-        "recruiterId": 3,
-        "recruiterName": "Sarah Williams"
-      }
-    ]
-  }
-}
-```
-
----
-
-### 5. Create Interview (First Round)
-
-Creates the first interview for a candidate. Round number starts at 1.
-
-**Endpoint:** `POST /:candidateId`
-
-**Request:**
-
-```http
-POST /api/interview/123
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "interviewDate": "2024-12-10",
+  "interviewDate": "2025-12-15",
   "fromTime": "10:00",
-  "durationMinutes": 60,
-  "interviewerId": 5,
-  "scheduledById": 2,
+  "durationMinutes": 45,
+  "interviewerId": 201,
+  "scheduledById": 301,
   "result": "pending",
-  "recruiterNotes": "Initial technical screening",
-  "interviewerFeedback": ""
+  "recruiterNotes": "Initial screening",
+  "interviewerFeedback": null
 }
 ```
 
-**Response:**
+- **Validation Rules:**
 
-```json
+| Field                 | Type   | Rules                                                             |
+| --------------------- | ------ | ----------------------------------------------------------------- |
+| `interviewDate`       | string | YYYY-MM-DD format, cannot be in the past, required                |
+| `fromTime`            | string | HH:MM format (00:00–23:59), required                              |
+| `durationMinutes`     | number | Integer, 15–480 minutes, required                                 |
+| `interviewerId`       | number | Positive integer, required                                        |
+| `scheduledById`       | number | Positive integer, required                                        |
+| `result`              | string | One of: `pending`, `selected`, `rejected`, `cancelled` (optional) |
+| `recruiterNotes`      | string | Max 1000 characters, optional, can be `""` or `null`              |
+| `interviewerFeedback` | string | Max 2000 characters, optional, can be `""` or `null`              |
+
+- **Response (201 Created):**
+
+```
 {
   "success": true,
   "message": "interview created successfully",
   "data": {
     "interviewId": 1,
-    "candidateId": 123,
+    "candidateId": 101,
     "roundNumber": 1,
     "totalInterviews": 1,
-    "interviewDate": "2024-12-10",
+    "interviewDate": "2025-12-15",
     "fromTime": "10:00",
-    "durationMinutes": 60,
-    "interviewerId": 5,
-    "scheduledById": 2,
-    "result": "Pending",
-    "recruiterNotes": "Initial technical screening",
-    "interviewerFeedback": ""
-  }
-}
-```
-
-**Validation Rules:**
-
-- `interviewDate`: Required, ISO date format, cannot be in the past
-- `fromTime`: Required, HH:MM format (00:00-23:59)
-- `durationMinutes`: Required, integer, 15-480 minutes
-- `interviewerId`: Required, positive integer
-- `scheduledById`: Required, positive integer
-- `result`: Optional, one of: `Pending`, `Selected`, `Rejected`, `Cancelled` (default: `Pending`)
-- `recruiterNotes`: Optional, max 1000 characters
-- `interviewerFeedback`: Optional, max 2000 characters
-
----
-
-### 6. Schedule Next Round
-
-Creates a new interview entry for the next round. Round number automatically increments.
-
-**Endpoint:** `POST /:candidateId/rounds`
-
-**Request:**
-
-```http
-POST /api/interview/123/rounds
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "interviewDate": "2024-12-15",
-  "fromTime": "14:00",
-  "durationMinutes": 45,
-  "interviewerId": 7,
-  "scheduledById": 2
-}
-```
-
-**Response:**
-
-```json
-{
-  "success": true,
-  "message": "Successfully scheduled round 2 for candidate",
-  "data": {
-    "interviewId": 2,
-    "candidateId": 123,
-    "roundNumber": 2,
-    "totalInterviews": 2,
-    "interviewDate": "2024-12-15",
-    "fromTime": "14:00",
     "durationMinutes": 45,
-    "interviewerId": 7,
-    "scheduledById": 2,
+    "interviewerId": 201,
+    "scheduledById": 301,
     "result": "pending",
-    "recruiterNotes": null,
+    "recruiterNotes": "Initial screening",
     "interviewerFeedback": null
   }
 }
 ```
 
-**Notes:**
+---
 
-- Requires at least one existing interview for the candidate
-- Automatically calculates and assigns the next round number
-- Updates `totalInterviews` for all candidate's interview records
+### 6. Schedule Next Round
 
-**Validation Rules:**
+Schedule the next interview round for a candidate (must have at least one existing interview).
 
-- `interviewDate`: Required, ISO date format, cannot be in the past
-- `fromTime`: Required, HH:MM format (00:00-23:59)
-- `durationMinutes`: Required, integer, 15-480 minutes
-- `interviewerId`: Required, positive integer
-- `scheduledById`: Required, positive integer
+- **Method:** `POST`
+- **Path:** `/:candidateId/rounds`
+- **Params:**
+
+| Field         | Type   | Required | Description         |
+| ------------- | ------ | -------- | ------------------- |
+| `candidateId` | number | Yes      | ID of the candidate |
+
+- **Request Body:** Same as `Create Interview` (no `result`, `recruiterNotes`, `interviewerFeedback` required).
+
+- **Response (201 Created):**
+
+```
+{
+  "success": true,
+  "message": "Successfully scheduled round 2 for candidate",
+  "data": {
+    "interviewId": 2,
+    "candidateId": 101,
+    "roundNumber": 2,
+    "totalInterviews": 2,
+    "interviewDate": "2025-12-16",
+    "fromTime": "14:00",
+    "durationMinutes": 60,
+    "interviewerId": 202,
+    "scheduledById": 301
+  }
+}
+```
 
 ---
 
 ### 7. Update Interview
 
-Updates basic interview details (date, time, interviewer, scheduler).
+Update an existing interview (partial update allowed).
 
-**Endpoint:** `PATCH /:interviewId`
+- **Method:** `PATCH`
+- **Path:** `/:interviewId`
+- **Params:**
 
-**Request:**
+| Field         | Type   | Required | Description         |
+| ------------- | ------ | -------- | ------------------- |
+| `interviewId` | number | Yes      | ID of the interview |
 
-```http
-PATCH /api/interview/1
-Authorization: Bearer <token>
-Content-Type: application/json
+- **Request Body (at least one field required):**
 
+```
 {
-  "interviewDate": "2024-12-12",
-  "fromTime": "11:00",
-  "durationMinutes": 90,
-  "interviewerId": 8
+  "interviewDate": "2025-12-15",
+  "fromTime": "10:30",
+  "durationMinutes": 60,
+  "interviewerId": 202,
+  "scheduledById": 302
 }
 ```
 
-**Response:**
+- **Validation Rules:**
 
-```json
+| Field             | Type   | Rules                                              |
+| ----------------- | ------ | -------------------------------------------------- |
+| `interviewDate`   | string | YYYY-MM-DD format, cannot be in the past, optional |
+| `fromTime`        | string | HH:MM format (00:00–23:59), optional               |
+| `durationMinutes` | number | Integer, 15–480 minutes, optional                  |
+| `interviewerId`   | number | Positive integer, optional                         |
+| `scheduledById`   | number | Positive integer, optional                         |
+
+- **Response:**
+
+```
 {
   "success": true,
   "message": "Interview entry updated successfully",
   "data": {
     "interviewId": 1,
-    "interviewDate": "2024-12-12",
-    "fromTime": "11:00",
-    "durationMinutes": 90,
-    "interviewerId": 8
+    "candidateId": 101,
+    "roundNumber": 1,
+    "totalInterviews": 2,
+    "interviewDate": "2025-12-15",
+    "fromTime": "10:30",
+    "durationMinutes": 60,
+    "interviewerId": 202,
+    "scheduledById": 302,
+    "result": "pending",
+    "recruiterNotes": "Initial screening",
+    "interviewerFeedback": null
   }
 }
 ```
-
-**Updatable Fields:**
-
-- `interviewDate`: Optional, ISO date format, cannot be in the past
-- `fromTime`: Optional, HH:MM format (00:00-23:59)
-- `durationMinutes`: Optional, integer, 15-480 minutes
-- `interviewerId`: Optional, positive integer
-- `scheduledById`: Optional, positive integer
-
-**Note:** At least one field must be provided for update.
 
 ---
 
 ### 8. Finalize Interview
 
-Updates the interview result and adds final feedback. Used to mark interview completion.
+Set the final result and feedback for an interview.
 
-**Endpoint:** `PUT /:interviewId/finalize`
+- **Method:** `PUT`
+- **Path:** `/:interviewId/finalize`
+- **Params:**
 
-**Request:**
+| Field         | Type   | Required | Description         |
+| ------------- | ------ | -------- | ------------------- |
+| `interviewId` | number | Yes      | ID of the interview |
 
-```http
-PUT /api/interview/1/finalize
-Authorization: Bearer <token>
-Content-Type: application/json
+- **Request Body:**
 
+```
 {
-  "result": "Selected",
-  "recruiterNotes": "Strong technical skills, good communication",
-  "interviewerFeedback": "Excellent problem-solving abilities. Recommended for next round."
+  "result": "selected",
+  "recruiterNotes": "Strong candidate, good fit",
+  "interviewerFeedback": "Technical skills are excellent"
 }
 ```
 
-**Response:**
+- **Validation Rules:**
 
-```json
+| Field                 | Type   | Rules                                                            |
+| --------------------- | ------ | ---------------------------------------------------------------- |
+| `result`              | string | One of: `pending`, `selected`, `rejected`, `cancelled`, required |
+| `recruiterNotes`      | string | Max 1000 characters, optional, can be `""` or `null`             |
+| `interviewerFeedback` | string | Max 2000 characters, optional, can be `""` or `null`             |
+
+- **Response:**
+
+```
 {
   "success": true,
   "message": "Interview finalized successfully",
   "data": {
     "interviewId": 1,
-    "result": "Selected",
-    "recruiterNotes": "Strong technical skills, good communication",
-    "interviewerFeedback": "Excellent problem-solving abilities. Recommended for next round."
+    "result": "selected",
+    "recruiterNotes": "Strong candidate, good fit",
+    "interviewerFeedback": "Technical skills are excellent"
   }
 }
 ```
-
-**Validation Rules:**
-
-- `result`: Required, one of: `Pending`, `Selected`, `Rejected`, `Cancelled`
-- `recruiterNotes`: Optional, max 1000 characters
-- `interviewerFeedback`: Optional, max 2000 characters
 
 ---
 
 ### 9. Delete Interview
 
-Soft deletes an interview (sets `isActive` to false).
+Soft-delete an interview (set `isActive = false`).
 
-**Endpoint:** `DELETE /:interviewId`
+- **Method:** `DELETE`
+- **Path:** `/:interviewId`
+- **Params:**
 
-**Request:**
+| Field         | Type   | Required | Description         |
+| ------------- | ------ | -------- | ------------------- |
+| `interviewId` | number | Yes      | ID of the interview |
 
-```http
-DELETE /api/interview/1
-Authorization: Bearer <token>
+- **Response:**
+
 ```
-
-**Response:**
-
-```json
 {
   "success": true,
   "message": "Interview entry deleted successfully",
-  "data": null
+  "data": {
+    "interviewId": 1,
+    "deletedAt": "2025-12-12T13:10:26.102Z"
+  }
 }
 ```
 
 ---
 
-## Error Responses
+### 10. Overall Summary Report
 
-### Validation Error
+Get total interview stats grouped by interviewer.
 
-```json
+- **Method:** `GET`
+- **Path:** `/report/overall`
+- **Response:**
+
+```
+{
+  "success": true,
+  "message": "Total Interviewer Data Retrieved Successfully",
+  "data": {
+    "interviewers": [
+      {
+        "interviewerId": 201,
+        "interviewerName": "Alice Smith",
+        "total": 5,
+        "selected": 2,
+        "rejected": 1,
+        "pending": 1,
+        "cancelled": 1,
+        "avgDuration": 45,
+        "totalMinutes": 225
+      }
+    ]
+  }
+}
+```
+
+---
+
+### 11. Monthly Summary Report
+
+Get interview summary for a date range.
+
+- **Method:** `GET`
+- **Path:** `/report/monthly`
+- **Query Params:**
+
+| Field       | Type   | Required | Description                                          |
+| ----------- | ------ | -------- | ---------------------------------------------------- |
+| `startDate` | string | Yes      | Start date in YYYY-MM-DD format                      |
+| `endDate`   | string | Yes      | End date in YYYY-MM-DD format, must be > `startDate` |
+
+- **Response:**
+
+```
+{
+  "success": true,
+  "message": "Total Monthly Summary Data Retrieved Successfully",
+  "data": {
+    "summary": {
+      "total": 10,
+      "selected": 4,
+      "rejected": 3,
+      "pending": 2,
+      "cancelled": 1
+    },
+    "interviewers": [
+      {
+        "interviewerId": 201,
+        "interviewerName": "Alice Smith",
+        "total": 5,
+        "selected": 2,
+        "rejected": 1,
+        "pending": 1,
+        "cancelled": 1,
+        "avgDuration": 45,
+        "totalMinutes": 225
+      }
+    ],
+    "interviewDates": [
+      { "interviewDate": "2025-12-15" },
+      { "interviewDate": "2025-12-16" }
+    ]
+  }
+}
+```
+
+---
+
+### 12. Daily Summary Report
+
+Get all interviews scheduled for a specific date.
+
+- **Method:** `GET`
+- **Path:** `/report/daily`
+- **Query Params:**
+
+| Field  | Type   | Required | Description               |
+| ------ | ------ | -------- | ------------------------- |
+| `date` | string | Yes      | Date in YYYY-MM-DD format |
+
+- **Response:**
+
+```
+{
+  "success": true,
+  "message": "Total Daily Summary Data Retrieved Sucessfully",
+  "data": {
+    "interviews": [
+      {
+        "interviewerId": 201,
+        "interviewerName": "Alice Smith",
+        "interviewId": 1,
+        "candidateId": 101,
+        "candidateName": "John Doe",
+        "interviewDate": "2025-12-15",
+        "fromTime": "10:00",
+        "toTime": "10:45",
+        "roundNumber": 1,
+        "totalInterviews": 2,
+        "durationMinutes": 45,
+        "recruiterNotes": "Initial screening",
+        "result": "pending"
+      }
+    ]
+  }
+}
+```
+
+---
+
+## Error Response Format
+
+All validation and business errors return a consistent format:
+
+```
 {
   "success": false,
   "message": "Validation failed",
@@ -3344,11 +4008,7 @@ Authorization: Bearer <token>
       "validationErrors": [
         {
           "field": "interviewDate",
-          "message": "Interview date is required"
-        },
-        {
-          "field": "durationMinutes",
-          "message": "Duration must be at least 15 minutes"
+          "message": "Interview date must be in YYYY-MM-DD format"
         }
       ]
     }
@@ -3356,179 +4016,24 @@ Authorization: Bearer <token>
 }
 ```
 
-### Not Found Error
+Common error codes:
 
-```json
-{
-  "success": false,
-  "message": "Interview Entry with 999 not found",
-  "error": {
-    "code": "INTERVIEW_ENTRY_NOT_FOUND"
-  }
-}
-```
-
-### No Previous Interviews Error
-
-```json
-{
-  "success": false,
-  "message": "No previous interviews found for candidate 123. Please create an initial interview first.",
-  "error": {
-    "code": "NO_PREVIOUS_INTERVIEWS"
-  }
-}
-```
-
-### Database Error
-
-```json
-{
-  "success": false,
-  "message": "Database operation failed",
-  "error": {
-    "code": "DATABASE_ERROR",
-    "details": {
-      "operation": "create",
-      "code": "ER_DUP_ENTRY"
-    }
-  }
-}
-```
-
----
-
-## Database Schema
-
-### Interview Table
-
-```sql
-CREATE TABLE `interview` (
-  `interviewId` int NOT NULL AUTO_INCREMENT,
-  `roundNumber` int NOT NULL DEFAULT 1,
-  `totalInterviews` int NOT NULL DEFAULT 1,
-  `interviewDate` date NOT NULL,
-  `fromTime` time NOT NULL,
-  `durationMinutes` int NOT NULL,
-  `candidateId` int NOT NULL,
-  `interviewerId` int NOT NULL,
-  `scheduledById` int NOT NULL,
-  `result` enum('Pending','Selected','Rejected','Cancelled') DEFAULT 'Pending',
-  `interviewerFeedback` text,
-  `recruiterNotes` text,
-  `createdAt` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
-  `updatedAt` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `isActive` tinyint(1) DEFAULT '1',
-  `toTime` time GENERATED ALWAYS AS (`fromTime` + interval `durationMinutes` minute) STORED,
-  PRIMARY KEY (`interviewId`),
-  KEY `idx_interviewDate` (`interviewDate`),
-  KEY `idx_candidate` (`candidateId`),
-  KEY `idx_interviewer` (`interviewerId`),
-  KEY `idx_scheduledBy` (`scheduledById`),
-  KEY `idx_result` (`result`),
-  KEY `idx_candidate_round` (`candidateId`, `roundNumber`),
-  CONSTRAINT `fk_interview_candidate` FOREIGN KEY (`candidateId`) REFERENCES `candidate` (`candidateId`) ON DELETE RESTRICT,
-  CONSTRAINT `interview_ibfk_2` FOREIGN KEY (`interviewerId`) REFERENCES `member` (`memberId`) ON DELETE RESTRICT,
-  CONSTRAINT `interview_ibfk_3` FOREIGN KEY (`scheduledById`) REFERENCES `member` (`memberId`) ON DELETE RESTRICT
-);
-```
-
----
-
-## Features
-
-### Automatic Round Management
-
-- **First Interview**: Creates Round 1 with `totalInterviews = 1`
-- **Next Rounds**: Automatically increments round number and updates `totalInterviews` for all candidate's interviews
-- **Example**: After scheduling Round 3, all previous rounds (1 & 2) will have `totalInterviews = 3`
-
-### Audit Logging
-
-All create, update, and delete operations are automatically logged with:
-
-- User ID
-- Action type (CREATE, UPDATE, DELETE)
-- Previous and new values
-- IP address
-- User agent
-- Timestamp
-
-### Data Integrity
-
-- Soft deletes maintain historical records
-- Foreign key constraints prevent orphaned records
-- Transaction support ensures data consistency
-- Automatic `toTime` calculation based on `fromTime` and `durationMinutes`
-
----
-
-## Usage Examples
-
-### Complete Interview Workflow
-
-#### Step 1: Create First Interview
-
-```bash
-curl -X POST http://localhost:3000/api/interview/123 \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "interviewDate": "2024-12-10",
-    "fromTime": "10:00",
-    "durationMinutes": 60,
-    "interviewerId": 5,
-    "scheduledById": 2
-  }'
-```
-
-#### Step 2: Finalize First Round
-
-```bash
-curl -X PUT http://localhost:3000/api/interview/1/finalize \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "result": "Selected",
-    "interviewerFeedback": "Strong candidate, proceed to next round"
-  }'
-```
-
-#### Step 3: Schedule Second Round
-
-```bash
-curl -X POST http://localhost:3000/api/interview/123/rounds \
-  -H "Authorization: Bearer <token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "interviewDate": "2024-12-15",
-    "fromTime": "14:00",
-    "durationMinutes": 45,
-    "interviewerId": 7,
-    "scheduledById": 2
-  }'
-```
-
-#### Step 4: View All Candidate Interviews
-
-```bash
-curl -X GET http://localhost:3000/api/interview/candidate/123 \
-  -H "Authorization: Bearer <token>"
-```
+- `VALIDATION_ERROR` – Request body/query/params failed validation
+- `INTERVIEW_ENTRY_NOT_FOUND` – Interview with given ID not found
+- `NO_PREVIOUS_INTERVIEWS` – No previous interviews for candidate (for next round)
+- `INTERVIEW_NOT_FOUND` – Interview not found during delete
+- Database errors (e.g., `DATABASE_ERROR`, `DATABASE_SCHEMA_ERROR`, etc.)
 
 ---
 
 ## Notes
 
-- All timestamps are stored in UTC
-- `toTime` is automatically calculated and cannot be manually set
-- Round numbers are sequential and managed automatically
-- Deleted interviews (`isActive = false`) are not returned in queries
-- Interview dates cannot be in the past
-- Duration must be between 15 minutes and 8 hours (480 minutes)
+- All dates are in `YYYY-MM-DD` format.
+- Time is in `HH:MM` 24‑hour format.
+- `result` is always returned in capitalized form (e.g., `Pending`, `Selected`).
+- Soft-deleted interviews (`isActive = false`) are excluded from all reports and list endpoints.
+- Round numbers are automatically renumbered when an interview is deleted.
 
----
+```
 
-## Support
-
-For issues or questions, please contact the development team or create an issue in the project repository.
+```

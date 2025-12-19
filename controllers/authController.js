@@ -39,6 +39,24 @@ class AuthController {
         }
     }
 
+    async changePassword(req, res, next) {
+        try {
+            const memberId = req.user.memberId;
+            const { currentPassword, newPassword } = req.body;
+
+            await authService.changePassword(memberId, currentPassword, newPassword);
+
+            return ApiResponse.success(
+                res,
+                null,
+                'Password changed successfully',
+                200
+            );
+        } catch (error) {
+            next(error);
+        }
+    }
+
     async refreshToken(req, res, next) {
         try {
             // ONLY extract token from Authorization header (best practice)
