@@ -42,28 +42,37 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          role-to-assume: arn:aws:iam::${{vars.AWS_ACCOUNT_ID}}:role/GitHubActions-Prod-Role
-          aws-region: ${{vars.AWS_REGION}}
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID }}:role/GitHubActions-Prod-Role
+          aws-region: ${{ vars.AWS_REGION }}
 
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Build and push image
+      - name: Build and push Docker image (prod)
         run: |
-          IMAGE="${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.ap-south-1.amazonaws.com/aerolens-portal-backend:${{ github.sha }}"
+          ECR_REG="${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com"
+          IMAGE="${ECR_REG}/aerolens-portal-backend:${{ github.sha }}"
+
           docker build -t "$IMAGE" .
           docker push "$IMAGE"
         env:
           DOCKER_BUILDKIT: 1
 
-      - name: Deploy via SSM to prod instance(s)
+      - name: Deploy to prod via SSM
         run: |
-          INSTANCE_ID="${{vars.INSTANCE_ID}}"
-          COMPOSE_FILE="${{vars.PROD_COMPOSE_FILE}}"
+          INSTANCE_ID="${{ vars.INSTANCE_ID }}"
+          COMPOSE_FILE="${{ vars.PROD_COMPOSE_FILE }}"
           SERVICE="backend"
+          IMAGE_TAG="${{ github.sha }}"
+          ECR_REG="${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com"
+
           aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
-            --comment "Prod deploy ${GITHUB_SHA}" \
-            --parameters commands="[ 'cd ${{vars.PROD_FOLDER_LOCATION}} && docker-compose -f ${COMPOSE_FILE} pull ${SERVICE} && docker-compose -f ${COMPOSE_FILE} up -d --remove-orphans ${SERVICE}' ]" \
-            --region ${{vars.AWS_REGION}}
+            --comment "Prod deploy ${IMAGE_TAG}" \
+            --parameters commands="[ 'cd ${{ vars.PROD_FOLDER_LOCATION }} && \
+              aws ecr get-login-password --region ${{ vars.AWS_REGION }} | docker login --username AWS --password-stdin ${ECR_REG} && \
+              docker pull ${ECR_REG}/aerolens-portal-backend:${IMAGE_TAG} && \
+              docker tag ${ECR_REG}/aerolens-portal-backend:${IMAGE_TAG} aerolens-portal-backend:latest && \
+              docker-compose -f ${COMPOSE_FILE} up -d --remove-orphans ${SERVICE}' ]" \
+            --region ${{ vars.AWS_REGION }}
