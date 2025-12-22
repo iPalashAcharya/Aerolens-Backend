@@ -122,7 +122,7 @@ const contactSchemas = {
 
 class ContactValidator {
     static validateCreate(req, res, next) {
-        const { value, error } = contactSchemas.create.validate(req.body, { abortEarly: false });
+        const { value, error } = contactSchemas.create.validate(req.body, { abortEarly: false, stripUnknown: true });
         if (error) {
             const details = error.details.map(detail => ({
                 field: detail.path[0],
@@ -135,8 +135,8 @@ class ContactValidator {
     }
 
     static validateUpdate(req, res, next) {
-        const { value, error: bodyError } = contactSchemas.update.validate(req.body, { abortEarly: false });
-        const { error: paramsError } = contactSchemas.params.validate(req.params, { abortEarly: false });
+        const { value, error: bodyError } = contactSchemas.update.validate(req.body, { abortEarly: false, stripUnknown: true });
+        const { error: paramsError } = contactSchemas.params.validate(req.params, { abortEarly: false, stripUnknown: true });
 
         if (bodyError || paramsError) {
             const details = [];
@@ -159,7 +159,7 @@ class ContactValidator {
     }
 
     static validateDelete(req, res, next) {
-        const { error } = contactSchemas.params.validate(req.params, { abortEarly: false });
+        const { error } = contactSchemas.params.validate(req.params, { abortEarly: false, stripUnknown: true });
         if (error) {
             const details = error.details.map(detail => ({
                 field: detail.path[0],

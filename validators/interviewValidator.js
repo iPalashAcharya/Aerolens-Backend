@@ -293,7 +293,7 @@ class InterviewValidator {
         if (error) {
             throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', {
                 validationErrors: error.details.map(detail => ({
-                    field: detail.path[0],
+                    field: detail.path.join('.'),
                     message: detail.message
                 }))
             });
@@ -310,7 +310,7 @@ class InterviewValidator {
         if (error) {
             throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', {
                 validationErrors: error.details.map(detail => ({
-                    field: detail.path[0],
+                    field: detail.path.join('.'),
                     message: detail.message
                 }))
             });
@@ -327,7 +327,7 @@ class InterviewValidator {
         if (error) {
             throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', {
                 validationErrors: error.details.map(detail => ({
-                    field: detail.path[0],
+                    field: detail.path.join('.'),
                     message: detail.message
                 }))
             });
@@ -344,7 +344,7 @@ class InterviewValidator {
         if (error) {
             throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', {
                 validationErrors: error.details.map(detail => ({
-                    field: detail.path[0],
+                    field: detail.path.join('.'),
                     message: detail.message
                 }))
             });
@@ -361,7 +361,7 @@ class InterviewValidator {
         if (error) {
             throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', {
                 validationErrors: error.details.map(detail => ({
-                    field: detail.path[0],
+                    field: detail.path.join('.'),
                     message: detail.message
                 }))
             });
@@ -378,7 +378,7 @@ class InterviewValidator {
         if (error) {
             throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', {
                 validationErrors: error.details.map(detail => ({
-                    field: detail.path[0],
+                    field: detail.path.join('.'),
                     message: detail.message
                 }))
             });
@@ -397,7 +397,7 @@ class InterviewValidator {
         if (error) {
             throw new AppError("Validation failed", 400, "VALIDATION_ERROR", {
                 validationErrors: error.details.map(d => ({
-                    field: d.path[0],
+                    field: d.path.join('.'),
                     message: d.message
                 }))
             });

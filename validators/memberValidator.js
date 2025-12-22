@@ -37,7 +37,7 @@ class MemberValidatorHelper {
         };
 
         if (!ALLOWED[table]?.includes(column)) {
-            throw new AppError('Invalid lookup reference', 500, 'INTERNAL_ERROR');
+            throw new AppError('Invalid lookup reference', 500, 'INTERNAL_SERVER_ERROR');
         }
         try {
             const [rows] = await connection.execute(
@@ -83,9 +83,17 @@ class MemberValidatorHelper {
                     const [rows] = await connection.execute(query, [skill.skillName.trim()]);
                     if (rows.length === 0) {
                         throw new AppError(
-                            `Invalid skill: ${skill.skillName}. Please refer to the lookup table.`,
+                            'Validation failed',
                             400,
-                            'INVALID_SKILL'
+                            'VALIDATION_ERROR',
+                            {
+                                validationErrors: [
+                                    {
+                                        field: 'skills',
+                                        message: `Invalid skill: ${skill.skillName}, Please refer the lookup table`
+                                    }
+                                ]
+                            }
                         );
                     }
                     skillId = rows[0].lookupKey;
@@ -130,9 +138,17 @@ class MemberValidatorHelper {
             const [result] = await connection.execute(query, [designation.trim()]);
             if (result.length === 0) {
                 throw new AppError(
-                    `Invalid Designation ${designation}, Please refer lookup table for valid designations`,
+                    'Validation failed',
                     400,
-                    `INVALID_DESIGNATION`
+                    'VALIDATION_ERROR',
+                    {
+                        validationErrors: [
+                            {
+                                field: 'designation',
+                                message: `Invalid designation: ${designation}, Please refer the lookup table`
+                            }
+                        ]
+                    }
                 );
             }
             const designationId = result[0].lookupKey;
@@ -151,10 +167,23 @@ class MemberValidatorHelper {
             const query = `SELECT clientId FROM client WHERE clientId = ?`;
             const [result] = await connection.execute(query, [clientId]);
             if (result.length === 0) {
-                throw new AppError(
+                /*throw new AppError(
                     `Client with ID ${clientId} does not exist`,
                     400,
                     'INVALID_CLIENT_ID'
+                );*/
+                throw new AppError(
+                    'Validation failed',
+                    400,
+                    'VALIDATION_ERROR',
+                    {
+                        validationErrors: [
+                            {
+                                field: 'clientId',
+                                message: `Invalid client ID: ${clientId} does not exist`
+                            }
+                        ]
+                    }
                 );
             }
             return true;
@@ -208,9 +237,17 @@ class MemberValidatorHelper {
         if (!locationName) return null;
         if (!locationName.city) {
             throw new AppError(
-                `Invalid location object: 'city' is required.`,
+                'Validation failed',
                 400,
-                'INVALID_LOCATION_OBJECT'
+                'VALIDATION_ERROR',
+                {
+                    validationErrors: [
+                        {
+                            field: 'location.city',
+                            message: 'City is required'
+                        }
+                    ]
+                }
             );
         }
 
@@ -240,9 +277,17 @@ class MemberValidatorHelper {
 
             if (rows.length === 0) {
                 throw new AppError(
-                    `Invalid location: '${locationValue}'. Location does not exist.`,
+                    'Validation failed',
                     400,
-                    'INVALID_LOCATION'
+                    'VALIDATION_ERROR',
+                    {
+                        validationErrors: [
+                            {
+                                field: 'location.city',
+                                message: `Invalid location: ${locationValue}`
+                            }
+                        ]
+                    }
                 );
             }
 
@@ -400,7 +445,8 @@ class MemberValidator {
                 stripUnknown: true
             });
             const { error: paramsError } = memberSchema.params.validate(req.params, {
-                abortEarly: false
+                abortEarly: false,
+                stripUnknown: true
             });
 
             if (bodyError || paramsError) {
@@ -474,7 +520,7 @@ class MemberValidator {
 
     static validateParams(req, res, next) {
         try {
-            const { error } = memberSchema.params.validate(req.params);
+            const { error } = memberSchema.params.validate(req.params, { stripUnknown: true, abortEarly: false });
 
             if (error) {
                 const details = error.details.map(detail => ({

@@ -1,7 +1,5 @@
 const Joi = require('joi');
 const AppError = require('../utils/appError');
-const path = require('path');
-const fs = require('fs');
 
 // Database helper class for lookups
 class CandidateValidatorHelper {
@@ -37,7 +35,7 @@ class CandidateValidatorHelper {
         };
 
         if (!ALLOWED[table]?.includes(column)) {
-            throw new AppError('Invalid lookup reference', 500, 'INTERNAL_ERROR');
+            throw new AppError('Invalid lookup reference', 500, 'INTERNAL_SERVER_ERROR');
         }
         const connection = client || await this.db.getConnection();
         try {
@@ -82,11 +80,21 @@ class CandidateValidatorHelper {
             const [rows] = await connection.execute(query, [statusName.trim()]);
 
             if (rows.length === 0) {
-                throw new AppError(
-                    `Invalid status: '${statusName}'. Status does not exist.`,
-                    400,
-                    'INVALID_STATUS'
-                );
+                if (rows.length === 0) {
+                    throw new AppError(
+                        'Validation failed',
+                        400,
+                        'VALIDATION_ERROR',
+                        {
+                            validationErrors: [
+                                {
+                                    field: 'status',
+                                    message: `Invalid status: '${statusName}'`
+                                }
+                            ]
+                        }
+                    );
+                }
             }
 
             const statusId = rows[0].lookupKey;
@@ -122,9 +130,17 @@ class CandidateValidatorHelper {
             const [rows] = await connection.execute(query, [recruiterName.trim()]);
             if (rows.length === 0) {
                 throw new AppError(
-                    `Invalid Recruiter Name: ${recruiterName} Does not exist in the database`,
+                    'Validation failed',
                     400,
-                    `INVALID_RECRUITER_NAME`
+                    'VALIDATION_ERROR',
+                    {
+                        validationErrors: [
+                            {
+                                field: 'recruiterName',
+                                message: `Invalid Recruiter Name: ${recruiterName} Does not exist in the database`
+                            }
+                        ]
+                    }
                 );
             }
             const recruiterId = rows[0].memberId;
@@ -142,9 +158,17 @@ class CandidateValidatorHelper {
         if (!locationName) return null;
         if (!locationName.city) {
             throw new AppError(
-                `Invalid location object: 'city' is required.`,
+                'Validation failed',
                 400,
-                'INVALID_LOCATION_OBJECT'
+                'VALIDATION_ERROR',
+                {
+                    validationErrors: [
+                        {
+                            field: 'preferredJobLocation.city',
+                            message: 'City is required'
+                        }
+                    ]
+                }
             );
         }
 
@@ -155,7 +179,7 @@ class CandidateValidatorHelper {
         if (this.locationCache.has(cacheKey)) {
             const cachedId = this.locationCache.get(cacheKey);
 
-            const isValid = await this._validateIdExists('location', 'locationId', cachedId)
+            const isValid = await this._validateIdExists('location', 'locationId', cachedId, client);
             if (isValid) {
                 return cachedId;
             }
@@ -170,9 +194,17 @@ class CandidateValidatorHelper {
 
             if (rows.length === 0) {
                 throw new AppError(
-                    `Invalid location: '${locationValue}'. Location does not exist.`,
+                    'Validation failed',
                     400,
-                    'INVALID_LOCATION'
+                    'VALIDATION_ERROR',
+                    {
+                        validationErrors: [
+                            {
+                                field: 'preferredJobLocation.city',
+                                message: `Invalid city: '${locationValue}'`
+                            }
+                        ]
+                    }
                 );
             }
 
@@ -681,7 +713,19 @@ class CandidateValidator {
                         Key: req.file.key
                     })).catch(err => console.error('S3 cleanup error:', err));
 
-                    throw new AppError('Invalid resume file format. Only PDF, DOC and DOCX are allowed.', 400, 'VALIDATION_ERROR', { field: 'resume' });
+                    throw new AppError(
+                        'Validation failed',
+                        400,
+                        'VALIDATION_ERROR',
+                        {
+                            validationErrors: [
+                                {
+                                    field: 'resume',
+                                    message: 'Invalid resume file format. Only PDF, DOC and DOCX are allowed.'
+                                }
+                            ]
+                        }
+                    );
                 }
 
                 const maxSizeBytes = 5 * 1024 * 1024;
@@ -694,7 +738,20 @@ class CandidateValidator {
                         Key: req.file.key
                     })).catch(err => console.error('S3 cleanup error:', err));
 
-                    throw new AppError('Resume file size cannot exceed 5MB', 400, 'VALIDATION_ERROR', { field: 'resume' });
+                    throw new AppError(
+                        'Validation failed',
+                        400,
+                        'VALIDATION_ERROR',
+                        {
+                            validationErrors: [
+                                {
+                                    field: 'resume',
+                                    message: 'Resume File size cannot exceed 5MB'
+                                }
+                            ]
+                        }
+                    );
+
                 }
             }
 
@@ -727,7 +784,20 @@ class CandidateValidator {
                         Key: req.file.key
                     })).catch(err => console.error('S3 cleanup error:', err));
                 }
-                throw new AppError('A candidate with this email already exists', 409, 'DUPLICATE_EMAIL', { field: 'email' });
+                throw new AppError(
+                    'Validation failed',
+                    409,
+                    'VALIDATION_ERROR',
+                    {
+                        validationErrors: [
+                            {
+                                field: 'email',
+                                message: 'A candidate with this email already exists'
+                            }
+                        ]
+                    }
+                );
+
             }
 
             if (await CandidateValidator.helper.checkContactExists(value.contactNumber)) {
@@ -740,7 +810,20 @@ class CandidateValidator {
                         Key: req.file.key
                     })).catch(err => console.error('S3 cleanup error:', err));
                 }
-                throw new AppError('A candidate with this contact number already exists', 409, 'DUPLICATE_CONTACT', { field: 'contactNumber' });
+                //throw new AppError('A candidate with this contact number already exists', 409, 'DUPLICATE_CONTACT', { field: 'contactNumber' });
+                throw new AppError(
+                    'Validation failed',
+                    409,
+                    'VALIDATION_ERROR',
+                    {
+                        validationErrors: [
+                            {
+                                field: 'contactNumber',
+                                message: 'A candidate with this contact number already exists'
+                            }
+                        ]
+                    }
+                );
             }
 
             req.body = value;
@@ -753,7 +836,7 @@ class CandidateValidator {
     static async validateUpdate(req, res, next) {
         try {
             // Validate params
-            const { error: paramsError } = candidateSchemas.params.validate(req.params, { abortEarly: false });
+            const { error: paramsError } = candidateSchemas.params.validate(req.params, { abortEarly: false, stripUnknown: true });
 
             // Validate body
             let { error: bodyError, value } = candidateSchemas.update.validate(req.body, {
@@ -816,7 +899,19 @@ class CandidateValidator {
                         Key: req.file.key
                     })).catch(err => console.error('S3 cleanup error:', err));
 
-                    throw new AppError('Invalid resume file format. Only PDF, DOC and DOCX are allowed.', 400, 'VALIDATION_ERROR', { field: 'resume' });
+                    throw new AppError(
+                        'Validation failed',
+                        400,
+                        'VALIDATION_ERROR',
+                        {
+                            validationErrors: [
+                                {
+                                    field: 'resume',
+                                    message: 'Invalid resume file format. Only PDF, DOC and DOCX are allowed.'
+                                }
+                            ]
+                        }
+                    );
                 }
 
                 const maxSizeBytes = 5 * 1024 * 1024;
@@ -829,7 +924,20 @@ class CandidateValidator {
                         Key: req.file.key
                     })).catch(err => console.error('S3 cleanup error:', err));
 
-                    throw new AppError('Resume file size cannot exceed 5MB', 400, 'VALIDATION_ERROR', { field: 'resume' });
+                    //throw new AppError('Resume file size cannot exceed 5MB', 400, 'VALIDATION_ERROR', { field: 'resume' });
+                    throw new AppError(
+                        'Validation failed',
+                        400,
+                        'VALIDATION_ERROR',
+                        {
+                            validationErrors: [
+                                {
+                                    field: 'resume',
+                                    message: 'Resume file size cannot exceed 5 MB'
+                                }
+                            ]
+                        }
+                    );
                 }
             }
 
@@ -861,7 +969,20 @@ class CandidateValidator {
                         Key: req.file.key
                     })).catch(err => console.error('S3 cleanup error:', err));
                 }
-                throw new AppError('A candidate with this email already exists', 409, 'DUPLICATE_EMAIL', { field: 'email' });
+
+                throw new AppError(
+                    'Validation failed',
+                    409,
+                    'VALIDATION_ERROR',
+                    {
+                        validationErrors: [
+                            {
+                                field: 'email',
+                                message: 'A candidate with this email already exists'
+                            }
+                        ]
+                    }
+                );
             }
 
             if (value.contactNumber && await CandidateValidator.helper.checkContactExists(value.contactNumber, candidateId)) {
@@ -874,10 +995,23 @@ class CandidateValidator {
                         Key: req.file.key
                     })).catch(err => console.error('S3 cleanup error:', err));
                 }
-                throw new AppError('A candidate with this contact number already exists', 409, 'DUPLICATE_CONTACT', { field: 'contactNumber' });
+
+                throw new AppError(
+                    'Validation failed',
+                    409,
+                    'VALIDATION_ERROR',
+                    {
+                        validationErrors: [
+                            {
+                                field: 'contactNumber',
+                                message: 'A candidate with this contact number already exists'
+                            }
+                        ]
+                    }
+                );
             }
 
-            req.body = value;  // ✅ Now this will be {} if only file uploaded
+            req.body = value;
             next();
         } catch (error) {
             next(error);
@@ -885,7 +1019,7 @@ class CandidateValidator {
     }
 
     static validateDelete(req, res, next) {
-        const { error } = candidateSchemas.params.validate(req.params, { abortEarly: false });
+        const { error } = candidateSchemas.params.validate(req.params, { abortEarly: false, stripUnknown: true });
 
         if (error) {
             const details = error.details.map(detail => ({
@@ -923,7 +1057,12 @@ class CandidateValidator {
                     field: detail.path.join('.'),
                     message: detail.message
                 }));
-                throw new AppError('Search validation failed', 400, 'SEARCH_VALIDATION_ERROR', { validationErrors: details });
+                throw new AppError(
+                    'Validation failed',
+                    400,
+                    'VALIDATION_ERROR',
+                    { validationErrors: details }
+                );
             }
 
             // Transform location

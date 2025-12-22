@@ -60,9 +60,17 @@ class JobProfileValidatorHelper {
 
             if (rows.length === 0) {
                 throw new AppError(
-                    `Invalid status: '${statusName}'. Status does not exist.`,
+                    'Validation failed',
                     400,
-                    'INVALID_STATUS'
+                    'VALIDATION_ERROR',
+                    {
+                        validationErrors: [
+                            {
+                                field: 'status',
+                                message: `Invalid status : '${statusName}'. Status does not exist.`
+                            }
+                        ]
+                    }
                 );
             }
 
@@ -80,9 +88,17 @@ class JobProfileValidatorHelper {
         if (!locationName) return null;
         if (!locationName.city) {
             throw new AppError(
-                `Invalid location object: 'city' is required.`,
+                'Validation failed',
                 400,
-                'INVALID_LOCATION_OBJECT'
+                'VALIDATION_ERROR',
+                {
+                    validationErrors: [
+                        {
+                            field: 'location.city',
+                            message: 'City is required'
+                        }
+                    ]
+                }
             );
         }
 
@@ -109,9 +125,17 @@ class JobProfileValidatorHelper {
 
             if (rows.length === 0) {
                 throw new AppError(
-                    `Invalid location: '${locationValue}'. Location does not exist.`,
+                    'Validation failed',
                     400,
-                    'INVALID_LOCATION'
+                    'VALIDATION_ERROR',
+                    {
+                        validationErrors: [
+                            {
+                                field: 'location.city',
+                                message: `Invalid location: ${locationValue}`
+                            }
+                        ]
+                    }
                 );
             }
 
@@ -437,10 +461,17 @@ class JobProfileValidator {
             // Check for duplicate job role for the same client
             if (await JobProfileValidator.helper.checkJobRoleExists(value.jobRole, value.clientId)) {
                 throw new AppError(
-                    'A job profile with this role already exists for this client',
+                    'Validation failed',
                     409,
                     'DUPLICATE_JOB_ROLE',
-                    { field: 'jobRole' }
+                    {
+                        validationErrors: [
+                            {
+                                field: 'jobRole',
+                                message: 'Job role already exists for this client'
+                            }
+                        ]
+                    }
                 );
             }
 
@@ -455,7 +486,7 @@ class JobProfileValidator {
     static async validateUpdate(req, res, next) {
         try {
             // Validate params
-            const { error: paramsError } = jobProfileSchemas.params.validate(req.params, { abortEarly: false });
+            const { error: paramsError } = jobProfileSchemas.params.validate(req.params, { abortEarly: false, stripUnknown: true });
 
             // Validate body
             let { error: bodyError, value } = jobProfileSchemas.update.validate(req.body, {
@@ -545,7 +576,7 @@ class JobProfileValidator {
     }
 
     static validateDelete(req, res, next) {
-        const { error } = jobProfileSchemas.params.validate(req.params, { abortEarly: false });
+        const { error } = jobProfileSchemas.params.validate(req.params, { abortEarly: false, stripUnknown: true });
 
         if (error) {
             const details = error.details.map(detail => ({
@@ -558,7 +589,7 @@ class JobProfileValidator {
     }
 
     static validateGetById(req, res, next) {
-        const { error } = jobProfileSchemas.params.validate(req.params, { abortEarly: false });
+        const { error } = jobProfileSchemas.params.validate(req.params, { abortEarly: false, stripUnknown: true });
 
         if (error) {
             const details = error.details.map(detail => ({
@@ -583,7 +614,12 @@ class JobProfileValidator {
                     field: detail.path.join('.'),
                     message: detail.message
                 }));
-                throw new AppError('Search validation failed', 400, 'SEARCH_VALIDATION_ERROR', { validationErrors: details });
+                throw new AppError(
+                    'Validation failed',
+                    400,
+                    'VALIDATION_ERROR',
+                    { validationErrors: details }
+                );
             }
 
             // Transform location string to locationId
@@ -648,9 +684,17 @@ class JobProfileValidator {
                 req.body.location = JSON.parse(req.body.location);
             } catch {
                 throw new AppError(
-                    'Invalid JSON in location field',
+                    'Validation failed',
                     400,
-                    'INVALID_LOCATION_JSON'
+                    'VALIDATION_ERROR',
+                    {
+                        validationErrors: [
+                            {
+                                field: 'location',
+                                message: 'Invalid JSON format'
+                            }
+                        ]
+                    }
                 );
             }
         }

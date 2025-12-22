@@ -7,14 +7,14 @@ const clientSchemas = {
     create: Joi.object({
         name: Joi.string()
             .trim()
-            .min(1)
-            .max(255)
+            .min(3)
+            .max(60)
             .required()
             .messages({
                 'string.base': 'Name must be a string',
                 'string.empty': 'Name cannot be empty',
-                'string.min': 'Name must be at least 1 character long',
-                'string.max': 'Name cannot exceed 255 characters',
+                'string.min': 'Name must be at least 3 character long',
+                'string.max': 'Name cannot exceed 60 characters',
                 'any.required': 'Name is required'
             }),
         address: Joi.string()
@@ -41,14 +41,14 @@ const clientSchemas = {
     update: Joi.object({
         name: Joi.string()
             .trim()
-            .min(1)
-            .max(255)
+            .min(3)
+            .max(60)
             .optional()
             .messages({
                 'string.base': 'Name must be a string',
                 'string.empty': 'Name cannot be empty',
-                'string.min': 'Name must be at least 1 character long',
-                'string.max': 'Name cannot exceed 255 characters'
+                'string.min': 'Name must be at least 3 character long',
+                'string.max': 'Name cannot exceed 60 characters'
             }),
         address: Joi.string()
             .trim()
@@ -112,7 +112,7 @@ const clientSchemas = {
 class ClientValidator {
     static validateCreate(req, res, next) {
         console.log('Validating create with body:', req.body);
-        const { value, error } = clientSchemas.create.validate(req.body, { abortEarly: false });
+        const { value, error } = clientSchemas.create.validate(req.body, { abortEarly: false, stripUnknown: true });
         if (error) {
             const details = error.details.map(detail => ({
                 field: detail.path[0],
@@ -125,8 +125,8 @@ class ClientValidator {
     }
 
     static validateUpdate(req, res, next) {
-        const { value, error: bodyError } = clientSchemas.update.validate(req.body, { abortEarly: false });
-        const { error: paramsError } = clientSchemas.params.validate(req.params, { abortEarly: false });
+        const { value, error: bodyError } = clientSchemas.update.validate(req.body, { abortEarly: false, stripUnknown: true });
+        const { error: paramsError } = clientSchemas.params.validate(req.params, { abortEarly: false, stripUnknown: true });
 
         if (bodyError || paramsError) {
             const details = [];
@@ -149,7 +149,7 @@ class ClientValidator {
     }
 
     static validateDelete(req, res, next) {
-        const { error } = clientSchemas.params.validate(req.params, { abortEarly: false });
+        const { error } = clientSchemas.params.validate(req.params, { abortEarly: false, stripUnknown: true });
         if (error) {
             const details = error.details.map(detail => ({
                 field: detail.path[0],
@@ -161,7 +161,7 @@ class ClientValidator {
     }
 
     static validatePagination(req, res, next) {
-        const { error } = clientSchemas.pagination.validate(req.query, { abortEarly: false });
+        const { error } = clientSchemas.pagination.validate(req.query, { abortEarly: false, stripUnknown: true });
         if (error) {
             const details = error.details.map(detail => ({
                 field: detail.path[0],

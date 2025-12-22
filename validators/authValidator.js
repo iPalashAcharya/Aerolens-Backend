@@ -11,13 +11,21 @@ class AuthValidatorHelper {
         const connection = client || await this.db.getConnection();
         try {
             const query = `SELECT lookupKey FROM lookup WHERE LOWER(value) = LOWER(?) AND tag='designation'`;
-            const [rows] = await connection.execute(query, [designationString]);
+            const [rows] = await connection.execute(query, [designationString.trim()]);
 
             if (!rows || rows.length === 0) {
                 throw new AppError(
-                    `Invalid designation specified. Provided designation is not currently present in the database`,
+                    'Validation failed',
                     400,
-                    `INVALID_DESIGNATION`
+                    'VALIDATION_ERROR',
+                    {
+                        validationErrors: [
+                            {
+                                field: 'designation',
+                                message: 'Invalid designation specified. Please choose a valid designation.'
+                            }
+                        ]
+                    }
                 );
             }
             return rows[0].lookupKey;
@@ -77,11 +85,11 @@ const registerSchema = Joi.object({
     password: Joi.string()
         .required()
         .min(8)
-        .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+        .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/)
         .messages({
             'any.required': 'Password is required',
             'string.min': 'Password must be at least 8 characters',
-            'string.pattern.base': 'Password must contain uppercase, lowercase, number and special character'
+            'string.pattern.base': 'Password must contain at least one uppercase letter, one lowercase letter, one number and one special character'
         }),
     designation: Joi.string()
         .lowercase()
@@ -109,14 +117,14 @@ const changePasswordSchema = Joi.object({
         .required()
         .min(8)
         .max(128)
-        .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+        .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/)
         .invalid(Joi.ref('currentPassword'))
         .messages({
             'any.required': 'New password is required',
             'string.min': 'New password must be at least 8 characters',
             'string.max': 'New password cannot exceed 128 characters',
             'string.empty': 'New password cannot be empty',
-            'string.pattern.base': 'New password must contain at least one uppercase letter, one lowercase letter, one number and one special character (@$!%*?&)',
+            'string.pattern.base': 'Password must contain at least one uppercase letter, one lowercase letter, one number and one special character',
             'any.invalid': 'New password must be different from current password'
         }),
     /*confirmPassword: Joi.string()
@@ -137,7 +145,7 @@ class AuthValidator {
     }
 
     static async validateLogin(req, res, next) {
-        const { error } = loginSchema.validate(req.body, { abortEarly: false });
+        const { error, value } = loginSchema.validate(req.body, { abortEarly: false, stripUnknown: true });
 
         if (error) {
             const details = error.details.map(detail => ({
@@ -146,25 +154,30 @@ class AuthValidator {
             }));
             return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details }));
         }
+        req.body = value;
         next();
     }
 
     static async validateRegister(req, res, next) {
-        const { error, value } = registerSchema.validate(req.body, { abortEarly: false });
+        try {
+            const { error, value } = registerSchema.validate(req.body, { abortEarly: false, stripUnknown: true });
 
-        if (error) {
-            const details = error.details.map(detail => ({
-                field: detail.path.join('.'),
-                message: detail.message
-            }));
-            return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details }));
-        }
+            if (error) {
+                const details = error.details.map(detail => ({
+                    field: detail.path.join('.'),
+                    message: detail.message
+                }));
+                return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details }));
+            }
 
-        if (value.designation) {
-            value.designation = await AuthValidator.helper.transformDesignation(value.designation);
+            if (value.designation) {
+                value.designation = await AuthValidator.helper.transformDesignation(value.designation);
+            }
+            req.body = value;
+            next();
+        } catch (err) {
+            next(err);
         }
-        req.body = value;
-        next();
     }
     static async validateResetPassword(req, res, next) {
         try {
@@ -184,7 +197,7 @@ class AuthValidator {
             req.body = value;
             next();
         } catch (err) {
-            next(new AppError('Validation error occurred', 500, 'VALIDATION_SYSTEM_ERROR', err.message));
+            next(err);
         }
     }
 }

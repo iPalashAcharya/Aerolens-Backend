@@ -130,7 +130,7 @@ class LocationValidator {
     }
 
     static validateParams(req, res, next) {
-        const { error } = locationSchemas.params.validate(req.params);
+        const { error } = locationSchemas.params.validate(req.params, { abortEarly: false, stripUnknown: true });
         if (error) {
             const details = error.details.map(detail => ({
                 field: detail.path[0],

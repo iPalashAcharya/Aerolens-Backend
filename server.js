@@ -9,6 +9,7 @@ if (process.env.MODE === 'LOCAL') {
 }
 
 const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client-secrets-manager');
+const AppError = require('./utils/appError');
 
 async function fetchSecrets() {
     if (process.env.MODE === 'LOCAL') {
@@ -23,7 +24,11 @@ async function fetchSecrets() {
         const region = process.env.AWS_REGION || 'ap-south-1';
 
         if (!secretName || !region) {
-            throw new Error('SECRET_NAME and AWS_REGION must be set');
+            throw new AppError(
+                'SECRET_NAME and AWS_REGION must be set',
+                500,
+                'CONFIG_ERROR'
+            );
         }
 
         const client = new SecretsManagerClient({ region });
@@ -125,7 +130,11 @@ async function startServer() {
                 if (allowedOrigins.includes(origin)) {
                     callback(null, true);
                 } else {
-                    callback(new Error('Not allowed by CORS'));
+                    callback(new AppError(
+                        'Origin not allowed by CORS',
+                        403,
+                        'CORS_FORBIDDEN'
+                    ));
                 }
             },
             methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
@@ -155,11 +164,17 @@ async function startServer() {
             handler: (req, res) => {
                 const email = req.body.email || req.body.username || 'unknown';
                 console.warn(`⚠️ Login rate limit hit for: ${email}`);
-                res.status(429).json({
+                /*res.status(429).json({
                     success: false,
                     error: 'LOGIN_ATTEMPTS_EXCEEDED',
-                    message: 'Too many login attempts. Please try again in 15 minutes.'
-                });
+                    message: 'Too many login attempts. Please try again in 15 minutes.',
+                    details: null
+                });*/
+                throw new AppError(
+                    'Too many login attempts',
+                    429,
+                    'LOGIN_ATTEMPTS_EXCEEDED'
+                );
             }
         });
 
@@ -182,7 +197,12 @@ async function startServer() {
 
             if (malicious.some(bot => userAgent.includes(bot))) {
                 console.warn(`🚫 BLOCKED malicious scanner: ${userAgent}`);
-                return res.status(403).json({ success: false, error: 'FORBIDDEN' });
+                //return res.status(403).json({ success: false, error: 'FORBIDDEN', message: 'Access Denied', details: null });
+                throw new AppError(
+                    'Access Denied',
+                    403,
+                    'FORBIDDEN'
+                );
             }
 
             next();
@@ -215,11 +235,17 @@ async function startServer() {
             // Allow 100 requests per 10 seconds (very generous)
             if (recentRequests.length > 100) {
                 console.warn(`⚠️ Burst limit for ${ip}: ${recentRequests.length} requests/10s`);
-                return res.status(429).json({
+                /*return res.status(429).json({
                     success: false,
                     error: 'TOO_MANY_REQUESTS',
-                    message: 'Please slow down your requests'
-                });
+                    message: 'Please slow down your requests',
+                    details: null
+                });*/
+                throw new AppError(
+                    'Please slow down your requests',
+                    429,
+                    'TOO_MANY_REQUESTS'
+                );
             }
 
             recentRequests.push(now);
@@ -295,14 +321,14 @@ async function startServer() {
         app.use('/interview', interviewRoutes);
 
         app.use(globalErrorHandler);
-        app.use((err, req, res, next) => {
+        /*app.use((err, req, res, next) => {
             console.error('Error:', err);
             res.status(500).json({
                 success: false,
                 error: 'INTERNAL_SERVER_ERROR',
                 message: 'Something went wrong'
             });
-        });
+        });*/
 
         app.get('/health', (req, res) => {
             res.status(200).send('OK');
