@@ -769,7 +769,8 @@ class InterviewRepository {
             throw new AppError(
                 'Interview scheduling conflict',
                 409,
-                'INTERVIEW_CONFLICT'
+                'INTERVIEW_CONFLICT',
+                null
             );
         }
         const errorMappings = {
