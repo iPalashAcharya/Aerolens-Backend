@@ -4014,6 +4014,98 @@ All validation and business errors return a consistent format:
     }
   }
 }
+
+---
+
+### 1. Interviewer Time Conflict
+
+Returned when the **same interviewer** is already scheduled for another active interview at the same date and time.
+
+* **Error Code:** `INTERVIEWER_TIME_CONFLICT`
+* **HTTP Status:** `409 Conflict`
+
+**Response:**
+
+```
+
+{
+"success": false,
+"message": "Interviewer is already scheduled at this time",
+"error": {
+"code": "INTERVIEWER_TIME_CONFLICT",
+"details": {
+"interviewerId": "conflict",
+"interviewDate": "conflict",
+"fromTime": "conflict"
+}
+}
+}
+
+```
+
+**Example Scenario:**
+
+* Interviewer `201` is already booked on `2025-12-15` at `10:00`
+* A new interview is attempted for the same interviewer at the same slot
+
+---
+
+### 2. Candidate Time Conflict
+
+Returned when the **same candidate** already has an active interview scheduled at the same date and time, regardless of interviewer.
+
+* **Error Code:** `CANDIDATE_TIME_CONFLICT`
+* **HTTP Status:** `409 Conflict`
+
+**Response:**
+
+```
+
+{
+"success": false,
+"message": "Candidate already has an interview scheduled at this time",
+"error": {
+"code": "CANDIDATE_TIME_CONFLICT",
+"details": {
+"candidateId": "conflict",
+"interviewDate": "conflict",
+"fromTime": "conflict"
+}
+}
+}
+
+```
+
+**Example Scenarios:**
+
+* Same candidate scheduled with **different interviewers** at the same time
+* Same candidate and interviewer scheduled again at the same time
+
+---
+
+### 3. Generic Interview Scheduling Conflict
+
+Returned when a scheduling conflict is detected but does not match a known constraint (fallback case).
+
+* **Error Code:** `INTERVIEW_CONFLICT`
+* **HTTP Status:** `409 Conflict`
+
+**Response:**
+
+```
+
+{
+"success": false,
+"message": "Interview scheduling conflict",
+"error": {
+"code": "INTERVIEW_CONFLICT"
+}
+}
+
+```
+
+---
+
 ```
 
 Common error codes:
