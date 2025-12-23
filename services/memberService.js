@@ -14,24 +14,33 @@ class MemberService {
 
             if (!member) {
                 throw new AppError(
-                    `Member with ID ${memberId} not found`,
+                    'Member not found',
                     404,
-                    'MEMBER_ID_NOT_FOUND'
+                    'MEMBER_NOT_FOUND',
+                    {
+                        validationErrors: [
+                            {
+                                field: 'memberId',
+                                message: `No member exists with ID ${memberId}`
+                            }
+                        ]
+                    }
                 );
             }
 
             return member;
         } catch (error) {
-            if (!(error instanceof AppError)) {
-                console.error('Error Fetching Member By ID', error.stack);
-                throw new AppError(
-                    'Failed to fetch Member',
-                    500,
-                    'MEMBER_FETCH_ERROR',
-                    { operation: 'getMemberById', memberId }
-                );
+            if (error instanceof AppError && error.isOperational) {
+                throw error;
             }
-            throw error;
+
+            console.error('Error Fetching Member By ID', error.stack);
+            throw new AppError(
+                'Something went wrong',
+                500,
+                'MEMBER_FETCH_ERROR',
+                null
+            );
         } finally {
             client.release();
         }
@@ -42,16 +51,17 @@ class MemberService {
         try {
             return await this.memberRepository.findAll(client);
         } catch (error) {
-            if (!(error instanceof AppError)) {
-                console.error('Error Fetching All Members', error.stack);
-                throw new AppError(
-                    'Failed to fetch all Members',
-                    500,
-                    'MEMBER_FETCH_ERROR',
-                    { operation: 'getAllMembers' }
-                );
+            if (error instanceof AppError && error.isOperational) {
+                throw error;
             }
-            throw error;
+
+            console.error('Error Fetching All Members', error.stack);
+            throw new AppError(
+                'Something went wrong',
+                500,
+                'MEMBER_FETCH_ERROR',
+                null
+            );
         } finally {
             client.release();
         }
@@ -66,12 +76,16 @@ class MemberService {
             const existingMember = await this.memberRepository.findById(memberId, client);
             if (!existingMember) {
                 throw new AppError(
-                    `Member with ID ${memberId} does not exist`,
+                    'Member not found',
                     404,
-                    "MEMBER_NOT_FOUND",
+                    'MEMBER_NOT_FOUND',
                     {
-                        memberId,
-                        suggestion: "Please verify the Member ID and try again"
+                        validationErrors: [
+                            {
+                                field: 'memberId',
+                                message: `No member exists with ID ${memberId}`
+                            }
+                        ]
                     }
                 );
             }
@@ -124,7 +138,7 @@ class MemberService {
 
         } catch (error) {
             await client.rollback();
-            if (error instanceof AppError) {
+            if (error instanceof AppError && error.isOperational) {
                 throw error;
             }
 
@@ -133,7 +147,7 @@ class MemberService {
                 "Failed to update member entry",
                 500,
                 "MEMBER_UPDATE_ERROR",
-                { operation: "updateMember", memberId }
+                null
             );
         } finally {
             client.release();
@@ -251,10 +265,17 @@ class MemberService {
 
             if (candidateCount[0].count > 0) {
                 throw new AppError(
-                    `Cannot delete member. They are the recruiter for ${candidateCount[0].count} active candidate(s). Please reassign or delete candidates first.`,
+                    'Validation failed',
                     400,
                     'MEMBER_HAS_CANDIDATES',
-                    { memberId, candidateCount: candidateCount[0].count }
+                    {
+                        validationErrors: [
+                            {
+                                field: 'memberId',
+                                message: `Member is recruiter for ${candidateCount[0].count} active candidate(s)`
+                            }
+                        ]
+                    }
                 );
             }
 
@@ -263,12 +284,20 @@ class MemberService {
              WHERE interviewerId = ? AND deletedAt IS NULL`,
                 [memberId]
             );
+
             if (interviewerResult[0].count > 0) {
                 throw new AppError(
-                    `Cannot delete member. They are the interviewer for ${interviewerResult[0].count} active interview(s). Please reassign or delete interviews first.`,
+                    'Validation failed',
                     400,
                     'MEMBER_HAS_INTERVIEWS',
-                    { memberId, interviewerResult: interviewerResult[0].count }
+                    {
+                        validationErrors: [
+                            {
+                                field: 'memberId',
+                                message: `Member is interviewer for ${interviewerResult[0].count} active interview(s)`
+                            }
+                        ]
+                    }
                 );
             }
 
@@ -306,7 +335,7 @@ class MemberService {
                     'Failed to Delete Member',
                     500,
                     'MEMBER_DELETE_ERROR',
-                    { operation: 'deleteMember', memberId }
+                    null
                 );
             }
             throw error;
@@ -363,7 +392,7 @@ class MemberService {
                 'Failed to permanently delete old members',
                 500,
                 'PERMANENT_DELETE_ERROR',
-                { operation: 'permanentlyDeleteOldMembers' }
+                null
             );
         } finally {
             client.release();

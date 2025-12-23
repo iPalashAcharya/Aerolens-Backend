@@ -12,13 +12,18 @@ const globalErrorHandler = (err, req, res, next) => {
         ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
     });
 
+    if (err instanceof AppError && err.isOperational) {
+        return ApiResponse.error(res, err);
+    }
+
     // Normalize non-AppError errors
     const error = err instanceof AppError
         ? err
         : new AppError(
             'Something went wrong',
             500,
-            'INTERNAL_SERVER_ERROR'
+            'INTERNAL_SERVER_ERROR',
+            null
         );
 
     return ApiResponse.error(res, error);

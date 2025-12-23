@@ -23,7 +23,7 @@ class ApiResponse { //a class for api response used to send uniform responses fr
             success: false,
             error: error.error,
             message: error.message,
-            details: error.details
+            details: error.details ?? null
         };
 
         if (process.env.NODE_ENV === 'development') {
