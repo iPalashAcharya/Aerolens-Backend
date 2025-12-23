@@ -726,6 +726,52 @@ class InterviewRepository {
     }
 
     _handleDatabaseError(error, operation) {
+        if (error.code === 'ER_DUP_ENTRY') {
+            if (error.message.includes('uq_active_interviewer_slot')) {
+                throw new AppError(
+                    'Interviewer is already scheduled at this time',
+                    409,
+                    'INTERVIEWER_TIME_CONFLICT',
+                    {
+                        interviewerId: 'conflict',
+                        interviewDate: 'conflict',
+                        fromTime: 'conflict'
+                    }
+                );
+            }
+
+            if (error.message.includes('uq_active_interview_slot')) {
+                throw new AppError(
+                    'Candidate already has an interview scheduled at this time',
+                    409,
+                    'CANDIDATE_TIME_CONFLICT',
+                    {
+                        candidateId: 'conflict',
+                        interviewDate: 'conflict',
+                        fromTime: 'conflict'
+                    }
+                );
+            }
+
+            if (error.message.includes('uq_active_candidate_slot')) {
+                throw new AppError(
+                    'Candidate already has an interview scheduled at this time',
+                    409,
+                    'CANDIDATE_TIME_CONFLICT',
+                    {
+                        candidateId: 'conflict',
+                        interviewDate: 'conflict',
+                        fromTime: 'conflict'
+                    }
+                );
+            }
+
+            throw new AppError(
+                'Interview scheduling conflict',
+                409,
+                'INTERVIEW_CONFLICT'
+            );
+        }
         const errorMappings = {
             'ER_BAD_FIELD_ERROR': {
                 status: 500,
