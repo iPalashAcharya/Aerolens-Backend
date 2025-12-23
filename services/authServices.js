@@ -5,6 +5,7 @@ const jwtConfig = require('../config/jwt');
 const MemberRepository = require('../repositories/memberRepository');
 const tokenRepository = require('../repositories/tokenRepository');
 const AppError = require('../utils/appError');
+const db = require('../db');
 
 const memberRepository = new MemberRepository();
 
@@ -64,24 +65,35 @@ class AuthService {
     }
 
     async register(memberData) {
-        // Check for existing email
-        const existingMember = await memberRepository.findByEmail(memberData.email);
-        if (existingMember) {
-            throw new AppError('Email already registered, Please Login', 409, 'EMAIL_EXISTS');
+        const client = await db.getConnection();
+        try {
+            await client.beginTransaction();
+            // Check for existing email
+            const existingMember = await memberRepository.findByEmail(memberData.email, client);
+            if (existingMember) {
+                throw new AppError('Email already registered, Please Login', 409, 'EMAIL_EXISTS');
+            }
+
+            // Hash password
+            const hashedPassword = await this.hashPassword(memberData.password);
+
+            // Create member
+            const newMember = await memberRepository.create({
+                ...memberData,
+                password: hashedPassword,
+                client
+            });
+
+            // Remove password from response
+            delete newMember.password;
+            await client.commit();
+            return newMember;
+        } catch (error) {
+            await client.rollback();
+            throw error;
+        } finally {
+            client.release();
         }
-
-        // Hash password
-        const hashedPassword = await this.hashPassword(memberData.password);
-
-        // Create member
-        const newMember = await memberRepository.create({
-            ...memberData,
-            password: hashedPassword
-        });
-
-        // Remove password from response
-        delete newMember.password;
-        return newMember;
     }
 
     async login(email, password, userAgent, ipAddress) {

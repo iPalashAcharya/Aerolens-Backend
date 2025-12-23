@@ -313,8 +313,8 @@ class MemberRepository {
         }
     }
 
-    async findByEmail(email) {
-        const connection = await db.getConnection();
+    async findByEmail(email, client = null) {
+        const connection = client || await db.getConnection();
         try {
             const [rows] = await connection.execute(
                 `SELECT memberId, memberName, memberContact, email, password, designation,
@@ -327,7 +327,9 @@ class MemberRepository {
         } catch (error) {
             throw new AppError('Database error while finding member', 500, 'DB_ERROR', error.message);
         } finally {
-            connection.release();
+            if (!client) {
+                connection.release();
+            }
         }
     }
 
@@ -372,8 +374,8 @@ class MemberRepository {
         }
     }
 
-    async create(memberData) {
-        const connection = await db.getConnection();
+    async create(memberData, client = null) {
+        const connection = client || await db.getConnection();
         try {
             const [result] = await connection.execute(
                 `INSERT INTO member (memberName, memberContact, email, password, designation, isRecruiter,isInterviewer)
@@ -405,7 +407,9 @@ class MemberRepository {
                 );
             }
         } finally {
-            connection.release();
+            if (!client) {
+                connection.release();
+            }
         }
     }
 
