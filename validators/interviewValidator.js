@@ -6,7 +6,7 @@ const interviewSchemas = {
         interviewDate: Joi.string()
             .pattern(/^\d{4}-\d{2}-\d{2}$/)
             .required()
-            .custom((value, helpers) => {
+            /*.custom((value, helpers) => {
                 const inputDate = new Date(value + 'T00:00:00');
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
@@ -14,10 +14,10 @@ const interviewSchemas = {
                     return helpers.error('date.min');
                 }
                 return value;
-            })
+            })*/
             .messages({
                 'string.pattern.base': 'Interview date must be in YYYY-MM-DD format',
-                'date.min': 'Interview date cannot be in the past',
+                //'date.min': 'Interview date cannot be in the past',
                 'any.required': 'Interview date is required'
             }),
         fromTime: Joi.string()
@@ -88,7 +88,7 @@ const interviewSchemas = {
         interviewDate: Joi.string()
             .pattern(/^\d{4}-\d{2}-\d{2}$/)
             .required()
-            .custom((value, helpers) => {
+            /*.custom((value, helpers) => {
                 const inputDate = new Date(value + 'T00:00:00');
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
@@ -96,10 +96,10 @@ const interviewSchemas = {
                     return helpers.error('date.min');
                 }
                 return value;
-            })
+            })*/
             .messages({
                 'string.pattern.base': 'Interview date must be in YYYY-MM-DD format',
-                'date.min': 'Interview date cannot be in the past',
+                //'date.min': 'Interview date cannot be in the past',
                 'any.required': 'Interview date is required'
             }),
         fromTime: Joi.string()
@@ -165,7 +165,7 @@ const interviewSchemas = {
         interviewDate: Joi.string()
             .pattern(/^\d{4}-\d{2}-\d{2}$/)
             .optional()
-            .custom((value, helpers) => {
+            /*.custom((value, helpers) => {
                 const inputDate = new Date(value + 'T00:00:00');
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
@@ -173,10 +173,10 @@ const interviewSchemas = {
                     return helpers.error('date.min');
                 }
                 return value;
-            })
+            })*/
             .messages({
                 'string.pattern.base': 'Interview date must be in YYYY-MM-DD format',
-                'date.min': 'Interview date cannot be in the past'
+                //'date.min': 'Interview date cannot be in the past'
             }),
         fromTime: Joi.string()
             .pattern(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/)
