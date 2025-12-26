@@ -421,6 +421,20 @@ class InterviewRepository {
             recruiters: recruiters[0]
         };
     }
+
+    async getFinalizationFormData(client, interviewId = null) {
+        const connection = client;
+        try {
+            const query = `SELECT interviewId, result, recruiterNotes, interviewerFeedback, meetingUrl
+            FROM interview
+            WHERE interviewId = ? AND isActive=TRUE;`;
+            const [rows] = await connection.query(query, [interviewId]);
+            return rows[0] || null;
+        } catch (error) {
+            this._handleDatabaseError();
+        }
+    }
+
     /*async replaceInterviewRounds(interviewId, rounds, client) {
         const connection = client;
 

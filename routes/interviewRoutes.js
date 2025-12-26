@@ -24,6 +24,11 @@ router.get('/create-data',
     interviewController.getCreateData
 );
 
+router.get('/:interviewId/finalize-data',
+    InterviewValidator.validateParams,
+    interviewController.getFinalizeData
+);
+
 router.get('/candidate/:candidateId',
     InterviewValidator.validateParams,
     interviewController.getInterviewsByCandidateId

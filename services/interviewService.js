@@ -252,6 +252,35 @@ class InterviewService {
         }
     }
 
+    async getFinalizationFormData(interviewId) {
+        const client = await this.db.getConnection();
+        try {
+            const result = await this.interviewRepository.getFinalizationFormData(client, interviewId);
+            if (!result) {
+                throw new AppError(
+                    `Interview Entry with ${interviewId} not found`,
+                    404,
+                    'INTERVIEW_ENTRY_NOT_FOUND'
+                );
+            }
+            return result;
+
+        } catch (error) {
+            if (!(error instanceof AppError)) {
+                console.error('Error Fetching Finalization Form Data By Id', error.stack);
+                throw new AppError(
+                    'Failed to fetch Finalization Form data by Id',
+                    500,
+                    'FINALIZATION_FORM_DATA_FETCH_ERROR',
+                    { operation: 'getFinalizationFormData', interviewId }
+                );
+            }
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
     async getTotalSummary() {
         const client = await this.db.getConnection();
         try {

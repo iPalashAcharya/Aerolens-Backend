@@ -3704,6 +3704,45 @@ Fetch all active interviews.
 
 ---
 
+## Get Finalization Form Data
+
+### `GET /interview/:interviewId/finalize-data`
+
+**Response**
+
+```json
+{
+  "success": true,
+  "message": "Finalize Interview Form Data retrieved successfully",
+  "data": {
+    "interviewId": 12,
+    "result": "Pending",
+    "recruiterNotes": null,
+    "interviewerFeedback": null,
+    "meetingUrl": null
+  }
+}
+```
+
+---
+
+## Finalize Interview
+
+### `PUT /interview/:interviewId/finalize`
+
+**Request**
+
+```json
+{
+  "result": "Selected",
+  "recruiterNotes": "Strong communication skills",
+  "interviewerFeedback": "Excellent problem solving",
+  "meetingUrl": "https://meet.google.com/abc-defg-hij"
+}
+```
+
+---
+
 ## Error Response Format
 
 ```json
