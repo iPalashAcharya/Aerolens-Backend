@@ -2187,7 +2187,9 @@ Deletes the JD file from a job profile.
 
 ---
 
-## Validation Rules
+### 7. Download JD File
+
+Downloads the JD file for a job profile.
 
 ### Job Profile Fields
 
@@ -3569,9 +3571,9 @@ Fetch all active interviews.
 - **Method:** `GET`
 - **Path:** `/candidate/:candidateId`
 
-**Response:**
+- **Response:**
 
-```json
+```
 {
   "success": true,
   "message": "Candidate interviews retrieved successfully",
@@ -3600,12 +3602,19 @@ Fetch all active interviews.
 
 ### 4. Get Interview by ID
 
+Fetch a single interview by its ID.
+
 - **Method:** `GET`
 - **Path:** `/:interviewId`
+- **Params:**
 
-**Response:**
+| Field         | Type   | Required | Description         |
+| ------------- | ------ | -------- | ------------------- |
+| `interviewId` | number | Yes      | ID of the interview |
 
-```json
+- **Response:**
+
+```
 {
   "success": true,
   "message": "Interview entry retrieved successfully",
@@ -3634,12 +3643,19 @@ Fetch all active interviews.
 
 ### 5. Create Interview
 
+Schedule a new interview for a candidate.
+
 - **Method:** `POST`
 - **Path:** `/:candidateId`
+- **Params:**
 
-**Request Body:**
+| Field         | Type   | Required | Description         |
+| ------------- | ------ | -------- | ------------------- |
+| `candidateId` | number | Yes      | ID of the candidate |
 
-```json
+- **Request Body:**
+
+```
 {
   "interviewDate": "2025-12-15",
   "fromTime": "10:00",
@@ -3652,9 +3668,22 @@ Fetch all active interviews.
 }
 ```
 
-**Response (201 Created):**
+- **Validation Rules:**
 
-```json
+| Field                 | Type   | Rules                                                             |
+| --------------------- | ------ | ----------------------------------------------------------------- |
+| `interviewDate`       | string | YYYY-MM-DD format, cannot be in the past, required                |
+| `fromTime`            | string | HH:MM format (00:00–23:59), required                              |
+| `durationMinutes`     | number | Integer, 15–480 minutes, required                                 |
+| `interviewerId`       | number | Positive integer, required                                        |
+| `scheduledById`       | number | Positive integer, required                                        |
+| `result`              | string | One of: `pending`, `selected`, `rejected`, `cancelled` (optional) |
+| `recruiterNotes`      | string | Max 1000 characters, optional, can be `""` or `null`              |
+| `interviewerFeedback` | string | Max 2000 characters, optional, can be `""` or `null`              |
+
+- **Response (201 Created):**
+
+```
 {
   "success": true,
   "message": "interview created successfully",
@@ -3679,12 +3708,21 @@ Fetch all active interviews.
 
 ### 6. Schedule Next Round
 
+Schedule the next interview round for a candidate (must have at least one existing interview).
+
 - **Method:** `POST`
 - **Path:** `/:candidateId/rounds`
+- **Params:**
 
-**Response (201 Created):**
+| Field         | Type   | Required | Description         |
+| ------------- | ------ | -------- | ------------------- |
+| `candidateId` | number | Yes      | ID of the candidate |
 
-```json
+- **Request Body:** Same as `Create Interview` (no `result`, `recruiterNotes`, `interviewerFeedback` required).
+
+- **Response (201 Created):**
+
+```
 {
   "success": true,
   "message": "Successfully scheduled round 2 for candidate",
@@ -3710,7 +3748,15 @@ Fetch all active interviews.
 
 **Response**
 
-```json
+| Field                 | Type   | Rules                                                            |
+| --------------------- | ------ | ---------------------------------------------------------------- |
+| `result`              | string | One of: `pending`, `selected`, `rejected`, `cancelled`, required |
+| `recruiterNotes`      | string | Max 1000 characters, optional, can be `""` or `null`             |
+| `interviewerFeedback` | string | Max 2000 characters, optional, can be `""` or `null`             |
+
+- **Response:**
+
+```
 {
   "success": true,
   "message": "Finalize Interview Form Data retrieved successfully",
@@ -3732,7 +3778,7 @@ Fetch all active interviews.
 
 **Request**
 
-```json
+```
 {
   "result": "Selected",
   "recruiterNotes": "Strong communication skills",
@@ -3745,7 +3791,11 @@ Fetch all active interviews.
 
 ## Error Response Format
 
-```json
+- **Method:** `GET`
+- **Path:** `/report/overall`
+- **Response:**
+
+```
 {
   "success": false,
   "message": "Validation failed",
@@ -3786,7 +3836,9 @@ Fetch all active interviews.
 
 ### Candidate Time Conflict
 
-```json
+- **Response:**
+
+```
 {
   "success": false,
   "message": "Candidate already has an interview scheduled at this time",
