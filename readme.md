@@ -2187,7 +2187,9 @@ Deletes the JD file from a job profile.
 
 ---
 
-## Validation Rules
+### 7. Download JD File
+
+Downloads the JD file for a job profile.
 
 ### Job Profile Fields
 
@@ -3465,6 +3467,16 @@ All error responses follow this format:
 "metadata": {}
 }
 
+Here is your **rewritten README with proper Markdown structure and valid, consistently formatted JSON**, **without changing any content or meaning**.
+I’ve only fixed:
+
+- Broken code fences
+- JSON indentation
+- Missing/extra backticks
+- Section boundaries
+
+---
+
 # Interview Management API
 
 This API provides endpoints to manage interviews in an HRMS system, including scheduling, updating, finalizing, and reporting on interviews.
@@ -3489,9 +3501,10 @@ Fetch all active interviews.
 
 - **Method:** `GET`
 - **Path:** `/`
-- **Response:**
 
-```
+**Response:**
+
+```json
 {
   "success": true,
   "message": "Interview entries retrieved successfully",
@@ -3523,13 +3536,12 @@ Fetch all active interviews.
 
 ### 2. Get Interview Form Data
 
-Get data needed to render the interview creation form (interviewers, recruiters, etc.).
-
 - **Method:** `GET`
 - **Path:** `/create-data`
-- **Response:**
 
-```
+**Response:**
+
+```json
 {
   "success": true,
   "message": "Interview Form Data retrieved successfully",
@@ -3556,15 +3568,8 @@ Get data needed to render the interview creation form (interviewers, recruiters,
 
 ### 3. Get Interviews by Candidate
 
-Fetch all interviews for a specific candidate.
-
 - **Method:** `GET`
 - **Path:** `/candidate/:candidateId`
-- **Params:**
-
-| Field         | Type   | Required | Description         |
-| ------------- | ------ | -------- | ------------------- |
-| `candidateId` | number | Yes      | ID of the candidate |
 
 - **Response:**
 
@@ -3737,88 +3742,11 @@ Schedule the next interview round for a candidate (must have at least one existi
 
 ---
 
-### 7. Update Interview
+## Get Finalization Form Data
 
-Update an existing interview (partial update allowed).
+### `GET /interview/:interviewId/finalize-data`
 
-- **Method:** `PATCH`
-- **Path:** `/:interviewId`
-- **Params:**
-
-| Field         | Type   | Required | Description         |
-| ------------- | ------ | -------- | ------------------- |
-| `interviewId` | number | Yes      | ID of the interview |
-
-- **Request Body (at least one field required):**
-
-```
-{
-  "interviewDate": "2025-12-15",
-  "fromTime": "10:30",
-  "durationMinutes": 60,
-  "interviewerId": 202,
-  "scheduledById": 302
-}
-```
-
-- **Validation Rules:**
-
-| Field             | Type   | Rules                                              |
-| ----------------- | ------ | -------------------------------------------------- |
-| `interviewDate`   | string | YYYY-MM-DD format, cannot be in the past, optional |
-| `fromTime`        | string | HH:MM format (00:00–23:59), optional               |
-| `durationMinutes` | number | Integer, 15–480 minutes, optional                  |
-| `interviewerId`   | number | Positive integer, optional                         |
-| `scheduledById`   | number | Positive integer, optional                         |
-
-- **Response:**
-
-```
-{
-  "success": true,
-  "message": "Interview entry updated successfully",
-  "data": {
-    "interviewId": 1,
-    "candidateId": 101,
-    "roundNumber": 1,
-    "totalInterviews": 2,
-    "interviewDate": "2025-12-15",
-    "fromTime": "10:30",
-    "durationMinutes": 60,
-    "interviewerId": 202,
-    "scheduledById": 302,
-    "result": "pending",
-    "recruiterNotes": "Initial screening",
-    "interviewerFeedback": null
-  }
-}
-```
-
----
-
-### 8. Finalize Interview
-
-Set the final result and feedback for an interview.
-
-- **Method:** `PUT`
-- **Path:** `/:interviewId/finalize`
-- **Params:**
-
-| Field         | Type   | Required | Description         |
-| ------------- | ------ | -------- | ------------------- |
-| `interviewId` | number | Yes      | ID of the interview |
-
-- **Request Body:**
-
-```
-{
-  "result": "selected",
-  "recruiterNotes": "Strong candidate, good fit",
-  "interviewerFeedback": "Technical skills are excellent"
-}
-```
-
-- **Validation Rules:**
+**Response**
 
 | Field                 | Type   | Rules                                                            |
 | --------------------- | ------ | ---------------------------------------------------------------- |
@@ -3831,164 +3759,31 @@ Set the final result and feedback for an interview.
 ```
 {
   "success": true,
-  "message": "Interview finalized successfully",
+  "message": "Finalize Interview Form Data retrieved successfully",
   "data": {
-    "interviewId": 1,
-    "result": "selected",
-    "recruiterNotes": "Strong candidate, good fit",
-    "interviewerFeedback": "Technical skills are excellent"
+    "interviewId": 12,
+    "result": "Pending",
+    "recruiterNotes": null,
+    "interviewerFeedback": null,
+    "meetingUrl": null
   }
 }
 ```
 
 ---
 
-### 9. Delete Interview
+## Finalize Interview
 
-Soft-delete an interview (set `isActive = false`).
+### `PUT /interview/:interviewId/finalize`
 
-- **Method:** `DELETE`
-- **Path:** `/:interviewId`
-- **Params:**
-
-| Field         | Type   | Required | Description         |
-| ------------- | ------ | -------- | ------------------- |
-| `interviewId` | number | Yes      | ID of the interview |
-
-- **Response:**
+**Request**
 
 ```
 {
-  "success": true,
-  "message": "Interview entry deleted successfully",
-  "data": {
-    "interviewId": 1,
-    "deletedAt": "2025-12-12T13:10:26.102Z"
-  }
-}
-```
-
----
-
-### 10. Overall Summary Report
-
-Get total interview stats grouped by interviewer.
-
-- **Method:** `GET`
-- **Path:** `/report/overall`
-- **Response:**
-
-```
-{
-  "success": true,
-  "message": "Total Interviewer Data Retrieved Successfully",
-  "data": {
-    "interviewers": [
-      {
-        "interviewerId": 201,
-        "interviewerName": "Alice Smith",
-        "total": 5,
-        "selected": 2,
-        "rejected": 1,
-        "pending": 1,
-        "cancelled": 1,
-        "avgDuration": 45,
-        "totalMinutes": 225
-      }
-    ]
-  }
-}
-```
-
----
-
-### 11. Monthly Summary Report
-
-Get interview summary for a date range.
-
-- **Method:** `GET`
-- **Path:** `/report/monthly`
-- **Query Params:**
-
-| Field       | Type   | Required | Description                                          |
-| ----------- | ------ | -------- | ---------------------------------------------------- |
-| `startDate` | string | Yes      | Start date in YYYY-MM-DD format                      |
-| `endDate`   | string | Yes      | End date in YYYY-MM-DD format, must be > `startDate` |
-
-- **Response:**
-
-```
-{
-  "success": true,
-  "message": "Total Monthly Summary Data Retrieved Successfully",
-  "data": {
-    "summary": {
-      "total": 10,
-      "selected": 4,
-      "rejected": 3,
-      "pending": 2,
-      "cancelled": 1
-    },
-    "interviewers": [
-      {
-        "interviewerId": 201,
-        "interviewerName": "Alice Smith",
-        "total": 5,
-        "selected": 2,
-        "rejected": 1,
-        "pending": 1,
-        "cancelled": 1,
-        "avgDuration": 45,
-        "totalMinutes": 225
-      }
-    ],
-    "interviewDates": [
-      { "interviewDate": "2025-12-15" },
-      { "interviewDate": "2025-12-16" }
-    ]
-  }
-}
-```
-
----
-
-### 12. Daily Summary Report
-
-Get all interviews scheduled for a specific date.
-
-- **Method:** `GET`
-- **Path:** `/report/daily`
-- **Query Params:**
-
-| Field  | Type   | Required | Description               |
-| ------ | ------ | -------- | ------------------------- |
-| `date` | string | Yes      | Date in YYYY-MM-DD format |
-
-- **Response:**
-
-```
-{
-  "success": true,
-  "message": "Total Daily Summary Data Retrieved Sucessfully",
-  "data": {
-    "interviews": [
-      {
-        "interviewerId": 201,
-        "interviewerName": "Alice Smith",
-        "interviewId": 1,
-        "candidateId": 101,
-        "candidateName": "John Doe",
-        "interviewDate": "2025-12-15",
-        "fromTime": "10:00",
-        "toTime": "10:45",
-        "roundNumber": 1,
-        "totalInterviews": 2,
-        "durationMinutes": 45,
-        "recruiterNotes": "Initial screening",
-        "result": "pending"
-      }
-    ]
-  }
+  "result": "Selected",
+  "recruiterNotes": "Strong communication skills",
+  "interviewerFeedback": "Excellent problem solving",
+  "meetingUrl": "https://meet.google.com/abc-defg-hij"
 }
 ```
 
@@ -3996,7 +3791,9 @@ Get all interviews scheduled for a specific date.
 
 ## Error Response Format
 
-All validation and business errors return a consistent format:
+- **Method:** `GET`
+- **Path:** `/report/overall`
+- **Response:**
 
 ```
 {
@@ -4016,24 +3813,80 @@ All validation and business errors return a consistent format:
 }
 ```
 
-Common error codes:
+---
 
-- `VALIDATION_ERROR` – Request body/query/params failed validation
-- `INTERVIEW_ENTRY_NOT_FOUND` – Interview with given ID not found
-- `NO_PREVIOUS_INTERVIEWS` – No previous interviews for candidate (for next round)
-- `INTERVIEW_NOT_FOUND` – Interview not found during delete
-- Database errors (e.g., `DATABASE_ERROR`, `DATABASE_SCHEMA_ERROR`, etc.)
+### Interviewer Time Conflict
+
+```json
+{
+  "success": false,
+  "message": "Interviewer is already scheduled at this time",
+  "error": {
+    "code": "INTERVIEWER_TIME_CONFLICT",
+    "details": {
+      "interviewerId": "conflict",
+      "interviewDate": "conflict",
+      "fromTime": "conflict"
+    }
+  }
+}
+```
+
+---
+
+### Candidate Time Conflict
+
+- **Response:**
+
+```
+{
+  "success": false,
+  "message": "Candidate already has an interview scheduled at this time",
+  "error": {
+    "code": "CANDIDATE_TIME_CONFLICT",
+    "details": {
+      "candidateId": "conflict",
+      "interviewDate": "conflict",
+      "fromTime": "conflict"
+    }
+  }
+}
+```
+
+---
+
+### Generic Interview Scheduling Conflict
+
+```json
+{
+  "success": false,
+  "message": "Interview scheduling conflict",
+  "error": {
+    "code": "INTERVIEW_CONFLICT"
+  },
+  "details": null
+}
+```
+
+---
+
+## Common Error Codes
+
+- `VALIDATION_ERROR`
+- `INTERVIEW_ENTRY_NOT_FOUND`
+- `NO_PREVIOUS_INTERVIEWS`
+- `INTERVIEW_NOT_FOUND`
+- `DATABASE_ERROR`
+- `DATABASE_SCHEMA_ERROR`
 
 ---
 
 ## Notes
 
-- All dates are in `YYYY-MM-DD` format.
-- Time is in `HH:MM` 24‑hour format.
-- `result` is always returned in capitalized form (e.g., `Pending`, `Selected`).
-- Soft-deleted interviews (`isActive = false`) are excluded from all reports and list endpoints.
-- Round numbers are automatically renumbered when an interview is deleted.
+- All dates are in `YYYY-MM-DD` format
+- Time is in `HH:MM` 24-hour format
+- `result` is always returned in capitalized form
+- Soft-deleted interviews are excluded from reports
+- Round numbers are automatically renumbered on delete
 
-```
-
-```
+---

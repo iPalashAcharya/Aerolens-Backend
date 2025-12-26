@@ -7,6 +7,10 @@ class InterviewService {
         this.interviewRepository = interviewRepository;
     }
 
+    static buildUtcDateTime(interviewDate, timeHHMM) {
+        return new Date(`${interviewDate}T${timeHHMM}:00.000Z`);
+    }
+
     static capitalizeFirstLetter(string) {
         if (typeof string !== "string" || string.length === 0) {
             return "";
@@ -21,6 +25,88 @@ class InterviewService {
         obj[fieldName] = InterviewService.capitalizeFirstLetter(obj[fieldName]);
     }
 
+    async assertNoOverlaps({
+        client,
+        candidateId,
+        interviewerId,
+        interviewDate,
+        fromTime,
+        durationMinutes,
+        excludeInterviewId = null
+    }) {
+        const startUtc = InterviewService.buildUtcDateTime(interviewDate, fromTime);
+        const endUtc = new Date(startUtc.getTime() + durationMinutes * 60000);
+
+        // ---------- Candidate overlap ----------
+        const candidateOverlapQuery = `
+        SELECT interviewId
+        FROM interview
+        WHERE candidateId = ?
+          AND interviewDate = ?
+          AND isActive = 1
+          AND deletedAt IS NULL
+          ${excludeInterviewId ? 'AND interviewId != ?' : ''}
+          AND (
+            fromTime < TIME(?)
+            AND toTime   > TIME(?)
+          )
+        LIMIT 1;
+    `;
+
+        const candidateParams = excludeInterviewId
+            ? [candidateId, interviewDate, excludeInterviewId, endUtc.toISOString().slice(11, 19), startUtc.toISOString().slice(11, 19)]
+            : [candidateId, interviewDate, endUtc.toISOString().slice(11, 19), startUtc.toISOString().slice(11, 19)];
+
+        const [candidateRows] = await client.query(candidateOverlapQuery, candidateParams);
+
+        if (candidateRows.length > 0) {
+            throw new AppError(
+                'Candidate already has an overlapping interview',
+                409,
+                'CANDIDATE_TIME_CONFLICT',
+                {
+                    candidateId: 'conflict',
+                    interviewDate: 'conflict',
+                    fromTime: 'conflict'
+                }
+            );
+        }
+
+        // ---------- Interviewer overlap ----------
+        const interviewerOverlapQuery = `
+        SELECT interviewId
+        FROM interview
+        WHERE interviewerId = ?
+          AND interviewDate = ?
+          AND isActive = 1
+          AND deletedAt IS NULL
+          ${excludeInterviewId ? 'AND interviewId != ?' : ''}
+          AND (
+            fromTime < TIME(?)
+            AND toTime   > TIME(?)
+          )
+        LIMIT 1;
+    `;
+
+        const interviewerParams = excludeInterviewId
+            ? [interviewerId, interviewDate, excludeInterviewId, endUtc.toISOString().slice(11, 19), startUtc.toISOString().slice(11, 19)]
+            : [interviewerId, interviewDate, endUtc.toISOString().slice(11, 19), startUtc.toISOString().slice(11, 19)];
+
+        const [interviewerRows] = await client.query(interviewerOverlapQuery, interviewerParams);
+
+        if (interviewerRows.length > 0) {
+            throw new AppError(
+                'Interviewer already has an overlapping interview',
+                409,
+                'INTERVIEWER_TIME_CONFLICT',
+                {
+                    interviewerId: 'conflict',
+                    interviewDate: 'conflict',
+                    fromTime: 'conflict'
+                }
+            );
+        }
+    }
 
     async getAll() {
         //const { limit = 10, page = 1 } = options || {};
@@ -66,15 +152,15 @@ class InterviewService {
     async getInterviewById(interviewId) {
         const client = await this.db.getConnection();
         try {
-            const result = await this.interviewRepository.getById(interviewId, client);
-            if (!result) {
+            const data = await this.interviewRepository.getById(interviewId, client);
+            if (!data) {
                 throw new AppError(
                     `Interview Entry with ${interviewId} not found`,
                     404,
                     'INTERVIEW_ENTRY_NOT_FOUND'
                 );
             }
-            const data = result.data;
+            //const data = result.data;
 
             if (Array.isArray(data)) {
                 data.forEach(item => InterviewService.capitalizeField(item, "result"));
@@ -82,7 +168,7 @@ class InterviewService {
                 InterviewService.capitalizeField(data, "result");
             }
 
-            return { data };
+            return data;
         } catch (error) {
             if (!(error instanceof AppError)) {
                 console.error('Error Fetching Interview Data By Id', error.stack);
@@ -158,6 +244,35 @@ class InterviewService {
                     500,
                     'INTERVIEW_DATA_FETCH_ERROR',
                     { operation: 'getFormData', interviewId }
+                );
+            }
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
+    async getFinalizationFormData(interviewId) {
+        const client = await this.db.getConnection();
+        try {
+            const result = await this.interviewRepository.getFinalizationFormData(client, interviewId);
+            if (!result) {
+                throw new AppError(
+                    `Interview Entry with ${interviewId} not found`,
+                    404,
+                    'INTERVIEW_ENTRY_NOT_FOUND'
+                );
+            }
+            return result;
+
+        } catch (error) {
+            if (!(error instanceof AppError)) {
+                console.error('Error Fetching Finalization Form Data By Id', error.stack);
+                throw new AppError(
+                    'Failed to fetch Finalization Form data by Id',
+                    500,
+                    'FINALIZATION_FORM_DATA_FETCH_ERROR',
+                    { operation: 'getFinalizationFormData', interviewId }
                 );
             }
             throw error;
@@ -278,6 +393,15 @@ class InterviewService {
         try {
             await client.beginTransaction();
 
+            await this.assertNoOverlaps({
+                client,
+                candidateId,
+                interviewerId: interviewData.interviewerId,
+                interviewDate: interviewData.interviewDate,
+                fromTime: interviewData.fromTime,
+                durationMinutes: interviewData.durationMinutes
+            });
+
             const result = await this.interviewRepository.create(candidateId, interviewData, client);
 
             await auditLogService.logAction({
@@ -362,7 +486,7 @@ class InterviewService {
             await client.beginTransaction();
 
             const existingInterview = await this.interviewRepository.getById(interviewId, client);
-            if (!existingInterview || !existingInterview.data) {
+            if (!existingInterview) {
                 throw new AppError(
                     `Interview with Id ${interviewId} not found`,
                     404,
@@ -370,12 +494,22 @@ class InterviewService {
                 );
             }
 
+            await this.assertNoOverlaps({
+                client,
+                candidateId: existingInterview.candidateId,
+                interviewerId: interviewData.interviewerId ?? existingInterview.interviewerId,
+                interviewDate: interviewData.interviewDate ?? existingInterview.interviewDate,
+                fromTime: interviewData.fromTime ?? existingInterview.fromTime,
+                durationMinutes: interviewData.durationMinutes ?? existingInterview.durationMinutes,
+                excludeInterviewId: interviewId
+            });
+
             const updatedInterview = await this.interviewRepository.update(interviewId, interviewData, client);
 
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'UPDATE',
-                previousValues: existingInterview.data,
+                previousValues: existingInterview,
                 newValues: updatedInterview,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
@@ -408,6 +542,15 @@ class InterviewService {
         const client = await this.db.getConnection();
         try {
             await client.beginTransaction();
+
+            await this.assertNoOverlaps({
+                client,
+                candidateId,
+                interviewerId: interviewData.interviewerId,
+                interviewDate: interviewData.interviewDate,
+                fromTime: interviewData.fromTime,
+                durationMinutes: interviewData.durationMinutes
+            });
 
             const previousInterviews = await this.interviewRepository.getInterviewsByCandidateId(candidateId, client);
 
@@ -463,7 +606,7 @@ class InterviewService {
             await client.beginTransaction();
 
             const existingInterview = await this.interviewRepository.getById(interviewId, client);
-            if (!existingInterview || !existingInterview.data) {
+            if (!existingInterview) {
                 throw new AppError(
                     `Interview with Id ${interviewId} not found`,
                     404,
@@ -476,7 +619,7 @@ class InterviewService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'UPDATE',
-                previousValues: existingInterview.data,
+                previousValues: existingInterview,
                 newValues: finalizedInterview,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,

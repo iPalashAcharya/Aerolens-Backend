@@ -144,11 +144,15 @@ class InterviewRepository {
                 i.interviewDate,
                 TIME_FORMAT(i.fromTime, '%H:%i') AS fromTime,
                 TIME_FORMAT(i.toTime, '%H:%i') AS toTime,
-                i.roundNumber,
-                i.totalInterviews,
+                RANK() OVER (
+                PARTITION BY i.candidateId
+                ORDER BY i.interviewDate, i.fromTime, i.interviewId
+                ) AS roundNumber,
+                COUNT(*) OVER (PARTITION BY candidateId) AS totalInterviews,
                 i.durationMinutes,
                 i.recruiterNotes,
-                i.result
+                i.result,
+                i.meetingUrl
 
             FROM interview i
             JOIN member m ON m.memberId = i.interviewerId
@@ -183,8 +187,11 @@ class InterviewRepository {
             const dataQuery = `
                 SELECT
                 i.interviewId,
-                i.roundNumber,
-                i.totalInterviews,
+                RANK() OVER (
+                PARTITION BY i.candidateId
+                ORDER BY i.interviewDate ASC, i.fromTime ASC, i.interviewId ASC
+                ) AS roundNumber,
+                COUNT(*) OVER (PARTITION BY candidateId) AS totalInterviews,
                 i.interviewDate,
                 TIME_FORMAT(i.fromTime, '%H:%i') AS fromTime,
                 TIME_FORMAT(i.toTime,'%H:%i') AS toTime,
@@ -198,6 +205,7 @@ class InterviewRepository {
                 i.result,
                 i.recruiterNotes,
                 i.interviewerFeedback,
+                i.meetingUrl,
                 i.isActive
             FROM interview i
             LEFT JOIN candidate c
@@ -224,12 +232,23 @@ class InterviewRepository {
 
     async getById(interviewId, client) {
         const connection = client;
+
         try {
-            const dataQuery = `
-                SELECT
+            const query = `
+        SELECT *
+        FROM (
+            SELECT
                 i.interviewId,
-                i.roundNumber,
-                i.totalInterviews,
+
+                RANK() OVER (
+                    PARTITION BY i.candidateId
+                    ORDER BY i.interviewDate ASC, i.fromTime ASC, i.interviewId ASC
+                ) AS roundNumber,
+
+                COUNT(*) OVER (
+                    PARTITION BY i.candidateId
+                ) AS totalInterviews,
+
                 i.interviewDate,
                 TIME_FORMAT(i.fromTime, '%H:%i') AS fromTime,
                 TIME_FORMAT(i.toTime,'%H:%i') AS toTime,
@@ -242,7 +261,9 @@ class InterviewRepository {
                 COALESCE(scheduler.memberName, 'Unknown') AS scheduledByName,
                 i.result,
                 i.recruiterNotes,
-                i.interviewerFeedback
+                i.interviewerFeedback,
+                i.meetingUrl
+
             FROM interview i
             LEFT JOIN candidate c
                 ON i.candidateId = c.candidateId
@@ -250,12 +271,15 @@ class InterviewRepository {
                 ON i.interviewerId = interviewer.memberId
             LEFT JOIN member scheduler
                 ON i.scheduledById = scheduler.memberId
-            WHERE i.interviewId = ? AND i.isActive=TRUE;
-            `;
-            const [interviewData] = await connection.query(dataQuery, [interviewId]);
-            return {
-                data: interviewData.length > 0 ? interviewData[0] : null
-            }
+            WHERE i.isActive = TRUE
+        ) ranked
+        WHERE ranked.interviewId = ?;
+        `;
+
+            const [rows] = await connection.query(query, [interviewId]);
+
+            return rows.length > 0 ? rows[0] : null;
+
         } catch (error) {
             this._handleDatabaseError(error, 'getById');
         }
@@ -267,20 +291,24 @@ class InterviewRepository {
             const query = `
                 SELECT
                 i.interviewId,
-                i.roundNumber,
-                i.totalInterviews,
+                RANK() OVER (
+                PARTITION BY i.candidateId
+                ORDER BY i.interviewDate ASC, i.fromTime ASC, i.interviewId ASC
+                ) AS roundNumber,
+                COUNT(*) OVER (PARTITION BY candidateId) AS totalInterviews,
                 i.interviewDate,
                 TIME_FORMAT(i.fromTime, '%H:%i') AS fromTime,
                 TIME_FORMAT(i.toTime,'%H:%i') AS toTime,
                 i.durationMinutes,
                 i.result,
+                i.meetingUrl,
                 interviewer.memberId AS interviewerId,
                 interviewer.memberName AS interviewerName
             FROM interview i
             LEFT JOIN member interviewer
                 ON i.interviewerId = interviewer.memberId
             WHERE i.candidateId = ? AND i.isActive=TRUE
-            ORDER BY i.roundNumber;
+            ORDER BY roundNumber;
             `;
             const [interviews] = await connection.query(query, [candidateId]);
             return interviews;
@@ -289,7 +317,7 @@ class InterviewRepository {
         }
     }
 
-    async getLatestRoundNumber(candidateId, client) {
+    /*async getLatestRoundNumber(candidateId, client) {
         const connection = client;
         try {
             const query = `
@@ -305,9 +333,9 @@ class InterviewRepository {
         } catch (error) {
             this._handleDatabaseError(error, 'getLatestRoundNumber');
         }
-    }
+    }*/
 
-    async getInterviewRounds(interviewId, client) {
+    /*async getInterviewRounds(interviewId, client) {
         const connection = client;
 
         try {
@@ -334,7 +362,7 @@ class InterviewRepository {
         } catch (error) {
             this._handleDatabaseError(error, 'getInterviewRounds');
         }
-    }
+    }*/
 
     async getFormData(client, interviewId = null) {
         const connection = client;
@@ -393,6 +421,20 @@ class InterviewRepository {
             recruiters: recruiters[0]
         };
     }
+
+    async getFinalizationFormData(client, interviewId = null) {
+        const connection = client;
+        try {
+            const query = `SELECT interviewId, result, recruiterNotes, interviewerFeedback, meetingUrl
+            FROM interview
+            WHERE interviewId = ? AND isActive=TRUE;`;
+            const [rows] = await connection.query(query, [interviewId]);
+            return rows[0] || null;
+        } catch (error) {
+            this._handleDatabaseError();
+        }
+    }
+
     /*async replaceInterviewRounds(interviewId, rounds, client) {
         const connection = client;
 
@@ -432,7 +474,7 @@ class InterviewRepository {
         }
     }*/
 
-    async renumberCandidateRounds(candidateId, client) {
+    /*async renumberCandidateRounds(candidateId, client) {
         const connection = client;
 
         // Fetch active interviews in deterministic order
@@ -452,7 +494,7 @@ class InterviewRepository {
         /*
          * PHASE 1: Break uniqueness
          * Move roundNumber into a safe negative range
-         */
+         
         let temp = -1;
         for (const row of rows) {
             await connection.execute(
@@ -467,7 +509,7 @@ class InterviewRepository {
 
         /*
          * PHASE 2: Assign correct round numbers
-         */
+         
         let round = 1;
         for (const row of rows) {
             await connection.execute(
@@ -481,21 +523,19 @@ class InterviewRepository {
         }
 
         return total;
-    }
+    }*/
 
     async create(candidateId, interviewData, client) {
         const connection = client;
         try {
-            const { latestRound, totalInterviews } = await this.getLatestRoundNumber(candidateId, client);
+            //const { latestRound, totalInterviews } = await this.getLatestRoundNumber(candidateId, client);
 
-            const newRoundNumber = latestRound + 1;
-            const newTotalInterviews = totalInterviews + 1;
+            //const newRoundNumber = latestRound + 1;
+            //const newTotalInterviews = totalInterviews + 1;
 
             const [result] = await connection.execute(
                 `INSERT INTO interview(
                 candidateId,
-                roundNumber,
-                totalInterviews,
                 interviewDate,
                 fromTime,
                 durationMinutes,
@@ -505,11 +545,11 @@ class InterviewRepository {
                 interviewerFeedback,
                 recruiterNotes
                 )
-            VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+            VALUES (?,?,?,?,?,?,?,?,?)`,
                 [
                     candidateId,
-                    newRoundNumber,
-                    newTotalInterviews,
+                    //newRoundNumber,
+                    //newTotalInterviews,
                     interviewData.interviewDate,
                     interviewData.fromTime,
                     interviewData.durationMinutes,
@@ -520,21 +560,52 @@ class InterviewRepository {
                     interviewData.recruiterNotes || null
                 ]
             );
+            const interviewId = result.insertId;
 
-            await connection.execute(
-                `UPDATE interview 
-                SET totalInterviews = ? 
-                WHERE candidateId = ? AND interviewId != ?`,
-                [newTotalInterviews, candidateId, result.insertId]
-            );
+            const query = `
+        SELECT *
+        FROM (
+            SELECT
+                i.interviewId,
 
-            return {
-                interviewId: result.insertId,
-                candidateId,
-                roundNumber: newRoundNumber,
-                totalInterviews: newTotalInterviews,
-                ...interviewData
-            };
+                RANK() OVER (
+                    PARTITION BY i.candidateId
+                    ORDER BY i.interviewDate ASC, i.fromTime ASC, i.interviewId ASC
+                ) AS roundNumber,
+
+                COUNT(*) OVER (
+                    PARTITION BY i.candidateId
+                ) AS totalInterviews,
+
+                i.interviewDate,
+                TIME_FORMAT(i.fromTime, '%H:%i') AS fromTime,
+                TIME_FORMAT(i.toTime,'%H:%i') AS toTime,
+                i.durationMinutes,
+                c.candidateId,
+                c.candidateName,
+                interviewer.memberId AS interviewerId,
+                interviewer.memberName AS interviewerName,
+                scheduler.memberId AS scheduledById,
+                COALESCE(scheduler.memberName, 'Unknown') AS scheduledByName,
+                i.result,
+                i.recruiterNotes,
+                i.interviewerFeedback
+
+            FROM interview i
+            LEFT JOIN candidate c
+                ON i.candidateId = c.candidateId
+            LEFT JOIN member interviewer
+                ON i.interviewerId = interviewer.memberId
+            LEFT JOIN member scheduler
+                ON i.scheduledById = scheduler.memberId
+            WHERE i.isActive = TRUE
+        ) ranked
+        WHERE ranked.interviewId = ?;
+        `;
+
+            const [rows] = await connection.query(query, [interviewId]);
+
+            return rows[0];
         } catch (error) {
             console.error('DB error in interviewRepository.create', error);
             this._handleDatabaseError(error, 'create');
@@ -609,7 +680,7 @@ class InterviewRepository {
                 throw new AppError('Final data is required', 400, 'MISSING_FINAL_DATA');
             }
 
-            const allowedFields = ['result', 'recruiterNotes', 'interviewerFeedback'];
+            const allowedFields = ['result', 'recruiterNotes', 'interviewerFeedback', 'meetingUrl'];
 
             const filteredData = {};
             Object.keys(finalData).forEach(key => {
@@ -726,6 +797,53 @@ class InterviewRepository {
     }
 
     _handleDatabaseError(error, operation) {
+        if (error.code === 'ER_DUP_ENTRY') {
+            if (error.message.includes('uq_active_interviewer_slot')) {
+                throw new AppError(
+                    'Interviewer is already scheduled at this time',
+                    409,
+                    'INTERVIEWER_TIME_CONFLICT',
+                    {
+                        interviewerId: 'conflict',
+                        interviewDate: 'conflict',
+                        fromTime: 'conflict'
+                    }
+                );
+            }
+
+            if (error.message.includes('uq_active_interview_slot')) {
+                throw new AppError(
+                    'Candidate already has an interview scheduled at this time',
+                    409,
+                    'CANDIDATE_TIME_CONFLICT',
+                    {
+                        candidateId: 'conflict',
+                        interviewDate: 'conflict',
+                        fromTime: 'conflict'
+                    }
+                );
+            }
+
+            if (error.message.includes('uq_active_candidate_slot')) {
+                throw new AppError(
+                    'Candidate already has an interview scheduled at this time',
+                    409,
+                    'CANDIDATE_TIME_CONFLICT',
+                    {
+                        candidateId: 'conflict',
+                        interviewDate: 'conflict',
+                        fromTime: 'conflict'
+                    }
+                );
+            }
+
+            throw new AppError(
+                'Interview scheduling conflict',
+                409,
+                'INTERVIEW_CONFLICT',
+                null
+            );
+        }
         const errorMappings = {
             'ER_BAD_FIELD_ERROR': {
                 status: 500,

@@ -99,6 +99,15 @@ class InterviewController {
         });
     });
 
+    getFinalizeData = catchAsync(async (req, res) => {
+        const formData = await this.interviewService.getFinalizationFormData(parseInt(req.params.interviewId));
+        return ApiResponse.success(
+            res,
+            formData,
+            'Finalize Interview Form Data retrieved successfully'
+        );
+    });
+
     createInterview = catchAsync(async (req, res) => {
         const interview = await this.interviewService.createInterview(
             parseInt(req.params.candidateId),
