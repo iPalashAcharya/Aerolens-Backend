@@ -151,7 +151,8 @@ class InterviewRepository {
                 COUNT(*) OVER (PARTITION BY candidateId) AS totalInterviews,
                 i.durationMinutes,
                 i.recruiterNotes,
-                i.result
+                i.result,
+                i.meetingUrl
 
             FROM interview i
             JOIN member m ON m.memberId = i.interviewerId
@@ -204,6 +205,7 @@ class InterviewRepository {
                 i.result,
                 i.recruiterNotes,
                 i.interviewerFeedback,
+                i.meetingUrl,
                 i.isActive
             FROM interview i
             LEFT JOIN candidate c
@@ -259,7 +261,8 @@ class InterviewRepository {
                 COALESCE(scheduler.memberName, 'Unknown') AS scheduledByName,
                 i.result,
                 i.recruiterNotes,
-                i.interviewerFeedback
+                i.interviewerFeedback,
+                i.meetingUrl
 
             FROM interview i
             LEFT JOIN candidate c
@@ -275,9 +278,7 @@ class InterviewRepository {
 
             const [rows] = await connection.query(query, [interviewId]);
 
-            return {
-                data: rows.length > 0 ? rows[0] : null
-            };
+            return rows.length > 0 ? rows[0] : null;
 
         } catch (error) {
             this._handleDatabaseError(error, 'getById');
@@ -300,6 +301,7 @@ class InterviewRepository {
                 TIME_FORMAT(i.toTime,'%H:%i') AS toTime,
                 i.durationMinutes,
                 i.result,
+                i.meetingUrl,
                 interviewer.memberId AS interviewerId,
                 interviewer.memberName AS interviewerName
             FROM interview i
@@ -664,7 +666,7 @@ class InterviewRepository {
                 throw new AppError('Final data is required', 400, 'MISSING_FINAL_DATA');
             }
 
-            const allowedFields = ['result', 'recruiterNotes', 'interviewerFeedback'];
+            const allowedFields = ['result', 'recruiterNotes', 'interviewerFeedback', 'meetingUrl'];
 
             const filteredData = {};
             Object.keys(finalData).forEach(key => {

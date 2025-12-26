@@ -224,7 +224,15 @@ const interviewSchemas = {
             .allow('', null)
             .messages({
                 'string.max': 'Interviewer feedback cannot exceed 2000 characters'
+            }),
+        meetingUrl: Joi.string()
+            .uri({
+                scheme: ['https'],
+                allowRelative: false
             })
+            .max(2048)
+            .optional()
+            .allow('', null)
     }),
 
     params: Joi.object({

@@ -152,15 +152,15 @@ class InterviewService {
     async getInterviewById(interviewId) {
         const client = await this.db.getConnection();
         try {
-            const result = await this.interviewRepository.getById(interviewId, client);
-            if (!result) {
+            const data = await this.interviewRepository.getById(interviewId, client);
+            if (!data) {
                 throw new AppError(
                     `Interview Entry with ${interviewId} not found`,
                     404,
                     'INTERVIEW_ENTRY_NOT_FOUND'
                 );
             }
-            const data = result.data;
+            //const data = result.data;
 
             if (Array.isArray(data)) {
                 data.forEach(item => InterviewService.capitalizeField(item, "result"));
@@ -168,7 +168,7 @@ class InterviewService {
                 InterviewService.capitalizeField(data, "result");
             }
 
-            return { data };
+            return data;
         } catch (error) {
             if (!(error instanceof AppError)) {
                 console.error('Error Fetching Interview Data By Id', error.stack);
@@ -456,18 +456,8 @@ class InterviewService {
         try {
             await client.beginTransaction();
 
-            await this.assertNoOverlaps({
-                client,
-                candidateId: existingInterview.data.candidateId,
-                interviewerId: interviewData.interviewerId ?? existingInterview.data.interviewerId,
-                interviewDate: interviewData.interviewDate ?? existingInterview.data.interviewDate,
-                fromTime: interviewData.fromTime ?? existingInterview.data.fromTime,
-                durationMinutes: interviewData.durationMinutes ?? existingInterview.data.durationMinutes,
-                excludeInterviewId: interviewId
-            });
-
             const existingInterview = await this.interviewRepository.getById(interviewId, client);
-            if (!existingInterview || !existingInterview.data) {
+            if (!existingInterview) {
                 throw new AppError(
                     `Interview with Id ${interviewId} not found`,
                     404,
@@ -475,12 +465,22 @@ class InterviewService {
                 );
             }
 
+            await this.assertNoOverlaps({
+                client,
+                candidateId: existingInterview.candidateId,
+                interviewerId: interviewData.interviewerId ?? existingInterview.interviewerId,
+                interviewDate: interviewData.interviewDate ?? existingInterview.interviewDate,
+                fromTime: interviewData.fromTime ?? existingInterview.fromTime,
+                durationMinutes: interviewData.durationMinutes ?? existingInterview.durationMinutes,
+                excludeInterviewId: interviewId
+            });
+
             const updatedInterview = await this.interviewRepository.update(interviewId, interviewData, client);
 
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'UPDATE',
-                previousValues: existingInterview.data,
+                previousValues: existingInterview,
                 newValues: updatedInterview,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
@@ -577,7 +577,7 @@ class InterviewService {
             await client.beginTransaction();
 
             const existingInterview = await this.interviewRepository.getById(interviewId, client);
-            if (!existingInterview || !existingInterview.data) {
+            if (!existingInterview) {
                 throw new AppError(
                     `Interview with Id ${interviewId} not found`,
                     404,
@@ -590,7 +590,7 @@ class InterviewService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'UPDATE',
-                previousValues: existingInterview.data,
+                previousValues: existingInterview,
                 newValues: finalizedInterview,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
