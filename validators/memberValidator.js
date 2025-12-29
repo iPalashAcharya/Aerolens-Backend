@@ -253,6 +253,48 @@ class MemberValidatorHelper {
             if (!client) connection.release();
         }
     }
+
+    async validateVendorExists(vendorId, client = null) {
+        const connection = client || await this.db.getConnection();
+        try {
+            const [rows] = await connection.execute(
+                `SELECT vendorId FROM recruitmentVendor WHERE vendorId = ?`,
+                [vendorId]
+            );
+
+            if (rows.length === 0) {
+                throw new AppError(
+                    `Vendor with ID ${vendorId} does not exist`,
+                    400,
+                    'INVALID_VENDOR_ID'
+                );
+            }
+            return true;
+        } finally {
+            if (!client) connection.release();
+        }
+    }
+    async getMemberRecruiterStatus(memberId, client = null) {
+        const connection = client || await this.db.getConnection();
+        try {
+            const [rows] = await connection.execute(
+                `SELECT isRecruiter FROM member WHERE memberId = ? AND isActive = TRUE`,
+                [memberId]
+            );
+
+            if (rows.length === 0) {
+                throw new AppError(
+                    `Member with ID ${memberId} not found`,
+                    404,
+                    'MEMBER_NOT_FOUND'
+                );
+            }
+
+            return rows[0].isRecruiter;
+        } finally {
+            if (!client) connection.release();
+        }
+    }
 }
 
 const memberSchema = {
@@ -366,7 +408,21 @@ const memberSchema = {
                 'number.base': 'Interviewer capacity must be a number',
                 'number.integer': 'Interviewer capacity must be an integer',
                 'number.min': 'Interviewer capacity cannot be negative'
+            }),
+        vendorId: Joi.when('isRecruiter', {
+            is: true,
+            then: Joi.number()
+                .integer()
+                .positive()
+                .optional()
+                .messages({
+                    'number.base': 'Vendor ID must be a number',
+                    'number.positive': 'Vendor ID must be a positive number'
+                }),
+            otherwise: Joi.forbidden().messages({
+                'any.unknown': 'Vendor ID is only allowed when isRecruiter is true'
             })
+        })
     }).min(1)
         .messages({
             'object.min': 'At least one field must be provided for update'
@@ -443,6 +499,14 @@ class MemberValidator {
 
             if (value.isInterviewer === false) {
                 value.interviewerCapacity = null;
+            }
+
+            if (value.isRecruiter === false) {
+                value.vendorId = null;
+            }
+
+            if (value.isRecruiter === true && value.vendorId) {
+                await MemberValidator.helper.validateVendorExists(value.vendorId);
             }
 
             req.body = value;

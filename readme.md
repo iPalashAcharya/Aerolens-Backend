@@ -3890,3 +3890,258 @@ Schedule the next interview round for a candidate (must have at least one existi
 - Round numbers are automatically renumbered on delete
 
 ---
+
+# Vendor API
+
+This module manages **recruitment vendors** with full CRUD support, validation, audit logging, and consistent error handling.
+
+---
+
+## 🔐 Authentication
+
+All vendor endpoints are **protected**.
+
+**Requirement**
+
+```
+Authorization: Bearer <JWT_TOKEN>
+```
+
+---
+
+## Base URL
+
+```
+/vendor
+```
+
+---
+
+## Vendor Object
+
+```json
+{
+  "vendorId": 1,
+  "vendorName": "ABC Recruiters",
+  "vendorPhone": "+91 9876543210",
+  "vendorEmail": "contact@abcrecruiters.com"
+}
+```
+
+---
+
+## Endpoints
+
+---
+
+## 1️⃣ Get All Vendors
+
+### ➤ Request
+
+```
+GET /vendor
+```
+
+### ➤ Response (200 OK)
+
+```json
+{
+  "success": true,
+  "message": "Vendor entries retrieved successfully",
+  "data": [
+    {
+      "vendorId": 1,
+      "vendorName": "ABC Recruiters",
+      "vendorPhone": "+91 9876543210",
+      "vendorEmail": "contact@abcrecruiters.com"
+    }
+  ]
+}
+```
+
+---
+
+## 2️⃣ Create Vendor
+
+### ➤ Request
+
+```
+POST /vendor
+```
+
+### ➤ Request Body
+
+```json
+{
+  "vendorName": "ABC Recruiters",
+  "vendorPhone": "+91 9876543210",
+  "vendorEmail": "contact@abcrecruiters.com"
+}
+```
+
+> `vendorPhone` and `vendorEmail` are optional, but **at least one should be provided**.
+
+### ➤ Response (201 Created)
+
+```json
+{
+  "success": true,
+  "message": "Vendor created successfully",
+  "data": {
+    "vendorId": 1,
+    "vendorName": "ABC Recruiters",
+    "vendorPhone": "+91 9876543210",
+    "vendorEmail": "contact@abcrecruiters.com"
+  }
+}
+```
+
+---
+
+## 3️⃣ Get Vendor by ID
+
+### ➤ Request
+
+```
+GET /vendor/:vendorId
+```
+
+### ➤ Response (200 OK)
+
+```json
+{
+  "success": true,
+  "message": "Vendor retrieved successfully",
+  "data": {
+    "vendorId": 1,
+    "vendorName": "ABC Recruiters",
+    "vendorPhone": "+91 9876543210",
+    "vendorEmail": "contact@abcrecruiters.com"
+  }
+}
+```
+
+---
+
+## 4️⃣ Update Vendor (Partial Update)
+
+### ➤ Request
+
+```
+PATCH /vendor/:vendorId
+```
+
+### ➤ Request Body (any subset)
+
+```json
+{
+  "vendorPhone": "+91 9999999999"
+}
+```
+
+### ➤ Response (200 OK)
+
+```json
+{
+  "success": true,
+  "message": "Vendor updated successfully",
+  "data": {
+    "vendorId": 1,
+    "vendorName": "ABC Recruiters",
+    "vendorPhone": "+91 9999999999",
+    "vendorEmail": "contact@abcrecruiters.com"
+  }
+}
+```
+
+---
+
+## 5️⃣ Delete Vendor
+
+### ➤ Request
+
+```
+DELETE /vendor/:vendorId
+```
+
+### ➤ Response (200 OK)
+
+```json
+{
+  "success": true,
+  "message": "Vendor deleted successfully",
+  "data": null
+}
+```
+
+---
+
+## ⚠️ Error Handling
+
+All errors follow a **consistent structure**.
+
+### ❌ Error Response Format
+
+```json
+{
+  "success": false,
+  "code": "ERROR_CODE",
+  "message": "Human readable message",
+  "details": {}
+}
+```
+
+---
+
+## 🚨 Error Codes
+
+| Code                    | HTTP | Description                              |
+| ----------------------- | ---- | ---------------------------------------- |
+| `VALIDATION_ERROR`      | 400  | Request body or params validation failed |
+| `VENDOR_DUPLICATE`      | 409  | Vendor phone or email already exists     |
+| `VENDOR_NOT_FOUND`      | 404  | Vendor ID does not exist                 |
+| `INVALID_UPDATE_FIELDS` | 400  | No valid fields provided for update      |
+| `DATABASE_ERROR`        | 500  | Internal database or server error        |
+
+---
+
+## 🧪 Example Validation Error
+
+```json
+{
+  "success": false,
+  "code": "VALIDATION_ERROR",
+  "message": "Validation failed",
+  "details": {
+    "validationErrors": [
+      {
+        "field": "vendorEmail",
+        "message": "Vendor email must be a valid email address"
+      }
+    ]
+  }
+}
+```
+
+---
+
+## 🔁 Data Normalization Rules
+
+| Input               | Stored Value  |
+| ------------------- | ------------- |
+| `""` (empty string) | `null`        |
+| `undefined`         | Field ignored |
+| `null`              | `null`        |
+| Valid string        | Stored as-is  |
+
+---
+
+## 🛡️ Additional Notes
+
+- All write operations are **transactional**
+- All changes are **audit logged**
+- Partial updates are **whitelisted**
+- Duplicate detection is enforced at both **service** and **database** levels
+- Error codes are **stable and frontend-safe**
+
+---

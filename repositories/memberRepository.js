@@ -50,7 +50,9 @@ class MemberRepository {
                     'proficiencyLevel', isk.proficiencyLevel,
                     'yearsOfExperience', isk.years_of_experience
                 )
-            ) AS skills
+            ) AS skills,
+            v.vendorId AS vendorId,
+            v.vendorName AS vendorName
 
         FROM member m
         INNER JOIN lookup l
@@ -63,6 +65,8 @@ class MemberRepository {
             ON isk.interviewerId = m.memberId
         LEFT JOIN lookup ls
             ON ls.lookupKey = isk.skillId
+        LEFT JOIN recruitmentVendor v
+            ON m.vendorId = v.vendorId
 
         WHERE m.isActive = TRUE AND m.memberId = ?
 
@@ -280,7 +284,9 @@ class MemberRepository {
                     'proficiencyLevel', isk.proficiencyLevel,
                     'yearsOfExperience', isk.years_of_experience
                 )
-            ) AS skills
+            ) AS skills,
+            v.vendorId AS vendorId,
+            v.vendorName AS vendorName
 
         FROM member m
         INNER JOIN lookup l
@@ -293,6 +299,8 @@ class MemberRepository {
             ON isk.interviewerId = m.memberId
         LEFT JOIN lookup ls
             ON ls.lookupKey = isk.skillId
+        LEFT JOIN recruitmentVendor v
+            ON m.vendorId = v.vendorId
 
         WHERE m.isActive = TRUE
 
@@ -378,8 +386,8 @@ class MemberRepository {
         const connection = client || await db.getConnection();
         try {
             const [result] = await connection.execute(
-                `INSERT INTO member (memberName, memberContact, email, password, designation, isRecruiter,isInterviewer)
-                 VALUES (?, ?, ?, ?, ?, ?,?)`,
+                `INSERT INTO member (memberName, memberContact, email, password, designation, isRecruiter,isInterviewer,vendorId)
+                 VALUES (?, ?, ?, ?, ?, ?,?,?)`,
                 [
                     memberData.memberName,
                     memberData.memberContact,
@@ -388,6 +396,7 @@ class MemberRepository {
                     memberData.designation,
                     memberData.isRecruiter || false,
                     memberData.isInterviewer || false,
+                    memberData.vendorId || null
                 ]
             );
             return await this.findById(result.insertId);
@@ -426,7 +435,7 @@ class MemberRepository {
             }
 
             const allowedFields = [
-                'memberName', 'memberContact', 'email', 'designation', 'isRecruiter', 'locationId', 'clientId', 'organisation', 'isInterviewer', 'interviewerCapacity'
+                'memberName', 'memberContact', 'email', 'designation', 'isRecruiter', 'locationId', 'clientId', 'organisation', 'isInterviewer', 'interviewerCapacity', 'vendorId'
             ];
 
             const filteredData = {};
@@ -438,6 +447,10 @@ class MemberRepository {
 
             if (Object.keys(filteredData).length === 0) {
                 throw new AppError('No valid fields to update', 400, 'NO_VALID_FIELDS');
+            }
+
+            if (filteredData.vendorId && filteredData.isRecruiter === false) {
+                filteredData.vendorId = null;
             }
 
             const fields = Object.keys(filteredData);
