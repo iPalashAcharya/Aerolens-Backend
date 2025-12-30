@@ -242,9 +242,8 @@ const candidateSchemas = {
         contactNumber: Joi.string()
             .trim()
             .pattern(/^[+]?[\d\s()-]{7,25}$/)
-            .required()
+            .optional()
             .messages({
-                'string.empty': 'Contact number is required',
                 'string.pattern.base': 'Contact number must be a valid phone number (7-25 characters, numbers, spaces, +, -, () allowed)'
             }),
 
@@ -253,9 +252,8 @@ const candidateSchemas = {
             .email()
             .max(255)
             .lowercase()
-            .required()
+            .optional()
             .messages({
-                'string.empty': 'Email is required',
                 'string.email': 'Email must be a valid email address',
                 'string.max': 'Email cannot exceed 255 characters'
             }),
@@ -316,26 +314,24 @@ const candidateSchemas = {
             .integer()
             .min(0)
             .max(10000000)
-            .required()
+            .optional()
             .messages({
                 'number.base': 'Current CTC must be a number',
                 'number.integer': 'Current CTC must be a whole number',
                 'number.min': 'Current CTC cannot be negative',
                 'number.max': 'Current CTC cannot exceed 1,00,00,000',
-                'any.required': 'Current CTC is required'
             }),
 
         expectedCTC: Joi.number()
             .integer()
             .min(0)
             .max(10000000)
-            .required()
+            .optional()
             .messages({
                 'number.base': 'Expected CTC must be a number',
                 'number.integer': 'Expected CTC must be a whole number',
                 'number.min': 'Expected CTC cannot be negative',
                 'number.max': 'Expected CTC cannot exceed 1,00,00,000',
-                'any.required': 'Expected CTC is required'
             }),
 
         noticePeriod: Joi.number()
@@ -717,7 +713,7 @@ class CandidateValidator {
             }
 
             // Check for duplicates
-            if (await CandidateValidator.helper.checkEmailExists(value.email)) {
+            if (value.email && await CandidateValidator.helper.checkEmailExists(value.email)) {
                 // Cleanup S3 file
                 if (req.file && req.file.key) {
                     const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
@@ -730,7 +726,7 @@ class CandidateValidator {
                 throw new AppError('A candidate with this email already exists', 409, 'DUPLICATE_EMAIL', { field: 'email' });
             }
 
-            if (await CandidateValidator.helper.checkContactExists(value.contactNumber)) {
+            if (value.contactNumber && await CandidateValidator.helper.checkContactExists(value.contactNumber)) {
                 // Cleanup S3 file
                 if (req.file && req.file.key) {
                     const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');

@@ -7,7 +7,7 @@ class MemberRepository {
         const connection = client;
 
         const designationPromise = connection.query(`
-        SELECT lookupKey, value
+        SELECT lookupKey AS designationId, value AS designationName
         FROM lookup
         WHERE tag='designation'
         `);

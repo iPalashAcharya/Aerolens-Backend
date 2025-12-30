@@ -2470,13 +2470,13 @@ Content-Type: multipart/form-data
 | Field                | Type        | Description                                            |
 | -------------------- | ----------- | ------------------------------------------------------ |
 | candidateName        | String      | Candidate full name (required)                         |
-| contactNumber        | String      | Phone number (required)                                |
-| email                | String      | Email address (required)                               |
+| contactNumber        | String      | Phone number (optional)                                |
+| email                | String      | Email address (optional)                               |
 | recruiterName        | String      | Recruiter name (required) [must be in member table]    |
 | jobRole              | String      | Job title (required)                                   |
 | preferredJobLocation | JSON Object | must be a json object with city and country attributes |
-| currentCTC           | Number      | Current CTC in INR (required)                          |
-| expectedCTC          | Number      | Expected CTC in INR (required)                         |
+| currentCTC           | Number      | Current CTC in INR (optional)                          |
+| expectedCTC          | Number      | Expected CTC in INR (optional)                         |
 | noticePeriod         | Number      | Notice period in days (required)                       |
 | experienceYears      | Number      | Years of experience (required)                         |
 | linkedinProfileUrl   | String      | LinkedIn URL (optional)                                |
