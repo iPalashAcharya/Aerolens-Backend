@@ -15,9 +15,16 @@ class CandidateRepository {
     `);
 
         const recruitersPromise = connection.query(`
-        SELECT memberId AS recruiterId, memberName AS recruiterName
-        FROM member
-        WHERE isRecruiter=TRUE
+        SELECT
+        m.memberId AS recruiterId,
+        CASE
+            WHEN v.vendorName IS NOT NULL
+            THEN CONCAT(m.memberName, ' (', v.vendorName, ')')
+            ELSE m.memberName
+        END AS recruiterName
+        FROM member m
+        LEFT JOIN recruitmentVendor v ON v.vendorId = m.vendorId
+        WHERE m.isRecruiter = TRUE AND m.isActive = TRUE
     `);
 
         const locationPromise = connection.query(`

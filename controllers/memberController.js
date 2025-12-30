@@ -6,6 +6,15 @@ class MemberController {
         this.memberService = memberService;
     }
 
+    getFormData = catchAsync(async (req, res) => {
+        const formData = await this.memberService.getMemberFormData();
+        return ApiResponse.success(
+            res,
+            formData,
+            'Member form data retrieved successfully'
+        );
+    })
+
     getAll = catchAsync(async (req, res) => {
         try {
             /*const options = {
