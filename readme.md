@@ -2788,364 +2788,333 @@ DATABASE_SCHEMA_ERROR – Missing table or invalid schema
 
 DATABASE_CONNECTION_ERROR – Connection timeout or reset
 
-# Member Endpoints
+---
 
-Validation & Transformation
-Joi Schemas
+# 👤 Member API – Request & Response Guide (Frontend Accurate)
 
-MemberValidator uses Joi to validate:​
+This document describes **all Member-related API endpoints**, including **request formats**, **response formats**, and **business rules**, exactly as returned by the backend.
 
-memberSchema.update – body for PATCH /members/:memberId
+Base URL:
 
-memberSchema.params – memberId route param
+```
+/api/member
+```
 
-Key rules:
+All endpoints require authentication.
 
-memberName: string, 2–100 chars.
+---
 
-memberContact: pattern for phone-like values, max 25 chars.
+## 🔐 Authentication
 
-email: valid email.
+All routes require a valid authenticated token.
 
-designation: string, lowercased, 2–100 chars.
+```
+Authorization: Bearer <token>
+```
 
-isRecruiter, isInterviewer: booleans.
+---
 
-client, organisation: non-empty strings, max 255 chars.
+## 📌 Standard API Response Format
 
-skills: array of { skillName, proficiencyLevel('beginner','intermediate','advanced'.'expert'), yearsOfExperience }.
+### ✅ Success Response (ALL endpoints)
 
-location: { cityName, country },
+```json
+{
+  "success": true,
+  "message": "Descriptive message",
+  "data": <response_payload>
+}
+```
 
-interviewerCapacity : Integer (Optional)
+### ❌ Error Response
 
-If validation fails, an AppError with code VALIDATION_ERROR is thrown, containing validationErrors.​
+```json
+{
+  "success": false,
+  "message": "Error summary",
+  "errorCode": "ERROR_CODE",
+  "details": {
+    "validationErrors": [
+      {
+        "field": "fieldName",
+        "message": "Reason"
+      }
+    ]
+  }
+}
+```
 
-Transform Helpers
+---
 
-MemberValidatorHelper converts human-readable fields to DB IDs:​
+## 📄 GET – Member Form Data
 
-transformDesignation(designation)
+Fetches all lookup data required to build **Member create/edit forms**.
 
-Queries lookup table (tag = 'designation') to get lookupKey.
+### Endpoint
 
-Uses an in-memory cache to avoid repeated queries.
+```
+GET /member/form-data
+```
 
-transformClient(clientName)
+---
 
-Queries client table to get clientId, with caching.
+### ✅ Success Response
 
-transformSkills(skills)
+```json
+{
+  "success": true,
+  "message": "Member form data retrieved successfully",
+  "data": {
+    "designations": [{ "lookupKey": 1, "value": "Software Engineer" }],
+    "vendors": [{ "vendorId": 3, "vendorName": "ABC Recruiters" }],
+    "clients": [{ "clientId": 5, "clientName": "Acme Corp" }],
+    "skills": [{ "skillId": 10, "skillName": "JavaScript" }],
+    "locations": [
+      {
+        "locationId": 2,
+        "city": "Bangalore",
+        "state": "Karnataka",
+        "country": "India"
+      }
+    ]
+  }
+}
+```
 
-For each { skillName, proficiencyLevel, yearsOfExperience }, loads lookupKey from lookup (tag = 'skill').
+---
 
-Returns { skill, proficiencyLevel, yearsOfExperience } with skill as the ID.
+## 📄 GET – All Members
 
-getLocationIdByName(location)
+Fetches all **active members**.
 
-Uses location.city (note: your schema uses cityName – adjust as needed) to find locationId in location table.
+### Endpoint
 
-All these throw AppError with meaningful codes like INVALID_SKILL, INVALID_DESIGNATION, INVALID_CLIENT_NAME, INVALID_LOCATION.​
-
-API Endpoints
-Base path (example): /api/member
-
-1. Get All Members
-
+```
 GET /member
+```
 
-Returns all active members with joined metadata (designation, location, client, skills).​
+---
 
-Example request:
+### ✅ Success Response
 
-GET /member HTTP/1.1
-Host: localhost:3000
-Authorization: Bearer <token>
-Success response (200):
-
+```json
 {
-"success": true,
-"message": "Members retrieved successfully",
-"data": [
-{
-"memberId": 1,
-"memberName": "Palash Acharya",
-"memberContact": "+91-9876543210",
-"email": "palash.acharya@aerolens.in",
-"designation": "Admin",
-"isRecruiter": 1,
-"isActive": 1,
-"lastLogin": "2025-11-30T01:48:05.000Z",
-"createdAt": "2025-10-21T03:58:42.000Z",
-"updatedAt": "2025-11-30T01:48:05.000Z",
-"cityName": "Ahmedabad",
-"country": "India",
-"clientName": null,
-"organisation": null,
-"isInterviewer": 1,
-"interviewerCapacity": null,
-"skills": [
-{
-"skillId": 43,
-"skillName": "DBMS",
-"proficiencyLevel": "Intermediate",
-"yearsOfExperience": 1
-},
-{
-"skillId": 42,
-"skillName": "ExpressJS",
-"proficiencyLevel": "Intermediate",
-"yearsOfExperience": 1
-},
-{
-"skillId": 41,
-"skillName": "NodeJS",
-"proficiencyLevel": "Intermediate",
-"yearsOfExperience": 1
+  "success": true,
+  "message": "Members retrieved successfully",
+  "data": [
+    {
+      "memberId": 1,
+      "memberName": "John Doe",
+      "memberContact": "+91 9999999999",
+      "email": "john@example.com",
+      "designation": "Recruiter",
+      "isRecruiter": true,
+      "isInterviewer": false,
+      "vendorId": 2,
+      "vendorName": "Random Vendor A",
+      "clientId": 4,
+      "clientName": "Acme Corp",
+      "organisation": "Acme Corp",
+      "city": "Mumbai",
+      "country": "India",
+      "interviewerCapacity": null,
+      "skills": [
+        {
+          "skillId": 10,
+          "skillName": "Communication",
+          "proficiencyLevel": "Advanced",
+          "yearsOfExperience": 5
+        }
+      ],
+      "isActive": true,
+      "createdAt": "2024-01-01T10:00:00.000Z",
+      "updatedAt": "2024-01-10T10:00:00.000Z"
+    }
+  ]
 }
-]
-},
-{
-"memberId": 420,
-"memberName": "Jaival Suthar",
-"memberContact": "+91 9999999999",
-"email": "jaival@testing.com",
-"designation": "Admin",
-"isRecruiter": 1,
-"isActive": 1,
-"lastLogin": "2025-12-01T04:33:24.000Z",
-"createdAt": "2025-10-27T04:58:41.000Z",
-"updatedAt": "2025-12-01T04:33:24.000Z",
-"cityName": "Ahmedabad",
-"country": "India",
-"clientName": null,
-"organisation": null,
-"isInterviewer": 1,
-"interviewerCapacity": null,
-"skills": [
-{
-"skillId": 41,
-"skillName": "NodeJS",
-"proficiencyLevel": "Intermediate",
-"yearsOfExperience": 1
-}
-]
-}
-]
-}
-Possible errors:
+```
 
-401 – Unauthorized (auth middleware).​
+---
 
-500 – MEMBER_FETCH_ERROR.​
+## 📄 GET – Member By ID
 
-2. Get Member By ID
+Fetches a **single active member** by ID.
 
+### Endpoint
+
+```
 GET /member/:memberId
+```
 
-Example request:
+---
 
-GET /members/1 HTTP/1.1
-Host: localhost:3000
-Authorization: Bearer <token>
-Success response (200):
+### ✅ Success Response
 
+```json
 {
-"success": true,
-"message": "Member entry retrieved successfully",
-"data": {
-"memberId": 1,
-"memberName": "Palash Acharya",
-"memberContact": "+91-9876543210",
-"email": "palash.acharya@aerolens.in",
-"designation": "Admin",
-"isRecruiter": 1,
-"isActive": 1,
-"lastLogin": "2025-11-30T01:48:05.000Z",
-"createdAt": "2025-10-21T03:58:42.000Z",
-"updatedAt": "2025-12-01T05:06:24.000Z",
-"cityName": "Ahmedabad",
-"country": "India",
-"clientName": null,
-"organisation": null,
-"isInterviewer": 1,
-"interviewerCapacity": 2,
-"skills": [
-{
-"skillId": 41,
-"skillName": "NodeJS",
-"proficiencyLevel": "Intermediate",
-"yearsOfExperience": 1
-},
-{
-"skillId": 42,
-"skillName": "ExpressJS",
-"proficiencyLevel": "Intermediate",
-"yearsOfExperience": 1
-},
-{
-"skillId": 43,
-"skillName": "DBMS",
-"proficiencyLevel": "Intermediate",
-"yearsOfExperience": 1
+  "success": true,
+  "message": "Member entry retrieved successfully",
+  "data": {
+    "memberId": 1,
+    "memberName": "John Doe",
+    "memberContact": "+91 9999999999",
+    "email": "john@example.com",
+    "designation": "Recruiter",
+    "isRecruiter": true,
+    "isInterviewer": false,
+    "vendorId": 2,
+    "vendorName": "Random Vendor A",
+    "clientId": 4,
+    "clientName": "Acme Corp",
+    "organisation": "Acme Corp",
+    "cityName": "Mumbai",
+    "country": "India",
+    "interviewerCapacity": null,
+    "skills": [
+      {
+        "skillId": 10,
+        "skillName": "Communication",
+        "proficiencyLevel": "Advanced",
+        "yearsOfExperience": 5
+      }
+    ],
+    "isActive": true,
+    "createdAt": "2024-01-01T10:00:00.000Z",
+    "updatedAt": "2024-01-10T10:00:00.000Z"
+  }
 }
-]
-}
-}
-Validation / error cases:
+```
 
-400 – VALIDATION_ERROR if memberId is not a positive integer.​
+---
 
-404 – MEMBER_ID_NOT_FOUND if the member does not exist or inactive.​
+## ✏️ PATCH – Update Member
 
-3. Update Member
+Updates **only the fields provided**.
 
+### Endpoint
+
+```
 PATCH /member/:memberId
+```
 
-Validates params and body via Joi.​
+> At least **one field is required**
 
-Transforms designation, client, location, and skills into IDs before updating.​
+---
 
-Adds new interviewer skills using interviewer_skill table.​
+### ✅ Allowed Request Payload
 
-Wraps in a DB transaction and writes an audit log.​
-
-Example request:
-
-PATCH /member/1 HTTP/1.1
-Host: localhost:3000
-Authorization: Bearer <token>
-Content-Type: application/json
-
+```json
 {
-"memberName": "Johnathan Doe",
-"memberContact": "+1 234 567 999",
-"email": "johnathan.doe@example.com",
-"designation": "Senior Developer",
-"client": "Acme Corp",
-"organisation": "Aerolens",
-"isRecruiter": true,
-"isInterviewer": true,
-"location": {
-"cityName": "Mumbai",
-"country": "India"
-},
-"skills": [
-{
-"skillName": "Node.js",
-"proficiencyLevel": "expert",
-"yearsOfExperience": 5
-},
-{
-"skillName": "React",
-"proficiencyLevel": "advanced",
-"yearsOfExperience": 3
+  "memberName": "Jane Doe",
+  "memberContact": "+91 8888888888",
+  "email": "jane@example.com",
+  "designation": "Senior Recruiter",
+  "isRecruiter": true,
+  "isInterviewer": false,
+  "clientId": 3,
+  "organisation": "New Org",
+  "vendorId": 2,
+  "interviewerCapacity": 5,
+  "location": {
+    "city": "Pune",
+    "country": "India"
+  },
+  "skills": [
+    {
+      "skillName": "Java",
+      "proficiencyLevel": "Advanced",
+      "yearsOfExperience": 6
+    }
+  ]
 }
-],
-"interviewerCapacity":3
-}
-Internally, after validation and helper transformations, the body passed to MemberService.updateMember looks roughly like:​
+```
 
+---
+
+### 🚨 Business Rules (Strictly Enforced)
+
+- `vendorId` can only be assigned if:
+
+  - Member **is already a recruiter**, OR
+  - `isRecruiter: true` is provided in the same request
+
+- Setting `isRecruiter: false` → `vendorId` is automatically cleared
+- Setting `isInterviewer: false` → `interviewerCapacity` becomes `null`
+- Updating `skills` **replaces all existing skills**
+- Designation, skills, and location names are internally converted to IDs
+
+---
+
+### ✅ Success Response
+
+```json
 {
-"memberName": "Johnathan Doe",
-"memberContact": "+1 234 567 999",
-"email": "johnathan.doe@example.com",
-"organisation": "Aerolens",
-"isRecruiter": true,
-"isInterviewer": true,
-"designationId": 12,
-"clientId": 3,
-"locationId": 5,
-"skills": [
-{
-"skill": 20,
-"proficiencyLevel": "expert",
-"yearsOfExperience": 5
-},
-{
-"skill": 21,
-"proficiencyLevel": "advanced",
-"yearsOfExperience": 3
+  "success": true,
+  "message": "Member entry updated successfully",
+  "data": {
+    "memberId": 1,
+    "memberName": "Jane Doe",
+    "isRecruiter": true,
+    "vendorId": 2
+  }
 }
-],
-"interviewerCapacity":3
-}
-Success response (200):
+```
 
-{
-"status": "success",
-"message": "Member entry updated successfully",
-"data": {
-"memberId": 1,
-"memberName": "Johnathan Doe",
-"memberContact": "+1 234 567 999",
-"email": "johnathan.doe@example.com",
-"organisation": "Aerolens",
-"isRecruiter": true,
-"isInterviewer": true,
-"designationId": 12,
-"clientId": 3,
-"locationId": 5,
-"interviewerCapacity":3
-}
-}
-Note: Repository updateMember only updates whitelisted fields (memberName, memberContact, email, designation, isRecruiter, locationId, clientId, organisation, isInterviewer).​
+---
 
-Possible errors:
+## 🗑️ DELETE – Delete Member (Soft Delete)
 
-400 – VALIDATION_ERROR (Joi) or NO_VALID_FIELDS, MISSING_UPDATE_DATA.​
+Soft-deletes a member. Permanent deletion occurs later via background cleanup.
 
-404 – MEMBER_NOT_FOUND.​
+### Endpoint
 
-400/404 – INVALID_SKILL, INVALID_DESIGNATION, INVALID_CLIENT_NAME, INVALID_LOCATION.​
-
-500 – MEMBER_UPDATE_ERROR for unexpected errors.​
-
-4. Delete Member (Deactivate)
-
+```
 DELETE /member/:memberId
+```
 
-Validates memberId.​
+---
 
-Checks member existence.
+### 🚫 Deletion Restrictions
 
-Deactivates member (isActive = FALSE) through repository and logs an audit entry.​
+Deletion is blocked if the member:
 
-Example request:
+- Is recruiter for **active candidates**
+- Is interviewer for **active interviews**
 
-DELETE /member/1 HTTP/1.1
-Host: localhost:3000
-Authorization: Bearer <token>
-Success response (200):
+---
 
+### ✅ Success Response
+
+```json
 {
-"status": "success",
-"message": "Member entry deactivated successfully and will be deleted from database in 10 days",
-"data": null
+  "success": true,
+  "message": "Member entry deactivated successfully and will be deleted from database in 10 days",
+  "data": {
+    "deletedMember": {
+      "memberId": 1,
+      "memberName": "John Doe"
+    },
+    "interviewsDeleted": 0,
+    "interviewsUnlinked": 2
+  }
 }
-Possible errors:
+```
 
-400 – VALIDATION_ERROR for invalid memberId.​
+---
 
-404 – MEMBER_NOT_FOUND.​
+## ❌ Common Error Codes
 
-500 – MEMBER_DELETE_ERROR for unexpected failures.​
+| Error Code                       | Meaning                            |
+| -------------------------------- | ---------------------------------- |
+| `VALIDATION_ERROR`               | Invalid request payload            |
+| `MEMBER_NOT_FOUND`               | Member ID does not exist           |
+| `INVALID_VENDOR_ID`              | Vendor ID is invalid               |
+| `VENDOR_ASSOCIATION_NOT_ALLOWED` | Vendor assigned to non-recruiter   |
+| `MEMBER_HAS_CANDIDATES`          | Member linked to active candidates |
+| `MEMBER_HAS_INTERVIEWS`          | Member linked to active interviews |
+| `MEMBER_FORM_DATA_FETCH_ERROR`   | Failed to load form data           |
 
-Error Format
-Errors are thrown using AppError and converted to a consistent JSON response, for example:​
-
-{
-"status": "error",
-"message": "Validation failed",
-"code": "VALIDATION_ERROR",
-"errors": [
-{
-"field": "email",
-"message": "Please provide a valid email address"
-}
-]
-}
-Database or service errors use informative code values like DB_ERROR, MEMBER_UPDATE_ERROR, etc.​
+---
 
 # Location Endpoints
 
@@ -3979,7 +3948,7 @@ POST /vendor
 }
 ```
 
-> `vendorPhone` and `vendorEmail` are optional, but **at least one should be provided**.
+> `vendorPhone` and `vendorEmail` are optional
 
 ### ➤ Response (201 Created)
 

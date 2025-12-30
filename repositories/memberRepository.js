@@ -2,6 +2,65 @@ const db = require('../db');
 const AppError = require('../utils/appError');
 
 class MemberRepository {
+
+    async getFormData(client) {
+        const connection = client;
+
+        const designationPromise = connection.query(`
+        SELECT lookupKey, value
+        FROM lookup
+        WHERE tag='designation'
+        `);
+
+        const vendorPromise = connection.query(`SELECT vendorId,vendorName FROM recruitmentVendor`);
+
+        const clientPromise = connection.query(`SELECT clientId,clientName FROM client`);
+
+        const skillPromise = connection.query(`SELECT lookupKey AS skillId,value AS skillName FROM lookup WHERE tag='skill'`);
+
+        const locationPromise = connection.query(`
+        SELECT locationId,cityName AS city,country,stateName AS state FROM location
+    `);
+
+        const [designations, vendors, clients, skills, locations] =
+            await Promise.all([
+                designationPromise,
+                vendorPromise,
+                clientPromise,
+                skillPromise,
+                locationPromise
+            ]);
+
+        return {
+            designations: designations[0],
+            vendors: vendors[0],
+            clients: clients[0],
+            skills: skills[0],
+            locations: locations[0]
+        };
+    }
+
+    async validateVendorExists(vendorId, client) {
+        const connection = client;
+        try {
+            const [rows] = await connection.execute(
+                `SELECT vendorId FROM recruitmentVendor WHERE vendorId = ?`,
+                [vendorId]
+            );
+
+            if (rows.length === 0) {
+                throw new AppError(
+                    `Vendor with ID ${vendorId} does not exist`,
+                    400,
+                    'INVALID_VENDOR_ID'
+                );
+            }
+            return true;
+        } catch (error) {
+            throw new AppError('Database error while finding member', 500, 'DB_ERROR', error.message);
+        }
+    }
+
     async findById(memberId) {
         const connection = await db.getConnection();
         try {

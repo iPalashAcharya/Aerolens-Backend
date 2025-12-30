@@ -116,14 +116,20 @@ const registerSchema = Joi.object({
         .default(false),
     isInterviewer: Joi.boolean()
         .default(false),
-    vendorId: Joi.number()
-        .integer()
-        .positive()
-        .optional()
-        .messages({
-            'number.base': 'Vendor ID must be a number',
-            'number.positive': 'Vendor ID must be a positive number'
+    vendorId: Joi.when('isRecruiter', {
+        is: true,
+        then: Joi.number()
+            .integer()
+            .positive()
+            .optional()
+            .messages({
+                'number.base': 'Vendor ID must be a number',
+                'number.positive': 'Vendor ID must be a positive number'
+            }),
+        otherwise: Joi.forbidden().messages({
+            'any.unknown': 'Vendor ID is only allowed when isRecruiter is true'
         })
+    })
 });
 
 const changePasswordSchema = Joi.object({

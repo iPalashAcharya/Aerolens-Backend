@@ -409,20 +409,15 @@ const memberSchema = {
                 'number.integer': 'Interviewer capacity must be an integer',
                 'number.min': 'Interviewer capacity cannot be negative'
             }),
-        vendorId: Joi.when('isRecruiter', {
-            is: true,
-            then: Joi.number()
-                .integer()
-                .positive()
-                .optional()
-                .messages({
-                    'number.base': 'Vendor ID must be a number',
-                    'number.positive': 'Vendor ID must be a positive number'
-                }),
-            otherwise: Joi.forbidden().messages({
-                'any.unknown': 'Vendor ID is only allowed when isRecruiter is true'
+        vendorId: Joi.number()
+            .integer()
+            .positive()
+            .optional()
+            .messages({
+                'number.base': 'Vendor ID must be a number',
+                'number.integer': 'Vendor ID must be an integer',
+                'number.positive': 'Vendor ID must be positive'
             })
-        })
     }).min(1)
         .messages({
             'object.min': 'At least one field must be provided for update'
@@ -504,11 +499,6 @@ class MemberValidator {
             if (value.isRecruiter === false) {
                 value.vendorId = null;
             }
-
-            if (value.isRecruiter === true && value.vendorId) {
-                await MemberValidator.helper.validateVendorExists(value.vendorId);
-            }
-
             req.body = value;
             next();
         } catch (error) {
