@@ -40,6 +40,19 @@ class MemberRepository {
         };
     }
 
+    async getCreateData(client) {
+        const connection = client;
+        const designationPromise = connection.query(`SELECT lookupKey AS designationId, value AS designationName FROM lookup WHERE tag='designation'`);
+
+        const vendorPromise = connection.query(`SELECT vendorId,vendorName FROM recruitmentVendor`);
+
+        const [designations, vendors] = await Promise.all([designationPromise, vendorPromise]);
+        return {
+            designations: designations[0],
+            vendors: vendors[0]
+        };
+    }
+
     async validateVendorExists(vendorId, client) {
         const connection = client;
         try {

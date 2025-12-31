@@ -13,7 +13,16 @@ class MemberController {
             formData,
             'Member form data retrieved successfully'
         );
-    })
+    });
+
+    getCreateData = catchAsync(async (req, res) => {
+        const createData = await this.memberService.getCreateData();
+        return ApiResponse.success(
+            res,
+            createData,
+            'Member create form data retrieved successfully'
+        );
+    });
 
     getAll = catchAsync(async (req, res) => {
         try {

@@ -28,6 +28,27 @@ class MemberService {
         }
     }
 
+    async getCreateData() {
+        const client = await this.db.getConnection();
+        try {
+            const data = await this.memberRepository.getCreateData(client);
+            return data;
+        } catch (error) {
+            if (!(error instanceof AppError)) {
+                console.error('Error Fetching Member Create Form Data', error.stack);
+                throw new AppError(
+                    'Failed to fetch Member create form data',
+                    500,
+                    'MEMBER_FORM_DATA_FETCH_ERROR',
+                    { operation: 'getCreateData' }
+                );
+            }
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
     async getMemberById(memberId) {
         const client = await this.db.getConnection();
         try {
