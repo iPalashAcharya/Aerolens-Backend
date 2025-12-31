@@ -2883,6 +2883,67 @@ GET /member/form-data
 
 ---
 
+## GET - Create User Form Data
+
+Fetches all lookup data required to build **User create form**.
+
+### Endpoint
+
+```
+GET /member/create-data
+```
+
+---
+
+### Success Response
+
+```json
+{
+  "success": true,
+  "message": "Member create form data retrieved successfully",
+  "data": {
+    "designations": [
+      {
+        "designationId": 11,
+        "designationName": "QA Automation Developer"
+      },
+      {
+        "designationId": 12,
+        "designationName": "Software Engineer"
+      },
+      {
+        "designationId": 13,
+        "designationName": "Sr. PHP Developer"
+      },
+      {
+        "designationId": 14,
+        "designationName": "Head Of Engineering"
+      },
+      {
+        "designationId": 24,
+        "designationName": "Admin"
+      },
+      {
+        "designationId": 36,
+        "designationName": "test-engineer"
+      },
+      {
+        "designationId": 40,
+        "designationName": "Staff Software Engineer"
+      }
+    ],
+    "vendors": [
+      {
+        "vendorId": 3,
+        "vendorName": "Random Vendor A"
+      }
+    ]
+  }
+}
+```
+
+---
+
 ## 📄 GET – All Members
 
 Fetches all **active members**.
