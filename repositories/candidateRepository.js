@@ -9,15 +9,22 @@ class CandidateRepository {
         const connection = client;
 
         const statusPromise = connection.query(`
-        SELECT lookupKey, value
+        SELECT lookupKey AS statusId, value AS statusName
         FROM lookup
         WHERE tag='candidateStatus'
     `);
 
         const recruitersPromise = connection.query(`
-        SELECT memberId AS recruiterId, memberName AS recruiterName
-        FROM member
-        WHERE isRecruiter=TRUE
+        SELECT
+        m.memberId AS recruiterId,
+        CASE
+            WHEN v.vendorName IS NOT NULL
+            THEN CONCAT(m.memberName, ' (', v.vendorName, ')')
+            ELSE m.memberName
+        END AS recruiterName
+        FROM member m
+        LEFT JOIN recruitmentVendor v ON v.vendorId = m.vendorId
+        WHERE m.isRecruiter = TRUE AND m.isActive = TRUE
     `);
 
         const locationPromise = connection.query(`
@@ -42,19 +49,20 @@ class CandidateRepository {
 
     async create(candidateData, client) {
         const connection = client;
+        console.log(candidateData);
         try {
             const query = `INSERT INTO candidate(candidateName,contactNumber,email,recruiterId,jobRole,preferredJobLocation,currentCTC,expectedCTC,noticePeriod,experienceYears,linkedinProfileUrl,statusId, resumeFilename, resumeOriginalName, resumeUploadDate,notes)
             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`
 
             const [result] = await connection.execute(query, [
                 candidateData.candidateName,
-                candidateData.contactNumber,
-                candidateData.email,
+                candidateData.contactNumber ?? null,
+                candidateData.email ?? null,
                 candidateData.recruiterId,
                 candidateData.jobRole,
                 candidateData.preferredJobLocation !== undefined ? candidateData.preferredJobLocation : null,
-                candidateData.currentCTC,
-                candidateData.expectedCTC,
+                candidateData.currentCTC ?? null,
+                candidateData.expectedCTC ?? null,
                 candidateData.noticePeriod,
                 candidateData.experienceYears,
                 candidateData.linkedinProfileUrl !== undefined ? candidateData.linkedinProfileUrl : null,
@@ -547,6 +555,7 @@ class CandidateRepository {
     }*/
 
     async checkEmailExists(email, excludeCandidateId = null, client) {
+        if (!email) return false;
         const connection = client;
 
         try {
@@ -566,6 +575,7 @@ class CandidateRepository {
     }
 
     async checkContactExists(contactNumber, excludeCandidateId = null, client) {
+        if (!contactNumber) return false;
         const connection = client;
 
         try {

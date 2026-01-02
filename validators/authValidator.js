@@ -25,6 +25,26 @@ class AuthValidatorHelper {
             if (!client) connection.release();
         }
     }
+    async validateVendorExists(vendorId, client = null) {
+        const connection = client || await this.db.getConnection();
+        try {
+            const [rows] = await connection.execute(
+                `SELECT vendorId FROM recruitmentVendor WHERE vendorId = ?`,
+                [vendorId]
+            );
+
+            if (rows.length === 0) {
+                throw new AppError(
+                    `Vendor with ID ${vendorId} does not exist`,
+                    400,
+                    'INVALID_VENDOR_ID'
+                );
+            }
+            return true;
+        } finally {
+            if (!client) connection.release();
+        }
+    }
 }
 
 const loginSchema = Joi.object({
@@ -95,7 +115,21 @@ const registerSchema = Joi.object({
     isRecruiter: Joi.boolean()
         .default(false),
     isInterviewer: Joi.boolean()
-        .default(false)
+        .default(false),
+    vendorId: Joi.when('isRecruiter', {
+        is: true,
+        then: Joi.number()
+            .integer()
+            .positive()
+            .optional()
+            .messages({
+                'number.base': 'Vendor ID must be a number',
+                'number.positive': 'Vendor ID must be a positive number'
+            }),
+        otherwise: Joi.forbidden().messages({
+            'any.unknown': 'Vendor ID is only allowed when isRecruiter is true'
+        })
+    })
 });
 
 const changePasswordSchema = Joi.object({
@@ -162,6 +196,9 @@ class AuthValidator {
 
         if (value.designation) {
             value.designation = await AuthValidator.helper.transformDesignation(value.designation);
+        }
+        if (value.isRecruiter === true && value.vendorId) {
+            await AuthValidator.helper.validateVendorExists(value.vendorId);
         }
         req.body = value;
         next();

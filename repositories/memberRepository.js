@@ -2,6 +2,78 @@ const db = require('../db');
 const AppError = require('../utils/appError');
 
 class MemberRepository {
+
+    async getFormData(client) {
+        const connection = client;
+
+        const designationPromise = connection.query(`
+        SELECT lookupKey AS designationId, value AS designationName
+        FROM lookup
+        WHERE tag='designation'
+        `);
+
+        const vendorPromise = connection.query(`SELECT vendorId,vendorName FROM recruitmentVendor`);
+
+        const clientPromise = connection.query(`SELECT clientId,clientName FROM client`);
+
+        const skillPromise = connection.query(`SELECT lookupKey AS skillId,value AS skillName FROM lookup WHERE tag='skill'`);
+
+        const locationPromise = connection.query(`
+        SELECT locationId,cityName AS city,country,stateName AS state FROM location
+    `);
+
+        const [designations, vendors, clients, skills, locations] =
+            await Promise.all([
+                designationPromise,
+                vendorPromise,
+                clientPromise,
+                skillPromise,
+                locationPromise
+            ]);
+
+        return {
+            designations: designations[0],
+            vendors: vendors[0],
+            clients: clients[0],
+            skills: skills[0],
+            locations: locations[0]
+        };
+    }
+
+    async getCreateData(client) {
+        const connection = client;
+        const designationPromise = connection.query(`SELECT lookupKey AS designationId, value AS designationName FROM lookup WHERE tag='designation'`);
+
+        const vendorPromise = connection.query(`SELECT vendorId,vendorName FROM recruitmentVendor`);
+
+        const [designations, vendors] = await Promise.all([designationPromise, vendorPromise]);
+        return {
+            designations: designations[0],
+            vendors: vendors[0]
+        };
+    }
+
+    async validateVendorExists(vendorId, client) {
+        const connection = client;
+        try {
+            const [rows] = await connection.execute(
+                `SELECT vendorId FROM recruitmentVendor WHERE vendorId = ?`,
+                [vendorId]
+            );
+
+            if (rows.length === 0) {
+                throw new AppError(
+                    `Vendor with ID ${vendorId} does not exist`,
+                    400,
+                    'INVALID_VENDOR_ID'
+                );
+            }
+            return true;
+        } catch (error) {
+            throw new AppError('Database error while finding member', 500, 'DB_ERROR', error.message);
+        }
+    }
+
     async findById(memberId) {
         const connection = await db.getConnection();
         try {
@@ -50,7 +122,9 @@ class MemberRepository {
                     'proficiencyLevel', isk.proficiencyLevel,
                     'yearsOfExperience', isk.years_of_experience
                 )
-            ) AS skills
+            ) AS skills,
+            v.vendorId AS vendorId,
+            v.vendorName AS vendorName
 
         FROM member m
         INNER JOIN lookup l
@@ -63,6 +137,8 @@ class MemberRepository {
             ON isk.interviewerId = m.memberId
         LEFT JOIN lookup ls
             ON ls.lookupKey = isk.skillId
+        LEFT JOIN recruitmentVendor v
+            ON m.vendorId = v.vendorId
 
         WHERE m.isActive = TRUE AND m.memberId = ?
 
@@ -280,7 +356,9 @@ class MemberRepository {
                     'proficiencyLevel', isk.proficiencyLevel,
                     'yearsOfExperience', isk.years_of_experience
                 )
-            ) AS skills
+            ) AS skills,
+            v.vendorId AS vendorId,
+            v.vendorName AS vendorName
 
         FROM member m
         INNER JOIN lookup l
@@ -293,6 +371,8 @@ class MemberRepository {
             ON isk.interviewerId = m.memberId
         LEFT JOIN lookup ls
             ON ls.lookupKey = isk.skillId
+        LEFT JOIN recruitmentVendor v
+            ON m.vendorId = v.vendorId
 
         WHERE m.isActive = TRUE
 
@@ -378,8 +458,8 @@ class MemberRepository {
         const connection = client || await db.getConnection();
         try {
             const [result] = await connection.execute(
-                `INSERT INTO member (memberName, memberContact, email, password, designation, isRecruiter,isInterviewer)
-                 VALUES (?, ?, ?, ?, ?, ?,?)`,
+                `INSERT INTO member (memberName, memberContact, email, password, designation, isRecruiter,isInterviewer,vendorId)
+                 VALUES (?, ?, ?, ?, ?, ?,?,?)`,
                 [
                     memberData.memberName,
                     memberData.memberContact,
@@ -388,6 +468,7 @@ class MemberRepository {
                     memberData.designation,
                     memberData.isRecruiter || false,
                     memberData.isInterviewer || false,
+                    memberData.vendorId || null
                 ]
             );
             return await this.findById(result.insertId);
@@ -426,7 +507,7 @@ class MemberRepository {
             }
 
             const allowedFields = [
-                'memberName', 'memberContact', 'email', 'designation', 'isRecruiter', 'locationId', 'clientId', 'organisation', 'isInterviewer', 'interviewerCapacity'
+                'memberName', 'memberContact', 'email', 'designation', 'isRecruiter', 'locationId', 'clientId', 'organisation', 'isInterviewer', 'interviewerCapacity', 'vendorId'
             ];
 
             const filteredData = {};
@@ -438,6 +519,10 @@ class MemberRepository {
 
             if (Object.keys(filteredData).length === 0) {
                 throw new AppError('No valid fields to update', 400, 'NO_VALID_FIELDS');
+            }
+
+            if (filteredData.vendorId && filteredData.isRecruiter === false) {
+                filteredData.vendorId = null;
             }
 
             const fields = Object.keys(filteredData);

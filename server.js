@@ -88,6 +88,7 @@ async function startServer() {
         const memberRoutes = require('./routes/memberRoutes');
         const locationRoutes = require('./routes/locationRoutes');
         const interviewRoutes = require('./routes/interviewRoutes');
+        const vendorRoutes = require('./routes/vendorRoutes');
         const db = require('./db');
         const JobProfileValidator = require('./validators/jobProfileValidator');
         const AuthValidator = require('./validators/authValidator');
@@ -293,6 +294,7 @@ async function startServer() {
         app.use('/member', memberRoutes);
         app.use('/location', locationRoutes);
         app.use('/interview', interviewRoutes);
+        app.use('/vendor', vendorRoutes);
 
         app.use(globalErrorHandler);
         app.use((err, req, res, next) => {

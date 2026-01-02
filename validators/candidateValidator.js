@@ -242,9 +242,8 @@ const candidateSchemas = {
         contactNumber: Joi.string()
             .trim()
             .pattern(/^[+]?[\d\s()-]{7,25}$/)
-            .required()
+            .optional()
             .messages({
-                'string.empty': 'Contact number is required',
                 'string.pattern.base': 'Contact number must be a valid phone number (7-25 characters, numbers, spaces, +, -, () allowed)'
             }),
 
@@ -253,9 +252,8 @@ const candidateSchemas = {
             .email()
             .max(255)
             .lowercase()
-            .required()
+            .optional()
             .messages({
-                'string.empty': 'Email is required',
                 'string.email': 'Email must be a valid email address',
                 'string.max': 'Email cannot exceed 255 characters'
             }),
@@ -316,26 +314,24 @@ const candidateSchemas = {
             .integer()
             .min(0)
             .max(10000000)
-            .required()
+            .optional()
             .messages({
                 'number.base': 'Current CTC must be a number',
                 'number.integer': 'Current CTC must be a whole number',
                 'number.min': 'Current CTC cannot be negative',
                 'number.max': 'Current CTC cannot exceed 1,00,00,000',
-                'any.required': 'Current CTC is required'
             }),
 
         expectedCTC: Joi.number()
             .integer()
             .min(0)
             .max(10000000)
-            .required()
+            .optional()
             .messages({
                 'number.base': 'Expected CTC must be a number',
                 'number.integer': 'Expected CTC must be a whole number',
                 'number.min': 'Expected CTC cannot be negative',
                 'number.max': 'Expected CTC cannot exceed 1,00,00,000',
-                'any.required': 'Expected CTC is required'
             }),
 
         noticePeriod: Joi.number()
@@ -638,6 +634,21 @@ class CandidateValidator {
         CandidateValidator.helper = new CandidateValidatorHelper(db);
     }
 
+    static removeNulls(obj) {
+        if (!obj || typeof obj !== 'object') return;
+
+        Object.keys(obj).forEach(key => {
+            if (obj[key] === null) {
+                delete obj[key];
+            } else if (typeof obj[key] === 'object' && !Array.isArray(obj[key])) {
+                CandidateValidator.removeNulls(obj[key]);
+                if (Object.keys(obj[key]).length === 0) {
+                    delete obj[key];
+                }
+            }
+        });
+    }
+
     static async validateCreate(req, res, next) {
         try {
             const { error, value } = candidateSchemas.create.validate(req.body, {
@@ -717,7 +728,7 @@ class CandidateValidator {
             }
 
             // Check for duplicates
-            if (await CandidateValidator.helper.checkEmailExists(value.email)) {
+            if (value.email && await CandidateValidator.helper.checkEmailExists(value.email)) {
                 // Cleanup S3 file
                 if (req.file && req.file.key) {
                     const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
@@ -730,7 +741,7 @@ class CandidateValidator {
                 throw new AppError('A candidate with this email already exists', 409, 'DUPLICATE_EMAIL', { field: 'email' });
             }
 
-            if (await CandidateValidator.helper.checkContactExists(value.contactNumber)) {
+            if (value.contactNumber && await CandidateValidator.helper.checkContactExists(value.contactNumber)) {
                 // Cleanup S3 file
                 if (req.file && req.file.key) {
                     const { S3Client, DeleteObjectCommand } = require('@aws-sdk/client-s3');
@@ -752,6 +763,7 @@ class CandidateValidator {
 
     static async validateUpdate(req, res, next) {
         try {
+            CandidateValidator.removeNulls(req.body);
             // Validate params
             const { error: paramsError } = candidateSchemas.params.validate(req.params, { abortEarly: false });
 

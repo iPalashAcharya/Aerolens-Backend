@@ -20,6 +20,14 @@ router.get('/',
     memberController.getAll
 );
 
+router.get('/form-data',
+    memberController.getFormData
+);
+
+router.get('/create-data',
+    memberController.getCreateData
+);
+
 router.patch('/:memberId',
     MemberValidator.validateUpdate,
     memberController.updateMember
