@@ -1,5 +1,6 @@
 const Joi = require('joi');
 const AppError = require('../utils/appError');
+const { removeNulls } = require('../utils/normaliseNull');
 
 const vendorSchemas = {
     create: Joi.object({
@@ -97,6 +98,7 @@ class VendorValidator {
     }
 
     static validateUpdate(req, res, next) { //validates both request body and route params, Aggregates errors from both validations into a single details array.
+        removeNulls(req.body);
         const { value, error: bodyError } = vendorSchemas.update.validate(req.body, { abortEarly: false }); //abortEarly false gathers all the validation errors instead of stopping at the first one
         const { error: paramsError } = vendorSchemas.params.validate(req.params, { abortEarly: false });
 

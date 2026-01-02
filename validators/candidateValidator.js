@@ -2,6 +2,7 @@ const Joi = require('joi');
 const AppError = require('../utils/appError');
 const path = require('path');
 const fs = require('fs');
+const { removeNulls } = require('../utils/normaliseNull');
 
 // Database helper class for lookups
 class CandidateValidatorHelper {
@@ -527,7 +528,6 @@ const candidateSchemas = {
             .optional()
             .messages({
                 'number.base': 'Current CTC must be a number',
-                'number.integer': 'Current CTC must be a whole number',
                 'number.min': 'Current CTC cannot be negative',
                 'number.max': 'Current CTC cannot exceed 1,00,00,000'
             }),
@@ -539,7 +539,6 @@ const candidateSchemas = {
             .optional()
             .messages({
                 'number.base': 'Expected CTC must be a number',
-                'number.integer': 'Expected CTC must be a whole number',
                 'number.min': 'Expected CTC cannot be negative',
                 'number.max': 'Expected CTC cannot exceed 1,00,00,000'
             }),
@@ -563,7 +562,6 @@ const candidateSchemas = {
             .optional()
             .messages({
                 'number.base': 'Experience years must be a number',
-                'number.integer': 'Experience years must be a whole number',
                 'number.min': 'Experience years cannot be negative',
                 'number.max': 'Experience years cannot exceed 50'
             }),
@@ -671,21 +669,6 @@ class CandidateValidator {
 
     static init(db) {
         CandidateValidator.helper = new CandidateValidatorHelper(db);
-    }
-
-    static removeNulls(obj) {
-        if (!obj || typeof obj !== 'object') return;
-
-        Object.keys(obj).forEach(key => {
-            if (obj[key] === null) {
-                delete obj[key];
-            } else if (typeof obj[key] === 'object' && !Array.isArray(obj[key])) {
-                CandidateValidator.removeNulls(obj[key]);
-                if (Object.keys(obj[key]).length === 0) {
-                    delete obj[key];
-                }
-            }
-        });
     }
 
     static async validateCreate(req, res, next) {
@@ -806,7 +789,7 @@ class CandidateValidator {
 
     static async validateUpdate(req, res, next) {
         try {
-            CandidateValidator.removeNulls(req.body);
+            removeNulls(req.body);
             // Validate params
             const { error: paramsError } = candidateSchemas.params.validate(req.params, { abortEarly: false });
 

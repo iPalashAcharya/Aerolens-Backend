@@ -1,5 +1,6 @@
 const Joi = require('joi');
 const AppError = require('../utils/appError');
+const { removeNulls } = require('../utils/normaliseNull');
 
 const ADDRESS_REGEX = /^(?:[A-Z0-9]{4,8}\+[A-Z0-9]{2,3},\s*)?[\w\s\.\#\/-]+(?:,\s*[\w\s\.-]+){1,}$/i;
 
@@ -125,6 +126,7 @@ class ClientValidator {
     }
 
     static validateUpdate(req, res, next) {
+        removeNulls(req.body);
         const { value, error: bodyError } = clientSchemas.update.validate(req.body, { abortEarly: false });
         const { error: paramsError } = clientSchemas.params.validate(req.params, { abortEarly: false });
 

@@ -1,5 +1,6 @@
 const Joi = require('joi');
 const AppError = require('../utils/appError');
+const { removeNulls } = require('../utils/normaliseNull');
 
 const lookupSchemas = {
     create: Joi.object({
@@ -102,6 +103,7 @@ class LookupValidator {
     }
 
     static validateUpdate(req, res, next) {
+        removeNulls(req.body);
         const { value, error } = lookupSchemas.update.validate(req.body, { abortEarly: false, stripUnknown: true });
         if (error) {
             const details = error.details.map(detail => ({

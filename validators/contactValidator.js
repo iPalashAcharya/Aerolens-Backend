@@ -1,5 +1,6 @@
 const Joi = require('joi');
 const AppError = require('../utils/appError');
+const { removeNulls } = require('../utils/normaliseNull');
 
 const contactSchemas = {
     create: Joi.object({
@@ -135,6 +136,7 @@ class ContactValidator {
     }
 
     static validateUpdate(req, res, next) {
+        removeNulls(req.body);
         const { value, error: bodyError } = contactSchemas.update.validate(req.body, { abortEarly: false });
         const { error: paramsError } = contactSchemas.params.validate(req.params, { abortEarly: false });
 

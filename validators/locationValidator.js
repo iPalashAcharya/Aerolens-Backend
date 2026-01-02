@@ -1,5 +1,6 @@
 const Joi = require('joi');
 const AppError = require('../utils/appError');
+const { removeNulls } = require('../utils/normaliseNull');
 
 const locationSchemas = {
     create: Joi.object({
@@ -105,6 +106,7 @@ class LocationValidator {
     }
 
     static validateUpdate(req, res, next) {
+        removeNulls(req.body);
         const { value, error } = locationSchemas.update.validate(req.body, { abortEarly: false, stripUnknown: true });
         if (error) {
             const details = error.details.map(detail => ({

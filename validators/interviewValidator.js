@@ -1,5 +1,6 @@
 const Joi = require('joi');
 const AppError = require('../utils/appError');
+const { removeNulls } = require('../utils/normaliseNull');
 
 const interviewSchemas = {
     create: Joi.object({
@@ -328,6 +329,7 @@ class InterviewValidator {
     }
 
     static validateUpdate(req, res, next) {
+        removeNulls(req.body);
         const { value, error } = interviewSchemas.update.validate(req.body, {
             abortEarly: false,
             stripUnknown: true

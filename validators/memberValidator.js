@@ -1,5 +1,6 @@
 const Joi = require('joi');
 const AppError = require('../utils/appError');
+const { removeNulls } = require('../utils/normaliseNull');
 
 class MemberValidatorHelper {
     constructor(db) {
@@ -446,6 +447,7 @@ class MemberValidator {
 
     static async validateUpdate(req, res, next) {
         try {
+            removeNulls(req.body);
             const { value, error: bodyError } = memberSchema.update.validate(req.body, {
                 abortEarly: false,
                 stripUnknown: true

@@ -1,5 +1,6 @@
 const Joi = require('joi');
 const AppError = require('../utils/appError');
+const { removeNulls } = require('../utils/normaliseNull');
 class JobProfileValidatorHelper {
     constructor(db) {
         this.db = db;
@@ -454,6 +455,7 @@ class JobProfileValidator {
 
     static async validateUpdate(req, res, next) {
         try {
+            removeNulls(req.body);
             // Validate params
             const { error: paramsError } = jobProfileSchemas.params.validate(req.params, { abortEarly: false });
 
