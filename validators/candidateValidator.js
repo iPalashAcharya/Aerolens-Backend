@@ -99,7 +99,7 @@ class CandidateValidatorHelper {
         }
     }
 
-    async getRecruiterId(recruiterName, client = null) {
+    /*async getRecruiterId(recruiterName, client = null) {
         this._resetCacheIfNeeded();
         if (!recruiterName) return null;
         const connection = client || await this.db.getConnection();
@@ -136,7 +136,7 @@ class CandidateValidatorHelper {
                 connection.release();
             }
         }
-    }
+    }*/
 
     async transformLocation(locationName, client = null) {
         this._resetCacheIfNeeded();
@@ -766,10 +766,10 @@ class CandidateValidator {
                 value.statusId = await CandidateValidator.helper.getStatusIdByName('interview pending');
             }
 
-            if (value.recruiterName) {
+            /*if (value.recruiterName) {
                 value.recruiterId = await CandidateValidator.helper.getRecruiterId(value.recruiterName);
                 delete value.recruiterName;
-            }
+            }*/
 
             // Check for duplicates
             if (value.email && await CandidateValidator.helper.checkEmailExists(value.email)) {
@@ -905,10 +905,10 @@ class CandidateValidator {
                 value.statusId = await CandidateValidator.helper.getStatusIdByName(value.status);
                 delete value.status;
             }
-            if (value.recruiterName) {
+            /*if (value.recruiterName) {
                 value.recruiterId = await CandidateValidator.helper.getRecruiterId(value.recruiterName);
                 delete value.recruiterName;
-            }
+            }*/
 
             // Check for duplicates (excluding current candidate)
             if (value.email && await CandidateValidator.helper.checkEmailExists(value.email, candidateId)) {

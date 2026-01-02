@@ -2482,7 +2482,7 @@ Content-Type: multipart/form-data
 | candidateName      | String      | Candidate full name (required)                            |
 | contactNumber      | String      | Phone number (optional)                                   |
 | email              | String      | Email address (optional)                                  |
-| recruiterName      | String      | Recruiter name (required) [must be in member table]       |
+| recruiterId        | Number      | Recruiter ID (required) [must be in member table]         |
 | jobRole            | String      | Job title (required)                                      |
 | expectedLocation   | JSON Object | must be a json object with city and country attributes    |
 | currentCTC         | Number      | Current CTC in INR [supports decimals ie 12.5] (optional) |
