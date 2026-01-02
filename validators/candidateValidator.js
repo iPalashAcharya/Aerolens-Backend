@@ -634,6 +634,21 @@ class CandidateValidator {
         CandidateValidator.helper = new CandidateValidatorHelper(db);
     }
 
+    static removeNulls(obj) {
+        if (!obj || typeof obj !== 'object') return;
+
+        Object.keys(obj).forEach(key => {
+            if (obj[key] === null) {
+                delete obj[key];
+            } else if (typeof obj[key] === 'object' && !Array.isArray(obj[key])) {
+                CandidateValidator.removeNulls(obj[key]);
+                if (Object.keys(obj[key]).length === 0) {
+                    delete obj[key];
+                }
+            }
+        });
+    }
+
     static async validateCreate(req, res, next) {
         try {
             const { error, value } = candidateSchemas.create.validate(req.body, {
@@ -748,6 +763,7 @@ class CandidateValidator {
 
     static async validateUpdate(req, res, next) {
         try {
+            CandidateValidator.removeNulls(req.body);
             // Validate params
             const { error: paramsError } = candidateSchemas.params.validate(req.params, { abortEarly: false });
 
