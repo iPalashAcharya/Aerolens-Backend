@@ -51,8 +51,8 @@ class CandidateRepository {
         const connection = client;
         console.log(candidateData);
         try {
-            const query = `INSERT INTO candidate(candidateName,contactNumber,email,recruiterId,jobRole,preferredJobLocation,currentCTC,expectedCTC,noticePeriod,experienceYears,linkedinProfileUrl,statusId, resumeFilename, resumeOriginalName, resumeUploadDate,notes)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`
+            const query = `INSERT INTO candidate(candidateName,contactNumber,email,recruiterId,jobRole,expectedLocation,currentLocation,currentCTC,expectedCTC,noticePeriod,experienceYears,linkedinProfileUrl,statusId, resumeFilename, resumeOriginalName, resumeUploadDate,notes)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`
 
             const [result] = await connection.execute(query, [
                 candidateData.candidateName,
@@ -60,7 +60,8 @@ class CandidateRepository {
                 candidateData.email ?? null,
                 candidateData.recruiterId,
                 candidateData.jobRole,
-                candidateData.preferredJobLocation !== undefined ? candidateData.preferredJobLocation : null,
+                candidateData.expectedLocation !== undefined ? candidateData.expectedLocation : null,
+                candidateData.currentLocation !== undefined ? candidateData.currentLocation : null,
                 candidateData.currentCTC ?? null,
                 candidateData.expectedCTC ?? null,
                 candidateData.noticePeriod,
@@ -91,7 +92,10 @@ class CandidateRepository {
             }
 
             const query = `
-            SELECT c.candidateId,c.candidateName,c.contactNumber,c.email,c.recruiterId,m.memberName AS recruiterName,m.memberContact AS recruiterContact,m.email AS recruiterEmail,c.jobRole,COALESCE((SELECT JSON_OBJECT('country',loc.country,'city',loc.cityName) FROM location loc WHERE loc.locationId = c.preferredJobLocation)) AS preferredJobLocation,c.currentCTC,c.expectedCTC,c.noticePeriod,c.experienceYears,c.linkedinProfileUrl,stat.value AS statusName, c.resumeFilename, c.resumeOriginalName, c.resumeUploadDate,c.notes
+            SELECT c.candidateId,c.candidateName,c.contactNumber,c.email,c.recruiterId,m.memberName AS recruiterName,m.memberContact AS recruiterContact,m.email AS recruiterEmail,c.jobRole,
+            COALESCE((SELECT JSON_OBJECT('country',loc.country,'city',loc.cityName) FROM location loc WHERE loc.locationId = c.expectedLocation)) AS expectedLocation,
+            COALESCE((SELECT JSON_OBJECT('country',loc.country,'city',loc.cityName) FROM location loc WHERE loc.locationId = c.currentLocation)) AS currentLocation,
+            c.currentCTC,c.expectedCTC,c.noticePeriod,c.experienceYears,c.linkedinProfileUrl,stat.value AS statusName, c.resumeFilename, c.resumeOriginalName, c.resumeUploadDate,c.notes
             FROM candidate c
             LEFT JOIN lookup stat ON c.statusId= stat.lookupKey AND stat.tag = 'candidateStatus'
             LEFT JOIN member m on m.memberId = c.recruiterId
@@ -100,9 +104,20 @@ class CandidateRepository {
 
             const [rows] = await connection.execute(query, [candidateId]);
             rows.forEach(row => {
-                if (typeof row.preferredJobLocation === 'string') {
-                    row.preferredJobLocation = JSON.parse(row.preferredJobLocation);
+                if (typeof row.expectedLocation === 'string') {
+                    row.expectedLocation = JSON.parse(row.expectedLocation);
                 }
+                if (typeof row.currentLocation === 'string') {
+                    row.currentLocation = JSON.parse(row.currentLocation);
+                }
+                row.currentCTC =
+                    row.currentCTC !== null ? Number(row.currentCTC) : null;
+
+                row.expectedCTC =
+                    row.expectedCTC !== null ? Number(row.expectedCTC) : null;
+
+                row.experienceYears =
+                    row.experienceYears !== null ? Number(row.experienceYears) : null;
             });
             return rows[0] || null;
         } catch (error) {
@@ -359,7 +374,7 @@ class CandidateRepository {
             // Filter only allowed fields for security
             const allowedFields = [
                 'candidateName', 'contactNumber', 'email', 'recruiterId',
-                'jobRole', 'preferredJobLocation', 'currentCTC', 'expectedCTC', 'noticePeriod', 'experienceYears', 'linkedinProfileUrl', 'statusId', 'resume', 'notes'
+                'jobRole', 'expectedLocation', 'currentLocation', 'currentCTC', 'expectedCTC', 'noticePeriod', 'experienceYears', 'linkedinProfileUrl', 'statusId', 'resume', 'notes'
             ];
 
             const filteredData = {};
@@ -481,7 +496,10 @@ class CandidateRepository {
 
         try {
             let query = `
-            SELECT c.candidateId,c.candidateName,c.contactNumber,c.email,c.recruiterId,m.memberName AS recruiterName,m.memberContact AS recruiterContact,m.email AS recruiterEmail,c.jobRole,COALESCE((SELECT JSON_OBJECT('country',loc.country,'city',loc.cityName) FROM location loc WHERE loc.locationId = c.preferredJobLocation)) AS preferredJobLocation,c.currentCTC,c.expectedCTC,c.noticePeriod,c.experienceYears,c.linkedinProfileUrl,stat.value AS statusName, c.resumeFilename, c.resumeOriginalName, c.resumeUploadDate,c.notes
+            SELECT c.candidateId,c.candidateName,c.contactNumber,c.email,c.recruiterId,m.memberName AS recruiterName,m.memberContact AS recruiterContact,m.email AS recruiterEmail,c.jobRole,
+            COALESCE((SELECT JSON_OBJECT('country',loc.country,'city',loc.cityName) FROM location loc WHERE loc.locationId = c.expectedLocation)) AS expectedLocation,
+            COALESCE((SELECT JSON_OBJECT('country',loc.country,'city',loc.cityName) FROM location loc WHERE loc.locationId = c.currentLocation)) AS currentLocation,
+            c.currentCTC,c.expectedCTC,c.noticePeriod,c.experienceYears,c.linkedinProfileUrl,stat.value AS statusName, c.resumeFilename, c.resumeOriginalName, c.resumeUploadDate,c.notes
             FROM candidate c
             LEFT JOIN lookup stat ON c.statusId= stat.lookupKey AND stat.tag = 'candidateStatus'
             LEFT JOIN member m on m.memberId = c.recruiterId
@@ -500,9 +518,20 @@ class CandidateRepository {
 
             const [rows] = await connection.execute(query, params);
             rows.forEach(row => {
-                if (typeof row.preferredJobLocation === 'string') {
-                    row.preferredJobLocation = JSON.parse(row.preferredJobLocation);
+                if (typeof row.expectedLocation === 'string') {
+                    row.expectedLocation = JSON.parse(row.expectedLocation);
                 }
+                if (typeof row.currentLocation === 'string') {
+                    row.currentLocation = JSON.parse(row.currentLocation);
+                }
+                row.currentCTC =
+                    row.currentCTC !== null ? Number(row.currentCTC) : null;
+
+                row.expectedCTC =
+                    row.expectedCTC !== null ? Number(row.expectedCTC) : null;
+
+                row.experienceYears =
+                    row.experienceYears !== null ? Number(row.experienceYears) : null;
             });
             return rows;
         } catch (error) {

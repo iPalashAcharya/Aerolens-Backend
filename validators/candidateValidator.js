@@ -289,7 +289,27 @@ const candidateSchemas = {
                 'string.max': 'Job role cannot exceed 100 characters'
             }),
 
-        preferredJobLocation: Joi.object({
+        currentLocation: Joi.object({
+            country: Joi.string()
+                .trim()
+                .lowercase()
+                .required()
+                .messages({
+                    "string.base": "Location's country must be a string",
+                }),
+            city: Joi.string()
+                .trim()
+                .min(2)
+                .max(100)
+                .required()
+                .messages({
+                    "string.min": "Location's city must be at least 2 characters long",
+                    "string.max": "Location's city cannot exceed 100 characters",
+                }),
+        }).optional().messages({
+            "object.unknown": "Invalid location object structure",
+        }),
+        expectedLocation: Joi.object({
             country: Joi.string()
                 .trim()
                 .lowercase()
@@ -311,7 +331,7 @@ const candidateSchemas = {
             "object.unknown": "Invalid location object structure",
         }),
         currentCTC: Joi.number()
-            .integer()
+            .precision(2)
             .min(0)
             .max(10000000)
             .optional()
@@ -323,7 +343,7 @@ const candidateSchemas = {
             }),
 
         expectedCTC: Joi.number()
-            .integer()
+            .precision(2)
             .min(0)
             .max(10000000)
             .optional()
@@ -348,7 +368,7 @@ const candidateSchemas = {
             }),
 
         experienceYears: Joi.number()
-            .integer()
+            .precision(2)
             .min(0)
             .max(50)
             .required()
@@ -458,11 +478,11 @@ const candidateSchemas = {
                 'string.max': 'Job role cannot exceed 100 characters'
             }),
 
-        preferredJobLocation: Joi.object({
+        currentLocation: Joi.object({
             country: Joi.string()
                 .trim()
                 .lowercase()
-                .optional()
+                .required()
                 .messages({
                     "string.empty": "Location's country is required",
                     "string.base": "Location's country must be a string",
@@ -471,18 +491,37 @@ const candidateSchemas = {
                 .trim()
                 .min(2)
                 .max(100)
-                .optional()
+                .required()
                 .messages({
                     "string.min": "Location's city must be at least 2 characters long",
                     "string.max": "Location's city cannot exceed 100 characters",
                 }),
-        }).min(1).optional().messages({
-            "object.min": "At least one field (country or city) must be provided in location",
+        }).optional().messages({
             "object.unknown": "Invalid location object structure",
         }),
-
+        expectedLocation: Joi.object({
+            country: Joi.string()
+                .trim()
+                .lowercase()
+                .required()
+                .messages({
+                    "string.empty": "Location's country is required",
+                    "string.base": "Location's country must be a string",
+                }),
+            city: Joi.string()
+                .trim()
+                .min(2)
+                .max(100)
+                .required()
+                .messages({
+                    "string.min": "Location's city must be at least 2 characters long",
+                    "string.max": "Location's city cannot exceed 100 characters",
+                }),
+        }).optional().messages({
+            "object.unknown": "Invalid location object structure",
+        }),
         currentCTC: Joi.number()
-            .integer()
+            .precision(2)
             .min(0)
             .max(10000000)
             .optional()
@@ -494,7 +533,7 @@ const candidateSchemas = {
             }),
 
         expectedCTC: Joi.number()
-            .integer()
+            .precision(2)
             .min(0)
             .max(10000000)
             .optional()
@@ -518,7 +557,7 @@ const candidateSchemas = {
             }),
 
         experienceYears: Joi.number()
-            .integer()
+            .precision(2)
             .min(0)
             .max(50)
             .optional()
@@ -710,8 +749,12 @@ class CandidateValidator {
             }
 
             // Transform location
-            if (value.preferredJobLocation) {
-                value.preferredJobLocation = await CandidateValidator.helper.transformLocation(value.preferredJobLocation);
+            if (value.expectedLocation) {
+                value.expectedLocation = await CandidateValidator.helper.transformLocation(value.expectedLocation);
+            }
+
+            if (value.currentLocation) {
+                value.currentLocation = await CandidateValidator.helper.transformLocation(value.currentLocation);
             }
 
             // Transform status
@@ -848,8 +891,12 @@ class CandidateValidator {
             const candidateId = req.params.id;
 
             // Transform location
-            if (value.preferredJobLocation) {
-                value.preferredJobLocation = await CandidateValidator.helper.transformLocation(value.preferredJobLocation);
+            if (value.expectedLocation) {
+                value.expectedLocation = await CandidateValidator.helper.transformLocation(value.expectedLocation);
+            }
+
+            if (value.currentLocation) {
+                value.currentLocation = await CandidateValidator.helper.transformLocation(value.currentLocation);
             }
 
             // Transform status
