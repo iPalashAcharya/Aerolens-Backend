@@ -259,7 +259,7 @@ const candidateSchemas = {
                 'string.max': 'Email cannot exceed 255 characters'
             }),
 
-        recruiterName: Joi.string()
+        /*recruiterName: Joi.string()
             .trim()
             .min(2)
             .max(100)
@@ -271,12 +271,21 @@ const candidateSchemas = {
                     return helpers.error("any.invalid");
                 }
                 return value;
-            })*/
+            })
             .messages({
                 'string.empty': 'Recruiter name is required',
                 'string.min': 'Recruiter name must be at least 2 characters long',
                 'string.max': 'Recruiter name cannot exceed 100 characters',
                 'string.pattern.base': 'Recruiter name can only contain letters, spaces, periods, hyphens and apostrophes'
+            }),*/
+        recruiterId: Joi.number()
+            .integer()
+            .positive()
+            .required()
+            .messages({
+                'number.base': 'Recruiter ID must be a number',
+                'number.integer': 'Recruiter ID must be an integer',
+                'number.positive': 'Recruiter ID must be positive'
             }),
 
         jobRole: Joi.string()
@@ -457,7 +466,7 @@ const candidateSchemas = {
                 'string.max': 'Email cannot exceed 255 characters'
             }),
 
-        recruiterName: Joi.string()
+        /*recruiterName: Joi.string()
             .trim()
             .min(2)
             .max(100)
@@ -467,6 +476,15 @@ const candidateSchemas = {
                 'string.min': 'Recruiter name must be at least 2 characters long',
                 'string.max': 'Recruiter name cannot exceed 100 characters',
                 'string.pattern.base': 'Recruiter name can only contain letters, spaces, periods, hyphens and apostrophes'
+            }),*/
+        recruiterId: Joi.number()
+            .integer()
+            .positive()
+            .required()
+            .messages({
+                'number.base': 'Recruiter ID must be a number',
+                'number.integer': 'Recruiter ID must be an integer',
+                'number.positive': 'Recruiter ID must be positive'
             }),
 
         jobRole: Joi.string()
@@ -919,7 +937,7 @@ class CandidateValidator {
                 throw new AppError('A candidate with this contact number already exists', 409, 'DUPLICATE_CONTACT', { field: 'contactNumber' });
             }
 
-            req.body = value;  // ✅ Now this will be {} if only file uploaded
+            req.body = value;
             next();
         } catch (error) {
             next(error);
