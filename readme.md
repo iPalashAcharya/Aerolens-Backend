@@ -2338,6 +2338,8 @@ GET /candidate
 GET /candidate/:id
 
 **Response:**
+
+```json
 {
 "success": true,
 "message": "Candidate retrieved successfully",
@@ -2351,7 +2353,11 @@ GET /candidate/:id
 "recruiterContact": "+91-9876543210",
 "recruiterEmail": "palash.acharya@aerolens.in",
 "jobRole": "SDE-2",
-"preferredJobLocation":{
+"expectedLocation":{
+"city":"Ahemedabad",
+"country":"India"
+},
+"currentLocation":{
 "city":"Ahemedabad",
 "country":"India"
 }
@@ -2366,6 +2372,7 @@ GET /candidate/:id
 "resumeUploadDate": "2025-11-21T06:35:46.000Z"
 }
 }
+```
 
 ---
 
@@ -2374,90 +2381,93 @@ GET /candidate/:id
 GET /candidate/create-data
 
 **Response:**
+
+```json
 {
-"success": true,
-"message": "Interview Form Data retrieved successfully",
-"data": {
-"recruiters": [
-{
-"recruiterId": 1,
-"recruiterName": "Palash Acharya"
-},
-{
-"recruiterId": 420,
-"recruiterName": "Jaival Suthar"
-},
-{
-"recruiterId": 445,
-"recruiterName": "Bhavin Trivedi"
-},
-{
-"recruiterId": 447,
-"recruiterName": "Random User"
-},
-{
-"recruiterId": 454,
-"recruiterName": "Test User"
-},
-{
-"recruiterId": 455,
-"recruiterName": "Testing New Field"
+  "success": true,
+  "message": "Interview Form Data retrieved successfully",
+  "data": {
+    "recruiters": [
+      {
+        "recruiterId": 1,
+        "recruiterName": "Palash Acharya"
+      },
+      {
+        "recruiterId": 420,
+        "recruiterName": "Jaival Suthar"
+      },
+      {
+        "recruiterId": 445,
+        "recruiterName": "Bhavin Trivedi"
+      },
+      {
+        "recruiterId": 447,
+        "recruiterName": "Random User"
+      },
+      {
+        "recruiterId": 454,
+        "recruiterName": "Test User"
+      },
+      {
+        "recruiterId": 455,
+        "recruiterName": "Testing New Field"
+      }
+    ],
+    "status": [
+      {
+        "lookupKey": 8,
+        "value": "Selected"
+      },
+      {
+        "lookupKey": 9,
+        "value": "Interview pending"
+      },
+      {
+        "lookupKey": 10,
+        "value": "Rejected"
+      }
+    ],
+    "locations": [
+      {
+        "locationId": 1,
+        "city": "Ahmedabad",
+        "country": "India",
+        "state": "Gujarat"
+      },
+      {
+        "locationId": 2,
+        "city": "Bangalore",
+        "country": "India",
+        "state": "Karnataka"
+      },
+      {
+        "locationId": 3,
+        "city": "Mountain View",
+        "country": "United States",
+        "state": "California"
+      },
+      {
+        "locationId": 4,
+        "city": "San Francisco",
+        "country": "United States",
+        "state": "California"
+      },
+      {
+        "locationId": 6,
+        "city": "Hyderabad",
+        "country": "India",
+        "state": "Telangana"
+      },
+      {
+        "locationId": 8,
+        "city": "Vancouver",
+        "country": "Canada",
+        "state": "British Columbia"
+      }
+    ]
+  }
 }
-],
-"status": [
-{
-"lookupKey": 8,
-"value": "Selected"
-},
-{
-"lookupKey": 9,
-"value": "Interview pending"
-},
-{
-"lookupKey": 10,
-"value": "Rejected"
-}
-],
-"locations": [
-{
-"locationId": 1,
-"city": "Ahmedabad",
-"country": "India",
-"state": "Gujarat"
-},
-{
-"locationId": 2,
-"city": "Bangalore",
-"country": "India",
-"state": "Karnataka"
-},
-{
-"locationId": 3,
-"city": "Mountain View",
-"country": "United States",
-"state": "California"
-},
-{
-"locationId": 4,
-"city": "San Francisco",
-"country": "United States",
-"state": "California"
-},
-{
-"locationId": 6,
-"city": "Hyderabad",
-"country": "India",
-"state": "Telangana"
-},
-{
-"locationId": 8,
-"city": "Vancouver",
-"country": "Canada",
-"state": "British Columbia"
-}
-]
-}
-}
+```
 
 ---
 
@@ -2467,42 +2477,45 @@ POST /candidate
 Content-Type: multipart/form-data
 **Request Body (form-data):**
 
-| Field                | Type        | Description                                            |
-| -------------------- | ----------- | ------------------------------------------------------ |
-| candidateName        | String      | Candidate full name (required)                         |
-| contactNumber        | String      | Phone number (optional)                                |
-| email                | String      | Email address (optional)                               |
-| recruiterName        | String      | Recruiter name (required) [must be in member table]    |
-| jobRole              | String      | Job title (required)                                   |
-| preferredJobLocation | JSON Object | must be a json object with city and country attributes |
-| currentCTC           | Number      | Current CTC in INR (optional)                          |
-| expectedCTC          | Number      | Expected CTC in INR (optional)                         |
-| noticePeriod         | Number      | Notice period in days (required)                       |
-| experienceYears      | Number      | Years of experience (required)                         |
-| linkedinProfileUrl   | String      | LinkedIn URL (optional)                                |
-| resume               | File        | PDF resume, max 5MB (optional)                         |
-| status               | String      | candidate status 50 characters (optional)              |
-| notes                | string      | notes about candidates (optional)                      |
+| Field              | Type        | Description                                               |
+| ------------------ | ----------- | --------------------------------------------------------- |
+| candidateName      | String      | Candidate full name (required)                            |
+| contactNumber      | String      | Phone number (optional)                                   |
+| email              | String      | Email address (optional)                                  |
+| recruiterName      | String      | Recruiter name (required) [must be in member table]       |
+| jobRole            | String      | Job title (required)                                      |
+| expectedLocation   | JSON Object | must be a json object with city and country attributes    |
+| currentCTC         | Number      | Current CTC in INR [supports decimals ie 12.5] (optional) |
+| expectedCTC        | Number      | Expected CTC in INR [supports decimal ie 12.5] (optional) |
+| noticePeriod       | Number      | Notice period in days (required)                          |
+| experienceYears    | Number      | Years of experience (required) [supports decimal]         |
+| linkedinProfileUrl | String      | LinkedIn URL (optional)                                   |
+| resume             | File        | PDF resume, max 5MB (optional)                            |
+| status             | String      | candidate status 50 characters (optional)                 |
+| notes              | string      | notes about candidates (optional)                         |
 
 **Response:**
+
+```json
 {
-"success": true,
-"message": "Candidate created successfully",
-"data": {
-"candidateId": 71,
-"candidateName": "Test Candidate",
-"contactNumber": "9998989876",
-"email": "testcandidate@example.com",
-"jobRole": "Java developer",
-"preferredJobLocation": 1,
-"currentCTC": 6,
-"expectedCTC": 9,
-"noticePeriod": 60,
-"experienceYears": 1,
-"recruiterId": 420,
-"createdOn": "2025-11-30T09:29:51.088Z"
+  "success": true,
+  "message": "Candidate created successfully",
+  "data": {
+    "candidateId": 71,
+    "candidateName": "Test Candidate",
+    "contactNumber": "9998989876",
+    "email": "testcandidate@example.com",
+    "jobRole": "Java developer",
+    "preferredJobLocation": 1,
+    "currentCTC": 6,
+    "expectedCTC": 9,
+    "noticePeriod": 60,
+    "experienceYears": 1,
+    "recruiterId": 420,
+    "createdOn": "2025-11-30T09:29:51.088Z"
+  }
 }
-}
+```
 
 ---
 
@@ -2512,23 +2525,29 @@ PATCH /candidate/:id
 Content-Type: multipart/form-data
 
 **Request Body (JSON) - fields to update:**
+
+```json
 {
-"jobRole": "Senior Backend Developer",
-"expectedCTC": 1500000,
-"status": "interview pending"
+  "jobRole": "Senior Backend Developer",
+  "expectedCTC": 1500000,
+  "status": "interview pending"
 }
+```
 
 **Response:**
+
+```json
 {
-"message": "Candidate updated successfully",
-"data": {
-"candidateId": 124,
-"candidateName": "Jane Smith",
-"jobRole": "Senior Backend Developer",
-"expectedCTC": 1500000,
-"statusName": "interview pending"
+  "message": "Candidate updated successfully",
+  "data": {
+    "candidateId": 124,
+    "candidateName": "Jane Smith",
+    "jobRole": "Senior Backend Developer",
+    "expectedCTC": 1500000,
+    "statusName": "interview pending"
+  }
 }
-}
+```
 
 ---
 
@@ -2537,11 +2556,14 @@ Content-Type: multipart/form-data
 DELETE /candidate/:id
 
 **Response:**
+
+```json
 {
-"success": true,
-"message": "Candidate deleted successfully",
-"data": null
+  "success": true,
+  "message": "Candidate deleted successfully",
+  "data": null
 }
+```
 
 ---
 
@@ -2557,16 +2579,19 @@ Content-Type: multipart/form-data
 | resume | File | PDF resume max 5MB |
 
 **Response:**
+
+```json
 {
-"message": "Resume uploaded successfully",
-"data": {
-"candidateId": 124,
-"filename": "candidate124_resume.pdf",
-"originalName": "Jane_Smith_Resume.pdf",
-"size": 450000,
-"uploadDate": "2025-09-25T10:45:00.000Z"
+  "message": "Resume uploaded successfully",
+  "data": {
+    "candidateId": 124,
+    "filename": "candidate124_resume.pdf",
+    "originalName": "Jane_Smith_Resume.pdf",
+    "size": 450000,
+    "uploadDate": "2025-09-25T10:45:00.000Z"
+  }
 }
-}
+```
 
 ---
 
@@ -2595,18 +2620,23 @@ GET /candidate/:id/resume/preview
 DELETE /candidate/:id/resume
 
 **Response:**
+
+```json
 {
-"message": "Resume deleted successfully"
+  "message": "Resume deleted successfully"
 }
+```
 
 ---
 
 ## Error Response Example
 
+```json
 {
-"error": "Candidate with ID 999 not found",
-"code": 404
+  "error": "Candidate with ID 999 not found",
+  "code": 404
 }
+```
 
 ---
 
