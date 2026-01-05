@@ -40,8 +40,8 @@ const contactSchemas = {
         phone: Joi.string()
             .trim()
             .pattern(/^[+]?[\d\s()-]{7,25}$/)
-            .optional()
-            .allow('', null)
+            .empty('')
+            .default(null)
             .messages({
                 'string.pattern.base': 'Contact number must be a valid phone number (7-25 characters, numbers, spaces, +, -, () allowed)'
             }),
@@ -50,8 +50,8 @@ const contactSchemas = {
             .email()
             .max(255)
             .lowercase()
-            .optional()
-            .empty('', null)
+            .empty('')
+            .default(null)
             .messages({
                 'string.email': 'Email must be a valid email address',
                 'string.max': 'Email cannot exceed 255 characters'
@@ -86,8 +86,9 @@ const contactSchemas = {
         phone: Joi.string()
             .trim()
             .pattern(/^[+]?[\d\s()-]{7,25}$/)
+            .empty('')
+            .default(null)
             .optional()
-            .allow('', null)
             .messages({
                 'string.pattern.base': 'Contact number must be a valid phone number (7-25 characters, numbers, spaces, +, -, () allowed)'
             }),
@@ -96,8 +97,9 @@ const contactSchemas = {
             .email()
             .max(255)
             .lowercase()
+            .empty('')
+            .default(null)
             .optional()
-            .allow('', null)
             .messages({
                 'string.email': 'Email must be a valid email address',
                 'string.max': 'Email cannot exceed 255 characters'

@@ -130,9 +130,9 @@ class ContactRepository {
             'ER_DUP_ENTRY': {
                 status: 409,
                 errorCode: "DUPLICATE_ENTRY",
-                message: "A client with this information already exists",
+                message: "A contact with this information already exists for the selected client",
                 details: {
-                    duplicateField: error.message.includes('clientName') ? 'name' : 'unknown'
+                    duplicateField: error.message.includes('contactName') ? 'name' : 'unknown'
                 }
             },
             'ER_DATA_TOO_LONG': {
