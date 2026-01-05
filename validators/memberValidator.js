@@ -549,10 +549,6 @@ class MemberValidator {
                 value.interviewerCapacity = null;
             }
 
-            if (value.isRecruiter === false) {
-                value.vendorId = null;
-            }
-
             req.body = value;
             next();
         } catch (err) {

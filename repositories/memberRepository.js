@@ -68,9 +68,21 @@ class MemberRepository {
                     'INVALID_VENDOR_ID'
                 );
             }
+
             return true;
+
         } catch (error) {
-            throw new AppError('Database error while finding member', 500, 'DB_ERROR', error.message);
+            // ✅ DO NOT WRAP AppError AGAIN
+            if (error instanceof AppError) {
+                throw error;
+            }
+
+            throw new AppError(
+                'Database error while validating vendor',
+                500,
+                'DB_ERROR',
+                { vendorId, originalError: error.message }
+            );
         }
     }
 

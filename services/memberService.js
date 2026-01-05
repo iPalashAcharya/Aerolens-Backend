@@ -106,13 +106,23 @@ class MemberService {
             await client.beginTransaction();
 
             const existingMember = await this.memberRepository.findById(memberId, client);
+            if (!existingMember) {
+                throw new AppError(
+                    `Member with ID ${memberId} does not exist`,
+                    404,
+                    "MEMBER_NOT_FOUND"
+                );
+            }
+
             const isCurrentlyRecruiter = existingMember.isRecruiter;
-            // Vendor can only be associated with recruiters
-            if (
-                updateData.vendorId != null &&   // catches only real values
-                !isCurrentlyRecruiter &&
-                updateData.isRecruiter !== true
-            ) {
+
+            const willBeRecruiter =
+                updateData.isRecruiter !== undefined
+                    ? updateData.isRecruiter
+                    : isCurrentlyRecruiter;
+
+            // ❌ vendor + non-recruiter is not allowed
+            if (updateData.vendorId != null && !willBeRecruiter) {
                 throw new AppError(
                     'Vendor can only be associated with recruiters',
                     400,
@@ -120,35 +130,25 @@ class MemberService {
                 );
             }
 
+            // Turning recruiter OFF → remove vendor
             if (updateData.isRecruiter === false) {
                 updateData.vendorId = null;
             }
 
-            if (
-                updateData.vendorId !== undefined &&
-                (isCurrentlyRecruiter || updateData.isRecruiter === true)
-            ) {
+            // Validate vendor if present
+            if (updateData.vendorId != null) {
                 await this.memberRepository.validateVendorExists(
                     updateData.vendorId,
                     client
                 );
             }
-            if (!existingMember) {
-                throw new AppError(
-                    `Member with ID ${memberId} does not exist`,
-                    404,
-                    "MEMBER_NOT_FOUND",
-                    {
-                        memberId,
-                        suggestion: "Please verify the Member ID and try again"
-                    }
-                );
-            }
 
+            // Interviewer capacity cleanup
             if (updateData.isInterviewer === false && existingMember.isInterviewer === true) {
                 updateData.interviewerCapacity = null;
             }
 
+            // Skills handling
             let skillsUpdateResult = null;
             if (updateData.skills !== undefined) {
                 const skillsData = updateData.skills;
@@ -159,8 +159,6 @@ class MemberService {
                     skillsData,
                     client
                 );
-
-                console.log(`Skills updated for member ${memberId}: ${skillsUpdateResult.skillsCount} skills`);
             }
 
             let updatedMember = existingMember;
