@@ -50,6 +50,23 @@ class MemberValidatorHelper {
         }
     }
 
+    normalizeEmptyStringsDeep(value) {
+        if (Array.isArray(value)) {
+            return value.map(v => this.normalizeEmptyStringsDeep(v));
+        }
+
+        if (value !== null && typeof value === 'object') {
+            for (const key of Object.keys(value)) {
+                value[key] = this.normalizeEmptyStringsDeep(value[key]);
+            }
+            return value;
+        }
+
+        if (value === '') return null;
+
+        return value;
+    }
+
     async transformSkills(skills, client = null) {
         this._resetCacheIfNeeded();
         if (!skills || !Array.isArray(skills)) return [];
@@ -104,7 +121,7 @@ class MemberValidatorHelper {
         }
     }
 
-    async transformDesignation(designation, client = null) {
+    /*async transformDesignation(designation, client = null) {
         this._resetCacheIfNeeded();
         if (!designation) return null;
         const cacheKey = designation.toLowerCase().trim();
@@ -140,6 +157,26 @@ class MemberValidatorHelper {
 
             return designationId;
 
+        } finally {
+            if (!client) connection.release();
+        }
+    }*/
+    async validateDesignationExists(designationId, client = null) {
+        const connection = client || await this.db.getConnection();
+        try {
+            const [rows] = await connection.execute(
+                `SELECT lookupKey FROM lookup WHERE lookupKey = ? AND tag='designation'`,
+                [designationId]
+            );
+
+            if (rows.length === 0) {
+                throw new AppError(
+                    `Designation with ID ${designationId} does not exist`,
+                    400,
+                    'INVALID_DESIGNATION_ID'
+                );
+            }
+            return designationId;
         } finally {
             if (!client) connection.release();
         }
@@ -302,6 +339,7 @@ const memberSchema = {
         memberName: Joi.string()
             .min(2)
             .max(100)
+            .allow(null, '')
             .trim()
             .messages({
                 'string.min': 'Name must be at least 2 characters',
@@ -310,6 +348,7 @@ const memberSchema = {
 
         memberContact: Joi.string()
             .pattern(/^[0-9+\-\s()]+$/)
+            .allow(null, '')
             .max(25)
             .messages({
                 'string.pattern.base': 'Invalid contact number format'
@@ -317,13 +356,14 @@ const memberSchema = {
 
         email: Joi.string()
             .email()
+            .allow(null, '')
             .lowercase()
             .trim()
             .messages({
                 'string.email': 'Please provide a valid email address'
             }),
 
-        designation: Joi.string()
+        /*designation: Joi.string()
             .lowercase()
             .trim()
             .min(2)
@@ -331,8 +371,16 @@ const memberSchema = {
             .messages({
                 'string.min': 'Designation must be at least 2 characters',
                 'string.max': 'Designation cannot exceed 100 characters'
+            }),*/
+        designationId: Joi.number()
+            .integer()
+            .positive()
+            .optional()
+            .allow(null)
+            .messages({
+                'number.base': 'Designation ID must be a number',
+                'number.positive': 'Designation ID must be a positive number'
             }),
-
         isRecruiter: Joi.boolean(),
 
         isInterviewer: Joi.boolean(),
@@ -340,6 +388,7 @@ const memberSchema = {
         clientId: Joi.number()
             .integer()
             .positive()
+            .allow(null)
             .messages({
                 'number.base': 'Client ID must be a number',
                 'number.integer': 'Client ID must be an integer',
@@ -350,7 +399,7 @@ const memberSchema = {
             .trim()
             .min(1)
             .max(255)
-            .allow('')
+            .allow(null, '')
             .messages({
                 'string.base': 'Organisation must be a string',
                 'string.min': 'Organisation cannot be empty',
@@ -369,7 +418,7 @@ const memberSchema = {
                     proficiencyLevel: Joi.string()
                         .trim()
                         .valid('Beginner', 'Intermediate', 'Advanced', 'Expert')
-                        .allow(null)
+                        .allow(null, '')
                         .default(null)
                         .messages({
                             'any.only': 'Proficiency level must be one of: Beginner, Intermediate, Advanced, Expert'
@@ -395,7 +444,7 @@ const memberSchema = {
 
         location: Joi.object({
             city: Joi.string().trim().min(1).max(255),
-            country: Joi.string().trim().min(1).max(255)
+            country: Joi.string().allow(null, '').trim().min(1).max(255)
         })
             .messages({
                 'object.base': 'Location must be an object with city and country'
@@ -403,6 +452,7 @@ const memberSchema = {
 
         interviewerCapacity: Joi.number()
             .integer()
+            .allow(null)
             .min(0)
             .messages({
                 'number.base': 'Interviewer capacity must be a number',
@@ -413,6 +463,7 @@ const memberSchema = {
             .integer()
             .positive()
             .optional()
+            .allow(null)
             .messages({
                 'number.base': 'Vendor ID must be a number',
                 'number.integer': 'Vendor ID must be an integer',
@@ -446,50 +497,52 @@ class MemberValidator {
 
     static async validateUpdate(req, res, next) {
         try {
-            const { value, error: bodyError } = memberSchema.update.validate(req.body, {
-                abortEarly: false,
-                stripUnknown: true
-            });
-            const { error: paramsError } = memberSchema.params.validate(req.params, {
-                abortEarly: false
-            });
+            const { value, error: bodyError } =
+                memberSchema.update.validate(req.body, {
+                    abortEarly: false,
+                    stripUnknown: true
+                });
+
+            const { error: paramsError } =
+                memberSchema.params.validate(req.params);
 
             if (bodyError || paramsError) {
-                const details = [];
-                if (bodyError) {
-                    details.push(...bodyError.details.map(detail => ({
-                        field: detail.path.join('.'),
-                        message: detail.message
-                    })));
-                }
-                if (paramsError) {
-                    details.push(...paramsError.details.map(detail => ({
-                        field: detail.path.join('.'),
-                        message: detail.message
-                    })));
-                }
-                throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details });
+                const details = [
+                    ...(bodyError?.details || []),
+                    ...(paramsError?.details || [])
+                ].map(d => ({
+                    field: d.path.join('.'),
+                    message: d.message
+                }));
+
+                throw new AppError(
+                    'Validation failed',
+                    400,
+                    'VALIDATION_ERROR',
+                    { validationErrors: details }
+                );
+            }
+            MemberValidator.helper.normalizeEmptyStringsDeep(value);
+
+            // FK validation
+            if (value.designationId != null) {
+                value.designation =
+                    await MemberValidator.helper.validateDesignationExists(value.designationId);
+                delete value.designationId;
             }
 
-            // Transform designation
-            if (value.designation) {
-                value.designationId = await MemberValidator.helper.transformDesignation(value.designation);
-                delete value.designation;
-            }
-
-            if (value.clientId) {
+            if (value.clientId != null) {
                 await MemberValidator.helper.validateClientExists(value.clientId);
             }
 
-            // Transform location
-            if (value.location) {
-                value.locationId = await MemberValidator.helper.getLocationIdByName(value.location);
-                delete value.location;
-            }
-
-            // Transform skills (FIXED: now returns correct format with 'skill' property)
             if (value.skills !== undefined) {
                 value.skills = await MemberValidator.helper.transformSkills(value.skills);
+            }
+
+            if (value.location) {
+                value.locationId =
+                    await MemberValidator.helper.getLocationIdByName(value.location);
+                delete value.location;
             }
 
             if (value.isInterviewer === false) {
@@ -499,10 +552,11 @@ class MemberValidator {
             if (value.isRecruiter === false) {
                 value.vendorId = null;
             }
+
             req.body = value;
             next();
-        } catch (error) {
-            next(error);
+        } catch (err) {
+            next(err);
         }
     }
 

@@ -49,9 +49,10 @@ All errors are thrown using a central `AppError` class and should be serialized 
   "memberContact": "+91-9876543210",
   "email": "john.doe@example.com",
   "password": "StrongP@ssw0rd",
-  "designation": "senior developer",
+  "designationId": 24,
   "isRecruiter": false,
-  "isInterviewer": false
+  "isInterviewer": false,
+  "vendorId": 2
 }
 ```
 
@@ -2998,6 +2999,7 @@ GET /member
       "memberName": "John Doe",
       "memberContact": "+91 9999999999",
       "email": "john@example.com",
+      "designationId": 24,
       "designation": "Recruiter",
       "isRecruiter": true,
       "isInterviewer": false,
@@ -3050,6 +3052,7 @@ GET /member/:memberId
     "memberName": "John Doe",
     "memberContact": "+91 9999999999",
     "email": "john@example.com",
+    "designationId": 24,
     "designation": "Recruiter",
     "isRecruiter": true,
     "isInterviewer": false,
@@ -3099,7 +3102,7 @@ PATCH /member/:memberId
   "memberName": "Jane Doe",
   "memberContact": "+91 8888888888",
   "email": "jane@example.com",
-  "designation": "Senior Recruiter",
+  "designationId": 24,
   "isRecruiter": true,
   "isInterviewer": false,
   "clientId": 3,
@@ -3132,7 +3135,7 @@ PATCH /member/:memberId
 - Setting `isRecruiter: false` → `vendorId` is automatically cleared
 - Setting `isInterviewer: false` → `interviewerCapacity` becomes `null`
 - Updating `skills` **replaces all existing skills**
-- Designation, skills, and location names are internally converted to IDs
+- skills, and location names are internally converted to IDs
 
 ---
 

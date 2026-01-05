@@ -6,7 +6,7 @@ class AuthValidatorHelper {
         this.db = db;
     }
 
-    async transformDesignation(designationString, client = null) {
+    /*async transformDesignation(designationString, client = null) {
         if (!designationString) return null;
         const connection = client || await this.db.getConnection();
         try {
@@ -24,7 +24,7 @@ class AuthValidatorHelper {
         } finally {
             if (!client) connection.release();
         }
-    }
+    }*/
     async validateVendorExists(vendorId, client = null) {
         const connection = client || await this.db.getConnection();
         try {
@@ -41,6 +41,26 @@ class AuthValidatorHelper {
                 );
             }
             return true;
+        } finally {
+            if (!client) connection.release();
+        }
+    }
+    async validateDesignationExists(designationId, client = null) {
+        const connection = client || await this.db.getConnection();
+        try {
+            const [rows] = await connection.execute(
+                `SELECT lookupKey FROM lookup WHERE lookupKey = ? AND tag='designation'`,
+                [designationId]
+            );
+
+            if (rows.length === 0) {
+                throw new AppError(
+                    `Designation with ID ${designationId} does not exist`,
+                    400,
+                    'INVALID_DESIGNATION_ID'
+                );
+            }
+            return designationId;
         } finally {
             if (!client) connection.release();
         }
@@ -103,7 +123,7 @@ const registerSchema = Joi.object({
             'string.min': 'Password must be at least 8 characters',
             'string.pattern.base': 'Password must contain uppercase, lowercase, number and special character'
         }),
-    designation: Joi.string()
+    /*designation: Joi.string()
         .lowercase()
         .trim()
         .required()
@@ -111,6 +131,14 @@ const registerSchema = Joi.object({
         .max(100)
         .messages({
             'any.required': 'Designation is required'
+        }),*/
+    designationId: Joi.number()
+        .integer()
+        .positive()
+        .required()
+        .messages({
+            'number.base': 'Designation ID must be a number',
+            'number.positive': 'Designation ID must be a positive number'
         }),
     isRecruiter: Joi.boolean()
         .default(false),
@@ -122,6 +150,7 @@ const registerSchema = Joi.object({
             .integer()
             .positive()
             .optional()
+            .allow(null)
             .messages({
                 'number.base': 'Vendor ID must be a number',
                 'number.positive': 'Vendor ID must be a positive number'
@@ -194,8 +223,9 @@ class AuthValidator {
             return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details }));
         }
 
-        if (value.designation) {
-            value.designation = await AuthValidator.helper.transformDesignation(value.designation);
+        if (value.designationId) {
+            value.designation = await AuthValidator.helper.validateDesignationExists(value.designationId);
+            delete value.designationId;
         }
         if (value.isRecruiter === true && value.vendorId) {
             await AuthValidator.helper.validateVendorExists(value.vendorId);

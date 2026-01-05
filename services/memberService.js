@@ -109,7 +109,7 @@ class MemberService {
             const isCurrentlyRecruiter = existingMember.isRecruiter;
             // Vendor can only be associated with recruiters
             if (
-                updateData.vendorId !== undefined &&
+                updateData.vendorId != null &&   // catches only real values
                 !isCurrentlyRecruiter &&
                 updateData.isRecruiter !== true
             ) {
