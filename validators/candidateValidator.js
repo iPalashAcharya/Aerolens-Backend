@@ -2,7 +2,15 @@ const Joi = require('joi');
 const AppError = require('../utils/appError');
 const path = require('path');
 const fs = require('fs');
-const { removeNulls } = require('../utils/normaliseNull');
+const { removeUndefined } = require('../utils/normaliseNull');
+const NOT_NULL_FIELDS = Object.freeze([
+    'candidateName',
+    'jobRole',
+    'recruiterId',
+    'noticePeriod',
+    'experienceYears'
+]);
+
 
 // Database helper class for lookups
 class CandidateValidatorHelper {
@@ -480,7 +488,7 @@ const candidateSchemas = {
         recruiterId: Joi.number()
             .integer()
             .positive()
-            .required()
+            .optional()
             .messages({
                 'number.base': 'Recruiter ID must be a number',
                 'number.integer': 'Recruiter ID must be an integer',
@@ -807,7 +815,6 @@ class CandidateValidator {
 
     static async validateUpdate(req, res, next) {
         try {
-            removeNulls(req.body);
             // Validate params
             const { error: paramsError } = candidateSchemas.params.validate(req.params, { abortEarly: false });
 
@@ -817,6 +824,17 @@ class CandidateValidator {
                 stripUnknown: true,
                 convert: true
             });
+            removeUndefined(value);
+            for (const field of NOT_NULL_FIELDS) {
+                if (Object.prototype.hasOwnProperty.call(value, field) && value[field] === null) {
+                    throw new AppError(
+                        `${field} cannot be set to null`,
+                        400,
+                        'NOT_NULL_FIELD',
+                        { field }
+                    );
+                }
+            }
 
             // If no body fields but req.file exists, set value to empty object
             if (bodyError) {
