@@ -39,7 +39,7 @@ class CandidateRepository {
 
         return {
             recruiters: recruiters[0],
-            status: status[0],
+            //status: status[0],
             locations: locations[0]
         };
     }
