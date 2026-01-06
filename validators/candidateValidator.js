@@ -54,7 +54,7 @@ class CandidateValidatorHelper {
     async getStatusIdByName(statusName, client = null) {
         this._resetCacheIfNeeded();
         if (!statusName) {
-            statusName = 'interview pending';
+            statusName = 'pending';
         }
 
         const cacheKey = statusName.toLowerCase().trim();
@@ -258,7 +258,7 @@ const candidateSchemas = {
                 'string.max': 'Email cannot exceed 255 characters'
             }),
 
-        recruiterName: Joi.string()
+        /*recruiterName: Joi.string()
             .trim()
             .min(2)
             .max(100)
@@ -270,14 +270,22 @@ const candidateSchemas = {
                     return helpers.error("any.invalid");
                 }
                 return value;
-            })*/
+            })
             .messages({
                 'string.empty': 'Recruiter name is required',
                 'string.min': 'Recruiter name must be at least 2 characters long',
                 'string.max': 'Recruiter name cannot exceed 100 characters',
                 'string.pattern.base': 'Recruiter name can only contain letters, spaces, periods, hyphens and apostrophes'
+            }),*/
+        recruiterId: Joi.number()
+            .integer()
+            .positive()
+            .required()
+            .messages({
+                'any.required': 'Recruiter ID is required',
+                'number.base': 'Recruiter ID must be a number',
+                'number.positive': 'Recruiter ID must be a positive number'
             }),
-
         jobRole: Joi.string()
             .trim()
             .min(2)
@@ -393,7 +401,7 @@ const candidateSchemas = {
                 'string.max': 'LinkedIn profile URL cannot exceed 500 characters'
             }),
 
-        status: Joi.string()
+        /*status: Joi.string()
             .trim()
             .min(1)
             .max(50)
@@ -408,7 +416,7 @@ const candidateSchemas = {
             .messages({
                 'string.min': 'Status must be at least 1 character long',
                 'string.max': 'Status cannot exceed 50 characters'
-            }),
+            }),*/
         notes: Joi.string()
             .allow('')
             .optional()
@@ -456,7 +464,7 @@ const candidateSchemas = {
                 'string.max': 'Email cannot exceed 255 characters'
             }),
 
-        recruiterName: Joi.string()
+        /*recruiterName: Joi.string()
             .trim()
             .min(2)
             .max(100)
@@ -466,6 +474,15 @@ const candidateSchemas = {
                 'string.min': 'Recruiter name must be at least 2 characters long',
                 'string.max': 'Recruiter name cannot exceed 100 characters',
                 'string.pattern.base': 'Recruiter name can only contain letters, spaces, periods, hyphens and apostrophes'
+            }),*/
+        recruiterId: Joi.number()
+            .integer()
+            .positive()
+            .optional()
+            .allow(null)
+            .messages({
+                'number.base': 'Recruiter ID must be a number',
+                'number.positive': 'Recruiter ID must be a positive number'
             }),
 
         jobRole: Joi.string()
@@ -581,7 +598,7 @@ const candidateSchemas = {
                 'string.max': 'LinkedIn profile URL cannot exceed 500 characters'
             }),
 
-        status: Joi.string()
+        /*status: Joi.string()
             .trim()
             .min(1)
             .max(50)
@@ -596,7 +613,7 @@ const candidateSchemas = {
                     return helpers.error("any.invalid");
                 }
                 return value;
-            }),
+            }),*/
         notes: Joi.string()
             .allow('')
             .optional()
@@ -757,18 +774,12 @@ class CandidateValidator {
                 value.currentLocation = await CandidateValidator.helper.transformLocation(value.currentLocation);
             }
 
-            // Transform status
-            if (value.status) {
-                value.statusId = await CandidateValidator.helper.getStatusIdByName(value.status);
-                delete value.status;
-            } else {
-                value.statusId = await CandidateValidator.helper.getStatusIdByName('interview pending');
-            }
+            value.statusId = await CandidateValidator.helper.getStatusIdByName('pending');
 
-            if (value.recruiterName) {
+            /*if (value.recruiterName) {
                 value.recruiterId = await CandidateValidator.helper.getRecruiterId(value.recruiterName);
                 delete value.recruiterName;
-            }
+            }*/
 
             // Check for duplicates
             if (value.email && await CandidateValidator.helper.checkEmailExists(value.email)) {
@@ -900,14 +911,14 @@ class CandidateValidator {
             }
 
             // Transform status
-            if (value.status) {
+            /*if (value.status) {
                 value.statusId = await CandidateValidator.helper.getStatusIdByName(value.status);
                 delete value.status;
-            }
-            if (value.recruiterName) {
+            }*/
+            /*if (value.recruiterName) {
                 value.recruiterId = await CandidateValidator.helper.getRecruiterId(value.recruiterName);
                 delete value.recruiterName;
-            }
+            }*/
 
             // Check for duplicates (excluding current candidate)
             if (value.email && await CandidateValidator.helper.checkEmailExists(value.email, candidateId)) {

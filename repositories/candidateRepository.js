@@ -8,11 +8,11 @@ class CandidateRepository {
     async getFormData(client) {
         const connection = client;
 
-        const statusPromise = connection.query(`
+        /*const statusPromise = connection.query(`
         SELECT lookupKey AS statusId, value AS statusName
         FROM lookup
         WHERE tag='candidateStatus'
-    `);
+    `);*/
 
         const recruitersPromise = connection.query(`
         SELECT
@@ -33,14 +33,11 @@ class CandidateRepository {
 
         const [recruiters, status, locations] =
             await Promise.all([
-                //interviewPromise,
                 recruitersPromise,
-                statusPromise,
                 locationPromise
             ]);
 
         return {
-            //interview: null,
             recruiters: recruiters[0],
             status: status[0],
             locations: locations[0]
@@ -51,7 +48,7 @@ class CandidateRepository {
         const connection = client;
         console.log(candidateData);
         try {
-            const query = `INSERT INTO candidate(candidateName,contactNumber,email,recruiterId,jobRole,expectedLocation,currentLocation,currentCTC,expectedCTC,noticePeriod,experienceYears,linkedinProfileUrl,statusId, resumeFilename, resumeOriginalName, resumeUploadDate,notes)
+            const query = `INSERT INTO candidate(candidateName,contactNumber,email,recruiterId,jobRole,expectedLocation,currentLocation,currentCTC,expectedCTC,noticePeriod,experienceYears,linkedinProfileUrl, resumeFilename, resumeOriginalName, resumeUploadDate,notes,statusId)
             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`
 
             const [result] = await connection.execute(query, [
@@ -67,11 +64,11 @@ class CandidateRepository {
                 candidateData.noticePeriod,
                 candidateData.experienceYears,
                 candidateData.linkedinProfileUrl !== undefined ? candidateData.linkedinProfileUrl : null,
-                candidateData.statusId,
                 null,
                 null,
                 null,
-                candidateData.notes ?? null
+                candidateData.notes ?? null,
+                candidateData.statusId
             ]);
 
             return {
@@ -374,7 +371,7 @@ class CandidateRepository {
             // Filter only allowed fields for security
             const allowedFields = [
                 'candidateName', 'contactNumber', 'email', 'recruiterId',
-                'jobRole', 'expectedLocation', 'currentLocation', 'currentCTC', 'expectedCTC', 'noticePeriod', 'experienceYears', 'linkedinProfileUrl', 'statusId', 'resume', 'notes'
+                'jobRole', 'expectedLocation', 'currentLocation', 'currentCTC', 'expectedCTC', 'noticePeriod', 'experienceYears', 'linkedinProfileUrl', 'resume', 'notes'
             ];
 
             const filteredData = {};
@@ -416,6 +413,7 @@ class CandidateRepository {
             this._handleDatabaseError(error);
         }
     }
+
     async updateStatus(candidateId, statusId, client) {
         const connection = client;
 
