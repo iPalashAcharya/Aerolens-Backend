@@ -31,7 +31,7 @@ class CandidateRepository {
         SELECT locationId,cityName AS city,country,stateName AS state FROM location
     `);
 
-        const [recruiters, status, locations] =
+        const [recruiters, locations] =
             await Promise.all([
                 recruitersPromise,
                 locationPromise
