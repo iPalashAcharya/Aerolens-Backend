@@ -12,20 +12,6 @@ class ContactService {
         try {
             await client.beginTransaction();
 
-            const exists = await this.contactRepository.existsByName(
-                contactData.contactPersonName,
-                null,
-                client
-            );
-
-            if (exists) {
-                throw new AppError(
-                    'A contact person with this name already exists',
-                    409,
-                    'DUPLICATE_CONTACT_PERSON_NAME'
-                );
-            }
-
             const result = await this.contactRepository.create(contactData, client);
             await auditLogService.logAction({
                 userId: auditContext.userId,
