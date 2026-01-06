@@ -86,7 +86,7 @@ class CandidateController {
             message: "Interview Form Data retrieved successfully",
             data: {
                 recruiters: formData.recruiters,
-                status: formData.status,
+                //status: formData.status,
                 locations: formData.locations
             }
         });
