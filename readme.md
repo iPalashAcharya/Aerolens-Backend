@@ -2273,6 +2273,8 @@ A structured **Node.js + Express.js API** for managing candidates, with validati
 GET /candidate
 
 **Response:**
+
+```json
 {
 "success": true,
 "message": "Candidates retrieved successfully",
@@ -2298,7 +2300,7 @@ GET /candidate
 "linkedinProfileUrl": "https://www.linkedin.com/in/aksh-patel1/",
 "createdAt": "2025-09-27T06:09:13.000Z",
 "updatedAt": "2025-11-21T05:30:40.000Z",
-"statusName": "interview pending",
+"statusName": "Pending",
 "resumeFilename": "resumes/candidate_38_1763722838929.docx",
 "resumeOriginalName": "AICTE_Internship_2024_Project_Report_Template_2.docx",
 "resumeUploadDate": "2025-11-21T05:30:40.000Z"
@@ -2324,13 +2326,14 @@ GET /candidate
 "linkedinProfileUrl": "https://www.linkedin.com/in/meghana-kaki-0862b8167/",
 "createdAt": "2025-09-27T06:14:07.000Z",
 "updatedAt": "2025-09-27T06:14:07.000Z",
-"statusName": "interview pending",
+"statusName": "Pending",
 "resumeFilename": null,
 "resumeOriginalName": null,
 "resumeUploadDate": null
 }
 ]
 }
+```
 
 ---
 
@@ -2414,20 +2417,6 @@ GET /candidate/create-data
         "recruiterName": "Testing New Field"
       }
     ],
-    "status": [
-      {
-        "lookupKey": 8,
-        "value": "Selected"
-      },
-      {
-        "lookupKey": 9,
-        "value": "Interview pending"
-      },
-      {
-        "lookupKey": 10,
-        "value": "Rejected"
-      }
-    ],
     "locations": [
       {
         "locationId": 1,
@@ -2478,22 +2467,21 @@ POST /candidate
 Content-Type: multipart/form-data
 **Request Body (form-data):**
 
-| Field              | Type        | Description                                               |
-| ------------------ | ----------- | --------------------------------------------------------- |
-| candidateName      | String      | Candidate full name (required)                            |
-| contactNumber      | String      | Phone number (optional)                                   |
-| email              | String      | Email address (optional)                                  |
-| recruiterName      | String      | Recruiter name (required) [must be in member table]       |
-| jobRole            | String      | Job title (required)                                      |
-| expectedLocation   | JSON Object | must be a json object with city and country attributes    |
-| currentCTC         | Number      | Current CTC in INR [supports decimals ie 12.5] (optional) |
-| expectedCTC        | Number      | Expected CTC in INR [supports decimal ie 12.5] (optional) |
-| noticePeriod       | Number      | Notice period in days (required)                          |
-| experienceYears    | Number      | Years of experience (required) [supports decimal]         |
-| linkedinProfileUrl | String      | LinkedIn URL (optional)                                   |
-| resume             | File        | PDF resume, max 5MB (optional)                            |
-| status             | String      | candidate status 50 characters (optional)                 |
-| notes              | string      | notes about candidates (optional)                         |
+| Field              | Type        | Description                                                       |
+| ------------------ | ----------- | ----------------------------------------------------------------- |
+| candidateName      | String      | Candidate full name (required)                                    |
+| contactNumber      | String      | Phone number (optional)                                           |
+| email              | String      | Email address (optional)                                          |
+| recruiterId        | String      | Recruiter Id (required) [must be in member table]                 |
+| jobRole            | String      | Job title (required)                                              |
+| expectedLocation   | JSON Object | must be a json object with city and country attributes (required) |
+| currentCTC         | Number      | Current CTC in INR [supports decimals ie 12.5] (optional)         |
+| expectedCTC        | Number      | Expected CTC in INR [supports decimal ie 12.5] (optional)         |
+| noticePeriod       | Number      | Notice period in days (required)                                  |
+| experienceYears    | Number      | Years of experience (required) [supports decimal]                 |
+| linkedinProfileUrl | String      | LinkedIn URL (optional)                                           |
+| resume             | File        | PDF resume, max 5MB (optional)                                    |
+| notes              | string      | notes about candidates (optional)                                 |
 
 **Response:**
 
@@ -2526,12 +2514,26 @@ PATCH /candidate/:id
 Content-Type: multipart/form-data
 
 **Request Body (JSON) - fields to update:**
+| Field | Type | Description |
+| ------------------ | ----------- | --------------------------------------------------------- |
+| candidateName | String | Candidate full name (optional) |
+| contactNumber | String | Phone number (optional) |
+| email | String | Email address (optional) |
+| recruiterId | String | Recruiter Id (optional) [must be in member table] |
+| jobRole | String | Job title (optional) |
+| expectedLocation | JSON Object | must be a json object with city and country attributes |
+| currentCTC | Number | Current CTC in INR [supports decimals ie 12.5] (optional) |
+| expectedCTC | Number | Expected CTC in INR [supports decimal ie 12.5] (optional) |
+| noticePeriod | Number | Notice period in days (optional) |
+| experienceYears | Number | Years of experience (optional) [supports decimal] |
+| linkedinProfileUrl | String | LinkedIn URL (optional) |
+| resume | File | PDF resume, max 5MB (optional) |
+| notes | string | notes about candidates (optional) |
 
 ```json
 {
   "jobRole": "Senior Backend Developer",
-  "expectedCTC": 1500000,
-  "status": "interview pending"
+  "expectedCTC": 1500000
 }
 ```
 
@@ -2545,7 +2547,7 @@ Content-Type: multipart/form-data
     "candidateName": "Jane Smith",
     "jobRole": "Senior Backend Developer",
     "expectedCTC": 1500000,
-    "statusName": "interview pending"
+    "statusName": "Pending"
   }
 }
 ```
