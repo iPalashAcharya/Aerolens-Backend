@@ -65,6 +65,26 @@ class AuthValidatorHelper {
             if (!client) connection.release();
         }
     }
+    async validateVendorExists(vendorId, client = null) {
+        const connection = client || await this.db.getConnection();
+        try {
+            const [rows] = await connection.execute(
+                `SELECT vendorId FROM recruitmentVendor WHERE vendorId = ?`,
+                [vendorId]
+            );
+
+            if (rows.length === 0) {
+                throw new AppError(
+                    `Vendor with ID ${vendorId} does not exist`,
+                    400,
+                    'INVALID_VENDOR_ID'
+                );
+            }
+            return true;
+        } finally {
+            if (!client) connection.release();
+        }
+    }
 }
 
 const loginSchema = Joi.object({
@@ -226,6 +246,9 @@ class AuthValidator {
         if (value.designationId) {
             value.designation = await AuthValidator.helper.validateDesignationExists(value.designationId);
             delete value.designationId;
+        }
+        if (value.isRecruiter === true && value.vendorId) {
+            await AuthValidator.helper.validateVendorExists(value.vendorId);
         }
         if (value.isRecruiter === true && value.vendorId) {
             await AuthValidator.helper.validateVendorExists(value.vendorId);

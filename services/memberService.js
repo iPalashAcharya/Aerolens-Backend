@@ -106,6 +106,33 @@ class MemberService {
             await client.beginTransaction();
 
             const existingMember = await this.memberRepository.findById(memberId, client);
+            const isCurrentlyRecruiter = existingMember.isRecruiter;
+            // Vendor can only be associated with recruiters
+            if (
+                updateData.vendorId !== undefined &&
+                !isCurrentlyRecruiter &&
+                updateData.isRecruiter !== true
+            ) {
+                throw new AppError(
+                    'Vendor can only be associated with recruiters',
+                    400,
+                    'VENDOR_ASSOCIATION_NOT_ALLOWED'
+                );
+            }
+
+            if (updateData.isRecruiter === false) {
+                updateData.vendorId = null;
+            }
+
+            if (
+                updateData.vendorId !== undefined &&
+                (isCurrentlyRecruiter || updateData.isRecruiter === true)
+            ) {
+                await this.memberRepository.validateVendorExists(
+                    updateData.vendorId,
+                    client
+                );
+            }
             if (!existingMember) {
                 throw new AppError(
                     `Member with ID ${memberId} does not exist`,
