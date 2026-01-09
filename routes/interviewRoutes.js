@@ -39,6 +39,11 @@ router.get('/:interviewId',
     interviewController.getById
 );
 
+router.get('/report/tracker',
+    InterviewValidator.validateTrackerQuery,
+    interviewController.getInterviewTracker
+);
+
 router.get('/report/overall',
     interviewController.getTotalSummary
 );

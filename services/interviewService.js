@@ -1,5 +1,6 @@
 const AppError = require('../utils/appError');
 const auditLogService = require('./auditLogService');
+const { DateTime } = require('luxon');
 
 class InterviewService {
     constructor(interviewRepository, db) {
@@ -7,8 +8,20 @@ class InterviewService {
         this.interviewRepository = interviewRepository;
     }
 
-    static buildUtcDateTime(interviewDate, timeHHMM) {
-        return new Date(`${interviewDate}T${timeHHMM}:00.000Z`);
+    static buildUtcDateTime(interviewDate, timeHHMM, timezone) {
+        const dt = DateTime.fromISO(`${interviewDate}T${timeHHMM}`, {
+            zone: timezone
+        });
+
+        if (!dt.isValid) {
+            throw new AppError(
+                'Invalid date/time for the specified timezone',
+                400,
+                'INVALID_TIMEZONE_TIME'
+            );
+        }
+
+        return dt.toUTC().toJSDate();
     }
 
     static capitalizeFirstLetter(string) {
@@ -29,46 +42,40 @@ class InterviewService {
         client,
         candidateId,
         interviewerId,
-        interviewDate,
-        fromTime,
-        durationMinutes,
+        startUTC,
+        endUTC,
         excludeInterviewId = null
     }) {
-        const startUtc = InterviewService.buildUtcDateTime(interviewDate, fromTime);
-        const endUtc = new Date(startUtc.getTime() + durationMinutes * 60000);
-
         // ---------- Candidate overlap ----------
         const candidateOverlapQuery = `
         SELECT interviewId
         FROM interview
         WHERE candidateId = ?
-          AND interviewDate = ?
           AND isActive = 1
           AND deletedAt IS NULL
           ${excludeInterviewId ? 'AND interviewId != ?' : ''}
           AND (
-            fromTime < TIME(?)
-            AND toTime   > TIME(?)
+            fromTimeUTC < ?
+            AND toTimeUTC   > ?
           )
         LIMIT 1;
     `;
 
         const candidateParams = excludeInterviewId
-            ? [candidateId, interviewDate, excludeInterviewId, endUtc.toISOString().slice(11, 19), startUtc.toISOString().slice(11, 19)]
-            : [candidateId, interviewDate, endUtc.toISOString().slice(11, 19), startUtc.toISOString().slice(11, 19)];
+            ? [candidateId, excludeInterviewId, endUTC, startUTC]
+            : [candidateId, endUTC, startUTC];
 
-        const [candidateRows] = await client.query(candidateOverlapQuery, candidateParams);
+        const [candidateRows] = await client.query(
+            candidateOverlapQuery,
+            candidateParams
+        );
 
         if (candidateRows.length > 0) {
             throw new AppError(
                 'Candidate already has an overlapping interview',
                 409,
                 'CANDIDATE_TIME_CONFLICT',
-                {
-                    candidateId: 'conflict',
-                    interviewDate: 'conflict',
-                    fromTime: 'conflict'
-                }
+                { candidateId: 'conflict' }
             );
         }
 
@@ -77,33 +84,31 @@ class InterviewService {
         SELECT interviewId
         FROM interview
         WHERE interviewerId = ?
-          AND interviewDate = ?
           AND isActive = 1
           AND deletedAt IS NULL
           ${excludeInterviewId ? 'AND interviewId != ?' : ''}
           AND (
-            fromTime < TIME(?)
-            AND toTime   > TIME(?)
+            fromTimeUTC < ?
+            AND toTimeUTC   > ?
           )
         LIMIT 1;
     `;
 
         const interviewerParams = excludeInterviewId
-            ? [interviewerId, interviewDate, excludeInterviewId, endUtc.toISOString().slice(11, 19), startUtc.toISOString().slice(11, 19)]
-            : [interviewerId, interviewDate, endUtc.toISOString().slice(11, 19), startUtc.toISOString().slice(11, 19)];
+            ? [interviewerId, excludeInterviewId, endUTC, startUTC]
+            : [interviewerId, endUTC, startUTC];
 
-        const [interviewerRows] = await client.query(interviewerOverlapQuery, interviewerParams);
+        const [interviewerRows] = await client.query(
+            interviewerOverlapQuery,
+            interviewerParams
+        );
 
         if (interviewerRows.length > 0) {
             throw new AppError(
                 'Interviewer already has an overlapping interview',
                 409,
                 'INTERVIEWER_TIME_CONFLICT',
-                {
-                    interviewerId: 'conflict',
-                    interviewDate: 'conflict',
-                    fromTime: 'conflict'
-                }
+                { interviewerId: 'conflict' }
             );
         }
     }
@@ -356,6 +361,66 @@ class InterviewService {
         }
     }
 
+    async getInterviewTracker(queryParams) {
+        const client = await this.db.getConnection();
+
+        try {
+            // Calculate date range based on filter
+            let startDate, endDate;
+
+            if (queryParams.filter === 'today') {
+                const today = new Date();
+                startDate = today.toISOString().split('T')[0]; // YYYY-MM-DD
+                endDate = startDate;
+
+            } else if (queryParams.filter === 'past7days') {
+                const today = new Date();
+                const past7Days = new Date(today);
+                past7Days.setDate(today.getDate() - 6); // Including today = 7 days
+
+                startDate = past7Days.toISOString().split('T')[0];
+                endDate = today.toISOString().split('T')[0];
+
+            } else if (queryParams.filter === 'custom') {
+                startDate = queryParams.startDate;
+                endDate = queryParams.endDate;
+            }
+
+            // Get interviews within date range
+            const interviews = await this.interviewRepository.getInterviewsByDateRange(
+                client,
+                startDate,
+                endDate,
+                {
+                    interviewerId: queryParams.interviewerId,
+                    result: queryParams.result,
+                    candidateId: queryParams.candidateId
+                }
+            );
+
+            // Capitalize result field
+            interviews.forEach(interview =>
+                InterviewService.capitalizeField(interview, "result")
+            );
+
+            return interviews;
+
+        } catch (error) {
+            if (!(error instanceof AppError)) {
+                console.error('Error fetching interview tracker data', error.stack);
+                throw new AppError(
+                    'Failed to fetch interview tracker data',
+                    500,
+                    'INTERVIEW_TRACKER_FETCH_ERROR',
+                    { operation: 'getInterviewTracker' }
+                );
+            }
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
     /*async getInterviewRounds(interviewId) {
         const client = await this.db.getConnection();
 
@@ -393,17 +458,38 @@ class InterviewService {
         try {
             await client.beginTransaction();
 
+            // 1. Build UTC times once
+            const startUTC = InterviewService.buildUtcDateTime(
+                interviewData.interviewDate,
+                interviewData.fromTime,
+                interviewData.timezone
+            );
+
+            const endUTC = new Date(
+                startUTC.getTime() + interviewData.durationMinutes * 60000
+            );
+
+            // 2. Check overlaps using UTC only
             await this.assertNoOverlaps({
                 client,
                 candidateId,
                 interviewerId: interviewData.interviewerId,
-                interviewDate: interviewData.interviewDate,
-                fromTime: interviewData.fromTime,
-                durationMinutes: interviewData.durationMinutes
+                startUTC,
+                endUTC
             });
 
-            const result = await this.interviewRepository.create(candidateId, interviewData, client);
+            // 3. Persist (repository must store UTC fields)
+            const result = await this.interviewRepository.create(
+                candidateId,
+                {
+                    ...interviewData,
+                    startUTC,
+                    //endUTC
+                },
+                client
+            );
 
+            // 4. Audit log
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'CREATE',
@@ -414,13 +500,11 @@ class InterviewService {
             }, client);
 
             await client.commit();
-
             return result;
+
         } catch (error) {
             await client.rollback();
-            if (error instanceof AppError) {
-                throw error;
-            }
+            if (error instanceof AppError) throw error;
 
             console.error("Error creating Interview entry:", error.stack);
             throw new AppError(
@@ -482,10 +566,13 @@ class InterviewService {
     }*/
     async updateInterview(interviewId, interviewData, auditContext) {
         const client = await this.db.getConnection();
+
         try {
             await client.beginTransaction();
 
-            const existingInterview = await this.interviewRepository.getById(interviewId, client);
+            const existingInterview =
+                await this.interviewRepository.getById(interviewId, client);
+
             if (!existingInterview) {
                 throw new AppError(
                     `Interview with Id ${interviewId} not found`,
@@ -494,18 +581,85 @@ class InterviewService {
                 );
             }
 
-            await this.assertNoOverlaps({
-                client,
-                candidateId: existingInterview.candidateId,
-                interviewerId: interviewData.interviewerId ?? existingInterview.interviewerId,
-                interviewDate: interviewData.interviewDate ?? existingInterview.interviewDate,
-                fromTime: interviewData.fromTime ?? existingInterview.fromTime,
-                durationMinutes: interviewData.durationMinutes ?? existingInterview.durationMinutes,
-                excludeInterviewId: interviewId
-            });
+            // 1. Detect if this patch affects time
+            const isTimeUpdate =
+                'eventTimezone' in interviewData ||
+                'fromTime' in interviewData ||
+                'interviewDate' in interviewData ||
+                'durationMinutes' in interviewData;
+            let startUTC;
+            let endUTC;
+            let effectiveTimezone;
+            let finalInterviewDate;
+            let finalDurationMinutes;
 
-            const updatedInterview = await this.interviewRepository.update(interviewId, interviewData, client);
+            if (isTimeUpdate) {
+                if (!interviewData.interviewDate ||
+                    !interviewData.fromTime ||
+                    !interviewData.eventTimezone) {
+                    throw new AppError(
+                        'interviewDate, fromTime, and timezone are all required when updating time',
+                        400,
+                        'INVALID_TIME_UPDATE'
+                    );
+                }
 
+                finalInterviewDate =
+                    interviewData.interviewDate ?? existingInterview.interviewDate;
+
+                const finalFromTime =
+                    interviewData.fromTime ?? existingInterview.fromTime;
+
+                finalDurationMinutes =
+                    interviewData.durationMinutes ?? existingInterview.durationMinutes;
+                effectiveTimezone =
+                    interviewData.eventTimezone;
+
+                startUTC = InterviewService.buildUtcDateTime(
+                    finalInterviewDate,
+                    finalFromTime,
+                    effectiveTimezone
+                );
+
+                endUTC = new Date(
+                    startUTC.getTime() + finalDurationMinutes * 60000
+                );
+
+                await this.assertNoOverlaps({
+                    client,
+                    candidateId: existingInterview.candidateId,
+                    interviewerId:
+                        interviewData.interviewerId ?? existingInterview.interviewerId,
+                    startUTC,
+                    endUTC,
+                    excludeInterviewId: interviewId
+                });
+            }
+
+            const updatePayload = {};
+
+            if (isTimeUpdate) {
+                updatePayload.interviewDate = finalInterviewDate;
+                updatePayload.fromTimeUTC = startUTC;
+                updatePayload.eventTimezone = effectiveTimezone;
+                updatePayload.durationMinutes = finalDurationMinutes;
+            }
+
+            if (interviewData.interviewerId !== undefined) {
+                updatePayload.interviewerId = interviewData.interviewerId;
+            }
+
+            if (interviewData.scheduledById !== undefined) {
+                updatePayload.scheduledById = interviewData.scheduledById;
+            }
+
+            const updatedInterview = await this.interviewRepository.update(
+                interviewId,
+                updatePayload,
+                client
+            );
+
+            // 6. Audit
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'UPDATE',
@@ -517,21 +671,17 @@ class InterviewService {
             }, client);
 
             await client.commit();
-
             return updatedInterview;
 
         } catch (error) {
             await client.rollback();
-            if (error instanceof AppError) {
-                throw error;
-            }
+            if (error instanceof AppError) throw error;
 
-            console.error("Error updating Interview entry:", error.stack);
             throw new AppError(
-                "Failed to update Interview entry",
+                'Failed to update Interview entry',
                 500,
-                "INTERVIEW_UPDATE_ERROR",
-                { operation: "updateInterview", interviewId }
+                'INTERVIEW_UPDATE_ERROR',
+                { interviewId }
             );
         } finally {
             client.release();
@@ -542,14 +692,22 @@ class InterviewService {
         const client = await this.db.getConnection();
         try {
             await client.beginTransaction();
+            const startUTC = InterviewService.buildUtcDateTime(
+                interviewData.interviewDate,
+                interviewData.fromTime,
+                interviewData.timezone
+            );
+
+            const endUTC = new Date(
+                startUTC.getTime() + interviewData.durationMinutes * 60000
+            );
 
             await this.assertNoOverlaps({
                 client,
                 candidateId,
                 interviewerId: interviewData.interviewerId,
-                interviewDate: interviewData.interviewDate,
-                fromTime: interviewData.fromTime,
-                durationMinutes: interviewData.durationMinutes
+                startUTC,
+                endUTC
             });
 
             const previousInterviews = await this.interviewRepository.getInterviewsByCandidateId(candidateId, client);
@@ -562,7 +720,14 @@ class InterviewService {
                 );
             }
 
-            const result = await this.interviewRepository.create(candidateId, interviewData, client);
+            const result = await this.interviewRepository.create(
+                candidateId,
+                {
+                    ...interviewData,
+                    startUTC
+                },
+                client
+            );
 
             await auditLogService.logAction({
                 userId: auditContext.userId,
