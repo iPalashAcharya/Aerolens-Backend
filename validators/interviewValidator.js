@@ -39,6 +39,14 @@ const interviewSchemas = {
                 'number.max': 'Duration cannot exceed 8 hours (480 minutes)',
                 'any.required': 'Duration is required'
             }),
+        eventTimezone: Joi.string()
+            .trim()
+            .pattern(/^[A-Za-z_]+\/[A-Za-z_]+$/)
+            .required()
+            .messages({
+                'string.pattern.base': 'Timezone must be a valid IANA timezone (e.g. Asia/Kolkata)',
+                'any.required': 'Timezone is required'
+            }),
         interviewerId: Joi.number()
             .integer()
             .positive()
@@ -121,6 +129,14 @@ const interviewSchemas = {
                 'number.max': 'Duration cannot exceed 8 hours (480 minutes)',
                 'any.required': 'Duration is required'
             }),
+        eventTimezone: Joi.string()
+            .trim()
+            .pattern(/^[A-Za-z_]+\/[A-Za-z_]+$/)
+            .required()
+            .messages({
+                'string.pattern.base': 'Timezone must be a valid IANA timezone (e.g. Asia/Kolkata)',
+                'any.required': 'Timezone is required'
+            }),
         interviewerId: Joi.number()
             .integer()
             .positive()
@@ -194,12 +210,22 @@ const interviewSchemas = {
                 'number.integer': 'Duration must be an integer',
                 'number.min': 'Duration must be at least 15 minutes',
                 'number.max': 'Duration cannot exceed 8 hours (480 minutes)'
-            })
+            }),
+        eventTimezone: Joi.string()
+            .trim()
+            .pattern(/^[A-Za-z_]+\/[A-Za-z_]+$/)
+            .optional()
+            .messages({
+                'string.pattern.base': 'Timezone must be a valid IANA timezone (e.g. Asia/Kolkata)',
+            }),
     })
         .min(1)
         .messages({
             'object.min': 'At least one field must be provided for update'
-        }),
+        })
+        .with('interviewDate', ['fromTime', 'eventTimezone'])
+        .with('fromTime', ['interviewDate', 'eventTimezone'])
+        .with('eventTimezone', ['interviewDate', 'fromTime']),
 
     finalize: Joi.object({
         result: Joi.string()
