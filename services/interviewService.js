@@ -361,6 +361,66 @@ class InterviewService {
         }
     }
 
+    async getInterviewTracker(queryParams) {
+        const client = await this.db.getConnection();
+
+        try {
+            // Calculate date range based on filter
+            let startDate, endDate;
+
+            if (queryParams.filter === 'today') {
+                const today = new Date();
+                startDate = today.toISOString().split('T')[0]; // YYYY-MM-DD
+                endDate = startDate;
+
+            } else if (queryParams.filter === 'past7days') {
+                const today = new Date();
+                const past7Days = new Date(today);
+                past7Days.setDate(today.getDate() - 6); // Including today = 7 days
+
+                startDate = past7Days.toISOString().split('T')[0];
+                endDate = today.toISOString().split('T')[0];
+
+            } else if (queryParams.filter === 'custom') {
+                startDate = queryParams.startDate;
+                endDate = queryParams.endDate;
+            }
+
+            // Get interviews within date range
+            const interviews = await this.interviewRepository.getInterviewsByDateRange(
+                client,
+                startDate,
+                endDate,
+                {
+                    interviewerId: queryParams.interviewerId,
+                    result: queryParams.result,
+                    candidateId: queryParams.candidateId
+                }
+            );
+
+            // Capitalize result field
+            interviews.forEach(interview =>
+                InterviewService.capitalizeField(interview, "result")
+            );
+
+            return interviews;
+
+        } catch (error) {
+            if (!(error instanceof AppError)) {
+                console.error('Error fetching interview tracker data', error.stack);
+                throw new AppError(
+                    'Failed to fetch interview tracker data',
+                    500,
+                    'INTERVIEW_TRACKER_FETCH_ERROR',
+                    { operation: 'getInterviewTracker' }
+                );
+            }
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
     /*async getInterviewRounds(interviewId) {
         const client = await this.db.getConnection();
 

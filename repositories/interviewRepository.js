@@ -175,6 +175,95 @@ class InterviewRepository {
         }
     }
 
+    async getInterviewsByDateRange(client, startUTC, endUTC, filters = {}) {
+        const connection = client;
+
+        try {
+            const conditions = [
+                'i.isActive = 1',
+                'i.deletedAt IS NULL',
+                'i.fromTimeUTC >= ?',
+                'i.fromTimeUTC < ?'
+            ];
+
+            const params = [startUTC, endUTC];
+
+            // Optional filters
+            if (filters.interviewerId) {
+                conditions.push('i.interviewerId = ?');
+                params.push(filters.interviewerId);
+            }
+
+            if (filters.result) {
+                conditions.push('i.result = ?');
+                params.push(filters.result);
+            }
+
+            if (filters.candidateId) {
+                conditions.push('i.candidateId = ?');
+                params.push(filters.candidateId);
+            }
+
+            const whereClause = conditions.join(' AND ');
+
+            const query = `
+            SELECT
+                -- Interview
+                i.interviewDate,
+                i.fromTimeUTC AS interviewFromTime,
+                i.interviewerFeedback,
+
+                -- Candidate
+                c.candidateId,
+                c.candidateName,
+                c.contactNumber AS candidatePhone,
+                c.email AS candidateEmail,
+                c.jobRole,
+                c.experienceYears,
+                c.noticePeriod,
+
+                -- Expected joining location as JSON
+                JSON_OBJECT(
+                    'locationId', loc.locationId,
+                    'city', loc.cityName,
+                    'state', loc.stateName,
+                    'country', loc.country
+                ) AS expectedJoiningLocation,
+
+                -- Interviewer
+                interviewer.memberId AS interviewerId,
+                interviewer.memberName AS interviewerName,
+
+                -- Recruiter
+                recruiter.memberName AS recruiterName
+
+            FROM interview i
+
+            JOIN candidate c
+                ON i.candidateId = c.candidateId
+
+            LEFT JOIN location loc
+                ON c.expectedLocation = loc.locationId
+
+            LEFT JOIN member interviewer
+                ON i.interviewerId = interviewer.memberId
+
+            LEFT JOIN member recruiter
+                ON c.recruiterId = recruiter.memberId
+
+            WHERE ${whereClause}
+
+            ORDER BY i.fromTimeUTC DESC;
+        `;
+
+            const [rows] = await connection.query(query, params);
+            return rows;
+
+        } catch (error) {
+            this._handleDatabaseError(error, 'getInterviewsByDateRange');
+        }
+    }
+
     async getAll(limit, page, client) {
         const connection = client;
         try {

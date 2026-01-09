@@ -75,6 +75,18 @@ class InterviewController {
         );
     });
 
+    getInterviewTracker = catchAsync(async (req, res) => {
+        const result = await this.interviewService.getInterviewTracker(
+            req.validatedQuery
+        );
+
+        return ApiResponse.success(
+            res,
+            result,
+            'Interview tracker data retrieved successfully'
+        );
+    });
+
     /*getInterviewRounds = catchAsync(async (req, res) => {
         const rounds = await this.interviewService.getInterviewRounds(parseInt(req.params.interviewId));
 
