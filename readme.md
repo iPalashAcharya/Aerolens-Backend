@@ -4428,7 +4428,7 @@ Detailed breakdown of each interview:
 }
 ```
 
-## Notes
+### Invalid Timezone Error
 
 - Only active interviewers with at least one interview in the date range are included
 - Round numbers are dynamically calculated based on interview chronological order per candidate
