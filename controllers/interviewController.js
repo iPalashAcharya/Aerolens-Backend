@@ -87,6 +87,18 @@ class InterviewController {
         );
     });
 
+    getInterviewerWorkloadReport = catchAsync(async (req, res) => {
+        const report = await this.interviewService.getInterviewerWorkloadReport(
+            req.validatedQuery
+        );
+
+        return ApiResponse.success(
+            res,
+            report,
+            'Interviewer workload report retrieved successfully'
+        );
+    });
+
     /*getInterviewRounds = catchAsync(async (req, res) => {
         const rounds = await this.interviewService.getInterviewRounds(parseInt(req.params.interviewId));
 

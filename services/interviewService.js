@@ -113,6 +113,73 @@ class InterviewService {
         }
     }
 
+    async getInterviewerWorkloadReport(queryParams) {
+        const client = await this.db.getConnection();
+
+        try {
+            // Calculate date range based on filter
+            let startDate, endDate;
+
+            if (queryParams.filter === 'today') {
+                const today = new Date();
+                startDate = today.toISOString().split('T')[0];
+                endDate = startDate;
+
+            } else if (queryParams.filter === 'past7days') {
+                const today = new Date();
+                const past7Days = new Date(today);
+                past7Days.setDate(today.getDate() - 6);
+
+                startDate = past7Days.toISOString().split('T')[0];
+                endDate = today.toISOString().split('T')[0];
+
+            } else if (queryParams.filter === 'past30days') {
+                const today = new Date();
+                const past30Days = new Date(today);
+                past30Days.setDate(today.getDate() - 29);
+
+                startDate = past30Days.toISOString().split('T')[0];
+                endDate = today.toISOString().split('T')[0];
+
+            } else if (queryParams.filter === 'custom') {
+                startDate = queryParams.startDate;
+                endDate = queryParams.endDate;
+            }
+
+            const report = await this.interviewRepository.getInterviewerWorkloadReport(
+                client,
+                startDate,
+                endDate,
+                queryParams.interviewerId
+            );
+
+            // Capitalize result fields
+            report.interviewers.forEach(interviewer => {
+                interviewer.interviews.forEach(interview => {
+                    InterviewService.capitalizeField(interview, 'result');
+                });
+            });
+
+            return {
+                ...report
+            };
+
+        } catch (error) {
+            if (!(error instanceof AppError)) {
+                console.error('Error fetching interviewer workload report', error.stack);
+                throw new AppError(
+                    'Failed to fetch interviewer workload report',
+                    500,
+                    'INTERVIEWER_WORKLOAD_REPORT_ERROR',
+                    { operation: 'getInterviewerWorkloadReport' }
+                );
+            }
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
     async getAll() {
         //const { limit = 10, page = 1 } = options || {};
         const client = await this.db.getConnection();
