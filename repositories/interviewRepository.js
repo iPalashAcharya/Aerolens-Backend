@@ -264,6 +264,121 @@ class InterviewRepository {
         }
     }
 
+    async getInterviewerWorkloadReport(client, startDate, endDate, interviewerId = null) {
+        const connection = client;
+
+        try {
+            // Build interviewer filter
+            let interviewerFilter = '';
+            const params = [startDate, endDate];
+
+            if (interviewerId) {
+                interviewerFilter = 'AND m.memberId = ?';
+                params.push(interviewerId);
+            }
+
+            // Get interviewer statistics
+            const statsQuery = `
+            SELECT
+                m.memberId AS interviewerId,
+                m.memberName AS interviewerName,
+                COUNT(i.interviewId) AS totalInterviews,
+                COUNT(i.interviewId) AS interviewsConducted,
+                SUM(CASE WHEN i.result = 'pending' THEN 1 ELSE 0 END) AS pending,
+                SUM(CASE WHEN i.result = 'selected' THEN 1 ELSE 0 END) AS selected,
+                SUM(CASE WHEN i.result = 'rejected' THEN 1 ELSE 0 END) AS rejected,
+                SUM(CASE WHEN i.result = 'cancelled' THEN 1 ELSE 0 END) AS cancelled,
+                0 AS cancelledByCandidates
+            FROM member m
+            LEFT JOIN interview i
+                ON i.interviewerId = m.memberId
+                AND DATE(i.fromTimeUTC) >= ?
+                AND DATE(i.fromTimeUTC) <= ?
+                AND i.deletedAt IS NULL
+                AND i.isActive = TRUE
+            WHERE m.isInterviewer = TRUE
+                AND m.isActive = TRUE
+                ${interviewerFilter}
+            GROUP BY m.memberId, m.memberName
+            HAVING totalInterviews > 0
+            ORDER BY m.memberName;
+        `;
+
+            const [interviewerStats] = await connection.query(statsQuery, params);
+
+            // Get detailed interviews for each interviewer
+            const detailsQuery = `
+            SELECT
+                i.interviewerId,
+                c.candidateId,
+                c.candidateName,
+                c.jobRole AS role,
+                CONCAT('R', RANK() OVER (
+                    PARTITION BY i.candidateId
+                    ORDER BY i.fromTimeUTC ASC, i.interviewId ASC
+                )) AS round,
+                DATE_FORMAT(i.interviewDate, '%d-%b') AS date,
+                i.result,
+                i.interviewerFeedback AS feedback,
+                recruiter.memberId AS recruiterId,
+                recruiter.memberName AS recruiterName
+            FROM interview i
+            LEFT JOIN candidate c ON i.candidateId = c.candidateId
+            LEFT JOIN member recruiter ON c.recruiterId = recruiter.memberId
+            WHERE DATE(i.fromTimeUTC) >= ?
+                AND DATE(i.fromTimeUTC) <= ?
+                AND i.deletedAt IS NULL
+                AND i.isActive = TRUE
+                ${interviewerId ? 'AND i.interviewerId = ?' : ''}
+            ORDER BY i.interviewerId, i.fromTimeUTC DESC;
+        `;
+
+            const [interviewDetails] = await connection.query(detailsQuery, params);
+
+            // Group interviews by interviewer
+            const interviewsByInterviewer = {};
+            interviewDetails.forEach(interview => {
+                if (!interviewsByInterviewer[interview.interviewerId]) {
+                    interviewsByInterviewer[interview.interviewerId] = [];
+                }
+                interviewsByInterviewer[interview.interviewerId].push({
+                    candidateId: interview.candidateId,
+                    candidateName: interview.candidateName,
+                    role: interview.role,
+                    round: interview.round,
+                    date: interview.date,
+                    result: interview.result,
+                    feedback: interview.feedback,
+                    recruiterId: interview.recruiterId,
+                    recruiterName: interview.recruiterName
+                });
+            });
+
+            // Combine stats with interview details
+            const interviewers = interviewerStats.map(stat => ({
+                interviewerId: stat.interviewerId,
+                interviewerName: stat.interviewerName,
+                statistics: {
+                    totalInterviews: stat.totalInterviews,
+                    interviewsConducted: stat.interviewsConducted,
+                    pending: stat.pending,
+                    selected: stat.selected,
+                    rejected: stat.rejected,
+                    cancelled: stat.cancelled,
+                    cancelledByCandidates: stat.cancelledByCandidates
+                },
+                interviews: interviewsByInterviewer[stat.interviewerId] || []
+            }));
+
+            return {
+                interviewers
+            };
+
+        } catch (error) {
+            this._handleDatabaseError(error, 'getInterviewerWorkloadReport');
+        }
+    }
+
     async getAll(limit, page, client) {
         const connection = client;
         try {

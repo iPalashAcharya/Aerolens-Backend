@@ -4212,6 +4212,231 @@ GET /interview/report/daily?date=2026-01-15
 
 ---
 
+# Interviewer Workload & Coverage Report
+
+Get comprehensive interviewer workload analysis with detailed interview breakdowns and statistics.
+
+## Endpoint
+
+```
+GET /interview/report/interviewer-workload
+```
+
+## Query Parameters
+
+| Parameter       | Type    | Required    | Description                                                            |
+| --------------- | ------- | ----------- | ---------------------------------------------------------------------- |
+| `filter`        | string  | Yes         | One of: `today`, `past7days`, `past30days`, `custom`                   |
+| `startDate`     | string  | Conditional | Required if `filter=custom`. Format: YYYY-MM-DD                        |
+| `endDate`       | string  | Conditional | Required if `filter=custom`. Format: YYYY-MM-DD (must be >= startDate) |
+| `interviewerId` | integer | No          | Filter by specific interviewer ID                                      |
+
+## Example Requests
+
+### Get last 7 days workload
+
+```http
+GET /interviews/report/interviewer-workload?filter=past7days
+```
+
+### Get custom date range
+
+```http
+GET /interviews/report/interviewer-workload?filter=custom&startDate=2026-12-01&endDate=2026-12-31
+```
+
+### Get specific interviewer workload
+
+```http
+GET /interviews/report/interviewer-workload?filter=past30days&interviewerId=3
+```
+
+## Response
+
+### Success Response (200 OK)
+
+```json
+{
+  "success": true,
+  "message": "Interviewer workload report retrieved successfully",
+  "data": {
+    "interviewers": [
+      {
+        "interviewerId": 1,
+        "interviewerName": "Thangavel",
+        "statistics": {
+          "totalInterviews": 6,
+          "interviewsConducted": 6,
+          "pending": 2,
+          "selected": 2,
+          "rejected": 2,
+          "cancelled": 0,
+          "cancelledByCandidates": 0
+        },
+        "interviews": [
+          {
+            "candidateId": 101,
+            "candidateName": "Ajaypal Padhiyar",
+            "role": "ROR Devel",
+            "round": "R1",
+            "date": "24-Dec",
+            "result": "Pending",
+            "feedback": null,
+            "recruiterId": 5,
+            "recruiterName": "Khushi Shah"
+          },
+          {
+            "candidateId": 102,
+            "candidateName": "Varun Bajaj",
+            "role": "TPM",
+            "round": "R1",
+            "date": "23-Dec",
+            "result": "Rejected",
+            "feedback": "Needs more experience in agile methodologies",
+            "recruiterId": 6,
+            "recruiterName": "Jayraj"
+          }
+        ]
+      },
+      {
+        "interviewerId": 2,
+        "interviewerName": "Bhavin Trivedi",
+        "statistics": {
+          "totalInterviews": 4,
+          "interviewsConducted": 4,
+          "pending": 1,
+          "selected": 1,
+          "rejected": 2,
+          "cancelled": 0,
+          "cancelledByCandidates": 0
+        },
+        "interviews": [
+          {
+            "candidateId": 107,
+            "candidateName": "Rahul Mehta",
+            "role": "QA Lead",
+            "round": "R1",
+            "date": "24-Dec",
+            "result": "Rejected",
+            "feedback": "Limited automation experience",
+            "recruiterId": 5,
+            "recruiterName": "Khushi Shah"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+## Response Fields
+
+### Interviewer Details
+
+Each interviewer object contains:
+
+#### Statistics
+
+- `totalInterviews`: Total interviews for this interviewer
+- `interviewsConducted`: Number of completed interviews
+- `pending`: Number of pending interviews
+- `selected`: Number of candidates selected
+- `rejected`: Number of candidates rejected
+- `cancelled`: Number of cancelled interviews
+- `cancelledByCandidates`: Number of cancellations by candidates
+
+#### Interviews Array
+
+Detailed breakdown of each interview:
+
+- `candidateId`: Unique candidate identifier
+- `candidateName`: Name of the candidate
+- `role`: Job role for the interview
+- `round`: Interview round (R1, R2, etc.)
+- `date`: Interview date (formatted as DD-MMM)
+- `result`: Interview outcome (Pending, Selected, Rejected, Cancelled)
+- `feedback`: Interviewer's feedback (if provided)
+- `recruiterId`: ID of the recruiter who scheduled the interview
+- `recruiterName`: Name of the recruiter
+
+## Filter Options
+
+| Filter       | Description                  | Date Range                         |
+| ------------ | ---------------------------- | ---------------------------------- |
+| `today`      | Today's interviews only      | Current date                       |
+| `past7days`  | Last 7 days including today  | Today - 6 days to today            |
+| `past30days` | Last 30 days including today | Today - 29 days to today           |
+| `custom`     | Custom date range            | User-specified start and end dates |
+
+## Error Responses
+
+### Validation Error (400)
+
+```json
+{
+  "success": false,
+  "message": "Validation failed",
+  "errorCode": "VALIDATION_ERROR",
+  "details": {
+    "validationErrors": [
+      {
+        "field": "filter",
+        "message": "Filter must be one of: today, past7days, past30days, custom"
+      }
+    ]
+  }
+}
+```
+
+### Missing Required Fields for Custom Filter (400)
+
+```json
+{
+  "success": false,
+  "message": "Validation failed",
+  "errorCode": "VALIDATION_ERROR",
+  "details": {
+    "validationErrors": [
+      {
+        "field": "startDate",
+        "message": "startDate is required when filter is custom"
+      },
+      {
+        "field": "endDate",
+        "message": "endDate is required when filter is custom"
+      }
+    ]
+  }
+}
+```
+
+### Invalid Date Range (400)
+
+```json
+{
+  "success": false,
+  "message": "Validation failed",
+  "errorCode": "VALIDATION_ERROR",
+  "details": {
+    "validationErrors": [
+      {
+        "field": "endDate",
+        "message": "endDate must be greater than or equal to startDate"
+      }
+    ]
+  }
+}
+```
+
+### Invalid Timezone Error
+
+- Only active interviewers with at least one interview in the date range are included
+- Round numbers are dynamically calculated based on interview chronological order per candidate
+- All timestamps are in UTC but formatted for easy reading
+- Results are automatically capitalized for consistency
+- The report excludes soft-deleted interviews and inactive records
+- Average interviews per interviewer is rounded to 1 decimal place
+
 ## Error Responses
 
 ### Validation Error

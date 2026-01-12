@@ -387,6 +387,59 @@ const interviewSchemas = {
                 'number.integer': 'Candidate ID must be an integer',
                 'number.positive': 'Candidate ID must be positive'
             })
+    }),
+    interviewerWorkloadQuery: Joi.object({
+        filter: Joi.string()
+            .valid('today', 'past7days', 'past30days', 'custom')
+            .required()
+            .messages({
+                'any.only': 'Filter must be one of: today, past7days, past30days, custom',
+                'any.required': 'Filter is required'
+            }),
+
+        startDate: Joi.string()
+            .pattern(/^\d{4}-\d{2}-\d{2}$/)
+            .when('filter', {
+                is: 'custom',
+                then: Joi.required(),
+                otherwise: Joi.forbidden()
+            })
+            .messages({
+                'string.pattern.base': 'startDate must be in YYYY-MM-DD format',
+                'any.required': 'startDate is required when filter is custom',
+                'any.unknown': 'startDate is only allowed when filter is custom'
+            }),
+
+        endDate: Joi.string()
+            .pattern(/^\d{4}-\d{2}-\d{2}$/)
+            .when('filter', {
+                is: 'custom',
+                then: Joi.required(),
+                otherwise: Joi.forbidden()
+            })
+            .custom((value, helpers) => {
+                const { startDate } = helpers.state.ancestors[0];
+                if (startDate && value < startDate) {
+                    return helpers.error('date.greater');
+                }
+                return value;
+            })
+            .messages({
+                'string.pattern.base': 'endDate must be in YYYY-MM-DD format',
+                'date.greater': 'endDate must be greater than or equal to startDate',
+                'any.required': 'endDate is required when filter is custom',
+                'any.unknown': 'endDate is only allowed when filter is custom'
+            }),
+
+        interviewerId: Joi.number()
+            .integer()
+            .positive()
+            .optional()
+            .messages({
+                'number.base': 'Interviewer ID must be a number',
+                'number.integer': 'Interviewer ID must be an integer',
+                'number.positive': 'Interviewer ID must be positive'
+            })
     })
 };
 
@@ -514,6 +567,24 @@ class InterviewValidator {
     }
     static validateTrackerQuery(req, res, next) {
         const { value, error } = interviewSchemas.trackerQuery.validate(req.query, {
+            abortEarly: false,
+            stripUnknown: true
+        });
+
+        if (error) {
+            throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', {
+                validationErrors: error.details.map(detail => ({
+                    field: detail.path[0],
+                    message: detail.message
+                }))
+            });
+        }
+
+        req.validatedQuery = value;
+        next();
+    }
+    static validateInterviewerWorkloadQuery(req, res, next) {
+        const { value, error } = interviewSchemas.interviewerWorkloadQuery.validate(req.query, {
             abortEarly: false,
             stripUnknown: true
         });

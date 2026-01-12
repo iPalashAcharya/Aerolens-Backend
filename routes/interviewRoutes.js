@@ -60,6 +60,11 @@ router.get(
     interviewController.getDailySummary
 );
 
+router.get('/report/interviewer-workload',
+    InterviewValidator.validateInterviewerWorkloadQuery,
+    interviewController.getInterviewerWorkloadReport
+);
+
 router.post('/:candidateId',
     InterviewValidator.validateParams,
     InterviewValidator.validateCreate,
