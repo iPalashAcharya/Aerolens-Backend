@@ -142,9 +142,9 @@ class InterviewRepository {
                 i.interviewId,
                 i.candidateId,
                 c.candidateName,
-                i.interviewDate,
-                i.fromTimeUTC AS fromTime,
-                i.toTimeUTC AS toTime,
+                DATE(i.fromTimeUTC) AS interviewDate,
+                DATE_FORMAT(i.fromTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS fromTime,
+                DATE_FORMAT(i.toTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS toTime,
                 i.eventTimezone,
                 RANK() OVER (
                 PARTITION BY i.candidateId
@@ -209,8 +209,8 @@ class InterviewRepository {
             const query = `
             SELECT
                 -- Interview
-                i.interviewDate,
-                i.fromTimeUTC AS interviewFromTime,
+                DATE(i.fromTimeUTC) AS interviewDate,
+                DATE_FORMAT(i.fromTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS interviewFromTime,
                 i.interviewerFeedback,
 
                 -- Candidate
@@ -317,7 +317,7 @@ class InterviewRepository {
                     PARTITION BY i.candidateId
                     ORDER BY i.fromTimeUTC ASC, i.interviewId ASC
                 )) AS round,
-                DATE_FORMAT(i.interviewDate, '%d-%b') AS date,
+                DATE_FORMAT(i.fromTimeUTC, '%d-%b') AS date,
                 i.result,
                 i.interviewerFeedback AS feedback,
                 recruiter.memberId AS recruiterId,
@@ -398,9 +398,9 @@ class InterviewRepository {
                 ORDER BY i.fromTimeUTC ASC, i.interviewId ASC
                 ) AS roundNumber,
                 COUNT(*) OVER (PARTITION BY candidateId) AS totalInterviews,
-                i.interviewDate,
-                i.fromTimeUTC AS fromTime,
-                i.toTimeUTC AS toTime,
+                DATE(i.fromTimeUTC) AS interviewDate,
+                DATE_FORMAT(i.fromTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS fromTime,
+                DATE_FORMAT(i.toTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS toTime,
                 i.eventTimezone,
                 i.durationMinutes,
                 c.candidateId,
@@ -456,9 +456,9 @@ class InterviewRepository {
                     PARTITION BY i.candidateId
                 ) AS totalInterviews,
 
-                i.interviewDate,
-                i.fromTimeUTC AS fromTime,
-                i.toTimeUTC AS toTime,
+                DATE(i.fromTimeUTC) AS interviewDate,
+                DATE_FORMAT(i.fromTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS fromTime,
+                DATE_FORMAT(i.toTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS toTime,
                 i.eventTimezone,
                 i.durationMinutes,
                 c.candidateId,
@@ -504,9 +504,9 @@ class InterviewRepository {
                 ORDER BY i.fromTimeUTC ASC, i.interviewId ASC
                 ) AS roundNumber,
                 COUNT(*) OVER (PARTITION BY candidateId) AS totalInterviews,
-                i.interviewDate,
-                i.fromTimeUTC AS fromTime,
-                i.toTimeUTC AS toTime,
+                DATE(i.fromTimeUTC) AS interviewDate,
+                DATE_FORMAT(i.fromTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS fromTime,
+                DATE_FORMAT(i.toTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS toTime,
                 i.eventTimezone,
                 i.durationMinutes,
                 i.result,
@@ -788,9 +788,9 @@ class InterviewRepository {
                     PARTITION BY i.candidateId
                 ) AS totalInterviews,
 
-                i.interviewDate,
-                i.fromTimeUTC AS fromTime,
-                i.toTimeUTC AS toTime,
+                DATE(i.fromTimeUTC) AS interviewDate,
+                DATE_FORMAT(i.fromTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS fromTime,
+                DATE_FORMAT(i.toTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS toTime,
                 i.durationMinutes,
                 c.candidateId,
                 c.candidateName,
