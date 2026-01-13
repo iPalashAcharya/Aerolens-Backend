@@ -691,12 +691,12 @@ class CandidateService {
                 );
             }
 
-            await client.execute(
+            /*await client.execute(
                 `UPDATE interview 
              SET deletedAt = NOW() 
              WHERE candidateId = ? AND deletedAt IS NULL`,
                 [candidateId]
-            );
+            );*/
 
             await this.candidateRepository.delete(candidateId, client);
             await auditLogService.logAction({
