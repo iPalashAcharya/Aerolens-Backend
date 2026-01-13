@@ -113,6 +113,34 @@ class InterviewService {
         }
     }
 
+    async assertCandidateActive(candidateId, client) {
+        const query = `
+        SELECT candidateId, isActive 
+        FROM candidate 
+        WHERE candidateId = ?
+    `;
+
+        const [rows] = await client.query(query, [candidateId]);
+
+        if (rows.length === 0) {
+            throw new AppError(
+                `Candidate with ID ${candidateId} not found`,
+                404,
+                'CANDIDATE_NOT_FOUND',
+                { candidateId }
+            );
+        }
+
+        if (!rows[0].isActive) {
+            throw new AppError(
+                'Cannot create or modify interviews for inactive candidates',
+                400,
+                'CANDIDATE_INACTIVE',
+                { candidateId }
+            );
+        }
+    }
+
     async getInterviewerWorkloadReport(queryParams) {
         const client = await this.db.getConnection();
 
@@ -525,6 +553,8 @@ class InterviewService {
         try {
             await client.beginTransaction();
 
+            await this.assertCandidateActive(candidateId, client);
+
             // 1. Build UTC times once
             const startUTC = InterviewService.buildUtcDateTime(
                 interviewData.interviewDate,
@@ -646,6 +676,11 @@ class InterviewService {
                     404,
                     'INTERVIEW_ENTRY_NOT_FOUND'
                 );
+            }
+
+            if (interviewData.candidateId &&
+                interviewData.candidateId !== existingInterview.candidateId) {
+                await this.assertCandidateActive(interviewData.candidateId, client);
             }
 
             // 1. Detect if this patch affects time
