@@ -529,7 +529,7 @@ class InterviewService {
             const startUTC = InterviewService.buildUtcDateTime(
                 interviewData.interviewDate,
                 interviewData.fromTime,
-                interviewData.timezone
+                interviewData.eventTimezone
             );
 
             const endUTC = new Date(
@@ -762,8 +762,10 @@ class InterviewService {
             const startUTC = InterviewService.buildUtcDateTime(
                 interviewData.interviewDate,
                 interviewData.fromTime,
-                interviewData.timezone
+                interviewData.eventTimezone
             );
+
+            console.log(startUTC);
 
             const endUTC = new Date(
                 startUTC.getTime() + interviewData.durationMinutes * 60000
