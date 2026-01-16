@@ -111,7 +111,7 @@ class InterviewRepository {
             SELECT DISTINCT fromTimeUTC AS interviewTimeStamp
             FROM interview
             WHERE DATE(fromTimeUTC) >= ? AND DATE(fromTimeUTC) <= ? AND deletedAt IS NULL
-            ORDER BY interviewDate;
+            ORDER BY interviewTimeStamp;
             `;
 
             const [datesData] = await connection.query(dateQuery, [
