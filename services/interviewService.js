@@ -8,6 +8,30 @@ class InterviewService {
         this.interviewRepository = interviewRepository;
     }
 
+    static computeEventTimestamp(fromTimeUTC, eventTimezone) {
+        return DateTime
+            .fromISO(fromTimeUTC, { zone: 'utc' })
+            .setZone(eventTimezone)
+            .toISO() // YYYY-MM-DD
+    }
+
+    static enrichInterview(interview) {
+        if (!interview) return interview;
+
+        // Capitalize result
+        InterviewService.capitalizeField(interview, 'result');
+
+        // Add derived event timestamp
+        if (interview.fromTime && interview.eventTimezone) {
+            interview.eventTimestamp = InterviewService.computeEventTimestamp(
+                interview.fromTime,
+                interview.eventTimezone
+            );
+        }
+
+        return interview;
+    }
+
     static buildUtcDateTime(interviewDate, timeHHMM, timezone) {
         const dt = DateTime.fromISO(`${interviewDate}T${timeHHMM}`, {
             zone: timezone
@@ -216,7 +240,7 @@ class InterviewService {
             const interviews = result.data;
 
             for (const interview of interviews) {
-                InterviewService.capitalizeField(interview, "result");
+                InterviewService.enrichInterview(interview);
             }
             /*const totalPages = Math.ceil(result.totalRecords / limit);
             const pagination = {
@@ -263,9 +287,9 @@ class InterviewService {
             //const data = result.data;
 
             if (Array.isArray(data)) {
-                data.forEach(item => InterviewService.capitalizeField(item, "result"));
+                data.forEach(item => InterviewService.enrichInterview(item));
             } else {
-                InterviewService.capitalizeField(data, "result");
+                InterviewService.enrichInterview(data);
             }
 
             return data;
@@ -292,9 +316,9 @@ class InterviewService {
             const data = interviews;
 
             if (Array.isArray(data)) {
-                data.forEach(item => InterviewService.capitalizeField(item, "result"));
+                data.forEach(item => InterviewService.enrichInterview(item));
             } else {
-                InterviewService.capitalizeField(data, "result");
+                InterviewService.enrichInterview(data);
             }
 
             return {
