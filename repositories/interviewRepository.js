@@ -108,7 +108,7 @@ class InterviewRepository {
             ]);
 
             const dateQuery = `
-            SELECT DISTINCT DATE(fromTimeUTC) AS interviewDate
+            SELECT DISTINCT fromTimeUTC AS interviewTimeStamp
             FROM interview
             WHERE DATE(fromTimeUTC) >= ? AND DATE(fromTimeUTC) <= ? AND deletedAt IS NULL
             ORDER BY interviewDate;
@@ -122,7 +122,7 @@ class InterviewRepository {
             return {
                 summary: summaryData[0],
                 interviewers: interviewerData,
-                interviewDates: datesData
+                interviewTimeStamp: datesData
             };
 
         } catch (error) {
