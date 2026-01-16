@@ -298,8 +298,7 @@ class InterviewRepository {
                 AND DATE(i.fromTimeUTC) <= ?
                 AND i.deletedAt IS NULL
                 AND i.isActive = TRUE
-            WHERE m.isInterviewer = TRUE
-                AND m.isActive = TRUE
+            WHERE m.isActive = TRUE
                 ${interviewerFilter}
             GROUP BY m.memberId, m.memberName
             HAVING totalInterviews > 0
