@@ -3591,6 +3591,9 @@ Retrieve all active interviews.
       "fromTime": "2026-01-15T09:00:00.000Z",
       "toTime": "2026-01-15T10:00:00.000Z",
       "eventTimezone": "Asia/Kolkata",
+      "eventTimestamp": "2025-12-15T14:30:00.000+05:30",
+      "candidateIsActive": 0,
+      "candidateIsDeleted": 1,
       "durationMinutes": 60,
       "candidateId": 5,
       "candidateName": "John Doe",
@@ -3634,6 +3637,9 @@ Retrieve a specific interview by its ID.
     "fromTime": "2026-01-15T09:00:00.000Z",
     "toTime": "2026-01-15T10:00:00.000Z",
     "eventTimezone": "Asia/Kolkata",
+    "eventTimestamp": "2025-12-15T14:30:00.000+05:30",
+    "candidateIsActive": 0,
+    "candidateIsDeleted": 1,
     "durationMinutes": 60,
     "candidateId": 5,
     "candidateName": "John Doe",
@@ -3679,6 +3685,7 @@ Retrieve all interviews for a specific candidate.
         "fromTime": "2026-01-15T09:00:00.000Z",
         "toTime": "2026-01-15T10:00:00.000Z",
         "eventTimezone": "Asia/Kolkata",
+        "eventTimestamp": "2025-12-15T14:30:00.000+05:30",
         "durationMinutes": 60,
         "result": "Selected",
         "meetingUrl": "https://meet.example.com/interview-123",
@@ -3693,6 +3700,7 @@ Retrieve all interviews for a specific candidate.
         "fromTime": "2026-01-20T14:00:00.000Z",
         "toTime": "2026-01-20T15:30:00.000Z",
         "eventTimezone": "Asia/Kolkata",
+        "eventTimestamp": "2025-12-15T14:30:00.000+05:30",
         "durationMinutes": 90,
         "result": "Pending",
         "meetingUrl": null,
@@ -4153,10 +4161,34 @@ GET /interview/report/monthly?startDate=2026-01-01&endDate=2026-01-31
         "totalMinutes": 1012.5
       }
     ],
-    "interviewDates": [
-      { "interviewDate": "2026-01-15" },
-      { "interviewDate": "2026-01-20" },
-      { "interviewDate": "2026-01-25" }
+    "interviewTimeStamp": [
+      {
+        "interviewTimeStamp": "2025-12-05 09:00:00.000000"
+      },
+      {
+        "interviewTimeStamp": "2025-12-10 09:00:00.000000"
+      },
+      {
+        "interviewTimeStamp": "2025-12-15 09:00:00.000000"
+      },
+      {
+        "interviewTimeStamp": "2025-12-15 13:00:00.000000"
+      },
+      {
+        "interviewTimeStamp": "2025-12-22 11:00:00.000000"
+      },
+      {
+        "interviewTimeStamp": "2025-12-23 11:00:00.000000"
+      },
+      {
+        "interviewTimeStamp": "2025-12-26 10:30:00.000000"
+      },
+      {
+        "interviewTimeStamp": "2025-12-27 11:00:00.000000"
+      },
+      {
+        "interviewTimeStamp": "2026-01-06 10:00:00.000000"
+      }
     ]
   }
 }

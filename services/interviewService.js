@@ -8,6 +8,30 @@ class InterviewService {
         this.interviewRepository = interviewRepository;
     }
 
+    static computeEventTimestamp(fromTimeUTC, eventTimezone) {
+        return DateTime
+            .fromISO(fromTimeUTC, { zone: 'utc' })
+            .setZone(eventTimezone)
+            .toISO() // YYYY-MM-DD
+    }
+
+    static enrichInterview(interview) {
+        if (!interview) return interview;
+
+        // Capitalize result
+        InterviewService.capitalizeField(interview, 'result');
+
+        // Add derived event timestamp
+        if (interview.fromTime && interview.eventTimezone) {
+            interview.eventTimestamp = InterviewService.computeEventTimestamp(
+                interview.fromTime,
+                interview.eventTimezone
+            );
+        }
+
+        return interview;
+    }
+
     static buildUtcDateTime(interviewDate, timeHHMM, timezone) {
         const dt = DateTime.fromISO(`${interviewDate}T${timeHHMM}`, {
             zone: timezone
@@ -113,6 +137,34 @@ class InterviewService {
         }
     }
 
+    async assertCandidateActive(candidateId, client) {
+        const query = `
+        SELECT candidateId, isActive 
+        FROM candidate 
+        WHERE candidateId = ?
+    `;
+
+        const [rows] = await client.query(query, [candidateId]);
+
+        if (rows.length === 0) {
+            throw new AppError(
+                `Candidate with ID ${candidateId} not found`,
+                404,
+                'CANDIDATE_NOT_FOUND',
+                { candidateId }
+            );
+        }
+
+        if (!rows[0].isActive) {
+            throw new AppError(
+                'Cannot create or modify interviews for inactive candidates',
+                400,
+                'CANDIDATE_INACTIVE',
+                { candidateId }
+            );
+        }
+    }
+
     async getInterviewerWorkloadReport(queryParams) {
         const client = await this.db.getConnection();
 
@@ -188,7 +240,7 @@ class InterviewService {
             const interviews = result.data;
 
             for (const interview of interviews) {
-                InterviewService.capitalizeField(interview, "result");
+                InterviewService.enrichInterview(interview);
             }
             /*const totalPages = Math.ceil(result.totalRecords / limit);
             const pagination = {
@@ -235,9 +287,9 @@ class InterviewService {
             //const data = result.data;
 
             if (Array.isArray(data)) {
-                data.forEach(item => InterviewService.capitalizeField(item, "result"));
+                data.forEach(item => InterviewService.enrichInterview(item));
             } else {
-                InterviewService.capitalizeField(data, "result");
+                InterviewService.enrichInterview(data);
             }
 
             return data;
@@ -264,9 +316,9 @@ class InterviewService {
             const data = interviews;
 
             if (Array.isArray(data)) {
-                data.forEach(item => InterviewService.capitalizeField(item, "result"));
+                data.forEach(item => InterviewService.enrichInterview(item));
             } else {
-                InterviewService.capitalizeField(data, "result");
+                InterviewService.enrichInterview(data);
             }
 
             return {
@@ -525,11 +577,13 @@ class InterviewService {
         try {
             await client.beginTransaction();
 
+            await this.assertCandidateActive(candidateId, client);
+
             // 1. Build UTC times once
             const startUTC = InterviewService.buildUtcDateTime(
                 interviewData.interviewDate,
                 interviewData.fromTime,
-                interviewData.timezone
+                interviewData.eventTimezone
             );
 
             const endUTC = new Date(
@@ -648,6 +702,11 @@ class InterviewService {
                 );
             }
 
+            if (interviewData.candidateId &&
+                interviewData.candidateId !== existingInterview.candidateId) {
+                await this.assertCandidateActive(interviewData.candidateId, client);
+            }
+
             // 1. Detect if this patch affects time
             const isTimeUpdate =
                 'eventTimezone' in interviewData ||
@@ -762,7 +821,7 @@ class InterviewService {
             const startUTC = InterviewService.buildUtcDateTime(
                 interviewData.interviewDate,
                 interviewData.fromTime,
-                interviewData.timezone
+                interviewData.eventTimezone
             );
 
             const endUTC = new Date(
