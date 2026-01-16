@@ -284,11 +284,13 @@ class InterviewRepository {
                 m.memberName AS interviewerName,
                 COUNT(i.interviewId) AS totalInterviews,
                 COUNT(i.interviewId) AS interviewsConducted,
-                SUM(CASE WHEN i.result = 'pending' THEN 1 ELSE 0 END) AS pending,
-                SUM(CASE WHEN i.result = 'selected' THEN 1 ELSE 0 END) AS selected,
-                SUM(CASE WHEN i.result = 'rejected' THEN 1 ELSE 0 END) AS rejected,
-                SUM(CASE WHEN i.result = 'cancelled' THEN 1 ELSE 0 END) AS cancelled,
-                0 AS cancelledByCandidates
+                CAST(COUNT(i.interviewId) AS UNSIGNED) AS totalInterviews,
+                CAST(SUM(CASE WHEN i.result = 'pending' THEN 1 ELSE 0 END) AS UNSIGNED) AS pending,
+                CAST(SUM(CASE WHEN i.result = 'selected' THEN 1 ELSE 0 END) AS UNSIGNED) AS selected,
+                CAST(SUM(CASE WHEN i.result = 'rejected' THEN 1 ELSE 0 END) AS UNSIGNED) AS rejected,
+                CAST(SUM(CASE WHEN i.result = 'cancelled' THEN 1 ELSE 0 END) AS UNSIGNED) AS cancelled,
+                CAST(0 AS UNSIGNED) AS cancelledByCandidates
+
             FROM member m
             LEFT JOIN interview i
                 ON i.interviewerId = m.memberId
@@ -302,7 +304,7 @@ class InterviewRepository {
             GROUP BY m.memberId, m.memberName
             HAVING totalInterviews > 0
             ORDER BY m.memberName;
-        `;
+            `;
 
             const [interviewerStats] = await connection.query(statsQuery, params);
 
@@ -313,10 +315,10 @@ class InterviewRepository {
                 c.candidateId,
                 c.candidateName,
                 c.jobRole AS role,
-                CONCAT('R', RANK() OVER (
+                CONCAT('R', CAST(RANK() OVER (
                     PARTITION BY i.candidateId
                     ORDER BY i.fromTimeUTC ASC, i.interviewId ASC
-                )) AS round,
+                ) AS CHAR)) AS round,
                 DATE_FORMAT(i.fromTimeUTC, '%d-%b') AS date,
                 i.result,
                 i.interviewerFeedback AS feedback,
@@ -331,7 +333,7 @@ class InterviewRepository {
                 AND i.isActive = TRUE
                 ${interviewerId ? 'AND i.interviewerId = ?' : ''}
             ORDER BY i.interviewerId, i.fromTimeUTC DESC;
-        `;
+            `;
 
             const [interviewDetails] = await connection.query(detailsQuery, params);
 
