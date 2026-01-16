@@ -969,7 +969,7 @@ class InterviewService {
                 );
             }
 
-            await this.interviewRepository.renumberCandidateRounds(deleteResult.candidateId, client);
+            //await this.interviewRepository.renumberCandidateRounds(deleteResult.candidateId, client);
 
             await auditLogService.logAction({
                 userId: auditContext.userId,
