@@ -66,8 +66,8 @@ class InterviewController {
     });
 
     getDailySummary = catchAsync(async (req, res) => {
-        const { date } = req.validatedQuery;
-        const summaryData = await this.interviewService.getDailySummary(date);
+        const { date, timezone } = req.validatedQuery;
+        const summaryData = await this.interviewService.getDailySummary(date, timezone);
         return ApiResponse.success(
             res,
             summaryData,

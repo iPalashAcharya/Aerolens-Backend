@@ -322,6 +322,14 @@ const interviewSchemas = {
             .messages({
                 "string.pattern.base": "date must be in YYYY-MM-DD format",
                 "any.required": "date is required"
+            }),
+        timezone: Joi.string()
+            .trim()
+            .pattern(/^[A-Za-z_]+\/[A-Za-z_]+$/)
+            .required()
+            .messages({
+                'string.pattern.base': 'Timezone must be a valid IANA timezone (e.g. Asia/Kolkata)',
+                'any.required': 'Timezone is required'
             })
     }),
     trackerQuery: Joi.object({
@@ -366,6 +374,14 @@ const interviewSchemas = {
                 'date.greater': 'endDate must be greater than or equal to startDate',
                 'any.required': 'endDate is required when filter is custom',
                 'any.unknown': 'endDate is only allowed when filter is custom'
+            }),
+        timezone: Joi.string()
+            .trim()
+            .pattern(/^[A-Za-z_]+\/[A-Za-z_]+$/)
+            .required()
+            .messages({
+                'string.pattern.base': 'Timezone must be a valid IANA timezone (e.g. Asia/Kolkata)',
+                'any.required': 'Timezone is required'
             }),
 
         // Optional: additional filters
@@ -437,6 +453,14 @@ const interviewSchemas = {
                 'date.greater': 'endDate must be greater than or equal to startDate',
                 'any.required': 'endDate is required when filter is custom',
                 'any.unknown': 'endDate is only allowed when filter is custom'
+            }),
+        timezone: Joi.string()
+            .trim()
+            .pattern(/^[A-Za-z_]+\/[A-Za-z_]+$/)
+            .required()
+            .messages({
+                'string.pattern.base': 'Timezone must be a valid IANA timezone (e.g. Asia/Kolkata)',
+                'any.required': 'Timezone is required'
             }),
 
         interviewerId: Joi.number()

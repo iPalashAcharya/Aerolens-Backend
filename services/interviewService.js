@@ -168,41 +168,42 @@ class InterviewService {
 
     async getInterviewerWorkloadReport(queryParams) {
         const client = await this.db.getConnection();
-
         try {
             // Calculate date range based on filter
             let startDate, endDate;
+            const timezone = queryParams.timezone;
 
             if (queryParams.filter === 'today') {
-                const today = new Date();
-                startDate = today.toISOString().split('T')[0];
+                const today = DateTime.now().setZone(timezone);
+                startDate = today.toISODate();
                 endDate = startDate;
-
             } else if (queryParams.filter === 'past7days') {
-                const today = new Date();
-                const past7Days = new Date(today);
-                past7Days.setDate(today.getDate() - 6);
-
-                startDate = past7Days.toISOString().split('T')[0];
-                endDate = today.toISOString().split('T')[0];
-
+                const today = DateTime.now().setZone(timezone);
+                const past7Days = today.minus({ days: 6 });
+                startDate = past7Days.toISODate();
+                endDate = today.toISODate();
             } else if (queryParams.filter === 'past30days') {
-                const today = new Date();
-                const past30Days = new Date(today);
-                past30Days.setDate(today.getDate() - 29);
-
-                startDate = past30Days.toISOString().split('T')[0];
-                endDate = today.toISOString().split('T')[0];
-
+                const today = DateTime.now().setZone(timezone);
+                const past30Days = today.minus({ days: 29 });
+                startDate = past30Days.toISODate();
+                endDate = today.toISODate();
             } else if (queryParams.filter === 'custom') {
                 startDate = queryParams.startDate;
                 endDate = queryParams.endDate;
             }
 
-            const report = await this.interviewRepository.getInterviewerWorkloadReport(
-                client,
+            // Convert local date range to UTC
+            const { startUTC, endUTC } = DateConverter.getUTCRangeFromLocalDates(
                 startDate,
                 endDate,
+                timezone
+            );
+
+            // Pass UTC timestamps to repository
+            const report = await this.interviewRepository.getInterviewerWorkloadReport(
+                client,
+                startUTC,
+                endUTC,
                 queryParams.interviewerId
             );
 
@@ -216,7 +217,6 @@ class InterviewService {
             return {
                 ...report
             };
-
         } catch (error) {
             if (!(error instanceof AppError)) {
                 console.error('Error fetching interviewer workload report', error.stack);
@@ -461,14 +461,20 @@ class InterviewService {
         }
     }
 
-    async getDailySummary(date) {
+    async getDailySummary(date, timezone) {
         const client = await this.db.getConnection();
 
         try {
+            const { startUTC, endUTC } = DateConverter.getUTCRangeFromLocalDates(
+                date,
+                date,
+                timezone
+            );
 
             return await this.interviewRepository.getDailySummary(
                 client,
-                date
+                startUTC,
+                endUTC
             );
 
         } catch (error) {
@@ -488,34 +494,39 @@ class InterviewService {
 
     async getInterviewTracker(queryParams) {
         const client = await this.db.getConnection();
-
         try {
             // Calculate date range based on filter
             let startDate, endDate;
+            const timezone = queryParams.timezone;
 
             if (queryParams.filter === 'today') {
-                const today = new Date();
-                startDate = today.toISOString().split('T')[0]; // YYYY-MM-DD
+                // Get today's date in user's timezone
+                const today = DateTime.now().setZone(timezone);
+                startDate = today.toISODate(); // YYYY-MM-DD
                 endDate = startDate;
-
             } else if (queryParams.filter === 'past7days') {
-                const today = new Date();
-                const past7Days = new Date(today);
-                past7Days.setDate(today.getDate() - 6); // Including today = 7 days
-
-                startDate = past7Days.toISOString().split('T')[0];
-                endDate = today.toISOString().split('T')[0];
-
+                // Get date 6 days ago to today (7 days total) in user's timezone
+                const today = DateTime.now().setZone(timezone);
+                const past7Days = today.minus({ days: 6 });
+                startDate = past7Days.toISODate();
+                endDate = today.toISODate();
             } else if (queryParams.filter === 'custom') {
                 startDate = queryParams.startDate;
                 endDate = queryParams.endDate;
             }
 
-            // Get interviews within date range
-            const interviews = await this.interviewRepository.getInterviewsByDateRange(
-                client,
+            // Convert local date range to UTC
+            const { startUTC, endUTC } = DateConverter.getUTCRangeFromLocalDates(
                 startDate,
                 endDate,
+                timezone
+            );
+
+            // Get interviews within date range using UTC timestamps
+            const interviews = await this.interviewRepository.getInterviewsByDateRange(
+                client,
+                startUTC,
+                endUTC,
                 {
                     interviewerId: queryParams.interviewerId,
                     result: queryParams.result,
@@ -529,7 +540,6 @@ class InterviewService {
             );
 
             return interviews;
-
         } catch (error) {
             if (!(error instanceof AppError)) {
                 console.error('Error fetching interview tracker data', error.stack);

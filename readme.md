@@ -4030,6 +4030,7 @@ Filter and track interviews by various criteria.
 - `filter` (required): One of `today`, `past7days`, `custom`
 - `startDate` (required if filter=custom): Format YYYY-MM-DD
 - `endDate` (required if filter=custom): Format YYYY-MM-DD (must be >= startDate)
+- `timezone` (Required) should be in IANA Format
 - `interviewerId` (optional): Filter by interviewer ID
 - `result` (optional): Filter by result (pending, selected, rejected, cancelled)
 - `candidateId` (optional): Filter by candidate ID
@@ -4037,7 +4038,7 @@ Filter and track interviews by various criteria.
 **Example Request:**
 
 ```http
-GET /interview/report/tracker?filter=custom&startDate=2026-01-01&endDate=2026-01-31&result=selected
+GET /interview/report/tracker?filter=custom&startDate=2026-01-01&endDate=2026-01-31&result=selected&timezone=Asia/Kolkata
 ```
 
 **Response:**
@@ -4127,11 +4128,12 @@ Get interview statistics for a specific date range, grouped by interviewer.
 
 - `startDate` (required): Format YYYY-MM-DD
 - `endDate` (required): Format YYYY-MM-DD (must be > startDate)
+- `timezone` (Required) should be in IANA Format
 
 **Example Request:**
 
 ```http
-GET /interview/report/monthly?startDate=2026-01-01&endDate=2026-01-31
+GET /interview/report/monthly?startDate=2026-01-01&endDate=2026-01-31&timezone=Asia/Kolkata
 ```
 
 **Response:**
@@ -4205,11 +4207,12 @@ Get all interviews scheduled for a specific date.
 **Query Parameters:**
 
 - `date` (required): Format YYYY-MM-DD
+- `timezone` (Required) should be in IANA Format
 
 **Example Request:**
 
 ```http
-GET /interview/report/daily?date=2026-01-15
+GET /interview/report/daily?date=2026-01-15&timezone=Asia/Kolkata
 ```
 
 **Response:**
@@ -4261,6 +4264,7 @@ GET /interview/report/interviewer-workload
 | `filter`        | string  | Yes         | One of: `today`, `past7days`, `past30days`, `custom`                   |
 | `startDate`     | string  | Conditional | Required if `filter=custom`. Format: YYYY-MM-DD                        |
 | `endDate`       | string  | Conditional | Required if `filter=custom`. Format: YYYY-MM-DD (must be >= startDate) |
+| `timezone`      | stirng  | yes         | User's timezone specified in IANA Format                               |
 | `interviewerId` | integer | No          | Filter by specific interviewer ID                                      |
 
 ## Example Requests
@@ -4268,19 +4272,19 @@ GET /interview/report/interviewer-workload
 ### Get last 7 days workload
 
 ```http
-GET /interviews/report/interviewer-workload?filter=past7days
+GET /interviews/report/interviewer-workload?filter=past7days&timezone=Asia/Kolkata
 ```
 
 ### Get custom date range
 
 ```http
-GET /interviews/report/interviewer-workload?filter=custom&startDate=2026-12-01&endDate=2026-12-31
+GET /interviews/report/interviewer-workload?filter=custom&startDate=2026-12-01&endDate=2026-12-31&timezone=Asia/Kolkata
 ```
 
 ### Get specific interviewer workload
 
 ```http
-GET /interviews/report/interviewer-workload?filter=past30days&interviewerId=3
+GET /interviews/report/interviewer-workload?filter=past30days&interviewerId=3&timezone=Asia/Kolkata
 ```
 
 ## Response
