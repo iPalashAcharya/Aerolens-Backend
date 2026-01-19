@@ -305,6 +305,14 @@ const interviewSchemas = {
                 'string.pattern.base': 'endDate must be in YYYY-MM-DD format',
                 'date.greater': 'endDate must be greater than startDate',
                 'any.required': 'endDate is required'
+            }),
+        timezone: Joi.string()
+            .trim()
+            .pattern(/^[A-Za-z_]+\/[A-Za-z_]+$/)
+            .required()
+            .messages({
+                'string.pattern.base': 'Timezone must be a valid IANA timezone (e.g. Asia/Kolkata)',
+                'any.required': 'Timezone is required'
             })
     }),
     dailyQuery: Joi.object({

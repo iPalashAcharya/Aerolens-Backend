@@ -1,6 +1,7 @@
 const AppError = require('../utils/appError');
 const auditLogService = require('./auditLogService');
 const { DateTime } = require('luxon');
+const DateConverter = require('../utils/dateConverter');
 
 class InterviewService {
     constructor(interviewRepository, db) {
@@ -428,14 +429,19 @@ class InterviewService {
         }
     }
 
-    async getMonthlySummary(startDate, endDate) {
+    async getMonthlySummary(startDate, endDate, timezone) {
         const client = await this.db.getConnection();
 
         try {
+            const { startUTC, endUTC } = DateConverter.getUTCRangeFromLocalDates(
+                startDate,
+                endDate,
+                timezone
+            );
             const result = await this.interviewRepository.getMonthlySummary(
                 client,
-                startDate,
-                endDate
+                startUTC,
+                endUTC
             );
             return result;
         } catch (error) {

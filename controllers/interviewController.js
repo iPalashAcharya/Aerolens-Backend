@@ -56,8 +56,8 @@ class InterviewController {
     });
 
     getMonthlySummary = catchAsync(async (req, res) => {
-        const { startDate, endDate } = req.validatedQuery;
-        const summaryData = await this.interviewService.getMonthlySummary(startDate, endDate);
+        const { startDate, endDate, timezone } = req.validatedQuery;
+        const summaryData = await this.interviewService.getMonthlySummary(startDate, endDate, timezone);
         return ApiResponse.success(
             res,
             summaryData,

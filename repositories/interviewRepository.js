@@ -58,9 +58,8 @@ class InterviewRepository {
         }
     }
 
-    async getMonthlySummary(client, startDate, endDate) {
+    async getMonthlySummary(client, startUTC, endUTC) {
         const connection = client;
-
         try {
             const summaryQuery = `
             SELECT
@@ -70,61 +69,53 @@ class InterviewRepository {
                 SUM(CASE WHEN result = 'pending' THEN 1 ELSE 0 END) AS pending,
                 SUM(CASE WHEN result = 'cancelled' THEN 1 ELSE 0 END) AS cancelled
             FROM interview
-            WHERE deletedAt IS NULL;
-            `;
+            WHERE deletedAt IS NULL
+            AND fromTimeUTC >= ?
+            AND fromTimeUTC <= ?;
+        `;
 
-            const [summaryData] = await connection.query(summaryQuery);
+            const [summaryData] = await connection.query(summaryQuery, [startUTC, endUTC]);
 
             const interviewerQuery = `
             SELECT
                 m.memberId AS interviewerId,
                 m.memberName AS interviewerName,
-
                 COUNT(i.interviewId) AS total,
                 SUM(CASE WHEN i.result = 'selected' THEN 1 ELSE 0 END) AS selected,
                 SUM(CASE WHEN i.result = 'rejected' THEN 1 ELSE 0 END) AS rejected,
                 SUM(CASE WHEN i.result = 'pending' THEN 1 ELSE 0 END) AS pending,
                 SUM(CASE WHEN i.result = 'cancelled' THEN 1 ELSE 0 END) AS cancelled,
-
                 AVG(i.durationMinutes) AS avgDuration,
                 SUM(i.durationMinutes) AS totalMinutes
-
             FROM member m
             LEFT JOIN interview i
                 ON i.interviewerId = m.memberId
-                AND DATE(i.fromTimeUTC) >= ?      
-                AND DATE(i.fromTimeUTC) <= ?  AND i.deletedAt IS NULL
-
+                AND i.fromTimeUTC >= ?
+                AND i.fromTimeUTC <= ?
+                AND i.deletedAt IS NULL
             GROUP BY m.memberId, m.memberName
             HAVING total > 0
             ORDER BY interviewerName;
-            `;
-            console.log('startDate:', startDate, typeof startDate);
-            console.log('endDate:', endDate, typeof endDate);
+        `;
 
-            const [interviewerData] = await connection.query(interviewerQuery, [
-                startDate,
-                endDate
-            ]);
+            const [interviewerData] = await connection.query(interviewerQuery, [startUTC, endUTC]);
 
             const dateQuery = `
             SELECT DISTINCT fromTimeUTC AS interviewTimeStamp
             FROM interview
-            WHERE DATE(fromTimeUTC) >= ? AND DATE(fromTimeUTC) <= ? AND deletedAt IS NULL
+            WHERE fromTimeUTC >= ?
+            AND fromTimeUTC <= ?
+            AND deletedAt IS NULL
             ORDER BY interviewTimeStamp;
-            `;
+        `;
 
-            const [datesData] = await connection.query(dateQuery, [
-                startDate,
-                endDate
-            ]);
+            const [datesData] = await connection.query(dateQuery, [startUTC, endUTC]);
 
             return {
                 summary: summaryData[0],
                 interviewers: interviewerData,
                 interviewTimeStamp: datesData
             };
-
         } catch (error) {
             this._handleDatabaseError(error, "getMonthlySummary");
         }
