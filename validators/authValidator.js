@@ -155,8 +155,8 @@ const registerSchema = Joi.object({
                 'number.base': 'Vendor ID must be a number',
                 'number.positive': 'Vendor ID must be a positive number'
             }),
-        otherwise: Joi.forbidden().messages({
-            'any.unknown': 'Vendor ID is only allowed when isRecruiter is true'
+        otherwise: Joi.valid(null).optional().messages({
+            'any.only': 'Vendor ID must be null when isRecruiter is false'
         })
     })
 });

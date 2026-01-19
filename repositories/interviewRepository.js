@@ -58,9 +58,8 @@ class InterviewRepository {
         }
     }
 
-    async getMonthlySummary(client, startDate, endDate) {
+    async getMonthlySummary(client, startUTC, endUTC) {
         const connection = client;
-
         try {
             const summaryQuery = `
             SELECT
@@ -70,67 +69,59 @@ class InterviewRepository {
                 SUM(CASE WHEN result = 'pending' THEN 1 ELSE 0 END) AS pending,
                 SUM(CASE WHEN result = 'cancelled' THEN 1 ELSE 0 END) AS cancelled
             FROM interview
-            WHERE deletedAt IS NULL;
-            `;
+            WHERE deletedAt IS NULL
+            AND fromTimeUTC >= ?
+            AND fromTimeUTC <= ?;
+        `;
 
-            const [summaryData] = await connection.query(summaryQuery);
+            const [summaryData] = await connection.query(summaryQuery, [startUTC, endUTC]);
 
             const interviewerQuery = `
             SELECT
                 m.memberId AS interviewerId,
                 m.memberName AS interviewerName,
-
                 COUNT(i.interviewId) AS total,
                 SUM(CASE WHEN i.result = 'selected' THEN 1 ELSE 0 END) AS selected,
                 SUM(CASE WHEN i.result = 'rejected' THEN 1 ELSE 0 END) AS rejected,
                 SUM(CASE WHEN i.result = 'pending' THEN 1 ELSE 0 END) AS pending,
                 SUM(CASE WHEN i.result = 'cancelled' THEN 1 ELSE 0 END) AS cancelled,
-
                 AVG(i.durationMinutes) AS avgDuration,
                 SUM(i.durationMinutes) AS totalMinutes
-
             FROM member m
             LEFT JOIN interview i
                 ON i.interviewerId = m.memberId
-                AND DATE(i.fromTimeUTC) >= ?      
-                AND DATE(i.fromTimeUTC) <= ?  AND i.deletedAt IS NULL
-
+                AND i.fromTimeUTC >= ?
+                AND i.fromTimeUTC <= ?
+                AND i.deletedAt IS NULL
             GROUP BY m.memberId, m.memberName
             HAVING total > 0
             ORDER BY interviewerName;
-            `;
-            console.log('startDate:', startDate, typeof startDate);
-            console.log('endDate:', endDate, typeof endDate);
+        `;
 
-            const [interviewerData] = await connection.query(interviewerQuery, [
-                startDate,
-                endDate
-            ]);
+            const [interviewerData] = await connection.query(interviewerQuery, [startUTC, endUTC]);
 
             const dateQuery = `
             SELECT DISTINCT fromTimeUTC AS interviewTimeStamp
             FROM interview
-            WHERE DATE(fromTimeUTC) >= ? AND DATE(fromTimeUTC) <= ? AND deletedAt IS NULL
+            WHERE fromTimeUTC >= ?
+            AND fromTimeUTC <= ?
+            AND deletedAt IS NULL
             ORDER BY interviewTimeStamp;
-            `;
+        `;
 
-            const [datesData] = await connection.query(dateQuery, [
-                startDate,
-                endDate
-            ]);
+            const [datesData] = await connection.query(dateQuery, [startUTC, endUTC]);
 
             return {
                 summary: summaryData[0],
                 interviewers: interviewerData,
                 interviewTimeStamp: datesData
             };
-
         } catch (error) {
             this._handleDatabaseError(error, "getMonthlySummary");
         }
     }
 
-    async getDailySummary(client, date) {
+    async getDailySummary(client, startUTC, endUTC) {
         const connection = client;
 
         try {
@@ -160,13 +151,14 @@ class InterviewRepository {
             JOIN member m ON m.memberId = i.interviewerId
             LEFT JOIN candidate c ON c.candidateId = i.candidateId
 
-            WHERE DATE(i.fromTimeUTC) = ?
+            WHERE i.fromTimeUTC >= ?
+            AND i.fromTimeUTC <= ?
               AND i.deletedAt IS NULL
 
             ORDER BY m.memberName, i.fromTimeUTC;
         `;
 
-            const [rows] = await connection.query(query, [date]);
+            const [rows] = await connection.query(query, [startUTC, endUTC]);
 
             return { interviews: rows };
 
@@ -264,75 +256,74 @@ class InterviewRepository {
         }
     }
 
-    async getInterviewerWorkloadReport(client, startDate, endDate, interviewerId = null) {
+    async getInterviewerWorkloadReport(client, startUTC, endUTC, interviewerId = null) {
         const connection = client;
 
         try {
             // Build interviewer filter
             let interviewerFilter = '';
-            const params = [startDate, endDate];
+            const params = [startUTC, endUTC];
 
             if (interviewerId) {
                 interviewerFilter = 'AND m.memberId = ?';
                 params.push(interviewerId);
             }
 
-            // Get interviewer statistics
+            // Get interviewer statistics - USE UTC TIMESTAMPS
             const statsQuery = `
-            SELECT
-                m.memberId AS interviewerId,
-                m.memberName AS interviewerName,
-                COUNT(i.interviewId) AS totalInterviews,
-                COUNT(i.interviewId) AS interviewsConducted,
-                CAST(COUNT(i.interviewId) AS UNSIGNED) AS totalInterviews,
-                CAST(SUM(CASE WHEN i.result = 'pending' THEN 1 ELSE 0 END) AS UNSIGNED) AS pending,
-                CAST(SUM(CASE WHEN i.result = 'selected' THEN 1 ELSE 0 END) AS UNSIGNED) AS selected,
-                CAST(SUM(CASE WHEN i.result = 'rejected' THEN 1 ELSE 0 END) AS UNSIGNED) AS rejected,
-                CAST(SUM(CASE WHEN i.result = 'cancelled' THEN 1 ELSE 0 END) AS UNSIGNED) AS cancelled,
-                CAST(0 AS UNSIGNED) AS cancelledByCandidates
-
-            FROM member m
-            LEFT JOIN interview i
-                ON i.interviewerId = m.memberId
-                AND DATE(i.fromTimeUTC) >= ?
-                AND DATE(i.fromTimeUTC) <= ?
-                AND i.deletedAt IS NULL
-                AND i.isActive = TRUE
-            WHERE m.isActive = TRUE
-                ${interviewerFilter}
-            GROUP BY m.memberId, m.memberName
-            HAVING totalInterviews > 0
-            ORDER BY m.memberName;
-            `;
+        SELECT
+            m.memberId AS interviewerId,
+            m.memberName AS interviewerName,
+            COUNT(i.interviewId) AS totalInterviews,
+            COUNT(i.interviewId) AS interviewsConducted,
+            CAST(COUNT(i.interviewId) AS UNSIGNED) AS totalInterviews,
+            CAST(SUM(CASE WHEN i.result = 'pending' THEN 1 ELSE 0 END) AS UNSIGNED) AS pending,
+            CAST(SUM(CASE WHEN i.result = 'selected' THEN 1 ELSE 0 END) AS UNSIGNED) AS selected,
+            CAST(SUM(CASE WHEN i.result = 'rejected' THEN 1 ELSE 0 END) AS UNSIGNED) AS rejected,
+            CAST(SUM(CASE WHEN i.result = 'cancelled' THEN 1 ELSE 0 END) AS UNSIGNED) AS cancelled,
+            CAST(0 AS UNSIGNED) AS cancelledByCandidates
+        FROM member m
+        LEFT JOIN interview i
+            ON i.interviewerId = m.memberId
+            AND i.fromTimeUTC >= ?
+            AND i.fromTimeUTC <= ?
+            AND i.deletedAt IS NULL
+            AND i.isActive = TRUE
+        WHERE m.isActive = TRUE
+            ${interviewerFilter}
+        GROUP BY m.memberId, m.memberName
+        HAVING totalInterviews > 0
+        ORDER BY m.memberName;
+        `;
 
             const [interviewerStats] = await connection.query(statsQuery, params);
 
-            // Get detailed interviews for each interviewer
+            // Get detailed interviews - USE UTC TIMESTAMPS
             const detailsQuery = `
-            SELECT
-                i.interviewerId,
-                c.candidateId,
-                c.candidateName,
-                c.jobRole AS role,
-                CONCAT('R', CAST(RANK() OVER (
-                    PARTITION BY i.candidateId
-                    ORDER BY i.fromTimeUTC ASC, i.interviewId ASC
-                ) AS CHAR)) AS round,
-                DATE_FORMAT(i.fromTimeUTC, '%d-%b') AS date,
-                i.result,
-                i.interviewerFeedback AS feedback,
-                recruiter.memberId AS recruiterId,
-                recruiter.memberName AS recruiterName
-            FROM interview i
-            LEFT JOIN candidate c ON i.candidateId = c.candidateId
-            LEFT JOIN member recruiter ON c.recruiterId = recruiter.memberId
-            WHERE DATE(i.fromTimeUTC) >= ?
-                AND DATE(i.fromTimeUTC) <= ?
-                AND i.deletedAt IS NULL
-                AND i.isActive = TRUE
-                ${interviewerId ? 'AND i.interviewerId = ?' : ''}
-            ORDER BY i.interviewerId, i.fromTimeUTC DESC;
-            `;
+        SELECT
+            i.interviewerId,
+            c.candidateId,
+            c.candidateName,
+            c.jobRole AS role,
+            CONCAT('R', CAST(RANK() OVER (
+                PARTITION BY i.candidateId
+                ORDER BY i.fromTimeUTC ASC, i.interviewId ASC
+            ) AS CHAR)) AS round,
+            DATE_FORMAT(i.fromTimeUTC, '%d-%b') AS date,
+            i.result,
+            i.interviewerFeedback AS feedback,
+            recruiter.memberId AS recruiterId,
+            recruiter.memberName AS recruiterName
+        FROM interview i
+        LEFT JOIN candidate c ON i.candidateId = c.candidateId
+        LEFT JOIN member recruiter ON c.recruiterId = recruiter.memberId
+        WHERE i.fromTimeUTC >= ?
+            AND i.fromTimeUTC <= ?
+            AND i.deletedAt IS NULL
+            AND i.isActive = TRUE
+            ${interviewerId ? 'AND i.interviewerId = ?' : ''}
+        ORDER BY i.interviewerId, i.fromTimeUTC DESC;
+        `;
 
             const [interviewDetails] = await connection.query(detailsQuery, params);
 
