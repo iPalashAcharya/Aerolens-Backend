@@ -249,6 +249,11 @@ class InterviewRepository {
         `;
 
             const [rows] = await connection.query(query, params);
+            rows.forEach(row => {
+                if (row.expectedJoiningLocation && typeof row.expectedJoiningLocation === 'string') {
+                    row.expectedJoiningLocation = JSON.parse(row.expectedJoiningLocation);
+                }
+            });
             return rows;
 
         } catch (error) {
