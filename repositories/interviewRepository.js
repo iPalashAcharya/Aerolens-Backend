@@ -58,9 +58,8 @@ class InterviewRepository {
         }
     }
 
-    async getMonthlySummary(client, startDate, endDate) {
+    async getMonthlySummary(client, startUTC, endUTC) {
         const connection = client;
-
         try {
             const summaryQuery = `
             SELECT
@@ -70,66 +69,59 @@ class InterviewRepository {
                 SUM(CASE WHEN result = 'pending' THEN 1 ELSE 0 END) AS pending,
                 SUM(CASE WHEN result = 'cancelled' THEN 1 ELSE 0 END) AS cancelled
             FROM interview
-            WHERE deletedAt IS NULL;
-            `;
+            WHERE deletedAt IS NULL
+            AND fromTimeUTC >= ?
+            AND fromTimeUTC <= ?;
+        `;
 
-            const [summaryData] = await connection.query(summaryQuery);
+            const [summaryData] = await connection.query(summaryQuery, [startUTC, endUTC]);
 
             const interviewerQuery = `
             SELECT
                 m.memberId AS interviewerId,
                 m.memberName AS interviewerName,
-
                 COUNT(i.interviewId) AS total,
                 SUM(CASE WHEN i.result = 'selected' THEN 1 ELSE 0 END) AS selected,
                 SUM(CASE WHEN i.result = 'rejected' THEN 1 ELSE 0 END) AS rejected,
                 SUM(CASE WHEN i.result = 'pending' THEN 1 ELSE 0 END) AS pending,
                 SUM(CASE WHEN i.result = 'cancelled' THEN 1 ELSE 0 END) AS cancelled,
-
                 AVG(i.durationMinutes) AS avgDuration,
                 SUM(i.durationMinutes) AS totalMinutes
-
             FROM member m
             LEFT JOIN interview i
                 ON i.interviewerId = m.memberId
-                AND i.interviewDate >= ? AND i.interviewDate <= ? AND i.deletedAt IS NULL
-
+                AND i.fromTimeUTC >= ?
+                AND i.fromTimeUTC <= ?
+                AND i.deletedAt IS NULL
             GROUP BY m.memberId, m.memberName
             HAVING total > 0
             ORDER BY interviewerName;
-            `;
-            console.log('startDate:', startDate, typeof startDate);
-            console.log('endDate:', endDate, typeof endDate);
+        `;
 
-            const [interviewerData] = await connection.query(interviewerQuery, [
-                startDate,
-                endDate
-            ]);
+            const [interviewerData] = await connection.query(interviewerQuery, [startUTC, endUTC]);
 
             const dateQuery = `
-            SELECT DISTINCT interviewDate
+            SELECT DISTINCT fromTimeUTC AS interviewTimeStamp
             FROM interview
-            WHERE interviewDate >= ? AND interviewDate <= ? AND deletedAt IS NULL
-            ORDER BY interviewDate;
-            `;
+            WHERE fromTimeUTC >= ?
+            AND fromTimeUTC <= ?
+            AND deletedAt IS NULL
+            ORDER BY interviewTimeStamp;
+        `;
 
-            const [datesData] = await connection.query(dateQuery, [
-                startDate,
-                endDate
-            ]);
+            const [datesData] = await connection.query(dateQuery, [startUTC, endUTC]);
 
             return {
                 summary: summaryData[0],
                 interviewers: interviewerData,
-                interviewDates: datesData
+                interviewTimeStamp: datesData
             };
-
         } catch (error) {
             this._handleDatabaseError(error, "getMonthlySummary");
         }
     }
 
-    async getDailySummary(client, date) {
+    async getDailySummary(client, startUTC, endUTC) {
         const connection = client;
 
         try {
@@ -141,12 +133,13 @@ class InterviewRepository {
                 i.interviewId,
                 i.candidateId,
                 c.candidateName,
-                i.interviewDate,
-                TIME_FORMAT(i.fromTime, '%H:%i') AS fromTime,
-                TIME_FORMAT(i.toTime, '%H:%i') AS toTime,
+                DATE(i.fromTimeUTC) AS interviewDate,
+                DATE_FORMAT(i.fromTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS fromTime,
+                DATE_FORMAT(i.toTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS toTime,
+                i.eventTimezone,
                 RANK() OVER (
                 PARTITION BY i.candidateId
-                ORDER BY i.interviewDate, i.fromTime, i.interviewId
+                ORDER BY i.fromTimeUTC, i.interviewId
                 ) AS roundNumber,
                 COUNT(*) OVER (PARTITION BY candidateId) AS totalInterviews,
                 i.durationMinutes,
@@ -158,18 +151,228 @@ class InterviewRepository {
             JOIN member m ON m.memberId = i.interviewerId
             LEFT JOIN candidate c ON c.candidateId = i.candidateId
 
-            WHERE i.interviewDate = ?
+            WHERE i.fromTimeUTC >= ?
+            AND i.fromTimeUTC <= ?
               AND i.deletedAt IS NULL
 
-            ORDER BY m.memberName, i.fromTime;
+            ORDER BY m.memberName, i.fromTimeUTC;
         `;
 
-            const [rows] = await connection.query(query, [date]);
+            const [rows] = await connection.query(query, [startUTC, endUTC]);
 
             return { interviews: rows };
 
         } catch (error) {
             this._handleDatabaseError(error, "getDailySummary");
+        }
+    }
+
+    async getInterviewsByDateRange(client, startUTC, endUTC, filters = {}) {
+        const connection = client;
+
+        try {
+            const conditions = [
+                'i.isActive = 1',
+                'i.deletedAt IS NULL',
+                'i.fromTimeUTC >= ?',
+                'i.fromTimeUTC < ?'
+            ];
+
+            const params = [startUTC, endUTC];
+
+            // Optional filters
+            if (filters.interviewerId) {
+                conditions.push('i.interviewerId = ?');
+                params.push(filters.interviewerId);
+            }
+
+            if (filters.result) {
+                conditions.push('i.result = ?');
+                params.push(filters.result);
+            }
+
+            if (filters.candidateId) {
+                conditions.push('i.candidateId = ?');
+                params.push(filters.candidateId);
+            }
+
+            const whereClause = conditions.join(' AND ');
+
+            const query = `
+            SELECT
+                -- Interview
+                DATE(i.fromTimeUTC) AS interviewDate,
+                DATE_FORMAT(i.fromTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS interviewFromTime,
+                i.interviewerFeedback,
+
+                -- Candidate
+                c.candidateId,
+                c.candidateName,
+                c.contactNumber AS candidatePhone,
+                c.email AS candidateEmail,
+                c.jobRole,
+                c.experienceYears,
+                c.noticePeriod,
+
+                -- Expected joining location as JSON
+                JSON_OBJECT(
+                    'locationId', loc.locationId,
+                    'city', loc.cityName,
+                    'state', loc.stateName,
+                    'country', loc.country
+                ) AS expectedJoiningLocation,
+
+                -- Interviewer
+                interviewer.memberId AS interviewerId,
+                interviewer.memberName AS interviewerName,
+
+                -- Recruiter
+                recruiter.memberName AS recruiterName
+
+            FROM interview i
+
+            JOIN candidate c
+                ON i.candidateId = c.candidateId
+
+            LEFT JOIN location loc
+                ON c.expectedLocation = loc.locationId
+
+            LEFT JOIN member interviewer
+                ON i.interviewerId = interviewer.memberId
+
+            LEFT JOIN member recruiter
+                ON c.recruiterId = recruiter.memberId
+
+            WHERE ${whereClause}
+
+            ORDER BY i.fromTimeUTC DESC;
+        `;
+
+            const [rows] = await connection.query(query, params);
+            rows.forEach(row => {
+                if (row.expectedJoiningLocation && typeof row.expectedJoiningLocation === 'string') {
+                    row.expectedJoiningLocation = JSON.parse(row.expectedJoiningLocation);
+                }
+            });
+            return rows;
+
+        } catch (error) {
+            this._handleDatabaseError(error, 'getInterviewsByDateRange');
+        }
+    }
+
+    async getInterviewerWorkloadReport(client, startUTC, endUTC, interviewerId = null) {
+        const connection = client;
+
+        try {
+            // Build interviewer filter
+            let interviewerFilter = '';
+            const params = [startUTC, endUTC];
+
+            if (interviewerId) {
+                interviewerFilter = 'AND m.memberId = ?';
+                params.push(interviewerId);
+            }
+
+            // Get interviewer statistics - USE UTC TIMESTAMPS
+            const statsQuery = `
+        SELECT
+            m.memberId AS interviewerId,
+            m.memberName AS interviewerName,
+            COUNT(i.interviewId) AS totalInterviews,
+            COUNT(i.interviewId) AS interviewsConducted,
+            CAST(COUNT(i.interviewId) AS UNSIGNED) AS totalInterviews,
+            CAST(SUM(CASE WHEN i.result = 'pending' THEN 1 ELSE 0 END) AS UNSIGNED) AS pending,
+            CAST(SUM(CASE WHEN i.result = 'selected' THEN 1 ELSE 0 END) AS UNSIGNED) AS selected,
+            CAST(SUM(CASE WHEN i.result = 'rejected' THEN 1 ELSE 0 END) AS UNSIGNED) AS rejected,
+            CAST(SUM(CASE WHEN i.result = 'cancelled' THEN 1 ELSE 0 END) AS UNSIGNED) AS cancelled,
+            CAST(0 AS UNSIGNED) AS cancelledByCandidates
+        FROM member m
+        LEFT JOIN interview i
+            ON i.interviewerId = m.memberId
+            AND i.fromTimeUTC >= ?
+            AND i.fromTimeUTC <= ?
+            AND i.deletedAt IS NULL
+            AND i.isActive = TRUE
+        WHERE m.isActive = TRUE
+            ${interviewerFilter}
+        GROUP BY m.memberId, m.memberName
+        HAVING totalInterviews > 0
+        ORDER BY m.memberName;
+        `;
+
+            const [interviewerStats] = await connection.query(statsQuery, params);
+
+            // Get detailed interviews - USE UTC TIMESTAMPS
+            const detailsQuery = `
+        SELECT
+            i.interviewerId,
+            c.candidateId,
+            c.candidateName,
+            c.jobRole AS role,
+            CONCAT('R', CAST(RANK() OVER (
+                PARTITION BY i.candidateId
+                ORDER BY i.fromTimeUTC ASC, i.interviewId ASC
+            ) AS CHAR)) AS round,
+            DATE_FORMAT(i.fromTimeUTC, '%d-%b') AS date,
+            i.result,
+            i.interviewerFeedback AS feedback,
+            recruiter.memberId AS recruiterId,
+            recruiter.memberName AS recruiterName
+        FROM interview i
+        LEFT JOIN candidate c ON i.candidateId = c.candidateId
+        LEFT JOIN member recruiter ON c.recruiterId = recruiter.memberId
+        WHERE i.fromTimeUTC >= ?
+            AND i.fromTimeUTC <= ?
+            AND i.deletedAt IS NULL
+            AND i.isActive = TRUE
+            ${interviewerId ? 'AND i.interviewerId = ?' : ''}
+        ORDER BY i.interviewerId, i.fromTimeUTC DESC;
+        `;
+
+            const [interviewDetails] = await connection.query(detailsQuery, params);
+
+            // Group interviews by interviewer
+            const interviewsByInterviewer = {};
+            interviewDetails.forEach(interview => {
+                if (!interviewsByInterviewer[interview.interviewerId]) {
+                    interviewsByInterviewer[interview.interviewerId] = [];
+                }
+                interviewsByInterviewer[interview.interviewerId].push({
+                    candidateId: interview.candidateId,
+                    candidateName: interview.candidateName,
+                    role: interview.role,
+                    round: interview.round,
+                    date: interview.date,
+                    result: interview.result,
+                    feedback: interview.feedback,
+                    recruiterId: interview.recruiterId,
+                    recruiterName: interview.recruiterName
+                });
+            });
+
+            // Combine stats with interview details
+            const interviewers = interviewerStats.map(stat => ({
+                interviewerId: stat.interviewerId,
+                interviewerName: stat.interviewerName,
+                statistics: {
+                    totalInterviews: stat.totalInterviews,
+                    interviewsConducted: stat.interviewsConducted,
+                    pending: stat.pending,
+                    selected: stat.selected,
+                    rejected: stat.rejected,
+                    cancelled: stat.cancelled,
+                    cancelledByCandidates: stat.cancelledByCandidates
+                },
+                interviews: interviewsByInterviewer[stat.interviewerId] || []
+            }));
+
+            return {
+                interviewers
+            };
+
+        } catch (error) {
+            this._handleDatabaseError(error, 'getInterviewerWorkloadReport');
         }
     }
 
@@ -189,15 +392,18 @@ class InterviewRepository {
                 i.interviewId,
                 RANK() OVER (
                 PARTITION BY i.candidateId
-                ORDER BY i.interviewDate ASC, i.fromTime ASC, i.interviewId ASC
+                ORDER BY i.fromTimeUTC ASC, i.interviewId ASC
                 ) AS roundNumber,
                 COUNT(*) OVER (PARTITION BY candidateId) AS totalInterviews,
-                i.interviewDate,
-                TIME_FORMAT(i.fromTime, '%H:%i') AS fromTime,
-                TIME_FORMAT(i.toTime,'%H:%i') AS toTime,
+                DATE(i.fromTimeUTC) AS interviewDate,
+                DATE_FORMAT(i.fromTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS fromTime,
+                DATE_FORMAT(i.toTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS toTime,
+                i.eventTimezone,
                 i.durationMinutes,
                 c.candidateId,
                 c.candidateName,
+                c.isActive AS candidateIsActive,
+                c.isActive = FALSE AS candidateIsDeleted,
                 interviewer.memberId AS interviewerId,
                 interviewer.memberName AS interviewerName,
                 scheduler.memberId AS scheduledById,
@@ -242,19 +448,22 @@ class InterviewRepository {
 
                 RANK() OVER (
                     PARTITION BY i.candidateId
-                    ORDER BY i.interviewDate ASC, i.fromTime ASC, i.interviewId ASC
+                    ORDER BY i.fromTimeUTC ASC, i.interviewId ASC
                 ) AS roundNumber,
 
                 COUNT(*) OVER (
                     PARTITION BY i.candidateId
                 ) AS totalInterviews,
 
-                i.interviewDate,
-                TIME_FORMAT(i.fromTime, '%H:%i') AS fromTime,
-                TIME_FORMAT(i.toTime,'%H:%i') AS toTime,
+                DATE(i.fromTimeUTC) AS interviewDate,
+                DATE_FORMAT(i.fromTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS fromTime,
+                DATE_FORMAT(i.toTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS toTime,
+                i.eventTimezone,
                 i.durationMinutes,
                 c.candidateId,
                 c.candidateName,
+                c.isActive AS candidateIsActive,
+                c.isActive = FALSE AS candidateIsDeleted,
                 interviewer.memberId AS interviewerId,
                 interviewer.memberName AS interviewerName,
                 scheduler.memberId AS scheduledById,
@@ -293,12 +502,13 @@ class InterviewRepository {
                 i.interviewId,
                 RANK() OVER (
                 PARTITION BY i.candidateId
-                ORDER BY i.interviewDate ASC, i.fromTime ASC, i.interviewId ASC
+                ORDER BY i.fromTimeUTC ASC, i.interviewId ASC
                 ) AS roundNumber,
                 COUNT(*) OVER (PARTITION BY candidateId) AS totalInterviews,
-                i.interviewDate,
-                TIME_FORMAT(i.fromTime, '%H:%i') AS fromTime,
-                TIME_FORMAT(i.toTime,'%H:%i') AS toTime,
+                DATE(i.fromTimeUTC) AS interviewDate,
+                DATE_FORMAT(i.fromTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS fromTime,
+                DATE_FORMAT(i.toTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS toTime,
+                i.eventTimezone,
                 i.durationMinutes,
                 i.result,
                 i.meetingUrl,
@@ -534,24 +744,26 @@ class InterviewRepository {
             //const newTotalInterviews = totalInterviews + 1;
 
             const [result] = await connection.execute(
-                `INSERT INTO interview(
-                candidateId,
-                interviewDate,
-                fromTime,
-                durationMinutes,
-                interviewerId,
-                scheduledById,
-                result,
-                interviewerFeedback,
-                recruiterNotes
+                `INSERT INTO interview (
+                    candidateId,
+                    interviewDate,
+                    fromTimeUTC,
+                    eventTimezone,
+                    durationMinutes,
+                    interviewerId,
+                    scheduledById,
+                    result,
+                    interviewerFeedback,
+                    recruiterNotes
                 )
-            VALUES (?,?,?,?,?,?,?,?,?)`,
+                VALUES (?,?,?,?,?,?,?,?,?,?)
+                `,
                 [
                     candidateId,
-                    //newRoundNumber,
-                    //newTotalInterviews,
                     interviewData.interviewDate,
-                    interviewData.fromTime,
+                    interviewData.startUTC,
+                    //interviewData.endUTC,
+                    interviewData.eventTimezone,
                     interviewData.durationMinutes,
                     interviewData.interviewerId,
                     interviewData.scheduledById,
@@ -570,16 +782,16 @@ class InterviewRepository {
 
                 RANK() OVER (
                     PARTITION BY i.candidateId
-                    ORDER BY i.interviewDate ASC, i.fromTime ASC, i.interviewId ASC
+                    ORDER BY i.fromTimeUTC ASC, i.interviewId ASC
                 ) AS roundNumber,
 
                 COUNT(*) OVER (
                     PARTITION BY i.candidateId
                 ) AS totalInterviews,
 
-                i.interviewDate,
-                TIME_FORMAT(i.fromTime, '%H:%i') AS fromTime,
-                TIME_FORMAT(i.toTime,'%H:%i') AS toTime,
+                DATE(i.fromTimeUTC) AS interviewDate,
+                DATE_FORMAT(i.fromTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS fromTime,
+                DATE_FORMAT(i.toTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS toTime,
                 i.durationMinutes,
                 c.candidateId,
                 c.candidateName,
@@ -624,8 +836,15 @@ class InterviewRepository {
             }
 
             const allowedFields = [
-                'interviewDate', 'fromTime', 'durationMinutes', 'interviewerId', 'scheduledById'
+                'interviewDate',
+                'fromTimeUTC',
+                'toTimeUTC',
+                'eventTimezone',
+                'durationMinutes',
+                'interviewerId',
+                'scheduledById'
             ];
+
 
             const filteredData = {};
             Object.keys(interviewData).forEach(key => {

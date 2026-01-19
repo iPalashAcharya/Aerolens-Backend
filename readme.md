@@ -3532,40 +3532,49 @@ All error responses follow this format:
 "metadata": {}
 }
 
-Here is your **rewritten README with proper Markdown structure and valid, consistently formatted JSON**, **without changing any content or meaning**.
-I’ve only fixed:
-
-- Broken code fences
-- JSON indentation
-- Missing/extra backticks
-- Section boundaries
-
----
-
 # Interview Management API
 
-This API provides endpoints to manage interviews in an HRMS system, including scheduling, updating, finalizing, and reporting on interviews.
+A comprehensive REST API for managing interview scheduling, tracking, and reporting with timezone support and conflict detection.
+
+## Table of Contents
+
+- [Authentication](#authentication)
+- [Endpoints](#endpoints)
+  - [Get All Interviews](#get-all-interviews)
+  - [Get Interview by ID](#get-interview-by-id)
+  - [Get Interviews by Candidate](#get-interviews-by-candidate)
+  - [Get Create Form Data](#get-create-form-data)
+  - [Get Finalize Form Data](#get-finalize-form-data)
+  - [Create Interview](#create-interview)
+  - [Schedule Next Round](#schedule-next-round)
+  - [Update Interview](#update-interview)
+  - [Finalize Interview](#finalize-interview)
+  - [Delete Interview](#delete-interview)
+  - [Get Interview Tracker](#get-interview-tracker)
+  - [Get Overall Summary](#get-overall-summary)
+  - [Get Monthly Summary](#get-monthly-summary)
+  - [Get Daily Summary](#get-daily-summary)
+- [Error Responses](#error-responses)
 
 ---
 
-## Base URL
+## Authentication
 
-```
-/api/interview
-```
+All endpoints require authentication via Bearer token.
 
-All endpoints require authentication via the `authenticate` middleware and audit context via `auditContextMiddleware`.
+```http
+Authorization: Bearer <your-token>
+```
 
 ---
 
 ## Endpoints
 
-### 1. Get All Interviews
+### Get All Interviews
 
-Fetch all active interviews.
+Retrieve all active interviews.
 
-- **Method:** `GET`
-- **Path:** `/`
+**Endpoint:** `GET /interview`
 
 **Response:**
 
@@ -3578,19 +3587,24 @@ Fetch all active interviews.
       "interviewId": 1,
       "roundNumber": 1,
       "totalInterviews": 2,
-      "interviewDate": "2025-12-15",
-      "fromTime": "10:00",
-      "toTime": "10:45",
-      "durationMinutes": 45,
-      "candidateId": 101,
+      "interviewDate": "2026-01-15",
+      "fromTime": "2026-01-15T09:00:00.000Z",
+      "toTime": "2026-01-15T10:00:00.000Z",
+      "eventTimezone": "Asia/Kolkata",
+      "eventTimestamp": "2025-12-15T14:30:00.000+05:30",
+      "candidateIsActive": 0,
+      "candidateIsDeleted": 1,
+      "durationMinutes": 60,
+      "candidateId": 5,
       "candidateName": "John Doe",
-      "interviewerId": 201,
-      "interviewerName": "Alice Smith",
-      "scheduledById": 301,
-      "scheduledByName": "Bob Johnson",
-      "result": "pending",
-      "recruiterNotes": "Initial screening",
+      "interviewerId": 3,
+      "interviewerName": "Jane Smith",
+      "scheduledById": 2,
+      "scheduledByName": "HR Manager",
+      "result": "Pending",
+      "recruiterNotes": "Technical round",
       "interviewerFeedback": null,
+      "meetingUrl": "https://meet.example.com/interview-123",
       "isActive": true
     }
   ]
@@ -3599,64 +3613,99 @@ Fetch all active interviews.
 
 ---
 
-### 2. Get Interview Form Data
+### Get Interview by ID
 
-- **Method:** `GET`
-- **Path:** `/create-data`
+Retrieve a specific interview by its ID.
+
+**Endpoint:** `GET /interview/:interviewId`
+
+**Parameters:**
+
+- `interviewId` (path) - Interview ID (positive integer)
 
 **Response:**
 
 ```json
 {
   "success": true,
-  "message": "Interview Form Data retrieved successfully",
+  "message": "Interview entry retrieved successfully",
   "data": {
-    "interview": null,
-    "interviewers": [
-      {
-        "interviewerId": 201,
-        "interviewerName": "Alice Smith"
-      }
-    ],
-    "recruiters": [
-      {
-        "recruiterId": 301,
-        "recruiterName": "Bob Johnson"
-      }
-    ],
-    "candidates": []
+    "interviewId": 1,
+    "roundNumber": 1,
+    "totalInterviews": 2,
+    "interviewDate": "2026-01-15",
+    "fromTime": "2026-01-15T09:00:00.000Z",
+    "toTime": "2026-01-15T10:00:00.000Z",
+    "eventTimezone": "Asia/Kolkata",
+    "eventTimestamp": "2025-12-15T14:30:00.000+05:30",
+    "candidateIsActive": 0,
+    "candidateIsDeleted": 1,
+    "durationMinutes": 60,
+    "candidateId": 5,
+    "candidateName": "John Doe",
+    "interviewerId": 3,
+    "interviewerName": "Jane Smith",
+    "scheduledById": 2,
+    "scheduledByName": "HR Manager",
+    "result": "Pending",
+    "recruiterNotes": "Technical round",
+    "interviewerFeedback": null,
+    "meetingUrl": "https://meet.example.com/interview-123"
   }
 }
 ```
 
 ---
 
-### 3. Get Interviews by Candidate
+### Get Interviews by Candidate
 
-- **Method:** `GET`
-- **Path:** `/candidate/:candidateId`
+Retrieve all interviews for a specific candidate.
 
-- **Response:**
+**Endpoint:** `GET /interview/candidate/:candidateId`
 
-```
+**Parameters:**
+
+- `candidateId` (path) - Candidate ID (positive integer)
+
+**Response:**
+
+```json
 {
   "success": true,
   "message": "Candidate interviews retrieved successfully",
   "data": {
-    "candidateId": 101,
+    "candidateId": 5,
     "totalRounds": 2,
     "data": [
       {
         "interviewId": 1,
         "roundNumber": 1,
         "totalInterviews": 2,
-        "interviewDate": "2025-12-15",
-        "fromTime": "10:00",
-        "toTime": "10:45",
-        "durationMinutes": 45,
-        "result": "pending",
-        "interviewerId": 201,
-        "interviewerName": "Alice Smith"
+        "interviewDate": "2026-01-15",
+        "fromTime": "2026-01-15T09:00:00.000Z",
+        "toTime": "2026-01-15T10:00:00.000Z",
+        "eventTimezone": "Asia/Kolkata",
+        "eventTimestamp": "2025-12-15T14:30:00.000+05:30",
+        "durationMinutes": 60,
+        "result": "Selected",
+        "meetingUrl": "https://meet.example.com/interview-123",
+        "interviewerId": 3,
+        "interviewerName": "Jane Smith"
+      },
+      {
+        "interviewId": 2,
+        "roundNumber": 2,
+        "totalInterviews": 2,
+        "interviewDate": "2026-01-20",
+        "fromTime": "2026-01-20T14:00:00.000Z",
+        "toTime": "2026-01-20T15:30:00.000Z",
+        "eventTimezone": "Asia/Kolkata",
+        "eventTimestamp": "2025-12-15T14:30:00.000+05:30",
+        "durationMinutes": 90,
+        "result": "Pending",
+        "meetingUrl": null,
+        "interviewerId": 4,
+        "interviewerName": "Bob Johnson"
       }
     ]
   }
@@ -3665,105 +3714,129 @@ Fetch all active interviews.
 
 ---
 
-### 4. Get Interview by ID
+### Get Create Form Data
 
-Fetch a single interview by its ID.
+Retrieve data needed for the interview creation form.
 
-- **Method:** `GET`
-- **Path:** `/:interviewId`
-- **Params:**
+**Endpoint:** `GET /interview/create-data`
 
-| Field         | Type   | Required | Description         |
-| ------------- | ------ | -------- | ------------------- |
-| `interviewId` | number | Yes      | ID of the interview |
+**Response:**
 
-- **Response:**
-
-```
+```json
 {
   "success": true,
-  "message": "Interview entry retrieved successfully",
+  "message": "Interview Form Data retrieved successfully",
   "data": {
-    "interviewId": 1,
-    "roundNumber": 1,
-    "totalInterviews": 2,
-    "interviewDate": "2025-12-15",
-    "fromTime": "10:00",
-    "toTime": "10:45",
-    "durationMinutes": 45,
-    "candidateId": 101,
-    "candidateName": "John Doe",
-    "interviewerId": 201,
-    "interviewerName": "Alice Smith",
-    "scheduledById": 301,
-    "scheduledByName": "Bob Johnson",
-    "result": "pending",
-    "recruiterNotes": "Initial screening",
-    "interviewerFeedback": null
+    "interviewers": [
+      {
+        "interviewerId": 3,
+        "interviewerName": "Jane Smith"
+      },
+      {
+        "interviewerId": 4,
+        "interviewerName": "Bob Johnson"
+      }
+    ],
+    "recruiters": [
+      {
+        "recruiterId": 2,
+        "recruiterName": "HR Manager"
+      }
+    ]
   }
 }
 ```
 
 ---
 
-### 5. Create Interview
+### Get Finalize Form Data
 
-Schedule a new interview for a candidate.
+Retrieve current data for finalizing an interview.
 
-- **Method:** `POST`
-- **Path:** `/:candidateId`
-- **Params:**
+**Endpoint:** `GET /interview/:interviewId/finalize-data`
 
-| Field         | Type   | Required | Description         |
-| ------------- | ------ | -------- | ------------------- |
-| `candidateId` | number | Yes      | ID of the candidate |
+**Parameters:**
 
-- **Request Body:**
+- `interviewId` (path) - Interview ID (positive integer)
 
-```
+**Response:**
+
+```json
 {
-  "interviewDate": "2025-12-15",
-  "fromTime": "10:00",
-  "durationMinutes": 45,
-  "interviewerId": 201,
-  "scheduledById": 301,
+  "success": true,
+  "message": "Finalize Interview Form Data retrieved successfully",
+  "data": {
+    "interviewId": 1,
+    "result": "pending",
+    "recruiterNotes": "Technical round",
+    "interviewerFeedback": null,
+    "meetingUrl": "https://meet.example.com/interview-123"
+  }
+}
+```
+
+---
+
+### Create Interview
+
+Create a new interview for a candidate.
+
+**Endpoint:** `POST /interview/:candidateId`
+
+**Parameters:**
+
+- `candidateId` (path) - Candidate ID (positive integer)
+
+**Request Body:**
+
+```json
+{
+  "interviewDate": "2026-01-15",
+  "fromTime": "09:00",
+  "durationMinutes": 60,
+  "eventTimezone": "Asia/Kolkata",
+  "interviewerId": 3,
+  "scheduledById": 2,
   "result": "pending",
-  "recruiterNotes": "Initial screening",
+  "recruiterNotes": "Technical round - focus on algorithms",
   "interviewerFeedback": null
 }
 ```
 
-- **Validation Rules:**
+**Validation Rules:**
 
-| Field                 | Type   | Rules                                                             |
-| --------------------- | ------ | ----------------------------------------------------------------- |
-| `interviewDate`       | string | YYYY-MM-DD format, cannot be in the past, required                |
-| `fromTime`            | string | HH:MM format (00:00–23:59), required                              |
-| `durationMinutes`     | number | Integer, 15–480 minutes, required                                 |
-| `interviewerId`       | number | Positive integer, required                                        |
-| `scheduledById`       | number | Positive integer, required                                        |
-| `result`              | string | One of: `pending`, `selected`, `rejected`, `cancelled` (optional) |
-| `recruiterNotes`      | string | Max 1000 characters, optional, can be `""` or `null`              |
-| `interviewerFeedback` | string | Max 2000 characters, optional, can be `""` or `null`              |
+- `interviewDate`: Required, format YYYY-MM-DD
+- `fromTime`: Required, format HH:MM (00:00-23:59)
+- `durationMinutes`: Required, integer, min 15, max 480
+- `eventTimezone`: Required, valid IANA timezone (e.g., Asia/Kolkata)
+- `interviewerId`: Required, positive integer
+- `scheduledById`: Required, positive integer
+- `result`: Optional, one of: pending, selected, rejected, cancelled (default: pending)
+- `recruiterNotes`: Optional, max 1000 characters
+- `interviewerFeedback`: Optional, max 2000 characters
 
-- **Response (201 Created):**
+**Response:**
 
-```
+```json
 {
   "success": true,
   "message": "interview created successfully",
   "data": {
     "interviewId": 1,
-    "candidateId": 101,
     "roundNumber": 1,
     "totalInterviews": 1,
-    "interviewDate": "2025-12-15",
-    "fromTime": "10:00",
-    "durationMinutes": 45,
-    "interviewerId": 201,
-    "scheduledById": 301,
-    "result": "pending",
-    "recruiterNotes": "Initial screening",
+    "interviewDate": "2026-01-15",
+    "fromTime": "2026-01-15T09:00:00.000Z",
+    "toTime": "2026-01-15T10:00:00.000Z",
+    "durationMinutes": 60,
+    "candidateId": 5,
+    "candidateName": "John Doe",
+    "interviewerId": 3,
+    "interviewerName": "Jane Smith",
+    "scheduledById": 2,
+    "scheduledByName": "HR Manager",
+    "result": "Pending",
+    "recruiterNotes": "Technical round - focus on algorithms",
     "interviewerFeedback": null
   }
 }
@@ -3771,190 +3844,701 @@ Schedule a new interview for a candidate.
 
 ---
 
-### 6. Schedule Next Round
+### Schedule Next Round
 
-Schedule the next interview round for a candidate (must have at least one existing interview).
+Schedule an additional interview round for a candidate.
 
-- **Method:** `POST`
-- **Path:** `/:candidateId/rounds`
-- **Params:**
+**Endpoint:** `POST /interview/:candidateId/rounds`
 
-| Field         | Type   | Required | Description         |
-| ------------- | ------ | -------- | ------------------- |
-| `candidateId` | number | Yes      | ID of the candidate |
+**Parameters:**
 
-- **Request Body:** Same as `Create Interview` (no `result`, `recruiterNotes`, `interviewerFeedback` required).
+- `candidateId` (path) - Candidate ID (positive integer)
 
-- **Response (201 Created):**
+**Request Body:**
 
+```json
+{
+  "interviewDate": "2026-01-20",
+  "fromTime": "14:00",
+  "durationMinutes": 90,
+  "eventTimezone": "Asia/Kolkata",
+  "interviewerId": 4,
+  "scheduledById": 2
+}
 ```
+
+**Validation Rules:**
+
+- Same as Create Interview, but without optional fields (result, notes, feedback)
+- Requires at least one previous interview for the candidate
+
+**Response:**
+
+```json
 {
   "success": true,
   "message": "Successfully scheduled round 2 for candidate",
   "data": {
     "interviewId": 2,
-    "candidateId": 101,
     "roundNumber": 2,
     "totalInterviews": 2,
-    "interviewDate": "2025-12-16",
-    "fromTime": "14:00",
-    "durationMinutes": 60,
-    "interviewerId": 202,
-    "scheduledById": 301
-  }
-}
-```
-
----
-
-## Get Finalization Form Data
-
-### `GET /interview/:interviewId/finalize-data`
-
-**Response**
-
-| Field                 | Type   | Rules                                                            |
-| --------------------- | ------ | ---------------------------------------------------------------- |
-| `result`              | string | One of: `pending`, `selected`, `rejected`, `cancelled`, required |
-| `recruiterNotes`      | string | Max 1000 characters, optional, can be `""` or `null`             |
-| `interviewerFeedback` | string | Max 2000 characters, optional, can be `""` or `null`             |
-
-- **Response:**
-
-```
-{
-  "success": true,
-  "message": "Finalize Interview Form Data retrieved successfully",
-  "data": {
-    "interviewId": 12,
+    "interviewDate": "2026-01-20",
+    "fromTime": "2026-01-20T14:00:00.000Z",
+    "toTime": "2026-01-20T15:30:00.000Z",
+    "durationMinutes": 90,
+    "candidateId": 5,
+    "candidateName": "John Doe",
+    "interviewerId": 4,
+    "interviewerName": "Bob Johnson",
+    "scheduledById": 2,
+    "scheduledByName": "HR Manager",
     "result": "Pending",
     "recruiterNotes": null,
-    "interviewerFeedback": null,
-    "meetingUrl": null
+    "interviewerFeedback": null
   }
 }
 ```
 
 ---
 
-## Finalize Interview
+### Update Interview
 
-### `PUT /interview/:interviewId/finalize`
+Update interview details. When updating time-related fields, all three (interviewDate, fromTime, eventTimezone) must be provided together.
 
-**Request**
+**Endpoint:** `PATCH /interview/:interviewId`
 
-```
+**Parameters:**
+
+- `interviewId` (path) - Interview ID (positive integer)
+
+**Request Body:**
+
+```json
 {
-  "result": "Selected",
-  "recruiterNotes": "Strong communication skills",
-  "interviewerFeedback": "Excellent problem solving",
-  "meetingUrl": "https://meet.google.com/abc-defg-hij"
+  "interviewDate": "2026-01-16",
+  "fromTime": "10:00",
+  "eventTimezone": "Asia/Kolkata",
+  "durationMinutes": 90,
+  "interviewerId": 4
+}
+```
+
+**Validation Rules:**
+
+- At least one field must be provided
+- If updating time: `interviewDate`, `fromTime`, and `eventTimezone` are all required together
+- `durationMinutes`: Optional, integer, min 15, max 480
+- `interviewerId`: Optional, positive integer
+- `scheduledById`: Optional, positive integer
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Interview entry updated successfully",
+  "data": {
+    "interviewId": 1,
+    "candidateId": 5,
+    "interviewDate": "2026-01-16",
+    "fromTime": "10:00",
+    "eventTimezone": "Asia/Kolkata",
+    "durationMinutes": 90,
+    "interviewerId": 4
+  }
 }
 ```
 
 ---
 
-## Error Response Format
+### Finalize Interview
 
-- **Method:** `GET`
-- **Path:** `/report/overall`
-- **Response:**
+Update interview result and feedback.
+
+**Endpoint:** `PUT /interview/:interviewId/finalize`
+
+**Parameters:**
+
+- `interviewId` (path) - Interview ID (positive integer)
+
+**Request Body:**
+
+```json
+{
+  "result": "Selected",
+  "recruiterNotes": "Strong technical skills",
+  "interviewerFeedback": "Excellent problem-solving abilities. Recommend for next round.",
+  "meetingUrl": "https://meet.example.com/interview-123"
+}
+```
+
+**Validation Rules:**
+
+- `result`: Required, one of: Pending, Selected, Rejected, Cancelled
+- `recruiterNotes`: Optional, max 1000 characters
+- `interviewerFeedback`: Optional, max 2000 characters
+- `meetingUrl`: Optional, must be HTTPS URL, max 2048 characters
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Interview finalized successfully",
+  "data": {
+    "interviewId": 1,
+    "result": "Selected",
+    "recruiterNotes": "Strong technical skills",
+    "interviewerFeedback": "Excellent problem-solving abilities. Recommend for next round.",
+    "meetingUrl": "https://meet.example.com/interview-123"
+  }
+}
+```
+
+---
+
+### Delete Interview
+
+Soft delete an interview. Automatically renumbers remaining rounds for the candidate.
+
+**Endpoint:** `DELETE /interview/:interviewId`
+
+**Parameters:**
+
+- `interviewId` (path) - Interview ID (positive integer)
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Interview entry deleted successfully",
+  "data": null
+}
+```
+
+---
+
+### Get Interview Tracker
+
+Filter and track interviews by various criteria.
+
+**Endpoint:** `GET /interview/report/tracker`
+
+**Query Parameters:**
+
+- `filter` (required): One of `today`, `past7days`, `custom`
+- `startDate` (required if filter=custom): Format YYYY-MM-DD
+- `endDate` (required if filter=custom): Format YYYY-MM-DD (must be >= startDate)
+- `timezone` (Required) should be in IANA Format
+- `interviewerId` (optional): Filter by interviewer ID
+- `result` (optional): Filter by result (pending, selected, rejected, cancelled)
+- `candidateId` (optional): Filter by candidate ID
+
+**Example Request:**
+
+```http
+GET /interview/report/tracker?filter=custom&startDate=2026-01-01&endDate=2026-01-31&result=selected&timezone=Asia/Kolkata
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Interview tracker data retrieved successfully",
+  "data": [
+    {
+      "interviewDate": "2026-01-15",
+      "interviewFromTime": "2026-01-15T09:00:00.000Z",
+      "interviewerFeedback": "Excellent problem-solving skills",
+      "candidateId": 5,
+      "candidateName": "John Doe",
+      "candidatePhone": "+1234567890",
+      "candidateEmail": "john.doe@example.com",
+      "jobRole": "Software Engineer",
+      "experienceYears": 3,
+      "noticePeriod": 30,
+      "expectedJoiningLocation": {
+        "locationId": 1,
+        "city": "Bangalore",
+        "state": "Karnataka",
+        "country": "India"
+      },
+      "interviewerId": 3,
+      "interviewerName": "Jane Smith",
+      "recruiterName": "HR Manager"
+    }
+  ]
+}
+```
+
+---
+
+### Get Overall Summary
+
+Get overall interview statistics grouped by interviewer.
+
+**Endpoint:** `GET /interview/report/overall`
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Total Interviewer Data Retrieved Successfully",
+  "data": {
+    "interviewers": [
+      {
+        "interviewerId": 3,
+        "interviewerName": "Jane Smith",
+        "total": 15,
+        "selected": 8,
+        "rejected": 5,
+        "pending": 2,
+        "cancelled": 0,
+        "avgDuration": 67.5,
+        "totalMinutes": 1012.5
+      },
+      {
+        "interviewerId": 4,
+        "interviewerName": "Bob Johnson",
+        "total": 12,
+        "selected": 6,
+        "rejected": 4,
+        "pending": 1,
+        "cancelled": 1,
+        "avgDuration": 75.0,
+        "totalMinutes": 900
+      }
+    ]
+  }
+}
+```
+
+---
+
+### Get Monthly Summary
+
+Get interview statistics for a specific date range, grouped by interviewer.
+
+**Endpoint:** `GET /interview/report/monthly`
+
+**Query Parameters:**
+
+- `startDate` (required): Format YYYY-MM-DD
+- `endDate` (required): Format YYYY-MM-DD (must be > startDate)
+- `timezone` (Required) should be in IANA Format
+
+**Example Request:**
+
+```http
+GET /interview/report/monthly?startDate=2026-01-01&endDate=2026-01-31&timezone=Asia/Kolkata
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Total Monthly Summary Data Retrieved Successfully",
+  "data": {
+    "summary": {
+      "total": 27,
+      "selected": 14,
+      "rejected": 9,
+      "pending": 3,
+      "cancelled": 1
+    },
+    "interviewers": [
+      {
+        "interviewerId": 3,
+        "interviewerName": "Jane Smith",
+        "total": 15,
+        "selected": 8,
+        "rejected": 5,
+        "pending": 2,
+        "cancelled": 0,
+        "avgDuration": 67.5,
+        "totalMinutes": 1012.5
+      }
+    ],
+    "interviewTimeStamp": [
+      {
+        "interviewTimeStamp": "2025-12-05 09:00:00.000000"
+      },
+      {
+        "interviewTimeStamp": "2025-12-10 09:00:00.000000"
+      },
+      {
+        "interviewTimeStamp": "2025-12-15 09:00:00.000000"
+      },
+      {
+        "interviewTimeStamp": "2025-12-15 13:00:00.000000"
+      },
+      {
+        "interviewTimeStamp": "2025-12-22 11:00:00.000000"
+      },
+      {
+        "interviewTimeStamp": "2025-12-23 11:00:00.000000"
+      },
+      {
+        "interviewTimeStamp": "2025-12-26 10:30:00.000000"
+      },
+      {
+        "interviewTimeStamp": "2025-12-27 11:00:00.000000"
+      },
+      {
+        "interviewTimeStamp": "2026-01-06 10:00:00.000000"
+      }
+    ]
+  }
+}
+```
+
+---
+
+### Get Daily Summary
+
+Get all interviews scheduled for a specific date.
+
+**Endpoint:** `GET /interview/report/daily`
+
+**Query Parameters:**
+
+- `date` (required): Format YYYY-MM-DD
+- `timezone` (Required) should be in IANA Format
+
+**Example Request:**
+
+```http
+GET /interview/report/daily?date=2026-01-15&timezone=Asia/Kolkata
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Total Daily Summary Data Retrieved Sucessfully",
+  "data": {
+    "interviews": [
+      {
+        "interviewerId": 3,
+        "interviewerName": "Jane Smith",
+        "interviewId": 1,
+        "candidateId": 5,
+        "candidateName": "John Doe",
+        "interviewDate": "2026-01-15",
+        "fromTime": "2026-01-15T09:00:00.000Z",
+        "toTime": "2026-01-15T10:00:00.000Z",
+        "eventTimezone": "Asia/Kolkata",
+        "roundNumber": 1,
+        "totalInterviews": 2,
+        "durationMinutes": 60,
+        "recruiterNotes": "Technical round",
+        "result": "Selected",
+        "meetingUrl": "https://meet.example.com/interview-123"
+      }
+    ]
+  }
+}
+```
+
+---
+
+# Interviewer Workload & Coverage Report
+
+Get comprehensive interviewer workload analysis with detailed interview breakdowns and statistics.
+
+## Endpoint
 
 ```
+GET /interview/report/interviewer-workload
+```
+
+## Query Parameters
+
+| Parameter       | Type    | Required    | Description                                                            |
+| --------------- | ------- | ----------- | ---------------------------------------------------------------------- |
+| `filter`        | string  | Yes         | One of: `today`, `past7days`, `past30days`, `custom`                   |
+| `startDate`     | string  | Conditional | Required if `filter=custom`. Format: YYYY-MM-DD                        |
+| `endDate`       | string  | Conditional | Required if `filter=custom`. Format: YYYY-MM-DD (must be >= startDate) |
+| `timezone`      | stirng  | yes         | User's timezone specified in IANA Format                               |
+| `interviewerId` | integer | No          | Filter by specific interviewer ID                                      |
+
+## Example Requests
+
+### Get last 7 days workload
+
+```http
+GET /interviews/report/interviewer-workload?filter=past7days&timezone=Asia/Kolkata
+```
+
+### Get custom date range
+
+```http
+GET /interviews/report/interviewer-workload?filter=custom&startDate=2026-12-01&endDate=2026-12-31&timezone=Asia/Kolkata
+```
+
+### Get specific interviewer workload
+
+```http
+GET /interviews/report/interviewer-workload?filter=past30days&interviewerId=3&timezone=Asia/Kolkata
+```
+
+## Response
+
+### Success Response (200 OK)
+
+```json
+{
+  "success": true,
+  "message": "Interviewer workload report retrieved successfully",
+  "data": {
+    "interviewers": [
+      {
+        "interviewerId": 1,
+        "interviewerName": "Thangavel",
+        "statistics": {
+          "totalInterviews": 6,
+          "interviewsConducted": 6,
+          "pending": 2,
+          "selected": 2,
+          "rejected": 2,
+          "cancelled": 0,
+          "cancelledByCandidates": 0
+        },
+        "interviews": [
+          {
+            "candidateId": 101,
+            "candidateName": "Ajaypal Padhiyar",
+            "role": "ROR Devel",
+            "round": "R1",
+            "date": "24-Dec",
+            "result": "Pending",
+            "feedback": null,
+            "recruiterId": 5,
+            "recruiterName": "Khushi Shah"
+          },
+          {
+            "candidateId": 102,
+            "candidateName": "Varun Bajaj",
+            "role": "TPM",
+            "round": "R1",
+            "date": "23-Dec",
+            "result": "Rejected",
+            "feedback": "Needs more experience in agile methodologies",
+            "recruiterId": 6,
+            "recruiterName": "Jayraj"
+          }
+        ]
+      },
+      {
+        "interviewerId": 2,
+        "interviewerName": "Bhavin Trivedi",
+        "statistics": {
+          "totalInterviews": 4,
+          "interviewsConducted": 4,
+          "pending": 1,
+          "selected": 1,
+          "rejected": 2,
+          "cancelled": 0,
+          "cancelledByCandidates": 0
+        },
+        "interviews": [
+          {
+            "candidateId": 107,
+            "candidateName": "Rahul Mehta",
+            "role": "QA Lead",
+            "round": "R1",
+            "date": "24-Dec",
+            "result": "Rejected",
+            "feedback": "Limited automation experience",
+            "recruiterId": 5,
+            "recruiterName": "Khushi Shah"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+## Response Fields
+
+### Interviewer Details
+
+Each interviewer object contains:
+
+#### Statistics
+
+- `totalInterviews`: Total interviews for this interviewer
+- `interviewsConducted`: Number of completed interviews
+- `pending`: Number of pending interviews
+- `selected`: Number of candidates selected
+- `rejected`: Number of candidates rejected
+- `cancelled`: Number of cancelled interviews
+- `cancelledByCandidates`: Number of cancellations by candidates
+
+#### Interviews Array
+
+Detailed breakdown of each interview:
+
+- `candidateId`: Unique candidate identifier
+- `candidateName`: Name of the candidate
+- `role`: Job role for the interview
+- `round`: Interview round (R1, R2, etc.)
+- `date`: Interview date (formatted as DD-MMM)
+- `result`: Interview outcome (Pending, Selected, Rejected, Cancelled)
+- `feedback`: Interviewer's feedback (if provided)
+- `recruiterId`: ID of the recruiter who scheduled the interview
+- `recruiterName`: Name of the recruiter
+
+## Filter Options
+
+| Filter       | Description                  | Date Range                         |
+| ------------ | ---------------------------- | ---------------------------------- |
+| `today`      | Today's interviews only      | Current date                       |
+| `past7days`  | Last 7 days including today  | Today - 6 days to today            |
+| `past30days` | Last 30 days including today | Today - 29 days to today           |
+| `custom`     | Custom date range            | User-specified start and end dates |
+
+## Error Responses
+
+### Validation Error (400)
+
+```json
 {
   "success": false,
   "message": "Validation failed",
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "details": {
-      "validationErrors": [
-        {
-          "field": "interviewDate",
-          "message": "Interview date must be in YYYY-MM-DD format"
-        }
-      ]
-    }
+  "errorCode": "VALIDATION_ERROR",
+  "details": {
+    "validationErrors": [
+      {
+        "field": "filter",
+        "message": "Filter must be one of: today, past7days, past30days, custom"
+      }
+    ]
   }
 }
 ```
 
----
-
-### Interviewer Time Conflict
+### Missing Required Fields for Custom Filter (400)
 
 ```json
 {
   "success": false,
-  "message": "Interviewer is already scheduled at this time",
-  "error": {
-    "code": "INTERVIEWER_TIME_CONFLICT",
-    "details": {
-      "interviewerId": "conflict",
-      "interviewDate": "conflict",
-      "fromTime": "conflict"
-    }
+  "message": "Validation failed",
+  "errorCode": "VALIDATION_ERROR",
+  "details": {
+    "validationErrors": [
+      {
+        "field": "startDate",
+        "message": "startDate is required when filter is custom"
+      },
+      {
+        "field": "endDate",
+        "message": "endDate is required when filter is custom"
+      }
+    ]
   }
 }
 ```
 
----
-
-### Candidate Time Conflict
-
-- **Response:**
-
-```
-{
-  "success": false,
-  "message": "Candidate already has an interview scheduled at this time",
-  "error": {
-    "code": "CANDIDATE_TIME_CONFLICT",
-    "details": {
-      "candidateId": "conflict",
-      "interviewDate": "conflict",
-      "fromTime": "conflict"
-    }
-  }
-}
-```
-
----
-
-### Generic Interview Scheduling Conflict
+### Invalid Date Range (400)
 
 ```json
 {
   "success": false,
-  "message": "Interview scheduling conflict",
-  "error": {
-    "code": "INTERVIEW_CONFLICT"
-  },
-  "details": null
+  "message": "Validation failed",
+  "errorCode": "VALIDATION_ERROR",
+  "details": {
+    "validationErrors": [
+      {
+        "field": "endDate",
+        "message": "endDate must be greater than or equal to startDate"
+      }
+    ]
+  }
 }
 ```
 
----
+### Invalid Timezone Error
 
-## Common Error Codes
+- Only active interviewers with at least one interview in the date range are included
+- Round numbers are dynamically calculated based on interview chronological order per candidate
+- All timestamps are in UTC but formatted for easy reading
+- Results are automatically capitalized for consistency
+- The report excludes soft-deleted interviews and inactive records
+- Average interviews per interviewer is rounded to 1 decimal place
 
-- `VALIDATION_ERROR`
-- `INTERVIEW_ENTRY_NOT_FOUND`
-- `NO_PREVIOUS_INTERVIEWS`
-- `INTERVIEW_NOT_FOUND`
-- `DATABASE_ERROR`
-- `DATABASE_SCHEMA_ERROR`
+## Error Responses
+
+### Validation Error
+
+```json
+{
+  "success": false,
+  "message": "Validation failed",
+  "errorCode": "VALIDATION_ERROR",
+  "details": {
+    "validationErrors": [
+      {
+        "field": "interviewDate",
+        "message": "Interview date must be in YYYY-MM-DD format"
+      },
+      {
+        "field": "durationMinutes",
+        "message": "Duration must be at least 15 minutes"
+      }
+    ]
+  }
+}
+```
+
+### Time Conflict Error
+
+```json
+{
+  "success": false,
+  "message": "Candidate already has an overlapping interview",
+  "errorCode": "CANDIDATE_TIME_CONFLICT",
+  "details": {
+    "candidateId": "conflict"
+  }
+}
+```
+
+### Not Found Error
+
+```json
+{
+  "success": false,
+  "message": "Interview Entry with 999 not found",
+  "errorCode": "INTERVIEW_ENTRY_NOT_FOUND"
+}
+```
+
+### Invalid Timezone Error
+
+```json
+{
+  "success": false,
+  "message": "Invalid date/time for the specified timezone",
+  "errorCode": "INVALID_TIMEZONE_TIME"
+}
+```
 
 ---
 
 ## Notes
 
-- All dates are in `YYYY-MM-DD` format
-- Time is in `HH:MM` 24-hour format
-- `result` is always returned in capitalized form
-- Soft-deleted interviews are excluded from reports
-- Round numbers are automatically renumbered on delete
-
----
+- All timestamps are stored and returned in UTC
+- The system automatically detects scheduling conflicts for both candidates and interviewers
+- Round numbers are automatically managed and renumbered when interviews are deleted
+- Soft deletion is used - deleted interviews are marked inactive but retained for 15 days
+- All operations are logged in the audit trail
 
 # Vendor API
 

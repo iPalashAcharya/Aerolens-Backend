@@ -39,6 +39,11 @@ router.get('/:interviewId',
     interviewController.getById
 );
 
+router.get('/report/tracker',
+    InterviewValidator.validateTrackerQuery,
+    interviewController.getInterviewTracker
+);
+
 router.get('/report/overall',
     interviewController.getTotalSummary
 );
@@ -53,6 +58,11 @@ router.get(
     '/report/daily',
     InterviewValidator.validateDailyQuery,
     interviewController.getDailySummary
+);
+
+router.get('/report/interviewer-workload',
+    InterviewValidator.validateInterviewerWorkloadQuery,
+    interviewController.getInterviewerWorkloadReport
 );
 
 router.post('/:candidateId',

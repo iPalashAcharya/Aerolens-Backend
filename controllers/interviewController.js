@@ -56,8 +56,8 @@ class InterviewController {
     });
 
     getMonthlySummary = catchAsync(async (req, res) => {
-        const { startDate, endDate } = req.validatedQuery;
-        const summaryData = await this.interviewService.getMonthlySummary(startDate, endDate);
+        const { startDate, endDate, timezone } = req.validatedQuery;
+        const summaryData = await this.interviewService.getMonthlySummary(startDate, endDate, timezone);
         return ApiResponse.success(
             res,
             summaryData,
@@ -66,12 +66,36 @@ class InterviewController {
     });
 
     getDailySummary = catchAsync(async (req, res) => {
-        const { date } = req.validatedQuery;
-        const summaryData = await this.interviewService.getDailySummary(date);
+        const { date, timezone } = req.validatedQuery;
+        const summaryData = await this.interviewService.getDailySummary(date, timezone);
         return ApiResponse.success(
             res,
             summaryData,
             'Total Daily Summary Data Retrieved Sucessfully'
+        );
+    });
+
+    getInterviewTracker = catchAsync(async (req, res) => {
+        const result = await this.interviewService.getInterviewTracker(
+            req.validatedQuery
+        );
+
+        return ApiResponse.success(
+            res,
+            result,
+            'Interview tracker data retrieved successfully'
+        );
+    });
+
+    getInterviewerWorkloadReport = catchAsync(async (req, res) => {
+        const report = await this.interviewService.getInterviewerWorkloadReport(
+            req.validatedQuery
+        );
+
+        return ApiResponse.success(
+            res,
+            report,
+            'Interviewer workload report retrieved successfully'
         );
     });
 
