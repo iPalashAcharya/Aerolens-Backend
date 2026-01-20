@@ -87,7 +87,8 @@ class CandidateController {
             data: {
                 recruiters: formData.recruiters,
                 //status: formData.status,
-                locations: formData.locations
+                locations: formData.locations,
+                jobProfiles: formData.jobProfiles
             }
         });
     });
