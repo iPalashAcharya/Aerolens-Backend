@@ -2288,6 +2288,7 @@ GET /candidate
 "recruiterName": null,
 "recruiterContact": null,
 "recruiterEmail": null,
+"jobProfileId":1,
 "jobRole": "SDE",
 "preferredJobLocation":{
 "city":"Ahemedabad",
@@ -2314,6 +2315,7 @@ GET /candidate
 "recruiterName": null,
 "recruiterContact": null,
 "recruiterEmail": null,
+"jobProfileId":1,
 "jobRole": "Software Devloper",
 "preferredJobLocation":{
 "city":"Ahemedabad",
@@ -2356,6 +2358,7 @@ GET /candidate/:id
 "recruiterName": "Palash Acharya",
 "recruiterContact": "+91-9876543210",
 "recruiterEmail": "palash.acharya@aerolens.in",
+"jobProfileId":1,
 "jobRole": "SDE-2",
 "expectedLocation":{
 "city":"Ahemedabad",
@@ -2454,6 +2457,40 @@ GET /candidate/create-data
         "country": "Canada",
         "state": "British Columbia"
       }
+    ],
+    "jobProfiles": [
+      {
+        "jobProfileId": 21,
+        "jobRole": "Devops Engineer, Teraform Expert"
+      },
+      {
+        "jobProfileId": 28,
+        "jobRole": "Backend Developer"
+      },
+      {
+        "jobProfileId": 29,
+        "jobRole": "Backend Engineer"
+      },
+      {
+        "jobProfileId": 30,
+        "jobRole": "Backend dev"
+      },
+      {
+        "jobProfileId": 31,
+        "jobRole": "devops"
+      },
+      {
+        "jobProfileId": 18,
+        "jobRole": "Marketing Manager"
+      },
+      {
+        "jobProfileId": 19,
+        "jobRole": "Software Engineer"
+      },
+      {
+        "jobProfileId": 20,
+        "jobRole": "Consultant Manager"
+      }
     ]
   }
 }
@@ -2467,21 +2504,22 @@ POST /candidate
 Content-Type: multipart/form-data
 **Request Body (form-data):**
 
-| Field              | Type        | Description                                                       |
-| ------------------ | ----------- | ----------------------------------------------------------------- |
-| candidateName      | String      | Candidate full name (required)                                    |
-| contactNumber      | String      | Phone number (optional)                                           |
-| email              | String      | Email address (optional)                                          |
-| recruiterId        | String      | Recruiter Id (required) [must be in member table]                 |
-| jobRole            | String      | Job title (required)                                              |
-| expectedLocation   | JSON Object | must be a json object with city and country attributes (required) |
-| currentCTC         | Number      | Current CTC in INR [supports decimals ie 12.5] (optional)         |
-| expectedCTC        | Number      | Expected CTC in INR [supports decimal ie 12.5] (optional)         |
-| noticePeriod       | Number      | Notice period in days (required)                                  |
-| experienceYears    | Number      | Years of experience (required) [supports decimal]                 |
-| linkedinProfileUrl | String      | LinkedIn URL (optional)                                           |
-| resume             | File        | PDF resume, max 5MB (optional)                                    |
-| notes              | string      | notes about candidates (optional)                                 |
+| Field                  | Type        | Description                                                       |
+| ---------------------- | ----------- | ----------------------------------------------------------------- |
+| candidateName          | String      | Candidate full name (required)                                    |
+| contactNumber          | String      | Phone number (optional)                                           |
+| email                  | String      | Email address (optional)                                          |
+| recruiterId            | String      | Recruiter Id (required) [must be in member table]                 |
+| jobRole                | String      | Job title (optional, soon to be depricated)                       |
+| appliedForJobProfileId | Number      | Job Profile Id (required) [must be in jobProfile table]           |
+| expectedLocation       | JSON Object | must be a json object with city and country attributes (required) |
+| currentCTC             | Number      | Current CTC in INR [supports decimals ie 12.5] (optional)         |
+| expectedCTC            | Number      | Expected CTC in INR [supports decimal ie 12.5] (optional)         |
+| noticePeriod           | Number      | Notice period in days (required)                                  |
+| experienceYears        | Number      | Years of experience (required) [supports decimal]                 |
+| linkedinProfileUrl     | String      | LinkedIn URL (optional)                                           |
+| resume                 | File        | PDF resume, max 5MB (optional)                                    |
+| notes                  | string      | notes about candidates (optional)                                 |
 
 **Response:**
 
@@ -2490,18 +2528,15 @@ Content-Type: multipart/form-data
   "success": true,
   "message": "Candidate created successfully",
   "data": {
-    "candidateId": 71,
-    "candidateName": "Test Candidate",
-    "contactNumber": "9998989876",
-    "email": "testcandidate@example.com",
-    "jobRole": "Java developer",
-    "preferredJobLocation": 1,
-    "currentCTC": 6,
-    "expectedCTC": 9,
-    "noticePeriod": 60,
-    "experienceYears": 1,
-    "recruiterId": 420,
-    "createdOn": "2025-11-30T09:29:51.088Z"
+    "candidateId": 81,
+    "candidateName": "Pedri Gonzales",
+    "recruiterId": 1,
+    "appliedForJobProfileId": 28,
+    "expectedLocation": 1,
+    "noticePeriod": 30,
+    "experienceYears": 2.2,
+    "statusId": 9,
+    "createdOn": "2026-01-20T12:05:03.201Z"
   }
 }
 ```
@@ -2521,6 +2556,7 @@ Content-Type: multipart/form-data
 | email | String | Email address (optional) |
 | recruiterId | String | Recruiter Id (optional) [must be in member table] |
 | jobRole | String | Job title (optional) |
+| appliedForJobProfileId | Number | job profile ID must be in jobProfileTable |
 | expectedLocation | JSON Object | must be a json object with city and country attributes |
 | currentCTC | Number | Current CTC in INR [supports decimals ie 12.5] (optional) |
 | expectedCTC | Number | Expected CTC in INR [supports decimal ie 12.5] (optional) |
