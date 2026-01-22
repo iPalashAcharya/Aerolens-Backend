@@ -515,15 +515,15 @@ class JobProfileService {
         }
     }
 
-    async createJobProfile(jobProfileData, auditContext) {
+    async createJobProfile(jobProfileRequirementData, auditContext) {
         const client = await this.db.getConnection();
 
         try {
             await client.beginTransaction();
 
             const exists = await this.jobProfileRepository.existsByRole(
-                jobProfileData.jobRole,
-                jobProfileData.clientId,
+                jobProfileRequirementData.jobRole,
+                jobProfileRequirementData.clientId,
                 null,
                 client
             );
@@ -565,16 +565,16 @@ class JobProfileService {
         }
     }
 
-    async getJobProfileById(jobProfileId) {
+    async getJobProfileById(jobProfileRequirementId) {
         const client = await this.db.getConnection();
         try {
-            const jobProfile = await this.jobProfileRepository.findById(jobProfileId, client);
+            const jobProfileRequirement = await this.jobProfileRepository.findById(jobProfileRequirementId, client);
 
-            if (!jobProfile) {
+            if (!jobProfileRequirement) {
                 throw new AppError(
-                    `Job profile with ID ${jobProfileId} not found`,
+                    `Job profile with ID ${jobProfileRequirementId} not found`,
                     404,
-                    'JOB_PROFILE_NOT_FOUND'
+                    'JOB_PROFILE_REQUIREMENT_NOT_FOUND'
                 );
             }
 

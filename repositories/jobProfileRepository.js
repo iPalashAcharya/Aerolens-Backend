@@ -11,7 +11,7 @@ class JobProfileRepository {
 
         try {
             const query = `
-            INSERT INTO jobProfile (
+            INSERT INTO jobProfileRequirement (
                 clientId, departmentId, jobProfileDescription, jobRole, 
                 techSpecification, positions, receivedOn, estimatedCloseDate, locationId, workArrangement, statusId
             ) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?,?)
@@ -31,7 +31,7 @@ class JobProfileRepository {
             ]);
 
             return {
-                jobProfileId: result.insertId,
+                jobProfileRequirementId: result.insertId,
                 ...jobProfileData,
                 receivedOn: new Date()
             };
@@ -42,28 +42,28 @@ class JobProfileRepository {
         }
     }
 
-    async findById(jobProfileId, client) {
+    async findById(jobProfileRequirementId, client) {
         const connection = client;
 
         try {
-            if (!jobProfileId) {
-                throw new AppError('Job Profile ID is required', 400, 'MISSING_JOB_PROFILE_ID');
+            if (!jobProfileRequirementId) {
+                throw new AppError('Job Profile Requirement ID is required', 400, 'MISSING_JOB_PROFILE_REQUIREMENT_ID');
             }
 
             const query = `
-            SELECT jp.jobProfileId, c.clientId ,c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
+            SELECT jp.jobProfileRequirementId, c.clientId ,c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
                    jp.techSpecification, jp.positions, DATE(jp.receivedOn) AS receivedOn, jp.estimatedCloseDate, jp.workArrangement,
                    COALESCE((SELECT JSON_OBJECT('country',l.country,'city',l.cityName) FROM location l WHERE l.locationId = jp.locationId)) AS location, stat.value AS status,
                    jp.jdFileName, jp.jdOriginalName, jp.jdUploadDate
-            FROM jobProfile jp
+            FROM jobProfileRequirement jp
             LEFT JOIN client c ON jp.clientId=c.clientId
             LEFT JOIN department d ON jp.departmentId = d.departmentId
             LEFT JOIN lookup stat on jp.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
-            WHERE jp.jobProfileId = ?
+            WHERE jp.jobProfileRequirementId = ?
             ORDER BY jp.receivedOn DESC
             `;
 
-            const [rows] = await connection.execute(query, [jobProfileId]);
+            const [rows] = await connection.execute(query, [jobProfileRequirementId]);
             if (rows.length > 0) {
                 const jobProfile = rows[0];
                 if (typeof jobProfile.location === 'string') {
@@ -79,16 +79,16 @@ class JobProfileRepository {
         }
     }
 
-    async update(jobProfileId, updateData, client) {
+    async update(jobProfileRequirementId, updateData, client) {
         const connection = client;
 
         try {
-            if (!jobProfileId) {
-                throw new AppError('Job Profile ID is required', 400, 'MISSING_JOB_PROFILE_ID');
+            if (!jobProfileRequirementId) {
+                throw new AppError('Job Profile Requirement ID is required', 400, 'MISSING_JOB_PROFILE_REQUIREMENT_ID');
             }
 
             if (!updateData || Object.keys(updateData).length === 0) {
-                return { jobProfileId };
+                return { jobProfileRequirementId };
             }
 
             // Filter only allowed fields for security
@@ -112,20 +112,20 @@ class JobProfileRepository {
             const values = Object.values(filteredData);
 
             const setClause = fields.map(field => `${field} = ?`).join(', ');
-            const query = `UPDATE jobProfile SET ${setClause} WHERE jobProfileId = ?`;
+            const query = `UPDATE jobProfileRequirement SET ${setClause} WHERE jobProfileRequirementId = ?`;
 
-            const [result] = await connection.execute(query, [...values, jobProfileId]);
+            const [result] = await connection.execute(query, [...values, jobProfileRequirementId]);
 
             if (result.affectedRows === 0) {
                 throw new AppError(
-                    `Job profile with ID ${jobProfileId} not found`,
+                    `Job profile with ID ${jobProfileRequirementId} not found`,
                     404,
-                    'JOB_PROFILE_NOT_FOUND'
+                    'JOB_PROFILE_REQUIREMENT_NOT_FOUND'
                 );
             }
 
             return {
-                jobProfileId,
+                jobProfileRequirementId,
                 ...updateData
             };
         } catch (error) {
@@ -134,22 +134,22 @@ class JobProfileRepository {
         }
     }
 
-    async delete(jobProfileId, client) {
+    async delete(jobProfileRequirementId, client) {
         const connection = client;
 
         try {
-            if (!jobProfileId) {
-                throw new AppError('Job Profile ID is required', 400, 'MISSING_JOB_PROFILE_ID');
+            if (!jobProfileRequirementId) {
+                throw new AppError('Job Profile Requirement ID is required', 400, 'MISSING_JOB_PROFILE_REQUIREMENT_ID');
             }
 
-            const query = `DELETE FROM jobProfile WHERE jobProfileId = ?`;
-            const [result] = await connection.execute(query, [jobProfileId]);
+            const query = `DELETE FROM jobProfileRequirement WHERE jobProfileRequirementId = ?`;
+            const [result] = await connection.execute(query, [jobProfileRequirementId]);
 
             if (result.affectedRows === 0) {
                 throw new AppError(
-                    `Job profile with ID ${jobProfileId} not found`,
+                    `Job profile with ID ${jobProfileRequirementId} not found`,
                     404,
-                    'JOB_PROFILE_NOT_FOUND'
+                    'JOB_PROFILE_REQUIREMENT_NOT_FOUND'
                 );
             }
 
@@ -169,10 +169,10 @@ class JobProfileRepository {
             }
 
             let query = `
-            SELECT jp.jobProfileId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
+            SELECT jp.jobProfileRequirementId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
                    jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,jp.workArrangement,
                    COALESCE((SELECT JSON_OBJECT('country',l.country,'city',l.cityName) FROM location l WHERE l.locationId = jp.locationId)) AS location, stat.value AS status
-            FROM jobProfile jp
+            FROM jobProfileRequirement jp
             LEFT JOIN client c ON jp.clientId=c.clientId
             LEFT JOIN department d ON jp.departmentId = d.departmentId
             LEFT JOIN lookup stat on jp.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
@@ -209,10 +209,10 @@ class JobProfileRepository {
             }
 
             const query = `
-            SELECT jp.jobProfileId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
+            SELECT jp.jobProfileRequirementId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
                    jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,jp.workArrangement,
                    COALESCE((SELECT JSON_OBJECT('country',l.country,'city',l.cityName) FROM location l WHERE l.locationId = jp.locationId)) AS location, stat.value AS status
-            FROM jobProfile jp
+            FROM jobProfileRequirement jp
             LEFT JOIN client c ON jp.clientId=c.clientId
             LEFT JOIN department d ON jp.departmentId = d.departmentId
             LEFT JOIN lookup stat on jp.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
@@ -237,10 +237,10 @@ class JobProfileRepository {
             }
 
             const query = `
-            SELECT jp.jobProfileId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
+            SELECT jp.jobProfileRequirementId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
                    jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,jp.workArrangement,
                    COALESCE((SELECT JSON_OBJECT('country',l.country,'city',l.cityName) FROM location l WHERE l.locationId = jp.locationId)) AS location, stat.value AS status
-            FROM jobProfile jp
+            FROM jobProfileRequirement jp
             LEFT JOIN client c ON jp.clientId=c.clientId
             LEFT JOIN department d ON jp.departmentId = d.departmentId
             LEFT JOIN lookup stat on jp.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
@@ -264,7 +264,7 @@ class JobProfileRepository {
                 throw new AppError('Client ID is required', 400, 'MISSING_CLIENT_ID');
             }
 
-            const query = `SELECT COUNT(*) as count FROM jobProfile WHERE clientId = ?`;
+            const query = `SELECT COUNT(*) as count FROM jobProfileRequirement WHERE clientId = ?`;
             const [rows] = await connection.execute(query, [clientId]);
             return rows[0].count;
         } catch (error) {
@@ -283,13 +283,13 @@ class JobProfileRepository {
 
             let query = `
             SELECT COUNT(*) as count 
-            FROM jobProfile 
+            FROM jobProfileRequirement
             WHERE jobRole = ? AND clientId = ?
             `;
             const params = [jobRole, clientId];
 
             if (excludeId) {
-                query += ` AND jobProfileId != ?`;
+                query += ` AND jobProfileRequirementId != ?`;
                 params.push(excludeId);
             }
 
@@ -306,11 +306,11 @@ class JobProfileRepository {
 
         try {
             let query = `
-            SELECT jp.jobProfileId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
+            SELECT jp.jobProfileRequirementId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
                    jp.techSpecification, jp.positions, DATE(jp.receivedOn) AS receivedOn, jp.estimatedCloseDate,jp.workArrangement,
                    COALESCE((SELECT JSON_OBJECT('country',l.country,'city',l.cityName) FROM location l WHERE l.locationId = jp.locationId)) AS location, stat.value AS status,
                    jp.jdFileName, jp.jdOriginalName, jp.jdUploadDate
-            FROM jobProfile jp
+            FROM jobProfileRequirement jp
             LEFT JOIN client c ON jp.clientId=c.clientId
             LEFT JOIN department d ON jp.departmentId = d.departmentId
             LEFT JOIN lookup stat on jp.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
