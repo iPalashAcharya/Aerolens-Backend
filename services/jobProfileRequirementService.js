@@ -13,23 +13,6 @@ class JobProfileRequirementService {
         try {
             await client.beginTransaction();
 
-            // Check for duplicate using unique constraint (clientId, departmentId, jobRole)
-            const exists = await this.jobProfileRequirementRepository.existsByRole(
-                jobProfileRequirementData.jobRole,
-                jobProfileRequirementData.clientId,
-                jobProfileRequirementData.departmentId,
-                null,
-                client
-            );
-
-            if (exists) {
-                throw new AppError(
-                    'A job profile requirement with this role already exists for this client and department',
-                    409,
-                    'DUPLICATE_JOB_REQUIREMENT'
-                );
-            }
-
             const jobProfileRequirement = await this.jobProfileRequirementRepository.create(
                 jobProfileRequirementData,
                 client
@@ -118,10 +101,10 @@ class JobProfileRequirementService {
                 );
             }
 
-            // Check if updating to a duplicate job role
-            if (updateData.jobRole) {
-                const exists = await this.jobProfileRequirementRepository.existsByRole(
-                    updateData.jobRole,
+            // Check if updating to a duplicate job profile requirement
+            if (updateData.jobProfileId) {
+                const exists = await this.jobProfileRequirementRepository.existsByJobProfile(
+                    updateData.jobProfileId,
                     existingJobProfileRequirement.clientId,
                     existingJobProfileRequirement.departmentId,
                     jobProfileRequirementId,
@@ -130,7 +113,7 @@ class JobProfileRequirementService {
 
                 if (exists) {
                     throw new AppError(
-                        'A job profile requirement with this role already exists for this client and department',
+                        'A job profile requirement with this job profile already exists for this client and department',
                         409,
                         'DUPLICATE_JOB_REQUIREMENT'
                     );

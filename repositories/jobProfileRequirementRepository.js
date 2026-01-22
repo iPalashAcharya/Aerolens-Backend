@@ -11,16 +11,15 @@ class JobProfileRequirementRepository {
         try {
             const query = `
             INSERT INTO jobProfileRequirement (
-                jobProfileId, clientId, departmentId, jobRole, 
+                jobProfileId, clientId, departmentId, 
                 positions, receivedOn, estimatedCloseDate, locationId, workArrangement, statusId
-            ) VALUES (?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, NOW(), ?, ?, ?, ?)
             `;
 
             const [result] = await connection.execute(query, [
-                jobProfileRequirementData.jobProfileId || null,
+                jobProfileRequirementData.jobProfileId,
                 jobProfileRequirementData.clientId,
                 jobProfileRequirementData.departmentId,
-                jobProfileRequirementData.jobRole,
                 jobProfileRequirementData.positions,
                 jobProfileRequirementData.estimatedCloseDate || null,
                 jobProfileRequirementData.locationId,
@@ -50,11 +49,11 @@ class JobProfileRequirementRepository {
             SELECT 
                 jpr.jobProfileRequirementId,
                 jpr.jobProfileId,
+                jp.jobRole,
                 c.clientId,
                 c.clientName, 
                 d.departmentId,
                 d.departmentName, 
-                jpr.jobRole,
                 jpr.positions, 
                 DATE(jpr.receivedOn) AS receivedOn, 
                 jpr.estimatedCloseDate, 
@@ -66,6 +65,7 @@ class JobProfileRequirementRepository {
                 ) AS location, 
                 stat.value AS status
             FROM jobProfileRequirement jpr
+            LEFT JOIN jobProfile jp ON jpr.jobProfileId = jp.jobProfileId
             LEFT JOIN client c ON jpr.clientId = c.clientId
             LEFT JOIN department d ON jpr.departmentId = d.departmentId
             LEFT JOIN lookup stat ON jpr.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
@@ -101,9 +101,9 @@ class JobProfileRequirementRepository {
                 return { jobProfileRequirementId };
             }
 
-            // Filter only allowed fields for security
+            // Filter only allowed fields for security (removed jobRole)
             const allowedFields = [
-                'jobProfileId', 'jobRole', 'positions', 'estimatedCloseDate',
+                'jobProfileId', 'positions', 'estimatedCloseDate',
                 'locationId', 'workArrangement', 'statusId'
             ];
 
@@ -182,9 +182,9 @@ class JobProfileRequirementRepository {
             SELECT 
                 jpr.jobProfileRequirementId,
                 jpr.jobProfileId,
+                jp.jobRole,
                 c.clientName, 
                 d.departmentName, 
-                jpr.jobRole,
                 jpr.positions, 
                 DATE(jpr.receivedOn) AS receivedOn, 
                 jpr.estimatedCloseDate,
@@ -196,6 +196,7 @@ class JobProfileRequirementRepository {
                 ) AS location, 
                 stat.value AS status
             FROM jobProfileRequirement jpr
+            LEFT JOIN jobProfile jp ON jpr.jobProfileId = jp.jobProfileId
             LEFT JOIN client c ON jpr.clientId = c.clientId
             LEFT JOIN department d ON jpr.departmentId = d.departmentId
             LEFT JOIN lookup stat ON jpr.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
@@ -240,9 +241,9 @@ class JobProfileRequirementRepository {
             SELECT 
                 jpr.jobProfileRequirementId,
                 jpr.jobProfileId,
+                jp.jobRole,
                 c.clientName, 
                 d.departmentName, 
-                jpr.jobRole,
                 jpr.positions, 
                 DATE(jpr.receivedOn) AS receivedOn, 
                 jpr.estimatedCloseDate,
@@ -254,6 +255,7 @@ class JobProfileRequirementRepository {
                 ) AS location, 
                 stat.value AS status
             FROM jobProfileRequirement jpr
+            LEFT JOIN jobProfile jp ON jpr.jobProfileId = jp.jobProfileId
             LEFT JOIN client c ON jpr.clientId = c.clientId
             LEFT JOIN department d ON jpr.departmentId = d.departmentId
             LEFT JOIN lookup stat ON jpr.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
@@ -286,9 +288,9 @@ class JobProfileRequirementRepository {
             SELECT 
                 jpr.jobProfileRequirementId,
                 jpr.jobProfileId,
+                jp.jobRole,
                 c.clientName, 
                 d.departmentName, 
-                jpr.jobRole,
                 jpr.positions, 
                 DATE(jpr.receivedOn) AS receivedOn, 
                 jpr.estimatedCloseDate,
@@ -300,6 +302,7 @@ class JobProfileRequirementRepository {
                 ) AS location, 
                 stat.value AS status
             FROM jobProfileRequirement jpr
+            LEFT JOIN jobProfile jp ON jpr.jobProfileId = jp.jobProfileId
             LEFT JOIN client c ON jpr.clientId = c.clientId
             LEFT JOIN department d ON jpr.departmentId = d.departmentId
             LEFT JOIN lookup stat ON jpr.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
@@ -332,9 +335,9 @@ class JobProfileRequirementRepository {
             SELECT 
                 jpr.jobProfileRequirementId,
                 jpr.jobProfileId,
+                jp.jobRole,
                 c.clientName, 
                 d.departmentName, 
-                jpr.jobRole,
                 jpr.positions, 
                 DATE(jpr.receivedOn) AS receivedOn, 
                 jpr.estimatedCloseDate,
@@ -346,6 +349,7 @@ class JobProfileRequirementRepository {
                 ) AS location, 
                 stat.value AS status
             FROM jobProfileRequirement jpr
+            LEFT JOIN jobProfile jp ON jpr.jobProfileId = jp.jobProfileId
             LEFT JOIN client c ON jpr.clientId = c.clientId
             LEFT JOIN department d ON jpr.departmentId = d.departmentId
             LEFT JOIN lookup stat ON jpr.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
@@ -383,20 +387,20 @@ class JobProfileRequirementRepository {
         }
     }
 
-    async existsByRole(jobRole, clientId, departmentId, excludeId = null, client) {
+    async existsByJobProfile(jobProfileId, clientId, departmentId, excludeId = null, client) {
         const connection = client;
 
         try {
-            if (!jobRole || !clientId || !departmentId) {
-                throw new AppError('Job Role, Client ID, and Department ID are required', 400, 'MISSING_REQUIRED_PARAMETERS');
+            if (!jobProfileId || !clientId || !departmentId) {
+                throw new AppError('Job Profile ID, Client ID, and Department ID are required', 400, 'MISSING_REQUIRED_PARAMETERS');
             }
 
             let query = `
             SELECT COUNT(*) as count 
             FROM jobProfileRequirement
-            WHERE jobRole = ? AND clientId = ? AND departmentId = ?
+            WHERE jobProfileId = ? AND clientId = ? AND departmentId = ?
             `;
-            const params = [jobRole, clientId, departmentId];
+            const params = [jobProfileId, clientId, departmentId];
 
             if (excludeId) {
                 query += ` AND jobProfileRequirementId != ?`;
@@ -419,9 +423,9 @@ class JobProfileRequirementRepository {
             SELECT 
                 jpr.jobProfileRequirementId,
                 jpr.jobProfileId,
+                jp.jobRole,
                 c.clientName, 
                 d.departmentName, 
-                jpr.jobRole,
                 jpr.positions, 
                 DATE(jpr.receivedOn) AS receivedOn, 
                 jpr.estimatedCloseDate,
@@ -433,6 +437,7 @@ class JobProfileRequirementRepository {
                 ) AS location, 
                 stat.value AS status
             FROM jobProfileRequirement jpr
+            LEFT JOIN jobProfile jp ON jpr.jobProfileId = jp.jobProfileId
             LEFT JOIN client c ON jpr.clientId = c.clientId
             LEFT JOIN department d ON jpr.departmentId = d.departmentId
             LEFT JOIN lookup stat ON jpr.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
@@ -471,9 +476,9 @@ class JobProfileRequirementRepository {
             SELECT 
                 jpr.jobProfileRequirementId,
                 jpr.jobProfileId,
+                jp.jobRole,
                 c.clientName, 
                 d.departmentName, 
-                jpr.jobRole,
                 jpr.positions, 
                 DATE(jpr.receivedOn) AS receivedOn, 
                 jpr.estimatedCloseDate,
@@ -485,6 +490,7 @@ class JobProfileRequirementRepository {
                 ) AS location, 
                 stat.value AS status
             FROM jobProfileRequirement jpr
+            LEFT JOIN jobProfile jp ON jpr.jobProfileId = jp.jobProfileId
             LEFT JOIN client c ON jpr.clientId = c.clientId
             LEFT JOIN department d ON jpr.departmentId = d.departmentId
             LEFT JOIN lookup stat ON jpr.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
@@ -506,11 +512,6 @@ class JobProfileRequirementRepository {
             if (searchCriteria.departmentId) {
                 query += ` AND jpr.departmentId = ?`;
                 params.push(searchCriteria.departmentId);
-            }
-
-            if (searchCriteria.jobRole) {
-                query += ` AND jpr.jobRole LIKE ?`;
-                params.push(`%${searchCriteria.jobRole}%`);
             }
 
             if (searchCriteria.locationId) {
@@ -579,10 +580,10 @@ class JobProfileRequirementRepository {
         switch (error.code) {
             case 'ER_DUP_ENTRY':
                 throw new AppError(
-                    'A job profile requirement with this role already exists for this client and department',
+                    'A job profile requirement with this job profile already exists for this client and department',
                     409,
                     'DUPLICATE_ENTRY',
-                    { field: 'jobRole' }
+                    { field: 'jobProfileId' }
                 );
 
             case 'ER_DATA_TOO_LONG':

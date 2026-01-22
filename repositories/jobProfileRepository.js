@@ -11,7 +11,7 @@ class JobProfileRepository {
 
         try {
             const query = `
-            INSERT INTO jobProfileRequirement (
+            INSERT INTO jobProfile (
                 clientId, departmentId, jobProfileDescription, jobRole, 
                 techSpecification, positions, receivedOn, estimatedCloseDate, locationId, workArrangement, statusId
             ) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?,?)

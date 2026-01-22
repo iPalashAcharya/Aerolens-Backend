@@ -1,5 +1,6 @@
 const catchAsync = require('../utils/catchAsync');
 const ApiResponse = require('../utils/response');
+const AppError = require('../utils/appError');
 
 class JobProfileRequirementController {
     constructor(jobProfileRequirementService) {

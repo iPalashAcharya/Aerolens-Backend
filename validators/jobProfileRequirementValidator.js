@@ -44,17 +44,14 @@ class JobProfileRequirementValidatorHelper {
         const cacheKey = statusName.toLowerCase().trim();
         if (this.statusCache.has(cacheKey)) {
             const cachedId = this.statusCache.get(cacheKey);
-
             const isValid = await this._validateLookupKeyExists(cachedId, client);
             if (isValid) {
                 return cachedId;
             }
-
             this.statusCache.delete(cacheKey);
         }
 
         const connection = client || await this.db.getConnection();
-
         try {
             const query = `SELECT lookupKey FROM lookup WHERE LOWER(value) = LOWER(?) AND lookup.tag = 'profileStatus'`;
             const [rows] = await connection.execute(query, [statusName.trim()]);
@@ -69,7 +66,6 @@ class JobProfileRequirementValidatorHelper {
 
             const statusId = rows[0].lookupKey;
             this.statusCache.set(cacheKey, statusId);
-
             return statusId;
         } finally {
             if (!client) connection.release();
@@ -79,6 +75,7 @@ class JobProfileRequirementValidatorHelper {
     async getLocationIdByName(locationName, client = null) {
         this._resetCacheIfNeeded();
         if (!locationName) return null;
+
         if (!locationName.city) {
             throw new AppError(
                 `Invalid location object: 'city' is required.`,
@@ -93,12 +90,10 @@ class JobProfileRequirementValidatorHelper {
         const cacheKey = locationValue.toLowerCase().trim();
         if (this.locationCache.has(cacheKey)) {
             const cachedId = this.locationCache.get(cacheKey);
-
             const isValid = await this._validateLookupKeyExists(cachedId, client);
             if (isValid) {
                 return cachedId;
             }
-
             this.locationCache.delete(cacheKey);
         }
 
@@ -123,12 +118,15 @@ class JobProfileRequirementValidatorHelper {
         }
     }
 
-    async checkJobRoleExists(jobRole, clientId, departmentId, excludeJobProfileRequirementId = null, client = null) {
+    async checkJobProfileRequirementExists(jobProfileId, clientId, departmentId, excludeJobProfileRequirementId = null, client = null) {
         const connection = client || await this.db.getConnection();
-
         try {
-            let query = `SELECT jobProfileRequirementId FROM jobProfileRequirement WHERE jobRole = ? AND clientId = ? AND departmentId = ?`;
-            const params = [jobRole, clientId, departmentId];
+            let query = `
+                SELECT jobProfileRequirementId 
+                FROM jobProfileRequirement 
+                WHERE jobProfileId = ? AND clientId = ? AND departmentId = ?
+            `;
+            const params = [jobProfileId, clientId, departmentId];
 
             if (excludeJobProfileRequirementId) {
                 query += ` AND jobProfileRequirementId != ?`;
@@ -163,39 +161,30 @@ class JobProfileRequirementValidatorHelper {
 
 const jobProfileRequirementSchemas = {
     create: Joi.object({
-        jobProfileId: Joi.number().integer().positive().optional().messages({
+        jobProfileId: Joi.number().integer().positive().required().messages({
             "number.base": "Job Profile ID must be a number",
             "number.integer": "Job Profile ID must be an integer",
             "number.positive": "Job Profile ID must be a positive number",
+            "any.required": "Job Profile ID is required",
         }),
-
         clientId: Joi.number().integer().positive().required().messages({
             "number.base": "Client ID must be a number",
             "number.integer": "Client ID must be an integer",
             "number.positive": "Client ID must be a positive number",
             "any.required": "Client ID is required",
         }),
-
         departmentId: Joi.number().integer().positive().required().messages({
             "number.base": "Department ID must be a number",
             "number.integer": "Department ID must be an integer",
             "number.positive": "Department ID must be a positive number",
             "any.required": "Department ID is required",
         }),
-
-        jobRole: Joi.string().trim().min(2).max(100).required().messages({
-            "string.empty": "Job role is required",
-            "string.min": "Job role must be at least 2 characters",
-            "string.max": "Job role cannot exceed 100 characters",
-        }),
-
         positions: Joi.number().integer().positive().required().messages({
             "number.base": "Positions must be a number",
             "number.integer": "Positions must be an integer",
             "number.positive": "Positions must be a positive number",
             "any.required": "Positions is required",
         }),
-
         estimatedCloseDate: Joi.string()
             .pattern(/^\d{4}-\d{2}-\d{2}$/)
             .required()
@@ -213,12 +202,10 @@ const jobProfileRequirementSchemas = {
                 'date.min': 'Close date cannot be in the past',
                 'any.required': 'Close date is required'
             }),
-
         workArrangement: Joi.string().trim().lowercase().valid('remote', 'onsite', 'hybrid').required().messages({
             "any.only": "Work arrangement must be one of 'remote', 'onsite', or 'hybrid'",
             "any.required": "Work arrangement is required",
         }),
-
         location: Joi.object({
             country: Joi.string()
                 .trim()
@@ -240,7 +227,6 @@ const jobProfileRequirementSchemas = {
         }).required().messages({
             "object.unknown": "Invalid location object structure",
         }),
-
         status: Joi.string()
             .trim()
             .min(2)
@@ -265,9 +251,6 @@ const jobProfileRequirementSchemas = {
             "number.integer": "Job Profile ID must be an integer",
             "number.positive": "Job Profile ID must be a positive number",
         }),
-
-        jobRole: Joi.string().trim().min(2).max(100).optional(),
-
         estimatedCloseDate: Joi.string()
             .pattern(/^\d{4}-\d{2}-\d{2}$/)
             .optional()
@@ -284,17 +267,14 @@ const jobProfileRequirementSchemas = {
                 'string.pattern.base': 'Close date must be in YYYY-MM-DD format',
                 'date.min': 'Close date cannot be in the past',
             }),
-
         workArrangement: Joi.string().trim().lowercase().valid('remote', 'onsite', 'hybrid').optional().messages({
             "any.only": "Work arrangement must be one of 'remote', 'onsite', or 'hybrid'"
         }),
-
         positions: Joi.number().integer().positive().optional().messages({
             "number.base": "Positions must be a number",
             "number.integer": "Positions must be an integer",
             "number.positive": "Positions must be a positive number",
         }),
-
         location: Joi.object({
             country: Joi.string()
                 .trim()
@@ -317,7 +297,6 @@ const jobProfileRequirementSchemas = {
             "object.min": "At least one field (country or city) must be provided in location",
             "object.unknown": "Invalid location object structure",
         }),
-
         status: Joi.string()
             .trim()
             .min(2)
@@ -353,7 +332,6 @@ const jobProfileRequirementSchemas = {
         jobProfileId: Joi.number().integer().positive().optional(),
         clientId: Joi.number().integer().positive().optional(),
         departmentId: Joi.number().integer().positive().optional(),
-        jobRole: Joi.string().trim().min(1).max(100).optional(),
         location: Joi.string().trim().min(1).max(100).optional(),
         status: Joi.string().trim().min(1).max(50).optional(),
         minPositions: Joi.number().integer().min(1).optional(),
@@ -369,13 +347,11 @@ const jobProfileRequirementSchemas = {
                 return helpers.error('custom.positionRange');
             }
         }
-
         if (value.fromDate !== undefined && value.toDate !== undefined) {
             if (value.fromDate > value.toDate) {
                 return helpers.error('custom.dateRange');
             }
         }
-
         return value;
     }).messages({
         'custom.positionRange': 'Minimum positions cannot be greater than maximum positions',
@@ -406,17 +382,15 @@ class JobProfileRequirementValidator {
                 throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details });
             }
 
-            // Validate jobProfileId exists if provided
-            if (value.jobProfileId) {
-                const exists = await JobProfileRequirementValidator.helper.validateJobProfileExists(value.jobProfileId);
-                if (!exists) {
-                    throw new AppError(
-                        `Job profile with ID ${value.jobProfileId} does not exist`,
-                        404,
-                        'JOB_PROFILE_NOT_FOUND',
-                        { field: 'jobProfileId' }
-                    );
-                }
+            // Validate jobProfileId exists (now required)
+            const exists = await JobProfileRequirementValidator.helper.validateJobProfileExists(value.jobProfileId);
+            if (!exists) {
+                throw new AppError(
+                    `Job profile with ID ${value.jobProfileId} does not exist`,
+                    404,
+                    'JOB_PROFILE_NOT_FOUND',
+                    { field: 'jobProfileId' }
+                );
             }
 
             // Transform location string to locationId
@@ -433,20 +407,6 @@ class JobProfileRequirementValidator {
                 value.statusId = await JobProfileRequirementValidator.helper.getStatusIdByName('pending');
             }
 
-            // Check for duplicate job role based on unique constraint (clientId, departmentId, jobRole)
-            if (await JobProfileRequirementValidator.helper.checkJobRoleExists(
-                value.jobRole,
-                value.clientId,
-                value.departmentId
-            )) {
-                throw new AppError(
-                    'A job profile requirement with this role already exists for this client and department',
-                    409,
-                    'DUPLICATE_JOB_REQUIREMENT',
-                    { field: 'jobRole' }
-                );
-            }
-
             req.body = value;
             next();
         } catch (error) {
@@ -457,7 +417,6 @@ class JobProfileRequirementValidator {
     static async validateUpdate(req, res, next) {
         try {
             const { error: paramsError } = jobProfileRequirementSchemas.params.validate(req.params, { abortEarly: false });
-
             let { error: bodyError, value } = jobProfileRequirementSchemas.update.validate(req.body, {
                 abortEarly: false,
                 stripUnknown: true,
@@ -508,43 +467,6 @@ class JobProfileRequirementValidator {
                 delete value.status;
             }
 
-            // Check for duplicate job role (if jobRole is being updated)
-            if (value.jobRole) {
-                const connection = await JobProfileRequirementValidator.helper.db.getConnection();
-                try {
-                    const [existingRows] = await connection.execute(
-                        'SELECT clientId, departmentId FROM jobProfileRequirement WHERE jobProfileRequirementId = ?',
-                        [jobProfileRequirementId]
-                    );
-
-                    if (existingRows.length === 0) {
-                        throw new AppError(
-                            `Job profile requirement with ID ${jobProfileRequirementId} not found`,
-                            404,
-                            'JOB_PROFILE_REQUIREMENT_NOT_FOUND'
-                        );
-                    }
-
-                    const { clientId, departmentId } = existingRows[0];
-
-                    if (await JobProfileRequirementValidator.helper.checkJobRoleExists(
-                        value.jobRole,
-                        clientId,
-                        departmentId,
-                        jobProfileRequirementId
-                    )) {
-                        throw new AppError(
-                            'A job profile requirement with this role already exists for this client and department',
-                            409,
-                            'DUPLICATE_JOB_REQUIREMENT',
-                            { field: 'jobRole' }
-                        );
-                    }
-                } finally {
-                    connection.release();
-                }
-            }
-
             req.body = value;
             next();
         } catch (error) {
@@ -563,6 +485,7 @@ class JobProfileRequirementValidator {
                 }));
                 throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details });
             }
+
             next();
         } catch (error) {
             next(error);
@@ -580,6 +503,7 @@ class JobProfileRequirementValidator {
                 }));
                 throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details });
             }
+
             next();
         } catch (error) {
             next(error);
