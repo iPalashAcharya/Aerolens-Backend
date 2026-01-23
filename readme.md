@@ -3489,36 +3489,46 @@ GET /candidate/create-data
     ],
     "jobProfiles": [
       {
-        "jobProfileId": 21,
-        "jobRole": "Devops Engineer, Teraform Expert"
+        "jobProfileRequirementId": 30,
+        "positions": 1,
+        "receivedOn": "2025-12-16 11:19:37",
+        "estimatedCloseDate": "2025-12-24 00:00:00",
+        "jobProfileId": 9,
+        "jobRole": "Backend dev",
+        "experienceText": null,
+        "experienceMinYears": null,
+        "experienceMaxYears": null,
+        "clientId": 4,
+        "clientName": "Google ( Alphabet ) Test",
+        "departmentId": 83,
+        "departmentName": "check",
+        "locationId": 1,
+        "city": "Ahmedabad",
+        "state": "Gujarat",
+        "country": "India",
+        "statusId": 4,
+        "statusName": "In Progress"
       },
       {
-        "jobProfileId": 28,
-        "jobRole": "Backend Developer"
-      },
-      {
-        "jobProfileId": 29,
-        "jobRole": "Backend Engineer"
-      },
-      {
-        "jobProfileId": 30,
-        "jobRole": "Backend dev"
-      },
-      {
-        "jobProfileId": 31,
-        "jobRole": "devops"
-      },
-      {
-        "jobProfileId": 18,
-        "jobRole": "Marketing Manager"
-      },
-      {
-        "jobProfileId": 19,
-        "jobRole": "Software Engineer"
-      },
-      {
-        "jobProfileId": 20,
-        "jobRole": "Consultant Manager"
+        "jobProfileRequirementId": 29,
+        "positions": 1,
+        "receivedOn": "2025-12-16 11:07:23",
+        "estimatedCloseDate": "2025-12-24 00:00:00",
+        "jobProfileId": 8,
+        "jobRole": "Backend Engineer",
+        "experienceText": null,
+        "experienceMinYears": null,
+        "experienceMaxYears": null,
+        "clientId": 4,
+        "clientName": "Google ( Alphabet ) Test",
+        "departmentId": 83,
+        "departmentName": "check",
+        "locationId": 1,
+        "city": "Ahmedabad",
+        "state": "Gujarat",
+        "country": "India",
+        "statusId": 4,
+        "statusName": "In Progress"
       }
     ]
   }
