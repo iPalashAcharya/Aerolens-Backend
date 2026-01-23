@@ -24,6 +24,7 @@ class JobProfileService {
         this.jdFolder = S3_JD_FOLDER;
         this.initializeMulter();
     }
+
     initializeMulter() {
         const storage = multerS3({
             s3: this.s3Client,
@@ -145,14 +146,12 @@ class JobProfileService {
     }
 
     async renameS3File(oldKey, jobProfileId, originalName) {
-
         try {
             const timestamp = Date.now();
             const sanitizedOriginalName = originalName.replace(/[^a-zA-Z0-9.-]/g, '_');
             const fileExtension = path.extname(sanitizedOriginalName);
             const newKey = `${this.jdFolder}jobProfile_${jobProfileId}_${timestamp}${fileExtension}`;
 
-            // Copy object to new key
             const copyCommand = new CopyObjectCommand({
                 Bucket: this.bucketName,
                 CopySource: `${this.bucketName}/${oldKey}`,
@@ -169,7 +168,6 @@ class JobProfileService {
             await this.s3Client.send(copyCommand);
             console.log(`Successfully copied S3 file from ${oldKey} to ${newKey}`);
 
-            // Delete old temp file
             const deleteCommand = new DeleteObjectCommand({
                 Bucket: this.bucketName,
                 Key: oldKey
@@ -202,7 +200,6 @@ class JobProfileService {
 
             const jobProfile = await this.jobProfileRepository.findById(jobProfileId, client);
             if (!jobProfile) {
-                // Delete uploaded S3 file if job profile not found
                 if (file.key) {
                     await this.deleteFromS3(file.key);
                 }
@@ -220,13 +217,12 @@ class JobProfileService {
                     console.log(`Deleted old JD from S3: ${existingJDInfo.jdFileName}`);
                 } catch (error) {
                     console.error('Error deleting old JD from S3:', error);
-                    // Continue with update even if old file deletion fails
                 }
             }
 
             await this.jobProfileRepository.updateJDInfo(
                 jobProfileId,
-                file.key, // S3 key
+                file.key,
                 file.originalname,
                 client
             );
@@ -238,13 +234,12 @@ class JobProfileService {
                 filename: file.key,
                 originalName: file.originalname,
                 size: file.size,
-                location: file.location, // S3 URL
+                location: file.location,
                 uploadDate: new Date()
             };
         } catch (error) {
             await client.rollback();
 
-            // Delete uploaded S3 file on error
             if (file && file.key) {
                 try {
                     await this.deleteFromS3(file.key);
@@ -290,7 +285,6 @@ class JobProfileService {
                 );
             }
 
-            // Check if file exists in S3
             const fileExists = await this.fileExistsInS3(jdInfo.jdFileName);
             if (!fileExists) {
                 throw new AppError(
@@ -300,10 +294,8 @@ class JobProfileService {
                 );
             }
 
-            // Get file metadata for additional info
             const metadata = await this.getS3FileMetadata(jdInfo.jdFileName);
 
-            // Return S3 key and metadata for controller to stream
             return {
                 s3Key: jdInfo.jdFileName,
                 originalName: jdInfo.jdOriginalName,
@@ -351,7 +343,6 @@ class JobProfileService {
                 );
             }
 
-            // Check if file exists in S3
             const fileExists = await this.fileExistsInS3(jdInfo.jdFileName);
             if (!fileExists) {
                 throw new AppError(
@@ -361,7 +352,6 @@ class JobProfileService {
                 );
             }
 
-            // Generate presigned URL
             const downloadUrl = await this.generatePresignedUrl(jdInfo.jdFileName, expiresIn);
 
             return {
@@ -413,15 +403,12 @@ class JobProfileService {
                 );
             }
 
-            // Delete file from S3
             try {
                 await this.deleteFromS3(jdInfo.jdFileName);
             } catch (error) {
                 console.error('Error deleting JD from S3:', error);
-                // Continue with database update even if S3 deletion fails
             }
 
-            // Update database to remove resume info
             await this.jobProfileRepository.deleteJDInfo(jobProfileId, client);
 
             await client.commit();
@@ -515,36 +502,48 @@ class JobProfileService {
         }
     }
 
-    async createJobProfile(jobProfileRequirementData, auditContext) {
+    async createJobProfile(jobProfileData, auditContext) {
         const client = await this.db.getConnection();
 
         try {
             await client.beginTransaction();
 
             const exists = await this.jobProfileRepository.existsByRole(
-                jobProfileRequirementData.jobRole,
-                jobProfileRequirementData.clientId,
+                jobProfileData.jobRole,
                 null,
                 client
             );
 
             if (exists) {
                 throw new AppError(
-                    'A job profile with this role already exists for this client',
+                    'A job profile with this role already exists',
                     409,
                     'DUPLICATE_JOB_ROLE'
                 );
             }
 
             const jobProfile = await this.jobProfileRepository.create(jobProfileData, client);
-            await auditLogService.logAction({
-                userId: auditContext.userId,
-                action: 'CREATE',
-                newValues: jobProfile,
-                ipAddress: auditContext.ipAddress,
-                userAgent: auditContext.userAgent,
-                timestamp: auditContext.timestamp
-            }, client);
+
+            // Add technical specifications if provided
+            if (jobProfileData.techSpecLookupIds && jobProfileData.techSpecLookupIds.length > 0) {
+                await this.jobProfileRepository.addTechSpecifications(
+                    jobProfile.jobProfileId,
+                    jobProfileData.techSpecLookupIds,
+                    client
+                );
+            }
+
+            if (auditContext) {
+                await auditLogService.logAction({
+                    userId: auditContext.userId,
+                    action: 'CREATE',
+                    newValues: jobProfile,
+                    ipAddress: auditContext.ipAddress,
+                    userAgent: auditContext.userAgent,
+                    timestamp: auditContext.timestamp
+                }, client);
+            }
+
             await client.commit();
 
             return jobProfile;
@@ -565,16 +564,16 @@ class JobProfileService {
         }
     }
 
-    async getJobProfileById(jobProfileRequirementId) {
+    async getJobProfileById(jobProfileId) {
         const client = await this.db.getConnection();
         try {
-            const jobProfileRequirement = await this.jobProfileRepository.findById(jobProfileRequirementId, client);
+            const jobProfile = await this.jobProfileRepository.findById(jobProfileId, client);
 
-            if (!jobProfileRequirement) {
+            if (!jobProfile) {
                 throw new AppError(
-                    `Job profile with ID ${jobProfileRequirementId} not found`,
+                    `Job profile with ID ${jobProfileId} not found`,
                     404,
-                    'JOB_PROFILE_REQUIREMENT_NOT_FOUND'
+                    'JOB_PROFILE_NOT_FOUND'
                 );
             }
 
@@ -609,43 +608,36 @@ class JobProfileService {
                     'JOB_PROFILE_NOT_FOUND'
                 );
             }
-            console.log('Existing Job Profile:', existingJobProfile);
 
             if (updateData.jobRole) {
                 const exists = await this.jobProfileRepository.existsByRole(
                     updateData.jobRole,
-                    existingJobProfile.clientId,
                     jobProfileId,
                     client
                 );
 
                 if (exists) {
                     throw new AppError(
-                        'A job profile with this role already exists in the database for this client',
+                        'A job profile with this role already exists',
                         409,
                         'DUPLICATE_JOB_ROLE'
                     );
                 }
             }
 
-            if (existingJobProfile.status.toLowerCase() === "closed" || existingJobProfile.status.toLowerCase() === "cancelled") {
-                throw new AppError(
-                    `Cannot update a job profile that is ${existingJobProfile.status}`,
-                    400,
-                    'JOB_PROFILE_UPDATE_NOT_ALLOWED'
-                );
-            }
-
             const jobProfile = await this.jobProfileRepository.update(jobProfileId, updateData, client);
-            await auditLogService.logAction({
-                userId: auditContext.userId,
-                action: 'UPDATE',
-                oldValues: existingJobProfile,
-                newValues: jobProfile,
-                ipAddress: auditContext.ipAddress,
-                userAgent: auditContext.userAgent,
-                timestamp: auditContext.timestamp
-            }, client);
+
+            if (auditContext) {
+                await auditLogService.logAction({
+                    userId: auditContext.userId,
+                    action: 'UPDATE',
+                    oldValues: existingJobProfile,
+                    newValues: jobProfile,
+                    ipAddress: auditContext.ipAddress,
+                    userAgent: auditContext.userAgent,
+                    timestamp: auditContext.timestamp
+                }, client);
+            }
 
             await client.commit();
 
@@ -683,13 +675,17 @@ class JobProfileService {
             }
 
             await this.jobProfileRepository.delete(jobProfileId, client);
-            await auditLogService.logAction({
-                userId: auditContext.userId,
-                action: 'DELETE',
-                ipAddress: auditContext.ipAddress,
-                userAgent: auditContext.userAgent,
-                timestamp: auditContext.timestamp
-            }, client);
+
+            if (auditContext) {
+                await auditLogService.logAction({
+                    userId: auditContext.userId,
+                    action: 'DELETE',
+                    ipAddress: auditContext.ipAddress,
+                    userAgent: auditContext.userAgent,
+                    timestamp: auditContext.timestamp
+                }, client);
+            }
+
             await client.commit();
 
             return { deletedJobProfile: jobProfile };
@@ -702,67 +698,6 @@ class JobProfileService {
                     500,
                     'JOB_PROFILE_DELETE_ERROR',
                     { operation: 'deleteJobProfile', jobProfileId }
-                );
-            }
-            throw error;
-        } finally {
-            client.release();
-        }
-    }
-
-    async getJobProfilesByClientId(clientId, options = {}) {
-        const client = await this.db.getConnection();
-        const { limit, offset } = options;
-        try {
-            return await this.jobProfileRepository.findByClientId(clientId, limit, offset, client);
-        } catch (error) {
-            if (!(error instanceof AppError)) {
-                console.error('Error Fetching Job Profile By Client Id', error.stack);
-                throw new AppError(
-                    'Failed to fetch job profile By Client Id',
-                    500,
-                    'JOB_PROFILE_FETCH_ERROR',
-                    { operation: 'getJobProfilesByClientId', clientId }
-                );
-            }
-            throw error;
-        } finally {
-            client.release();
-        }
-    }
-
-    async getJobProfilesByStatus(statusId) {
-        const client = await this.db.getConnection();
-        try {
-            return await this.jobProfileRepository.findByStatus(statusId, client);
-        } catch (error) {
-            if (!(error instanceof AppError)) {
-                console.error('Error Fetching Job Profile By Status Id', error.stack);
-                throw new AppError(
-                    'Failed to fetch job profile By Status Id',
-                    500,
-                    'JOB_PROFILE_FETCH_ERROR',
-                    { operation: 'getJobProfilesByStatusId', statusId }
-                );
-            }
-            throw error;
-        } finally {
-            client.release();
-        }
-    }
-
-    async getJobProfilesByDepartment(departmentId) {
-        const client = await this.db.getConnection();
-        try {
-            return await this.jobProfileRepository.findByDepartment(departmentId, client);
-        } catch (error) {
-            if (!(error instanceof AppError)) {
-                console.error('Error Fetching Job Profile By Department', error.stack);
-                throw new AppError(
-                    'Failed to fetch job profile By Department',
-                    500,
-                    'JOB_PROFILE_FETCH_ERROR',
-                    { operation: 'getJobProfilesByDepartment', departmentId }
                 );
             }
             throw error;
@@ -792,33 +727,33 @@ class JobProfileService {
         }
     }
 
-    async getJobProfileCount(clientId) {
+    async getJobProfileCount() {
         const client = await this.db.getConnection();
         try {
-            return await this.jobProfileRepository.countByClient(clientId, client);
+            return await this.jobProfileRepository.count(client);
         } catch (error) {
             if (!(error instanceof AppError)) {
-                console.error('Error Fetching All Job Profiles', error.stack);
+                console.error('Error Fetching Job Profile Count', error.stack);
                 throw new AppError(
-                    'Failed to fetch all job profiles',
+                    'Failed to fetch job profile count',
                     500,
-                    'JOB_PROFILE_FETCH_ERROR',
-                    { operation: 'getAllJobProfiles' }
+                    'JOB_PROFILE_COUNT_ERROR',
+                    { operation: 'getJobProfileCount' }
                 );
             }
             throw error;
         } finally {
             client.release();
         }
-
     }
 
-    async getJobProfilesByClientWithPagination(clientId, page = 1, pageSize = 10) {
+    async getAllJobProfilesWithPagination(page = 1, pageSize = 10) {
         const offset = (page - 1) * pageSize;
         const client = await this.db.getConnection();
         try {
-            const jobProfiles = await this.jobProfileRepository.findByClientId(clientId, pageSize, offset, client);
-            const totalCount = await this.jobProfileRepository.countByClient(clientId, client);
+            const jobProfiles = await this.jobProfileRepository.findAll(pageSize, offset, client);
+            const totalCount = await this.jobProfileRepository.count(client);
+
             return {
                 jobProfiles,
                 pagination: {
@@ -832,93 +767,12 @@ class JobProfileService {
             };
         } catch (error) {
             if (!(error instanceof AppError)) {
-                console.error('Error Fetching All Job Profiles By Client', error.stack);
-                throw new AppError(
-                    'Failed to fetch all job profiles By Client',
-                    500,
-                    'JOB_PROFILE_FETCH_ERROR',
-                    { operation: 'getAllJobProfilesByClientWithPagination' }
-                );
-            }
-            throw error;
-        } finally {
-            client.release();
-        }
-    }
-
-    async getAllJobProfilesWithPagination(page = 1, pageSize = 10) {
-        const offset = (page - 1) * pageSize;
-        const client = await this.db.getConnection();
-        try {
-            const jobProfiles = await this.jobProfileRepository.findAll(pageSize, offset);
-
-            // Get total count for pagination - you might need to add this method to repository
-            // For now, returning without total count
-            return {
-                jobProfiles,
-                pagination: {
-                    currentPage: page,
-                    pageSize,
-                    hasNextPage: jobProfiles.length === pageSize,
-                    hasPreviousPage: page > 1
-                }
-            };
-        } catch (error) {
-            if (!(error instanceof AppError)) {
                 console.error('Error Fetching All Job Profiles with pagination', error.stack);
                 throw new AppError(
                     'Failed to fetch all job profiles with pagination',
                     500,
                     'JOB_PROFILE_FETCH_ERROR',
                     { operation: 'getAllJobProfilesWithPagination' }
-                );
-            }
-            throw error;
-        } finally {
-            client.release();
-        }
-
-    }
-
-    async bulkUpdateJobProfiles(jobProfileIds, updateData, auditContext) {
-        const client = await this.db.getConnection();
-        const results = [];
-        const errors = [];
-
-        try {
-            await client.beginTransaction();
-
-            for (const jobProfileId of jobProfileIds) {
-                try {
-                    await this.jobProfileRepository.update(jobProfileId, updateData, client);
-                    results.push({ jobProfileId, status: 'success' });
-                } catch (error) {
-                    errors.push({ jobProfileId, error: error.message });
-                    results.push({ jobProfileId, status: 'failed', error: error.message });
-                }
-            }
-
-            if (errors.length === 0) {
-                await client.commit();
-            } else {
-                throw new AppError(
-                    'Bulk update failed for some records',
-                    400,
-                    'BULK_UPDATE_ERROR',
-                    { results, errors }
-                );
-            }
-
-            return { results, totalProcessed: jobProfileIds.length, successful: results.filter(r => r.status === 'success').length };
-        } catch (error) {
-            await client.rollback();
-            if (!(error instanceof AppError)) {
-                console.error('Error Bulk Updating Job Profile', error.stack);
-                throw new AppError(
-                    'Failed to Update job profile',
-                    500,
-                    'JOB_PROFILE_UPDATE_ERROR',
-                    { operation: 'bulkUpdateJobProfiles', updateData }
                 );
             }
             throw error;
