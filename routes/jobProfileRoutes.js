@@ -88,9 +88,7 @@ router.post('/',
         console.log("=============================================");
         next();
     },
-    JobProfileValidator.normalizeMultipartBody,
     JobProfileValidator.validateCreate,
-    JobProfileValidator.validateJDUpload,
     jobProfileController.createJobProfile,
     cleanupS3OnError
 );
@@ -122,9 +120,9 @@ router.patch('/:id',
         console.log("=============================================");
         next();
     },
-    JobProfileValidator.normalizeMultipartBody, //to normalise location json object
+    //JobProfileValidator.normalizeMultipartBody, //to normalise location json object
     JobProfileValidator.validateUpdate,
-    JobProfileValidator.validateJDUpload,
+    //JobProfileValidator.validateJDUpload,
     jobProfileController.updateJobProfile,
     cleanupS3OnError
 );
