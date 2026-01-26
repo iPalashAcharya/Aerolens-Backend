@@ -2608,10 +2608,10 @@ A comprehensive RESTful API for managing job profile requirements, including CRU
 - [API Endpoints](#api-endpoints)
   - [Create Job Profile Requirement](#create-jobProfile-requirement)
   - [Get Job Profile Requirement by ID](#get-jobProfile-requirement-by-id)
-  - [Get All Job Profile Requirements](#get-all-jobProfile-requirements)
+  - [Get All Job Profile Requirements](#get-all-jobProfileRequirement)
   - [Update Job Profile Requirement](#update-jobProfile-requirement)
   - [Delete Job Profile Requirement](#delete-jobProfile-requirement)
-  - [Search Job Profile Requirements](#search-jobProfile-requirements)
+  - [Search Job Profile Requirements](#search-jobProfileRequirement)
   - [Get by Client ID](#get-by-client-id)
   - [Get by Job Profile ID](#get-by-jobProfile-id)
   - [Get by Status](#get-by-status)
@@ -2643,7 +2643,7 @@ Authorization: Bearer <your-token>
 
 Creates a new job profile requirement.
 
-**Endpoint:** `POST /api/jobProfile-requirements`
+**Endpoint:** `POST /api/jobProfileRequirement`
 
 **Request Body:**
 
@@ -2723,7 +2723,7 @@ Creates a new job profile requirement.
 
 Retrieves a specific job profile requirement by its ID.
 
-**Endpoint:** `GET /api/jobProfile-requirements/:id`
+**Endpoint:** `GET /api/jobProfileRequirement/:id`
 
 **URL Parameters:**
 
@@ -2774,9 +2774,9 @@ Retrieves a specific job profile requirement by its ID.
 
 Retrieves all job profile requirements with optional pagination.
 
-**Endpoint:** `GET /api/jobProfile-requirements`
+**Endpoint:** `GET /api/jobProfileRequirement`
 
-**Query Parameters:**
+**Query Parameters (Optional):**
 
 | Parameter | Type   | Default | Description    |
 | --------- | ------ | ------- | -------------- |
@@ -2786,7 +2786,7 @@ Retrieves all job profile requirements with optional pagination.
 **Example Request:**
 
 ```
-GET /api/jobProfile-requirements?page=1&pageSize=20
+GET /api/jobProfileRequirement?page=1&pageSize=20
 ```
 
 **Success Response (200 OK):**
@@ -2830,7 +2830,7 @@ GET /api/jobProfile-requirements?page=1&pageSize=20
 
 Updates an existing job profile requirement. At least one field must be provided.
 
-**Endpoint:** `PATCH /api/jobProfile-requirements/:id`
+**Endpoint:** `PATCH /api/jobProfileRequirement/:id`
 
 **URL Parameters:**
 
@@ -2896,7 +2896,7 @@ Updates an existing job profile requirement. At least one field must be provided
 
 Deletes a job profile requirement.
 
-**Endpoint:** `DELETE /api/jobProfile-requirements/:id`
+**Endpoint:** `DELETE /api/jobProfileRequirement/:id`
 
 **URL Parameters:**
 
@@ -2911,260 +2911,6 @@ Deletes a job profile requirement.
   "status": "success",
   "message": "Job Profile Requirement deleted successfully",
   "data": null
-}
-```
-
----
-
-### Search Job Profile Requirements
-
-Advanced search with multiple filter criteria.
-
-**Endpoint:** `GET /api/jobProfile-requirements/search`
-
-**Query Parameters:**
-
-| Parameter       | Type   | Description                                               |
-| --------------- | ------ | --------------------------------------------------------- |
-| jobProfileId    | number | Filter by job profile ID                                  |
-| clientId        | number | Filter by client ID                                       |
-| departmentId    | number | Filter by department ID                                   |
-| location        | string | Filter by city name                                       |
-| status          | string | Filter by status                                          |
-| minPositions    | number | Minimum number of positions                               |
-| maxPositions    | number | Maximum number of positions                               |
-| workArrangement | string | Filter by work arrangement (`remote`, `onsite`, `hybrid`) |
-| fromDate        | date   | Filter by received date (from)                            |
-| toDate          | date   | Filter by received date (to)                              |
-| limit           | number | Maximum results (default: 50, max: 1000)                  |
-| offset          | number | Result offset (default: 0)                                |
-
-**Example Request:**
-
-```
-GET /api/jobProfile-requirements/search?clientId=5&workArrangement=hybrid&minPositions=5&limit=10
-```
-
-**Success Response (200 OK):**
-
-```json
-{
-  "status": "success",
-  "message": "Job Profile Requirements search completed successfully",
-  "data": [
-    {
-      "jobProfileRequirementId": 42,
-      "jobProfileId": 1,
-      "jobRole": "Software Engineer",
-      "clientName": "Tech Corp",
-      "departmentName": "Engineering",
-      "positions": 10,
-      "receivedOn": "2026-01-23",
-      "estimatedCloseDate": "2026-03-15",
-      "workArrangement": "hybrid",
-      "location": {
-        "country": "india",
-        "city": "bangalore"
-      },
-      "status": "pending"
-    }
-  ],
-  "metadata": {
-    "totalResults": 1,
-    "searchCriteria": {
-      "clientId": 5,
-      "workArrangement": "hybrid",
-      "minPositions": 5,
-      "limit": 10
-    }
-  }
-}
-```
-
----
-
-### Get by Client ID
-
-Retrieves all job profile requirements for a specific client with pagination.
-
-**Endpoint:** `GET /api/jobProfile-requirements/client/:clientId`
-
-**URL Parameters:**
-
-| Parameter | Type   | Description |
-| --------- | ------ | ----------- |
-| clientId  | number | Client ID   |
-
-**Query Parameters:**
-
-| Parameter | Type   | Default | Description    |
-| --------- | ------ | ------- | -------------- |
-| page      | number | 1       | Page number    |
-| pageSize  | number | 10      | Items per page |
-
-**Example Request:**
-
-```
-GET /api/jobProfile-requirements/client/5?page=1&pageSize=10
-```
-
-**Success Response (200 OK):**
-
-```json
-{
-  "status": "success",
-  "message": "Job Profile Requirements retrieved successfully",
-  "data": [
-    {
-      "jobProfileRequirementId": 42,
-      "jobProfileId": 1,
-      "jobRole": "Software Engineer",
-      "clientName": "Tech Corp",
-      "departmentName": "Engineering",
-      "positions": 10,
-      "receivedOn": "2026-01-23",
-      "estimatedCloseDate": "2026-03-15",
-      "workArrangement": "hybrid",
-      "location": {
-        "country": "india",
-        "city": "bangalore"
-      },
-      "status": "pending"
-    }
-  ],
-  "metadata": {
-    "pagination": {
-      "currentPage": 1,
-      "pageSize": 10,
-      "totalCount": 25,
-      "totalPages": 3,
-      "hasNextPage": true,
-      "hasPreviousPage": false
-    }
-  }
-}
-```
-
----
-
-### Get by Job Profile ID
-
-Retrieves all requirements for a specific job profile.
-
-**Endpoint:** `GET /api/jobProfile-requirements/jobProfile/:jobProfileId`
-
-**URL Parameters:**
-
-| Parameter    | Type   | Description    |
-| ------------ | ------ | -------------- |
-| jobProfileId | number | Job profile ID |
-
-**Success Response (200 OK):**
-
-```json
-{
-  "status": "success",
-  "message": "Job Profile Requirements retrieved successfully",
-  "data": [
-    {
-      "jobProfileRequirementId": 42,
-      "jobProfileId": 1,
-      "jobRole": "Software Engineer",
-      "clientName": "Tech Corp",
-      "departmentName": "Engineering",
-      "positions": 10,
-      "receivedOn": "2026-01-23",
-      "estimatedCloseDate": "2026-03-15",
-      "workArrangement": "hybrid",
-      "location": {
-        "country": "india",
-        "city": "bangalore"
-      },
-      "status": "pending"
-    }
-  ]
-}
-```
-
----
-
-### Get by Status
-
-Retrieves all requirements with a specific status.
-
-**Endpoint:** `GET /api/jobProfile-requirements/status/:statusId`
-
-**URL Parameters:**
-
-| Parameter | Type   | Description |
-| --------- | ------ | ----------- |
-| statusId  | number | Status ID   |
-
-**Success Response (200 OK):**
-
-```json
-{
-  "status": "success",
-  "message": "Job Profile Requirements retrieved successfully",
-  "data": [
-    {
-      "jobProfileRequirementId": 42,
-      "jobProfileId": 1,
-      "jobRole": "Software Engineer",
-      "clientName": "Tech Corp",
-      "departmentName": "Engineering",
-      "positions": 10,
-      "receivedOn": "2026-01-23",
-      "estimatedCloseDate": "2026-03-15",
-      "workArrangement": "hybrid",
-      "location": {
-        "country": "india",
-        "city": "bangalore"
-      },
-      "status": "pending"
-    }
-  ]
-}
-```
-
----
-
-### Get by Department
-
-Retrieves all requirements for a specific department.
-
-**Endpoint:** `GET /api/jobProfile-requirements/department/:departmentId`
-
-**URL Parameters:**
-
-| Parameter    | Type   | Description   |
-| ------------ | ------ | ------------- |
-| departmentId | number | Department ID |
-
-**Success Response (200 OK):**
-
-```json
-{
-  "status": "success",
-  "message": "Job Profile Requirements retrieved successfully",
-  "data": [
-    {
-      "jobProfileRequirementId": 42,
-      "jobProfileId": 1,
-      "jobRole": "Software Engineer",
-      "clientName": "Tech Corp",
-      "departmentName": "Engineering",
-      "positions": 10,
-      "receivedOn": "2026-01-23",
-      "estimatedCloseDate": "2026-03-15",
-      "workArrangement": "hybrid",
-      "location": {
-        "country": "india",
-        "city": "bangalore"
-      },
-      "status": "pending"
-    }
-  ]
 }
 ```
 
@@ -3251,14 +2997,6 @@ All API errors follow this format:
   - **city**: Optional, 2-100 characters, must exist if provided
 - **status**: Optional, must be `pending`, `in progress`, `closed`, or `cancelled`
 - Cannot update requirements with status `closed` or `cancelled`
-
-### Search Validation
-
-- All fields optional
-- **minPositions** cannot be greater than **maxPositions**
-- **fromDate** cannot be greater than **toDate**
-- **limit**: 1-1000 (default: 50)
-- **offset**: >= 0 (default: 0)
 
 ---
 
