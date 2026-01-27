@@ -1639,18 +1639,18 @@ Create a new job profile with optional JD file upload.
 
 **Request Body Parameters:**
 
-| Field                | Type                | Required | Constraints                               | Description                                                 |
-| -------------------- | ------------------- | -------- | ----------------------------------------- | ----------------------------------------------------------- |
-| `position`           | string              | ✅ Yes   | 2-100 characters, must be unique          | Job position/role name                                      |
-| `experience`         | string              | ❌ No    | Max 50 characters                         | Experience description text (e.g., "5-7 years")             |
-| `experienceMinYears` | number              | ❌ No    | 0-99.99, max 2 decimal places             | Minimum years of experience required                        |
-| `experienceMaxYears` | number              | ❌ No    | 0-99.99, max 2 decimal places             | Maximum years of experience required                        |
-| `overview`           | string/object/array | ❌ No    | Max 5000 characters (after normalization) | Job overview - supports structured content                  |
-| `responsibilities`   | string/object/array | ❌ No    | Max 5000 characters (after normalization) | Key responsibilities - supports structured content          |
-| `requiredSkills`     | string/object/array | ❌ No    | Max 5000 characters (after normalization) | Required skills - supports structured content               |
-| `niceToHave`         | string/object/array | ❌ No    | Max 5000 characters (after normalization) | Nice to have skills - supports structured content           |
-| `techSpecifications` | array               | ❌ No    | -                                         | Array of technical specification names (strings) or objects |
-| `JD`                 | file                | ❌ No    | Max 5MB, PDF/DOC/DOCX only                | Job description document                                    |
+| Field                | Type                | Required | Constraints                               | Description                                        |
+| -------------------- | ------------------- | -------- | ----------------------------------------- | -------------------------------------------------- |
+| `position`           | string              | ✅ Yes   | 2-100 characters, must be unique          | Job position/role name                             |
+| `experience`         | string              | ❌ No    | Max 50 characters                         | Experience description text (e.g., "5-7 years")    |
+| `experienceMinYears` | number              | ❌ No    | 0-99.99, max 2 decimal places             | Minimum years of experience required               |
+| `experienceMaxYears` | number              | ❌ No    | 0-99.99, max 2 decimal places             | Maximum years of experience required               |
+| `overview`           | string/object/array | ❌ No    | Max 5000 characters (after normalization) | Job overview - supports structured content         |
+| `responsibilities`   | string/object/array | ❌ No    | Max 5000 characters (after normalization) | Key responsibilities - supports structured content |
+| `requiredSkills`     | string/object/array | ❌ No    | Max 5000 characters (after normalization) | Required skills - supports structured content      |
+| `niceToHave`         | string/object/array | ❌ No    | Max 5000 characters (after normalization) | Nice to have skills - supports structured content  |
+| `techSpecifications` | array               | ❌ No    | -                                         | Array of technical specification Ids               |
+| `JD`                 | file                | ❌ No    | Max 5MB, PDF/DOC/DOCX only                | Job description document                           |
 
 **Validation Rules:**
 
@@ -1710,22 +1710,6 @@ The following fields support three formats: `overview`, `responsibilities`, `req
 
 **Technical Specifications Format:**
 
-**Option 1: Array of Strings**
-
-```json
-"techSpecifications": ["React", "Node.js", "MongoDB", "AWS"]
-```
-
-**Option 2: Array of Objects**
-
-```json
-"techSpecifications": [
-  { "name": "React", "id": "optional-identifier" },
-  { "name": "Node.js" },
-  { "name": "MongoDB" }
-]
-```
-
 **Example Request:**
 
 ```http
@@ -1741,7 +1725,7 @@ overview: {"type":"paragraph","content":[{"text":"We are looking for an experien
 responsibilities: [{"type":"bullets","content":[{"text":"Design and develop scalable applications"},{"text":"Collaborate with cross-functional teams"}]}]
 requiredSkills: Strong knowledge of React, Node.js, and SQL databases
 niceToHave: Experience with AWS services
-techSpecifications: ["React","Node.js","PostgreSQL"]
+techSpecifications: [68,69,70]
 JD: <file-upload>
 ```
 

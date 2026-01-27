@@ -95,8 +95,8 @@ class JobProfileValidatorHelper {
         }
     }
 
-    async validateTechSpecifications(techSpecs, client = null) {
-        if (!techSpecs || !Array.isArray(techSpecs) || techSpecs.length === 0) {
+    async validateTechSpecifications(techSpecIds, client = null) {
+        if (!techSpecIds || !Array.isArray(techSpecIds) || techSpecIds.length === 0) {
             return [];
         }
 
@@ -106,11 +106,10 @@ class JobProfileValidatorHelper {
         try {
             const validatedSpecs = [];
 
-            for (const spec of techSpecs) {
-                const specName = typeof spec === 'string' ? spec : spec.name;
-                if (!specName) continue;
+            for (const specId of techSpecIds) {
+                if (!specId) continue;
 
-                const cacheKey = specName.toLowerCase().trim();
+                const cacheKey = `id_${specId}`;
 
                 if (this.techSpecCache.has(cacheKey)) {
                     validatedSpecs.push(this.techSpecCache.get(cacheKey));
@@ -118,15 +117,15 @@ class JobProfileValidatorHelper {
                 }
 
                 const query = `
-                    SELECT lookupKey, value 
+                    SELECT lookupKey 
                     FROM lookup 
-                    WHERE LOWER(value) = LOWER(?) AND tag = 'techSpecification'
+                    WHERE lookupKey = ? AND tag = 'techSpecification'
                 `;
-                const [rows] = await connection.execute(query, [specName.trim()]);
+                const [rows] = await connection.execute(query, [specId]);
 
                 if (rows.length === 0) {
                     throw new AppError(
-                        `Invalid technical specification: '${specName}'. Technical specification does not exist.`,
+                        `Invalid technical specification ID: '${specId}'. Technical specification does not exist.`,
                         400,
                         'INVALID_TECH_SPEC'
                     );
@@ -208,15 +207,12 @@ const jobProfileSchemas = {
         requiredSkills: structuredContentSchema.optional().allow(null),
         niceToHave: structuredContentSchema.optional().allow(null),
         techSpecifications: Joi.array().items(
-            Joi.alternatives().try(
-                Joi.string().trim(),
-                Joi.object({
-                    name: Joi.string().trim().required(),
-                    id: Joi.any().optional()
-                })
-            )
+            Joi.number().integer().positive()
         ).optional().allow(null).messages({
-            'array.base': 'Technical specifications must be an array'
+            'array.base': 'Technical specifications must be an array',
+            'number.base': 'Technical specification IDs must be numbers',
+            'number.integer': 'Technical specification IDs must be integers',
+            'number.positive': 'Technical specification IDs must be positive'
         })
     }).custom((value, helpers) => {
         if (value.experienceMinYears && value.experienceMaxYears) {
@@ -250,15 +246,12 @@ const jobProfileSchemas = {
         requiredSkills: structuredContentSchema.optional().allow(null),
         niceToHave: structuredContentSchema.optional().allow(null),
         techSpecifications: Joi.array().items(
-            Joi.alternatives().try(
-                Joi.string().trim(),
-                Joi.object({
-                    name: Joi.string().trim().required(),
-                    id: Joi.any().optional()
-                })
-            )
+            Joi.number().integer().positive()
         ).optional().allow(null).messages({
-            'array.base': 'Technical specifications must be an array'
+            'array.base': 'Technical specifications must be an array',
+            'number.base': 'Technical specification IDs must be numbers',
+            'number.integer': 'Technical specification IDs must be integers',
+            'number.positive': 'Technical specification IDs must be positive'
         })
     }).min(1).custom((value, helpers) => {
         if (value.experienceMinYears !== undefined && value.experienceMaxYears !== undefined) {
