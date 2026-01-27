@@ -302,6 +302,14 @@ class JobProfileValidator {
 
     static async validateCreate(req, res, next) {
         try {
+            // Handle comma-separated string from frontend
+            if (req.body.techSpecifications && typeof req.body.techSpecifications === 'string') {
+                req.body.techSpecifications = req.body.techSpecifications
+                    .split(',')
+                    .map(id => parseInt(id.trim(), 10))
+                    .filter(id => !isNaN(id) && id > 0);
+            }
+
             const { error, value } = jobProfileSchemas.create.validate(req.body, {
                 abortEarly: false,
                 stripUnknown: true,
@@ -344,6 +352,14 @@ class JobProfileValidator {
 
     static async validateUpdate(req, res, next) {
         try {
+            // Handle comma-separated string from frontend
+            if (req.body.techSpecifications && typeof req.body.techSpecifications === 'string') {
+                req.body.techSpecifications = req.body.techSpecifications
+                    .split(',')
+                    .map(id => parseInt(id.trim(), 10))
+                    .filter(id => !isNaN(id) && id > 0);
+            }
+
             const { error: paramsError } = jobProfileSchemas.params.validate(req.params, { abortEarly: false });
             const { error: bodyError, value } = jobProfileSchemas.update.validate(req.body, {
                 abortEarly: false,
