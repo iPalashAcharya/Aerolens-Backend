@@ -5,13 +5,139 @@ const normalizeWhitespace = (text) => {
     if (!text) return null;
 
     return text
-        .replace(/\r\n/g, '\n')       // Windows → Unix
-        .replace(/\r/g, '\n')         // Old Mac → Unix
-        .replace(/[ \t]+/g, ' ')      // Collapse multiple spaces/tabs
-        .replace(/\n{3,}/g, '\n\n')   // Max 2 newlines
-        .replace(/ \n/g, '\n')        // Space before newline
-        .replace(/\n /g, '\n')        // Space after newline
-        .trim();                      // Trim edges
+        .replace(/\r\n/g, '\n')                         // Normalize line endings
+        .replace(/\r/g, '\n')
+        .replace(/-\s*\n\s*/g, '-')                     // Fix hyphenation across lines
+        .replace(/\b([A-Z])\s+([a-z])/g, '$1$2')        // Fix "W eb" → "Web"
+        .replace(/(\w+)\s*-\s*(\w+)/g, '$1-$2')         // Fix "large - scale"
+        .replace(/[ \t]+/g, ' ')                         // Collapse spaces
+        .replace(/\n{3,}/g, '\n\n')                      // Max 2 newlines
+        .replace(/ ?\n ?/g, '\n')                        // Trim newlines
+        .trim();
+};
+
+// ENHANCED: Smart bullet point splitter that detects markers
+const splitBulletPoints = (text) => {
+    if (!text) return null;
+
+    // Common bullet markers (Unicode and ASCII)
+    const bulletMarkers = [
+        '•',   // U+2022 Bullet
+        '●',   // U+25CF Black Circle
+        '○',   // U+25CB White Circle
+        '■',   // U+25A0 Black Square
+        '□',   // U+25A1 White Square
+        '▪',   // U+25AA Black Small Square
+        '▫',   // U+25AB White Small Square
+        '‣',   // U+2023 Triangular Bullet
+        '⁃',   // U+2043 Hyphen Bullet
+        '◦',   // U+25E6 White Bullet
+        '▸',   // U+25B8 Black Right-Pointing Small Triangle
+        '▹',   // U+25B9 White Right-Pointing Small Triangle
+        '→',   // U+2192 Rightwards Arrow
+        '⇒',   // U+21D2 Rightwards Double Arrow
+        '➔',   // U+2794 Heavy Wide-Headed Rightwards Arrow
+        '➢',   // U+27A2 Three-D Top-Lighted Rightwards Arrowhead
+        '➤',   // U+27A4 Black Rightwards Arrowhead
+        '*',   // Asterisk
+        '·',   // U+00B7 Middle Dot
+        '+',   // Plus sign (common in markdown)
+    ];
+
+    // Check if text contains any bullet markers
+    const hasBulletMarkers = bulletMarkers.some(marker => text.includes(marker));
+
+    if (hasBulletMarkers) {
+        // Escape special regex characters for each marker
+        const escapedMarkers = bulletMarkers.map(m =>
+            m.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        );
+
+        // Create pattern that matches bullet markers at start of line or after whitespace
+        // This regex looks for:
+        // - Start of string OR newline
+        // - Optional whitespace
+        // - One of the bullet markers
+        // - Optional whitespace after the marker
+        const markerPattern = escapedMarkers.join('|');
+        const regex = new RegExp(
+            `(?:^|\\n)\\s*(${markerPattern})\\s*`,
+            'gm'
+        );
+
+        // Split on bullet markers and clean up
+        const bullets = text
+            .split(regex)
+            .filter(part => {
+                // Filter out empty strings and the captured bullet markers themselves
+                const trimmed = part.trim();
+                return trimmed.length > 0 && !bulletMarkers.includes(trimmed);
+            })
+            .map(line => {
+                // Normalize whitespace within each bullet point
+                // Replace multiple spaces/tabs with single space
+                // Replace multiple newlines within a bullet with single space
+                return line
+                    .replace(/\s+/g, ' ')  // Collapse all whitespace to single space
+                    .trim();
+            })
+            .filter(line => line.length > 0);
+
+        return bullets.join('\n');
+    }
+
+    // Fallback: No markers found
+    // Try to intelligently split on newlines
+    // Consider a line as a new bullet if it's not just a continuation
+    const lines = text.split('\n');
+    const bullets = [];
+    let currentBullet = '';
+
+    for (const line of lines) {
+        const trimmed = line.trim();
+
+        if (!trimmed) {
+            // Empty line - if we have a current bullet, save it
+            if (currentBullet) {
+                bullets.push(currentBullet.trim());
+                currentBullet = '';
+            }
+            continue;
+        }
+
+        // Check if this looks like a new bullet point
+        // Heuristic: starts with capital letter or number, or previous bullet seems complete
+        const looksLikeNewBullet =
+            /^[A-Z0-9]/.test(trimmed) && // Starts with capital or number
+            currentBullet && // We have a previous bullet
+            (
+                /[.!?]$/.test(currentBullet.trim()) || // Previous ends with punctuation
+                currentBullet.split(' ').length > 5 // Previous has substantial content
+            );
+
+        if (looksLikeNewBullet) {
+            bullets.push(currentBullet.trim());
+            currentBullet = trimmed;
+        } else {
+            // Continuation of current bullet
+            currentBullet += (currentBullet ? ' ' : '') + trimmed;
+        }
+    }
+
+    // Don't forget the last bullet
+    if (currentBullet) {
+        bullets.push(currentBullet.trim());
+    }
+
+    // If we couldn't intelligently split, just join all non-empty lines
+    if (bullets.length === 0) {
+        return lines
+            .map(l => l.trim())
+            .filter(l => l.length > 0)
+            .join('\n');
+    }
+
+    return bullets.join('\n');
 };
 
 // Helper to convert structured content to plain text
@@ -38,36 +164,84 @@ const convertStructuredContentToText = (content) => {
 
     let result = null;
 
+    // Handle single object with type 'bullets'
     if (content.type === 'bullets' && Array.isArray(content.content)) {
         result = content.content
-            .map(item => item.text?.trim())
+            .map(item => {
+                if (!item.text) return null;
+
+                // Check if this single text field contains multiple bullets
+                // (embedded newlines OR bullet markers present)
+                const hasEmbeddedNewlines = item.text.includes('\n');
+                const hasBulletMarkers = /[•●○■□▪▫‣⁃◦▸▹→⇒➔➢➤\*\·\+]/.test(item.text);
+
+                if (hasEmbeddedNewlines || hasBulletMarkers) {
+                    // Split into separate bullet points
+                    return splitBulletPoints(item.text);
+                }
+
+                // Single bullet point - just normalize whitespace
+                return normalizeWhitespace(item.text);
+            })
             .filter(Boolean)
             .join('\n');
     }
 
+    // Handle single object with type 'paragraph'
     else if (content.type === 'paragraph' && Array.isArray(content.content)) {
         result = content.content
-            .map(item => item.text?.trim())
+            .map(item => {
+                if (!item.text) return null;
+
+                // For paragraphs, preserve natural line breaks but normalize spacing
+                return item.text
+                    .split('\n')
+                    .map(line => line.trim())
+                    .filter(Boolean)
+                    .join('\n');
+            })
             .filter(Boolean)
-            .join('\n');
+            .join('\n\n'); // Double newline between paragraph blocks
     }
 
+    // Handle array of objects (mixed types)
     else if (Array.isArray(content)) {
         result = content
             .map(item => {
                 if (item.type === 'paragraph' && Array.isArray(item.content)) {
                     return item.content
-                        .map(c => c.text?.trim())
+                        .map(c => {
+                            if (!c.text) return null;
+                            return c.text
+                                .split('\n')
+                                .map(line => line.trim())
+                                .filter(Boolean)
+                                .join('\n');
+                        })
                         .filter(Boolean)
-                        .join('\n');
+                        .join('\n\n');
                 }
+
                 if (item.type === 'bullets' && Array.isArray(item.content)) {
                     return item.content
-                        .map(c => c.text?.trim())
+                        .map(c => {
+                            if (!c.text) return null;
+
+                            // Handle embedded newlines or bullet markers
+                            const hasEmbeddedNewlines = c.text.includes('\n');
+                            const hasBulletMarkers = /[•●○■□▪▫‣⁃◦▸▹→⇒➔➢➤\*\·\-\+]/.test(c.text);
+
+                            if (hasEmbeddedNewlines || hasBulletMarkers) {
+                                return splitBulletPoints(c.text);
+                            }
+
+                            return normalizeWhitespace(c.text);
+                        })
                         .filter(Boolean)
                         .join('\n');
                 }
-                return item.text?.trim() || '';
+
+                return normalizeWhitespace(item.text) || '';
             })
             .filter(Boolean)
             .join('\n\n');

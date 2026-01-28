@@ -31,7 +31,7 @@ class JobProfileRequirementService {
 
             await client.commit();
 
-            return jobProfileRequirement;
+            return await this.jobProfileRequirementRepository.findById(jobProfileRequirement.jobProfileRequirementId, client);
         } catch (error) {
             await client.rollback();
             if (!(error instanceof AppError)) {
