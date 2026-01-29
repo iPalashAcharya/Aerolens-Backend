@@ -428,6 +428,12 @@ class CandidateRepository {
                 return { candidateId };
             }
 
+            if ('jobProfileRequirementId' in updateData) {
+                updateData.appliedForJobProfileId = updateData.jobProfileRequirementId;
+                delete updateData.jobProfileRequirementId;
+            }
+
+
             // Filter only allowed fields for security
             const allowedFields = [
                 'candidateName', 'contactNumber', 'email', 'recruiterId',
