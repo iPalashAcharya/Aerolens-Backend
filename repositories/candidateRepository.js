@@ -115,7 +115,7 @@ class CandidateRepository {
                 candidateData.email ?? null,
                 candidateData.recruiterId,
                 candidateData.jobRole ?? null,
-                candidateData.appliedForJobProfileId,
+                candidateData.jobProfileRequirementId ?? null,
                 candidateData.expectedLocation !== undefined ? candidateData.expectedLocation : null,
                 candidateData.currentLocation !== undefined ? candidateData.currentLocation : null,
                 candidateData.currentCTC ?? null,

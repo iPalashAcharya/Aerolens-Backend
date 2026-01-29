@@ -43,7 +43,7 @@ class LookupRepository {
                 locationId: result.insertId,
                 city: locationData.city,
                 country: locationData.country,
-                state: locationData.state || null
+                state: locationData.state ?? null
             };
         } catch (error) {
             console.error('DB error in locationRepository.create:', error);

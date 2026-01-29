@@ -298,14 +298,14 @@ const candidateSchemas = {
                 'string.max': 'Job role cannot exceed 100 characters'
             }),
 
-        appliedForJobProfileId: Joi.number()
+        jobProfileRequirementId: Joi.number()
             .integer()
             .positive()
             .required()
             .messages({
-                'any.required': 'Job Profile ID is required',
-                'number.base': 'Job Profile ID must be a number',
-                'number.positive': 'Job Profile ID must be a positive number'
+                'any.required': 'Job Profile Requirement ID is required',
+                'number.base': 'Job Profile Requirement ID must be a number',
+                'number.positive': 'Job Profile Requirement ID must be a positive number'
             }),
 
         currentLocation: Joi.object({
@@ -505,15 +505,15 @@ const candidateSchemas = {
                 'string.min': 'Job role must be at least 2 characters long',
                 'string.max': 'Job role cannot exceed 100 characters'
             }),
-        appliedForJobProfileId: Joi.number()
+        jobProfileRequirementId: Joi.number()
             .integer()
             .positive()
             .optional()
             .allow(null)
             .messages({
-                'any.required': 'Job Profile ID is required',
-                'number.base': 'Job Profile ID must be a number',
-                'number.positive': 'Job Profile ID must be a positive number'
+                'any.required': 'Job Profile Requirement ID is required',
+                'number.base': 'Job Profile Requirement ID must be a number',
+                'number.positive': 'Job Profile Requirement ID must be a positive number'
             }),
 
         currentLocation: Joi.object({
