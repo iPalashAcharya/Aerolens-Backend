@@ -173,7 +173,7 @@ const convertStructuredContentToText = (content) => {
                 // Check if this single text field contains multiple bullets
                 // (embedded newlines OR bullet markers present)
                 const hasEmbeddedNewlines = item.text.includes('\n');
-                const hasBulletMarkers = /[•●○■□▪▫‣⁃◦▸▹→⇒➔➢➤\*\·\+]/.test(item.text);
+                const hasBulletMarkers = /[•●○■□▪▫‣⁃◦▸▹→⇒➔➢➤\*\·\+\-]/.test(item.text);
 
                 if (hasEmbeddedNewlines || hasBulletMarkers) {
                     // Split into separate bullet points
@@ -229,7 +229,7 @@ const convertStructuredContentToText = (content) => {
 
                             // Handle embedded newlines or bullet markers
                             const hasEmbeddedNewlines = c.text.includes('\n');
-                            const hasBulletMarkers = /[•●○■□▪▫‣⁃◦▸▹→⇒➔➢➤\*\·\-\+]/.test(c.text);
+                            const hasBulletMarkers = /[•●○■□▪▫‣⁃◦▸▹→⇒➔➢➤\*\·\+\-]/.test(c.text);
 
                             if (hasEmbeddedNewlines || hasBulletMarkers) {
                                 return splitBulletPoints(c.text);
@@ -478,7 +478,12 @@ class JobProfileValidator {
         try {
             // Handle comma-separated string from frontend
             if (req.body.techSpecifications && typeof req.body.techSpecifications === 'string') {
-                req.body.techSpecifications = req.body.techSpecifications
+                let techSpecString = req.body.techSpecifications.trim();
+                if ((techSpecString.startsWith('"') && techSpecString.endsWith('"')) ||
+                    (techSpecString.startsWith("'") && techSpecString.endsWith("'"))) {
+                    techSpecString = techSpecString.slice(1, -1);
+                }
+                req.body.techSpecifications = techSpecString
                     .split(',')
                     .map(id => parseInt(id.trim(), 10))
                     .filter(id => !isNaN(id) && id > 0);
@@ -528,10 +533,19 @@ class JobProfileValidator {
         try {
             // Handle comma-separated string from frontend
             if (req.body.techSpecifications && typeof req.body.techSpecifications === 'string') {
-                req.body.techSpecifications = req.body.techSpecifications
+                console.log('=== TECH SPEC DEBUG ===');
+                console.log('Raw techSpecifications:', req.body.techSpecifications);
+                let techSpecString = req.body.techSpecifications.trim();
+                if ((techSpecString.startsWith('"') && techSpecString.endsWith('"')) ||
+                    (techSpecString.startsWith("'") && techSpecString.endsWith("'"))) {
+                    techSpecString = techSpecString.slice(1, -1);
+                }
+                req.body.techSpecifications = techSpecString
                     .split(',')
                     .map(id => parseInt(id.trim(), 10))
                     .filter(id => !isNaN(id) && id > 0);
+                console.log('Parsed techSpecifications:', req.body.techSpecifications);
+                console.log('======================');
             }
 
             const { error: paramsError } = jobProfileSchemas.params.validate(req.params, { abortEarly: false });

@@ -2,6 +2,7 @@ const catchAsync = require('../utils/catchAsync');
 const ApiResponse = require('../utils/response');
 const AppError = require('../utils/appError');
 const path = require('path');
+const { transformToFrontend } = require('../utils/jobProfileFieldMapper');
 
 class JobProfileController {
     constructor(jobProfileService) {
@@ -192,9 +193,21 @@ class JobProfileController {
                     jdOriginalName: req.file.originalname,
                     jdUploadDate: new Date()
                 });
+                const updatedJobProfile = await this.jobProfileService.getJobProfileById(jobProfile.jobProfileId);
+                return ApiResponse.success(
+                    res,
+                    transformToFrontend(updatedJobProfile),
+                    "Job Profile created successfully",
+                    201
+                );
             }
 
-            return ApiResponse.success(res, jobProfile, "Job Profile created successfully", 201);
+            return ApiResponse.success(
+                res,
+                transformToFrontend(jobProfile),
+                "Job Profile created successfully",
+                201
+            );
         } catch (error) {
             if (req.file && req.file.key) {
                 try {
@@ -214,7 +227,7 @@ class JobProfileController {
 
         return ApiResponse.success(
             res,
-            jobProfile,
+            transformToFrontend(jobProfile),
             'Job Profile retrieved successfully'
         );
     });
@@ -223,7 +236,7 @@ class JobProfileController {
         const jobProfiles = await this.jobProfileService.getAllJobProfiles();
         return ApiResponse.success(
             res,
-            jobProfiles,
+            transformToFrontend(jobProfiles),
             'Job Profiles retrieved successfully'
         );
     });
@@ -258,9 +271,11 @@ class JobProfileController {
                 });
             }
 
+            const freshJobProfile = await this.jobProfileService.getJobProfileById(jobProfileId);
+
             return ApiResponse.success(
                 res,
-                updatedJobProfile,
+                transformToFrontend(freshJobProfile),
                 'Job Profile updated successfully'
             );
         } catch (error) {
@@ -300,7 +315,10 @@ class JobProfileController {
 
         return ApiResponse.success(
             res,
-            result,
+            {
+                jobProfiles: transformToFrontend(result.jobProfiles),
+                pagination: result.pagination
+            },
             'Job Profiles retrieved successfully'
         );
     });
