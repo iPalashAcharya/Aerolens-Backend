@@ -9,6 +9,7 @@ if (process.env.MODE === 'LOCAL') {
 }
 
 const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client-secrets-manager');
+const JobProfileRequirementValidator = require('./validators/jobProfileRequirementValidator');
 
 async function fetchSecrets() {
     if (process.env.MODE === 'LOCAL') {
@@ -81,6 +82,7 @@ async function startServer() {
         const clientRoutes = require('./routes/clientMVC');
         const departmentRoutes = require('./routes/department');
         const jobProfileRoutes = require('./routes/jobProfileRoutes');
+        const jobProfileRequirementRoutes = require('./routes/jobProfileRequirementRoutes');
         const contactRoutes = require('./routes/contact');
         const candidateRoutes = require('./routes/candidateRoutes');
         const CandidateValidator = require('./validators/candidateValidator');
@@ -91,6 +93,7 @@ async function startServer() {
         const vendorRoutes = require('./routes/vendorRoutes');
         const db = require('./db');
         const JobProfileValidator = require('./validators/jobProfileValidator');
+        const JobProfileRequirementValidator = require('./validators/jobProfileRequirementValidator');
         const AuthValidator = require('./validators/authValidator');
         const MemberValidator = require('./validators/memberValidator');
         const scheduledJobs = require('./jobs/scheduledJobs');
@@ -275,6 +278,7 @@ async function startServer() {
 
         AuthValidator.init(db);
         JobProfileValidator.init(db);
+        JobProfileRequirementValidator.init(db);
         CandidateValidator.init(db);
         MemberValidator.init(db);
         scheduledJobs.initializeAll();
@@ -289,6 +293,7 @@ async function startServer() {
         app.use('/department', departmentRoutes);
         app.use('/contact', contactRoutes);
         app.use('/jobProfile', jobProfileRoutes);
+        app.use('/jobProfileRequirement', jobProfileRequirementRoutes);
         app.use('/candidate', candidateRoutes);
         app.use('/lookup', lookupRoutes);
         app.use('/member', memberRoutes);

@@ -5,83 +5,203 @@ class JobProfileRepository {
         this.db = db;
     }
 
+    _groupJobProfiles(rows) {
+        const map = new Map();
+
+        for (const row of rows) {
+            if (!map.has(row.jobProfileId)) {
+                map.set(row.jobProfileId, {
+                    jobProfileId: row.jobProfileId,
+                    jobRole: row.jobRole,
+                    jobOverview: row.jobOverview,
+                    keyResponsibilities: row.keyResponsibilities,
+                    requiredSkillsText: row.requiredSkillsText,
+                    niceToHave: row.niceToHave,
+                    experienceText: row.experienceText,
+                    experienceMinYears: row.experienceMinYears,
+                    experienceMaxYears: row.experienceMaxYears,
+                    jdFileName: row.jdFileName,
+                    jdOriginalName: row.jdOriginalName,
+                    jdUploadDate: row.jdUploadDate,
+                    createdAt: row.createdAt,
+                    updatedAt: row.updatedAt,
+                    techSpecifications: []
+                });
+            }
+
+            if (row.techSpecId) {
+                map.get(row.jobProfileId).techSpecifications.push({
+                    lookupId: row.techSpecId,
+                    value: row.techSpecName
+                });
+            }
+        }
+
+        return Array.from(map.values());
+    }
+
     async create(jobProfileData, client) {
         const connection = client;
-        console.log(jobProfileData);
-
         try {
             const query = `
-            INSERT INTO jobProfile (
-                clientId, departmentId, jobProfileDescription, jobRole, 
-                techSpecification, positions, receivedOn, estimatedCloseDate, locationId, workArrangement, statusId
-            ) VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?,?)
+                INSERT INTO jobProfile (
+                    jobRole, 
+                    jobOverview, 
+                    keyResponsibilities, 
+                    requiredSkillsText,
+                    niceToHave,
+                    experienceText,
+                    experienceMinYears,
+                    experienceMaxYears
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             `;
 
             const [result] = await connection.execute(query, [
-                jobProfileData.clientId,
-                jobProfileData.departmentId,
-                jobProfileData.jobProfileDescription,
                 jobProfileData.jobRole,
-                jobProfileData.techSpecification,
-                jobProfileData.positions,
-                jobProfileData.estimatedCloseDate || null,
-                jobProfileData.locationId,
-                jobProfileData.workArrangement,
-                jobProfileData.statusId
+                jobProfileData.jobOverview || null,
+                jobProfileData.keyResponsibilities || null,
+                jobProfileData.requiredSkillsText || null,
+                jobProfileData.niceToHave || null,
+                jobProfileData.experienceText || null,
+                jobProfileData.experienceMinYears || null,
+                jobProfileData.experienceMaxYears || null
             ]);
 
             return {
                 jobProfileId: result.insertId,
                 ...jobProfileData,
-                receivedOn: new Date()
+                createdAt: new Date()
             };
         } catch (error) {
             this._handleDatabaseError(error);
-        } finally {
-            if (!client) connection.release();
+        }
+    }
+
+    async addTechSpecifications(jobProfileId, lookupIds, client) {
+        const connection = client;
+        try {
+            if (!lookupIds || lookupIds.length === 0) {
+                return;
+            }
+
+            const values = lookupIds.map(lookupId => [jobProfileId, lookupId]);
+            const query = `
+                INSERT INTO jobProfileTechSpec (jobProfileId, lookupId)
+                VALUES ?
+            `;
+
+            await connection.query(query, [values]);
+        } catch (error) {
+            this._handleDatabaseError(error);
+        }
+    }
+
+    async removeTechSpecifications(jobProfileId, client) {
+        const connection = client;
+        try {
+            const query = `DELETE FROM jobProfileTechSpec WHERE jobProfileId = ?`;
+            await connection.execute(query, [jobProfileId]);
+        } catch (error) {
+            this._handleDatabaseError(error);
+        }
+    }
+
+    async getTechSpecifications(jobProfileId, client) {
+        const connection = client;
+        try {
+            const query = `
+                SELECT 
+                    jpts.lookupId,
+                    l.value as techSpecName
+                FROM jobProfileTechSpec jpts
+                INNER JOIN lookup l ON jpts.lookupId = l.lookupKey
+                WHERE jpts.jobProfileId = ?
+            `;
+            const [rows] = await connection.execute(query, [jobProfileId]);
+            return rows;
+        } catch (error) {
+            this._handleDatabaseError(error);
         }
     }
 
     async findById(jobProfileId, client) {
         const connection = client;
-
         try {
             if (!jobProfileId) {
                 throw new AppError('Job Profile ID is required', 400, 'MISSING_JOB_PROFILE_ID');
             }
 
-            const query = `
-            SELECT jp.jobProfileId, c.clientId ,c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
-                   jp.techSpecification, jp.positions, DATE(jp.receivedOn) AS receivedOn, jp.estimatedCloseDate, jp.workArrangement,
-                   COALESCE((SELECT JSON_OBJECT('country',l.country,'city',l.cityName) FROM location l WHERE l.locationId = jp.locationId)) AS location, stat.value AS status,
-                   jp.jdFileName, jp.jdOriginalName, jp.jdUploadDate
-            FROM jobProfile jp
-            LEFT JOIN client c ON jp.clientId=c.clientId
-            LEFT JOIN department d ON jp.departmentId = d.departmentId
-            LEFT JOIN lookup stat on jp.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
-            WHERE jp.jobProfileId = ?
-            ORDER BY jp.receivedOn DESC
-            `;
+            const query = `SELECT
+            jp.jobProfileId,
+                jp.jobRole,
+                jp.jobOverview,
+                jp.keyResponsibilities,
+                jp.requiredSkillsText,
+                jp.niceToHave,
+                jp.experienceText,
+                jp.experienceMinYears,
+                jp.experienceMaxYears,
+                jp.jdFileName,
+                jp.jdOriginalName,
+                jp.jdUploadDate,
+                jp.createdAt,
+                jp.updatedAt,
+
+                l.lookupKey AS techSpecId,
+                    l.value AS techSpecName
+
+        FROM jobProfile jp
+        LEFT JOIN jobProfileTechSpec jpts
+        ON jpts.jobProfileId = jp.jobProfileId
+        LEFT JOIN lookup l
+        ON l.lookupKey = jpts.lookupId
+        AND l.tag = 'techSpecification'
+        WHERE jp.jobProfileId = ?
+        `;
 
             const [rows] = await connection.execute(query, [jobProfileId]);
-            if (rows.length > 0) {
-                const jobProfile = rows[0];
-                if (typeof jobProfile.location === 'string') {
-                    jobProfile.location = JSON.parse(jobProfile.location);
-                }
-                return jobProfile;
-            } else {
+
+            if (rows.length === 0) {
                 return null;
             }
+
+            const grouped = this._groupJobProfiles(rows);
+            return grouped[0];
         } catch (error) {
-            if (error instanceof AppError) { throw error; }
+            if (error instanceof AppError) throw error;
+            this._handleDatabaseError(error);
+        }
+    }
+
+    async findByRole(jobRole, excludeId = null, client) {
+        const connection = client;
+        try {
+            if (!jobRole) {
+                throw new AppError('Job Role is required', 400, 'MISSING_JOB_ROLE');
+            }
+
+            let query = `
+                SELECT jobProfileId 
+                FROM jobProfile 
+                WHERE jobRole = ?
+            `;
+            const params = [jobRole];
+
+            if (excludeId) {
+                query += ` AND jobProfileId != ?`;
+                params.push(excludeId);
+            }
+
+            const [rows] = await connection.execute(query, params);
+            return rows.length > 0 ? rows[0] : null;
+        } catch (error) {
+            if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
         }
     }
 
     async update(jobProfileId, updateData, client) {
         const connection = client;
-
         try {
             if (!jobProfileId) {
                 throw new AppError('Job Profile ID is required', 400, 'MISSING_JOB_PROFILE_ID');
@@ -91,10 +211,15 @@ class JobProfileRepository {
                 return { jobProfileId };
             }
 
-            // Filter only allowed fields for security
             const allowedFields = [
-                'jobProfileDescription', 'jobRole',
-                'techSpecification', 'positions', 'estimatedCloseDate', 'locationId', 'workArrangement', 'statusId'
+                'jobRole',
+                'jobOverview',
+                'keyResponsibilities',
+                'requiredSkillsText',
+                'niceToHave',
+                'experienceText',
+                'experienceMinYears',
+                'experienceMaxYears'
             ];
 
             const filteredData = {};
@@ -104,44 +229,54 @@ class JobProfileRepository {
                 }
             });
 
-            if (Object.keys(filteredData).length === 0) {
+            if (Object.keys(filteredData).length === 0 && !updateData.techSpecLookupIds) {
                 throw new AppError('No valid fields to update', 400, 'NO_VALID_FIELDS');
             }
 
-            const fields = Object.keys(filteredData);
-            const values = Object.values(filteredData);
+            // Update job profile fields if present
+            if (Object.keys(filteredData).length > 0) {
+                const fields = Object.keys(filteredData);
+                const values = Object.values(filteredData);
+                const setClause = fields.map(field => `${field} = ?`).join(', ');
 
-            const setClause = fields.map(field => `${field} = ?`).join(', ');
-            const query = `UPDATE jobProfile SET ${setClause} WHERE jobProfileId = ?`;
+                const query = `UPDATE jobProfile SET ${setClause} WHERE jobProfileId = ?`;
+                const [result] = await connection.execute(query, [...values, jobProfileId]);
 
-            const [result] = await connection.execute(query, [...values, jobProfileId]);
+                if (result.affectedRows === 0) {
+                    throw new AppError(
+                        `Job profile with ID ${jobProfileId} not found`,
+                        404,
+                        'JOB_PROFILE_NOT_FOUND'
+                    );
+                }
+            }
 
-            if (result.affectedRows === 0) {
-                throw new AppError(
-                    `Job profile with ID ${jobProfileId} not found`,
-                    404,
-                    'JOB_PROFILE_NOT_FOUND'
-                );
+            // Update technical specifications if provided
+            if (updateData.techSpecLookupIds !== undefined) {
+                await this.removeTechSpecifications(jobProfileId, connection);
+                if (updateData.techSpecLookupIds.length > 0) {
+                    await this.addTechSpecifications(jobProfileId, updateData.techSpecLookupIds, connection);
+                }
             }
 
             return {
                 jobProfileId,
-                ...updateData
+                ...filteredData
             };
         } catch (error) {
-            if (error instanceof AppError) { throw error; }
+            if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
         }
     }
 
     async delete(jobProfileId, client) {
         const connection = client;
-
         try {
             if (!jobProfileId) {
                 throw new AppError('Job Profile ID is required', 400, 'MISSING_JOB_PROFILE_ID');
             }
 
+            // Technical specifications will be deleted automatically due to CASCADE
             const query = `DELETE FROM jobProfile WHERE jobProfileId = ?`;
             const [result] = await connection.execute(query, [jobProfileId]);
 
@@ -155,138 +290,82 @@ class JobProfileRepository {
 
             return result.affectedRows;
         } catch (error) {
-            if (error instanceof AppError) { throw error; }
-            this._handleDatabaseError(error);
-        }
-    }
-
-    async findByClientId(clientId, limit = null, offset = null, client) {
-        const connection = client;
-
-        try {
-            if (!clientId) {
-                throw new AppError('Client ID is required', 400, 'MISSING_CLIENT_ID');
-            }
-
-            let query = `
-            SELECT jp.jobProfileId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
-                   jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,jp.workArrangement,
-                   COALESCE((SELECT JSON_OBJECT('country',l.country,'city',l.cityName) FROM location l WHERE l.locationId = jp.locationId)) AS location, stat.value AS status
-            FROM jobProfile jp
-            LEFT JOIN client c ON jp.clientId=c.clientId
-            LEFT JOIN department d ON jp.departmentId = d.departmentId
-            LEFT JOIN lookup stat on jp.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
-            WHERE jp.clientId = ?
-            ORDER BY jp.receivedOn DESC
-            `;
-
-            const params = [clientId];
-
-            if (limit) {
-                query += ` LIMIT ?`;
-                params.push(limit);
-
-                if (offset) {
-                    query += ` OFFSET ?`;
-                    params.push(offset);
-                }
-            }
-
-            const [rows] = await connection.execute(query, params);
-            return rows;
-        } catch (error) {
-            if (error instanceof AppError) { throw error; }
-            this._handleDatabaseError(error);
-        }
-    }
-
-    async findByStatus(statusId, client) {
-        const connection = client;
-
-        try {
-            if (!statusId) {
-                throw new AppError('Status ID is required', 400, 'MISSING_STATUS_ID');
-            }
-
-            const query = `
-            SELECT jp.jobProfileId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
-                   jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,jp.workArrangement,
-                   COALESCE((SELECT JSON_OBJECT('country',l.country,'city',l.cityName) FROM location l WHERE l.locationId = jp.locationId)) AS location, stat.value AS status
-            FROM jobProfile jp
-            LEFT JOIN client c ON jp.clientId=c.clientId
-            LEFT JOIN department d ON jp.departmentId = d.departmentId
-            LEFT JOIN lookup stat on jp.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
-            WHERE jp.statusId = ?
-            ORDER BY jp.receivedOn DESC
-            `;
-
-            const [rows] = await connection.execute(query, [statusId]);
-            return rows;
-        } catch (error) {
-            if (error instanceof AppError) { throw error; }
-            this._handleDatabaseError(error);
-        }
-    }
-
-    async findByDepartment(departmentId, client) {
-        const connection = client;
-
-        try {
-            if (!departmentId) {
-                throw new AppError('Department ID is required', 400, 'MISSING_DEPARTMENT_ID');
-            }
-
-            const query = `
-            SELECT jp.jobProfileId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
-                   jp.techSpecification, jp.positions, jp.receivedOn, jp.estimatedCloseDate,jp.workArrangement,
-                   COALESCE((SELECT JSON_OBJECT('country',l.country,'city',l.cityName) FROM location l WHERE l.locationId = jp.locationId)) AS location, stat.value AS status
-            FROM jobProfile jp
-            LEFT JOIN client c ON jp.clientId=c.clientId
-            LEFT JOIN department d ON jp.departmentId = d.departmentId
-            LEFT JOIN lookup stat on jp.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
-            WHERE jp.departmentId = ?
-            ORDER BY jp.receivedOn DESC
-            `;
-
-            const [rows] = await connection.execute(query, [departmentId]);
-            return rows;
-        } catch (error) {
-            if (error instanceof AppError) { throw error; }
-            this._handleDatabaseError(error);
-        }
-    }
-
-    async countByClient(clientId, client) {
-        const connection = client;
-
-        try {
-            if (!clientId) {
-                throw new AppError('Client ID is required', 400, 'MISSING_CLIENT_ID');
-            }
-
-            const query = `SELECT COUNT(*) as count FROM jobProfile WHERE clientId = ?`;
-            const [rows] = await connection.execute(query, [clientId]);
-            return rows[0].count;
-        } catch (error) {
             if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
         }
     }
 
-    async existsByRole(jobRole, clientId, excludeId = null, client) {
+    async findAll(limit = null, offset = null, client) {
         const connection = client;
 
+        let query = `
+        SELECT
+        jp.jobProfileId,
+        jp.jobRole,
+        jp.jobOverview,
+        jp.keyResponsibilities,
+        jp.requiredSkillsText,
+        jp.niceToHave,
+        jp.experienceText,
+        jp.experienceMinYears,
+        jp.experienceMaxYears,
+        jp.jdFileName,
+        jp.jdOriginalName,
+        jp.jdUploadDate,
+        jp.createdAt,
+        jp.updatedAt,
+
+        l.lookupKey AS techSpecId,
+        l.value AS techSpecName
+
+        FROM jobProfile jp
+        LEFT JOIN jobProfileTechSpec jpts
+        ON jpts.jobProfileId = jp.jobProfileId
+        LEFT JOIN lookup l
+        ON l.lookupKey = jpts.lookupId
+        AND l.tag = 'techSpecification'
+        ORDER BY jp.createdAt DESC
+        `;
+
+        const params = [];
+        if (limit !== null) {
+            query += ` LIMIT ?`;
+            params.push(limit);
+            if (offset !== null) {
+                query += ` OFFSET ?`;
+                params.push(offset);
+            }
+        }
+
+        const [rows] = await connection.execute(query, params);
+
+        return this._groupJobProfiles(rows);
+    }
+
+    async count(client) {
+        const connection = client;
         try {
-            if (!jobRole || !clientId) {
-                throw new AppError('Job Role and Client ID are required', 400, 'MISSING_REQUIRED_PARAMETERS');
+            const query = `SELECT COUNT(*) as count FROM jobProfile`;
+            const [rows] = await connection.execute(query);
+            return rows[0].count;
+        } catch (error) {
+            this._handleDatabaseError(error);
+        }
+    }
+
+    async existsByRole(jobRole, excludeId = null, client) {
+        const connection = client;
+        try {
+            if (!jobRole) {
+                throw new AppError('Job Role is required', 400, 'MISSING_JOB_ROLE');
             }
 
             let query = `
-            SELECT COUNT(*) as count 
-            FROM jobProfile 
-            WHERE jobRole = ? AND clientId = ?
+                SELECT COUNT(*) as count 
+                FROM jobProfile
+                WHERE jobRole = ?
             `;
-            const params = [jobRole, clientId];
+            const params = [jobRole];
 
             if (excludeId) {
                 query += ` AND jobProfileId != ?`;
@@ -296,66 +375,25 @@ class JobProfileRepository {
             const [rows] = await connection.execute(query, params);
             return rows[0].count > 0;
         } catch (error) {
-            if (error instanceof AppError) { throw error; }
-            this._handleDatabaseError(error);
-        }
-    }
-
-    async findAll(limit = null, offset = null, client) {
-        const connection = client;
-
-        try {
-            let query = `
-            SELECT jp.jobProfileId, c.clientName, d.departmentName, jp.jobProfileDescription, jp.jobRole,
-                   jp.techSpecification, jp.positions, DATE(jp.receivedOn) AS receivedOn, jp.estimatedCloseDate,jp.workArrangement,
-                   COALESCE((SELECT JSON_OBJECT('country',l.country,'city',l.cityName) FROM location l WHERE l.locationId = jp.locationId)) AS location, stat.value AS status,
-                   jp.jdFileName, jp.jdOriginalName, jp.jdUploadDate
-            FROM jobProfile jp
-            LEFT JOIN client c ON jp.clientId=c.clientId
-            LEFT JOIN department d ON jp.departmentId = d.departmentId
-            LEFT JOIN lookup stat on jp.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
-            ORDER BY jp.receivedOn DESC
-            `;
-
-            const params = [];
-
-            if (limit) {
-                query += ` LIMIT ?`;
-                params.push(limit);
-
-                if (offset) {
-                    query += ` OFFSET ?`;
-                    params.push(offset);
-                }
-            }
-
-            const [rows] = await connection.execute(query, params);
-            rows.forEach(row => {
-                if (typeof row.location === 'string') {
-                    row.location = JSON.parse(row.location);
-                }
-            });
-            return rows.length > 0 ? rows : null;
-        } catch (error) {
+            if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
         }
     }
 
     async updateJDInfo(jobProfileId, jdFilename, jdOriginalName, client) {
         const connection = client;
-
         try {
             if (!jobProfileId) {
                 throw new AppError('Job Profile ID is required', 400, 'MISSING_JOB_PROFILE_ID');
             }
 
             const query = `
-            UPDATE jobProfile 
-            SET jdFileName = ?, 
-                jdOriginalName = ?, 
-                jdUploadDate = NOW()
-            WHERE jobProfileId = ?
-        `;
+                UPDATE jobProfile 
+                SET jdFileName = ?, 
+                    jdOriginalName = ?, 
+                    jdUploadDate = NOW()
+                WHERE jobProfileId = ?
+            `;
 
             const [result] = await connection.execute(query, [jdFilename, jdOriginalName, jobProfileId]);
 
@@ -369,48 +407,46 @@ class JobProfileRepository {
 
             return result.affectedRows;
         } catch (error) {
-            if (error instanceof AppError) { throw error; }
+            if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
         }
     }
 
     async getJDInfo(jobProfileId, client) {
         const connection = client;
-
         try {
             if (!jobProfileId) {
                 throw new AppError('Job Profile ID is required', 400, 'MISSING_JOB_PROFILE_ID');
             }
 
             const query = `
-            SELECT jdFileName, jdOriginalName, jdUploadDate
-            FROM jobProfile 
-            WHERE jobProfileId = ?
-        `;
+                SELECT jdFileName, jdOriginalName, jdUploadDate
+                FROM jobProfile 
+                WHERE jobProfileId = ?
+            `;
 
             const [rows] = await connection.execute(query, [jobProfileId]);
             return rows[0] || null;
         } catch (error) {
-            if (error instanceof AppError) { throw error; }
+            if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
         }
     }
 
     async deleteJDInfo(jobProfileId, client) {
         const connection = client;
-
         try {
             if (!jobProfileId) {
-                throw new AppError('JOb Profile ID is required', 400, 'MISSING_JOB_PROFILE_ID');
+                throw new AppError('Job Profile ID is required', 400, 'MISSING_JOB_PROFILE_ID');
             }
 
             const query = `
-            UPDATE jobProfile 
-            SET jdFileName = NULL, 
-                jdOriginalName = NULL, 
-                jdUploadDate = NULL
-            WHERE jobProfileId = ?
-        `;
+                UPDATE jobProfile 
+                SET jdFileName = NULL, 
+                    jdOriginalName = NULL, 
+                    jdUploadDate = NULL
+                WHERE jobProfileId = ?
+            `;
 
             const [result] = await connection.execute(query, [jobProfileId]);
 
@@ -424,7 +460,7 @@ class JobProfileRepository {
 
             return result.affectedRows;
         } catch (error) {
-            if (error instanceof AppError) { throw error; }
+            if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
         }
     }
@@ -435,12 +471,11 @@ class JobProfileRepository {
         switch (error.code) {
             case 'ER_DUP_ENTRY':
                 throw new AppError(
-                    'A job profile with this role already exists for this client',
+                    'A job profile with this role already exists',
                     409,
                     'DUPLICATE_ENTRY',
                     { field: 'jobRole' }
                 );
-
             case 'ER_DATA_TOO_LONG':
                 throw new AppError(
                     'One or more fields exceed the maximum allowed length',
@@ -448,7 +483,6 @@ class JobProfileRepository {
                     'DATA_TOO_LONG',
                     { originalError: error.message }
                 );
-
             case 'ER_BAD_NULL_ERROR':
                 throw new AppError(
                     'Required field cannot be null',
@@ -456,7 +490,6 @@ class JobProfileRepository {
                     'NULL_CONSTRAINT_VIOLATION',
                     { originalError: error.message }
                 );
-
             case 'ER_NO_REFERENCED_ROW_2':
                 throw new AppError(
                     'Invalid foreign key provided - referenced record does not exist',
@@ -464,7 +497,6 @@ class JobProfileRepository {
                     'FOREIGN_KEY_CONSTRAINT',
                     { originalError: error.message }
                 );
-
             case 'ER_ROW_IS_REFERENCED_2':
                 throw new AppError(
                     'Cannot delete record - it is referenced by other records',
@@ -472,21 +504,18 @@ class JobProfileRepository {
                     'FOREIGN_KEY_CONSTRAINT_DELETE',
                     { originalError: error.message }
                 );
-
             case 'ECONNREFUSED':
                 throw new AppError(
                     'Database connection refused',
                     503,
                     'DATABASE_CONNECTION_ERROR'
                 );
-
             case 'ER_ACCESS_DENIED_ERROR':
                 throw new AppError(
                     'Database access denied',
                     503,
                     'DATABASE_ACCESS_DENIED'
                 );
-
             default:
                 throw new AppError(
                     'Database operation failed',

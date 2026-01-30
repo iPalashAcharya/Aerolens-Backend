@@ -1,6 +1,8 @@
 const catchAsync = require('../utils/catchAsync');
 const ApiResponse = require('../utils/response');
+const AppError = require('../utils/appError');
 const path = require('path');
+const { transformToFrontend } = require('../utils/jobProfileFieldMapper');
 
 class JobProfileController {
     constructor(jobProfileService) {
@@ -32,6 +34,7 @@ class JobProfileController {
         if (!req.file) {
             throw new AppError('No JD file uploaded', 400, 'NO_FILE_UPLOADED');
         }
+
         const jdInfo = await this.jobProfileService.getJDInfo(jobProfileId);
         if (jdInfo.hasJD && jdInfo.s3Key) {
             try {
@@ -39,7 +42,6 @@ class JobProfileController {
                 console.log(`Deleted old JD: ${jdInfo.s3Key}`);
             } catch (deleteError) {
                 console.error('Error deleting old JD:', deleteError);
-                // Continue with upload even if old file deletion fails
             }
         }
 
@@ -70,7 +72,6 @@ class JobProfileController {
         const mimeType = this.getMimeType(jdData.originalName);
         const sanitizedFilename = this.sanitizeFilename(jdData.originalName);
 
-        // Set headers for download
         res.setHeader('Content-Type', mimeType);
         res.setHeader('Content-Disposition', `attachment; filename="${sanitizedFilename}"`);
         res.setHeader('Access-Control-Allow-Origin', '*');
@@ -80,13 +81,9 @@ class JobProfileController {
             res.setHeader('Content-Length', s3Response.ContentLength);
         }
 
-        // Stream the S3 response to client
-        // Handle both Node.js streams and Web streams
         if (s3Response.Body.pipe) {
-            // Node.js stream
             s3Response.Body.pipe(res);
         } else {
-            // Web stream (AWS SDK v3)
             const stream = s3Response.Body;
             for await (const chunk of stream) {
                 res.write(chunk);
@@ -99,6 +96,7 @@ class JobProfileController {
         const jobProfileId = parseInt(req.params.id);
 
         const jdData = await this.jobProfileService.downloadJD(jobProfileId);
+
         if (!this.supportsInlinePreview(jdData.originalName)) {
             throw new AppError(
                 'Preview is only supported for PDF files. Please download the file instead.',
@@ -110,6 +108,7 @@ class JobProfileController {
                 }
             );
         }
+
         const { GetObjectCommand } = require('@aws-sdk/client-s3');
         const { s3Client, bucketName } = this.jobProfileService;
 
@@ -123,7 +122,6 @@ class JobProfileController {
         const mimeType = this.getMimeType(jdData.originalName);
         const sanitizedFilename = this.sanitizeFilename(jdData.originalName);
 
-        // Set headers for inline preview
         res.setHeader('Content-Type', mimeType);
         res.setHeader('Content-Disposition', `inline; filename="${sanitizedFilename}"`);
         res.setHeader('Access-Control-Allow-Origin', '*');
@@ -133,12 +131,9 @@ class JobProfileController {
             res.setHeader('Content-Length', s3Response.ContentLength);
         }
 
-        // Stream the S3 response to client
         if (s3Response.Body.pipe) {
-            // Node.js stream
             s3Response.Body.pipe(res);
         } else {
-            // Web stream (AWS SDK v3)
             const stream = s3Response.Body;
             for await (const chunk of stream) {
                 res.write(chunk);
@@ -187,24 +182,33 @@ class JobProfileController {
             const jobProfile = await this.jobProfileService.createJobProfile(jobProfileData, req.auditContext);
 
             if (req.file) {
-                // Step 2: Rename the S3 file with the proper candidateId
                 const renamedFileInfo = await this.jobProfileService.renameS3File(
                     req.file.key,
                     jobProfile.jobProfileId,
                     req.file.originalname
                 );
 
-                // Step 3: Update candidate resume info in DB with new S3 key
                 await this.jobProfileService.updateJobProfileJDInfo(jobProfile.jobProfileId, {
                     jdFileName: renamedFileInfo.newKey,
                     jdOriginalName: req.file.originalname,
                     jdUploadDate: new Date()
                 });
+                const updatedJobProfile = await this.jobProfileService.getJobProfileById(jobProfile.jobProfileId);
+                return ApiResponse.success(
+                    res,
+                    transformToFrontend(updatedJobProfile),
+                    "Job Profile created successfully",
+                    201
+                );
             }
 
-            return ApiResponse.success(res, jobProfile, "Job Profile created successfully", 201);
+            return ApiResponse.success(
+                res,
+                transformToFrontend(jobProfile),
+                "Job Profile created successfully",
+                201
+            );
         } catch (error) {
-            // If error occurs and file was uploaded to S3, delete it
             if (req.file && req.file.key) {
                 try {
                     await this.jobProfileService.deleteFromS3(req.file.key);
@@ -223,7 +227,7 @@ class JobProfileController {
 
         return ApiResponse.success(
             res,
-            jobProfile,
+            transformToFrontend(jobProfile),
             'Job Profile retrieved successfully'
         );
     });
@@ -232,7 +236,7 @@ class JobProfileController {
         const jobProfiles = await this.jobProfileService.getAllJobProfiles();
         return ApiResponse.success(
             res,
-            jobProfiles,
+            transformToFrontend(jobProfiles),
             'Job Profiles retrieved successfully'
         );
     });
@@ -241,7 +245,6 @@ class JobProfileController {
         try {
             const jobProfileId = parseInt(req.params.id);
 
-            // If new file is uploaded, delete old JD first
             if (req.file) {
                 const jdInfo = await this.jobProfileService.getJDInfo(jobProfileId);
                 if (jdInfo.hasJD && jdInfo.s3Key) {
@@ -250,7 +253,6 @@ class JobProfileController {
                         console.log(`Deleted old JD: ${jdInfo.s3Key}`);
                     } catch (deleteError) {
                         console.error('Error deleting old JD:', deleteError);
-                        // Continue with update even if old file deletion fails
                     }
                 }
             }
@@ -269,13 +271,14 @@ class JobProfileController {
                 });
             }
 
+            const freshJobProfile = await this.jobProfileService.getJobProfileById(jobProfileId);
+
             return ApiResponse.success(
                 res,
-                updatedJobProfile,
+                transformToFrontend(freshJobProfile),
                 'Job Profile updated successfully'
             );
         } catch (error) {
-            // If error occurs and file was uploaded to S3, delete it
             if (req.file && req.file.key) {
                 try {
                     await this.jobProfileService.deleteFromS3(req.file.key);
@@ -288,16 +291,35 @@ class JobProfileController {
     });
 
     deleteJobProfile = catchAsync(async (req, res) => {
-        const jdInfo = await this.jobProfileService.getJDInfo(parseInt(req.params.id));
+        const jobProfileId = parseInt(req.params.id);
+
+        const jdInfo = await this.jobProfileService.getJDInfo(jobProfileId);
         if (jdInfo.hasJD && jdInfo.s3Key) {
-            await this.jobProfileService.deleteJD(parseInt(req.params.id));
+            await this.jobProfileService.deleteJD(jobProfileId);
         }
 
-        await this.jobProfileService.deleteJobProfile(parseInt(req.params.id), req.auditContext);
+        await this.jobProfileService.deleteJobProfile(jobProfileId, req.auditContext);
+
         return ApiResponse.success(
             res,
             null,
             'Job Profile deleted successfully'
+        );
+    });
+
+    getAllJobProfilesWithPagination = catchAsync(async (req, res) => {
+        const page = parseInt(req.query.page) || 1;
+        const pageSize = parseInt(req.query.pageSize) || 10;
+
+        const result = await this.jobProfileService.getAllJobProfilesWithPagination(page, pageSize);
+
+        return ApiResponse.success(
+            res,
+            {
+                jobProfiles: transformToFrontend(result.jobProfiles),
+                pagination: result.pagination
+            },
+            'Job Profiles retrieved successfully'
         );
     });
 }

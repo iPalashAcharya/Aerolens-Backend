@@ -27,20 +27,78 @@ class CandidateRepository {
         WHERE m.isRecruiter = TRUE AND m.isActive = TRUE
     `);
 
+        const jobProfilePromise = connection.query(`
+                SELECT
+                -- Requirement
+                jpr.jobProfileRequirementId,
+                jpr.positions,
+                jpr.receivedOn,
+                jpr.estimatedCloseDate,
+
+                -- Job Profile (master)
+                jp.jobProfileId,
+                jp.jobRole,
+                jp.experienceText,
+                jp.experienceMinYears,
+                jp.experienceMaxYears,
+
+                -- Client
+                c.clientId,
+                c.clientName,
+
+                -- Department
+                d.departmentId,
+                d.departmentName,
+
+                -- Location (structured for frontend)
+                l.locationId,
+                l.cityName AS city,
+                l.stateName AS state,
+                l.country,
+
+                -- Status
+                s.lookupKey AS statusId,
+                s.value AS statusName
+
+            FROM jobProfileRequirement jpr
+
+            INNER JOIN jobProfile jp
+                ON jp.jobProfileId = jpr.jobProfileId
+
+            LEFT JOIN client c
+                ON c.clientId = jpr.clientId
+
+            LEFT JOIN department d
+                ON d.departmentId = jpr.departmentId
+
+            LEFT JOIN location l
+                ON l.locationId = jpr.locationId
+
+            LEFT JOIN lookup s
+                ON s.lookupKey = jpr.statusId
+            AND s.tag = 'profileStatus'
+
+            WHERE s.value IN ('Pending', 'In Progress')
+
+            ORDER BY jpr.jobProfileRequirementId DESC;
+            `);
+
         const locationPromise = connection.query(`
         SELECT locationId,cityName AS city,country,stateName AS state FROM location
     `);
 
-        const [recruiters, locations] =
+        const [recruiters, locations, jobProfiles] =
             await Promise.all([
                 recruitersPromise,
-                locationPromise
+                locationPromise,
+                jobProfilePromise
             ]);
 
         return {
             recruiters: recruiters[0],
             //status: status[0],
-            locations: locations[0]
+            locations: locations[0],
+            jobProfiles: jobProfiles[0]
         };
     }
 
@@ -48,15 +106,16 @@ class CandidateRepository {
         const connection = client;
         console.log(candidateData);
         try {
-            const query = `INSERT INTO candidate(candidateName,contactNumber,email,recruiterId,jobRole,expectedLocation,currentLocation,currentCTC,expectedCTC,noticePeriod,experienceYears,linkedinProfileUrl, resumeFilename, resumeOriginalName, resumeUploadDate,notes,statusId)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`
+            const query = `INSERT INTO candidate(candidateName,contactNumber,email,recruiterId,jobRole,appliedForJobProfileId,expectedLocation,currentLocation,currentCTC,expectedCTC,noticePeriod,experienceYears,linkedinProfileUrl, resumeFilename, resumeOriginalName, resumeUploadDate,notes,statusId)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`
 
             const [result] = await connection.execute(query, [
                 candidateData.candidateName,
                 candidateData.contactNumber ?? null,
                 candidateData.email ?? null,
                 candidateData.recruiterId,
-                candidateData.jobRole,
+                candidateData.jobRole ?? null,
+                candidateData.jobProfileRequirementId ?? null,
                 candidateData.expectedLocation !== undefined ? candidateData.expectedLocation : null,
                 candidateData.currentLocation !== undefined ? candidateData.currentLocation : null,
                 candidateData.currentCTC ?? null,
@@ -89,14 +148,65 @@ class CandidateRepository {
             }
 
             const query = `
-            SELECT c.candidateId,c.candidateName,c.contactNumber,c.email,c.recruiterId,m.memberName AS recruiterName,m.memberContact AS recruiterContact,m.email AS recruiterEmail,c.jobRole,
-            COALESCE((SELECT JSON_OBJECT('country',loc.country,'city',loc.cityName) FROM location loc WHERE loc.locationId = c.expectedLocation)) AS expectedLocation,
-            COALESCE((SELECT JSON_OBJECT('country',loc.country,'city',loc.cityName) FROM location loc WHERE loc.locationId = c.currentLocation)) AS currentLocation,
-            c.currentCTC,c.expectedCTC,c.noticePeriod,c.experienceYears,c.linkedinProfileUrl,stat.value AS statusName, c.resumeFilename, c.resumeOriginalName, c.resumeUploadDate,c.notes
-            FROM candidate c
-            LEFT JOIN lookup stat ON c.statusId= stat.lookupKey AND stat.tag = 'candidateStatus'
-            LEFT JOIN member m on m.memberId = c.recruiterId
-            WHERE c.candidateId = ? AND c.isActive = TRUE
+            SELECT
+            c.candidateId,
+            c.candidateName,
+            c.contactNumber,
+            c.email,
+            c.recruiterId,
+
+            m.memberName AS recruiterName,
+            m.memberContact AS recruiterContact,
+            m.email AS recruiterEmail,
+
+            jpReq.jobProfileRequirementId,
+            jp.jobRole AS jobRole,
+
+            COALESCE(
+                (
+                    SELECT JSON_OBJECT('country', loc.country, 'city', loc.cityName)
+                    FROM location loc
+                    WHERE loc.locationId = c.expectedLocation
+                )
+            ) AS expectedLocation,
+
+            COALESCE(
+                (
+                    SELECT JSON_OBJECT('country', loc.country, 'city', loc.cityName)
+                    FROM location loc
+                    WHERE loc.locationId = c.currentLocation
+                )
+            ) AS currentLocation,
+
+            c.currentCTC,
+            c.expectedCTC,
+            c.noticePeriod,
+            c.experienceYears,
+            c.linkedinProfileUrl,
+            stat.value AS statusName,
+            c.resumeFilename,
+            c.resumeOriginalName,
+            c.resumeUploadDate,
+            c.notes
+
+        FROM candidate c
+
+        LEFT JOIN jobProfileRequirement jpReq
+            ON c.appliedForJobProfileId = jpReq.jobProfileRequirementId
+
+        LEFT JOIN jobProfile jp
+            ON jpReq.jobProfileId = jp.jobProfileId  
+
+        LEFT JOIN lookup stat
+            ON c.statusId = stat.lookupKey
+            AND stat.tag = 'candidateStatus'
+
+        LEFT JOIN member m
+            ON m.memberId = c.recruiterId
+
+        WHERE c.candidateId = ?
+        AND c.isActive = TRUE;
+
             `;
 
             const [rows] = await connection.execute(query, [candidateId]);
@@ -368,10 +478,16 @@ class CandidateRepository {
                 return { candidateId };
             }
 
+            if ('jobProfileRequirementId' in updateData) {
+                updateData.appliedForJobProfileId = updateData.jobProfileRequirementId;
+                delete updateData.jobProfileRequirementId;
+            }
+
+
             // Filter only allowed fields for security
             const allowedFields = [
                 'candidateName', 'contactNumber', 'email', 'recruiterId',
-                'jobRole', 'expectedLocation', 'currentLocation', 'currentCTC', 'expectedCTC', 'noticePeriod', 'experienceYears', 'linkedinProfileUrl', 'resume', 'notes'
+                'jobRole', 'appliedForJobProfileId', 'expectedLocation', 'currentLocation', 'currentCTC', 'expectedCTC', 'noticePeriod', 'experienceYears', 'linkedinProfileUrl', 'resume', 'notes'
             ];
 
             const filteredData = {};
@@ -494,14 +610,63 @@ class CandidateRepository {
 
         try {
             let query = `
-            SELECT c.candidateId,c.candidateName,c.contactNumber,c.email,c.recruiterId,m.memberName AS recruiterName,m.memberContact AS recruiterContact,m.email AS recruiterEmail,c.jobRole,
-            COALESCE((SELECT JSON_OBJECT('country',loc.country,'city',loc.cityName) FROM location loc WHERE loc.locationId = c.expectedLocation)) AS expectedLocation,
-            COALESCE((SELECT JSON_OBJECT('country',loc.country,'city',loc.cityName) FROM location loc WHERE loc.locationId = c.currentLocation)) AS currentLocation,
-            c.currentCTC,c.expectedCTC,c.noticePeriod,c.experienceYears,c.linkedinProfileUrl,stat.value AS statusName, c.resumeFilename, c.resumeOriginalName, c.resumeUploadDate,c.notes
-            FROM candidate c
-            LEFT JOIN lookup stat ON c.statusId= stat.lookupKey AND stat.tag = 'candidateStatus'
-            LEFT JOIN member m on m.memberId = c.recruiterId
-            WHERE c.isActive = TRUE
+            SELECT
+            c.candidateId,
+            c.candidateName,
+            c.contactNumber,
+            c.email,
+            c.recruiterId,
+
+            m.memberName AS recruiterName,
+            m.memberContact AS recruiterContact,
+            m.email AS recruiterEmail,
+
+            jpReq.jobProfileRequirementId,
+            jp.jobRole AS jobRole,
+
+            COALESCE(
+                (
+                    SELECT JSON_OBJECT('country', loc.country, 'city', loc.cityName)
+                    FROM location loc
+                    WHERE loc.locationId = c.expectedLocation
+                )
+            ) AS expectedLocation,
+
+            COALESCE(
+                (
+                    SELECT JSON_OBJECT('country', loc.country, 'city', loc.cityName)
+                    FROM location loc
+                    WHERE loc.locationId = c.currentLocation
+                )
+            ) AS currentLocation,
+
+            c.currentCTC,
+            c.expectedCTC,
+            c.noticePeriod,
+            c.experienceYears,
+            c.linkedinProfileUrl,
+            stat.value AS statusName,
+            c.resumeFilename,
+            c.resumeOriginalName,
+            c.resumeUploadDate,
+            c.notes
+
+        FROM candidate c
+
+        LEFT JOIN jobProfileRequirement jpReq
+            ON c.appliedForJobProfileId = jpReq.jobProfileRequirementId
+
+        LEFT JOIN jobProfile jp
+            ON jpReq.jobProfileId = jp.jobProfileId  
+
+        LEFT JOIN lookup stat
+            ON c.statusId = stat.lookupKey
+            AND stat.tag = 'candidateStatus'
+
+        LEFT JOIN member m
+            ON m.memberId = c.recruiterId
+
+        WHERE c.isActive = TRUE
         `;
             const params = [];
             if (limit) {
