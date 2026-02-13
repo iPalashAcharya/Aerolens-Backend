@@ -137,6 +137,58 @@ class CandidateValidatorHelper {
         }
     }
 
+    // Add this method to the CandidateValidatorHelper class (after getRecruiterId method)
+
+    async getJobProfileRequirementId(clientName, departmentName, jobRole, client = null) {
+        this._resetCacheIfNeeded();
+
+        if (!clientName || !departmentName || !jobRole) {
+            throw new AppError(
+                'Client name, department name, and job role are all required to identify job requirement',
+                400,
+                'INCOMPLETE_JOB_REQUIREMENT_INFO'
+            );
+        }
+
+        const connection = client || await this.db.getConnection();
+
+        try {
+            const query = `
+            SELECT jpr.jobProfileRequirementId 
+            FROM jobProfileRequirement jpr
+            INNER JOIN client c ON c.clientId = jpr.clientId
+            INNER JOIN department d ON d.departmentId = jpr.departmentId
+            WHERE LOWER(c.clientName) = LOWER(?)
+            AND LOWER(d.departmentName) = LOWER(?)
+            AND LOWER(jpr.jobRole) = LOWER(?)
+            AND jpr.statusId IN (
+                SELECT lookupKey FROM lookup 
+                WHERE tag = 'profileStatus' 
+                AND value IN ('Pending', 'In Progress')
+            )
+            LIMIT 1
+        `;
+
+            const [rows] = await connection.execute(query, [
+                clientName.trim(),
+                departmentName.trim(),
+                jobRole.trim()
+            ]);
+
+            if (rows.length === 0) {
+                throw new AppError(
+                    `No active job requirement found for Client: '${clientName}', Department: '${departmentName}', Role: '${jobRole}'`,
+                    400,
+                    'JOB_REQUIREMENT_NOT_FOUND'
+                );
+            }
+
+            return rows[0].jobProfileRequirementId;
+        } finally {
+            if (!client) connection.release();
+        }
+    }
+
     async transformLocation(locationName, client = null) {
         this._resetCacheIfNeeded();
         if (!locationName) return null;

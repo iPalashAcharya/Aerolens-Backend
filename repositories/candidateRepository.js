@@ -944,7 +944,7 @@ class CandidateRepository {
             return result.affectedRows;
 
         } catch (error) {
-            console.error("🔥 REAL DB ERROR:", error);
+            console.error("REAL DB ERROR:", error);
             throw error;
         }
     }
@@ -955,10 +955,9 @@ class CandidateRepository {
         switch (error.code) {
             case 'ER_DUP_ENTRY':
                 throw new AppError(
-                    'A job profile with this role already exists for this client',
+                    'A Candidate Already exists with the same unique field value',
                     409,
-                    'DUPLICATE_ENTRY',
-                    { field: 'jobRole' }
+                    'DUPLICATE_ENTRY'
                 );
 
             case 'ER_DATA_TOO_LONG':

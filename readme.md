@@ -3297,7 +3297,316 @@ DELETE /candidate/:id/resume
 }
 ```
 
+### Upload Candidates in Bulk
+
+```
+POST /candidate/bulk-upload
+```
+
+**Content-Type:** `multipart/form-data`
+
+**Authentication:** Required (Bearer token)
+
 ---
+
+## Request
+
+### Form Data
+
+| Field | Type | Required | Description                                 |
+| ----- | ---- | -------- | ------------------------------------------- |
+| file  | File | Yes      | CSV or Excel file (`.csv`, `.xlsx`, `.xls`) |
+
+### File Requirements
+
+- **Max file size:** 10 MB
+- **Max rows:** 50,000 candidates
+- **Supported formats:** CSV, XLSX, XLS
+- **Encoding:** UTF-8 (for CSV)
+
+---
+
+## CSV Format
+
+### Required Columns
+
+| Column Name      | Type   | Required | Description                                      | Example                    |
+| ---------------- | ------ | -------- | ------------------------------------------------ | -------------------------- |
+| candidate_name   | String | ✅ Yes   | Full name (2-100 chars, letters/spaces/.-' only) | `John Doe`                 |
+| recruiter_name   | String | ✅ Yes   | Recruiter name (must exist in system)            | `Jayraj`                   |
+| client_name      | String | ✅ Yes   | Client name (must exist in system)               | `TCS`                      |
+| department_name  | String | ✅ Yes   | Department name (must exist in system)           | `Engineering`              |
+| job_role         | String | ✅ Yes   | Job role (must match active requirement)         | `Senior Software Engineer` |
+| expected_city    | String | ✅ Yes   | Preferred work location                          | `Bangalore`                |
+| notice_period    | Number | ✅ Yes   | Notice period in days (0-365)                    | `30`                       |
+| experience_years | Number | ✅ Yes   | Years of experience (0-50, supports decimals)    | `5.5`                      |
+
+### Optional Columns
+
+| Column Name    | Type   | Required | Description                                          | Example                           |
+| -------------- | ------ | -------- | ---------------------------------------------------- | --------------------------------- |
+| email          | String | ❌ No    | Email address (valid format)                         | `john.doe@example.com`            |
+| contact_number | String | ❌ No    | Phone number (7-25 chars, +/digits/spaces/()-)       | `+91-9876543210`                  |
+| current_city   | String | ❌ No    | Current location                                     | `Ahmedabad`                       |
+| current_ctc    | Number | ❌ No    | Current CTC in INR (0-10,000,000, supports decimals) | `1200000`                         |
+| expected_ctc   | Number | ❌ No    | Expected CTC in INR (must be ≥ current CTC)          | `1500000`                         |
+| linkedin_url   | String | ❌ No    | LinkedIn profile URL (valid format)                  | `https://linkedin.com/in/johndoe` |
+| notes          | String | ❌ No    | Additional notes/comments                            | `Strong React skills`             |
+
+### Column Name Variations
+
+The system accepts flexible column naming (case-insensitive, with underscores or spaces):
+
+- **candidate_name:** `name`, `full_name`, `candidatename`
+- **recruiter_name:** `recruiter`, `recruitername`
+- **client_name:** `client`, `clientname`
+- **department_name:** `department`, `departmentname`
+- **job_role:** `role`, `position`, `jobrole`
+- **contact_number:** `phone`, `mobile`, `contact`, `contactnumber`
+- **current_city:** `current_location`, `city`, `currentcity`
+- **expected_city:** `preferred_city`, `expected_location`, `expectedcity`
+- **current_ctc:** `currentctc`, `current_salary`
+- **expected_ctc:** `expectedctc`, `expected_salary`
+- **notice_period:** `notice`, `noticeperiod`
+- **experience_years:** `experience`, `exp`, `experienceyears`
+- **linkedin_url:** `linkedin`, `linkedinprofileurl`
+
+---
+
+## Sample CSV File
+
+```csv
+candidate_name,email,contact_number,recruiter_name,client_name,department_name,job_role,current_city,expected_city,current_ctc,expected_ctc,notice_period,experience_years,linkedin_url,notes
+John Doe,john.doe@example.com,+91-9876543210,Jayraj,TCS,Engineering,Senior Software Engineer,Ahmedabad,Bangalore,1200000,1500000,30,5.5,https://linkedin.com/in/johndoe,Strong React and Node.js skills
+Jane Smith,jane.smith@example.com,+91-9876543211,Khushi,Infosys,Marketing,Product Manager,Mumbai,Bangalore,1800000,2200000,60,7,https://linkedin.com/in/janesmith,Excellent product vision
+Raj Patel,raj.patel@example.com,+91-9876543212,Yash,Wipro,Engineering,Backend Developer,Pune,Ahmedabad,900000,1100000,15,3.5,https://linkedin.com/in/rajpatel,Expert in Java
+```
+
+---
+
+## Response Format
+
+### Success Response (All Records Inserted)
+
+**Status Code:** `201 Created`
+
+```json
+{
+  "success": true,
+  "message": "Bulk upload completed",
+  "data": {
+    "summary": {
+      "totalRows": 10,
+      "inserted": 10,
+      "failed": 0,
+      "skipped": 0,
+      "processingTime": "2.34s"
+    },
+    "failedRows": [],
+    "hasMoreErrors": false
+  }
+}
+```
+
+### Partial Success Response (Some Failures)
+
+**Status Code:** `207 Multi-Status`
+
+```json
+{
+  "success": true,
+  "message": "Bulk upload completed",
+  "data": {
+    "summary": {
+      "totalRows": 10,
+      "inserted": 7,
+      "failed": 3,
+      "skipped": 0,
+      "processingTime": "2.15s"
+    },
+    "failedRows": [
+      {
+        "row": 3,
+        "error": "Duplicate email: existing@example.com"
+      },
+      {
+        "row": 5,
+        "error": "Recruiter 'InvalidName' not found"
+      },
+      {
+        "row": 8,
+        "error": "No active job requirement found for Client: 'ABC Corp', Department: 'Sales', Role: 'Manager'"
+      }
+    ],
+    "hasMoreErrors": false
+  }
+}
+```
+
+### Response Fields
+
+| Field                    | Type    | Description                                            |
+| ------------------------ | ------- | ------------------------------------------------------ |
+| `summary.totalRows`      | Number  | Total number of data rows processed (excludes header)  |
+| `summary.inserted`       | Number  | Number of candidates successfully created              |
+| `summary.failed`         | Number  | Number of rows that failed validation/insertion        |
+| `summary.skipped`        | Number  | Number of rows skipped (reserved for future use)       |
+| `summary.processingTime` | String  | Total processing time in seconds                       |
+| `failedRows`             | Array   | List of failed rows with error details (max 100 shown) |
+| `failedRows[].row`       | Number  | Row number in the file (1-indexed, includes header)    |
+| `failedRows[].error`     | String  | Specific error message for that row                    |
+| `hasMoreErrors`          | Boolean | `true` if more than 100 errors occurred                |
+
+---
+
+## Error Responses
+
+### File Validation Errors
+
+**Status Code:** `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "Invalid file format. Only CSV and Excel files are allowed.",
+  "error": {
+    "code": "INVALID_FILE_FORMAT"
+  }
+}
+```
+
+**Common File Errors:**
+
+| Error Code            | Description                         |
+| --------------------- | ----------------------------------- |
+| `NO_FILE_UPLOADED`    | No file provided in request         |
+| `INVALID_FILE_FORMAT` | File is not CSV or Excel            |
+| `FILE_TOO_LARGE`      | File exceeds 10 MB limit            |
+| `ROW_LIMIT_EXCEEDED`  | File contains more than 50,000 rows |
+
+### Row Validation Errors
+
+These errors appear in the `failedRows` array:
+
+| Error Type                 | Example Message                                                                          |
+| -------------------------- | ---------------------------------------------------------------------------------------- |
+| **Missing Required Field** | `"Candidate name is required"`                                                           |
+| **Invalid Format**         | `"Email must be a valid email address"`                                                  |
+| **Out of Range**           | `"Experience years cannot exceed 50"`                                                    |
+| **Duplicate Entry**        | `"Duplicate email: john@example.com"`                                                    |
+| **Not Found**              | `"Recruiter 'John Smith' not found"`                                                     |
+| **Job Requirement**        | `"No active job requirement found for Client: 'TCS', Department: 'HR', Role: 'Manager'"` |
+| **CTC Validation**         | `"Expected CTC should not be less than current CTC"`                                     |
+| **LinkedIn URL**           | `"LinkedIn URL must be in format: https://linkedin.com/in/username"`                     |
+
+---
+
+## Validation Rules
+
+### Field-Specific Rules
+
+#### candidate_name
+
+- ✅ Required
+- Min length: 2 characters
+- Max length: 100 characters
+- Allowed: Letters, spaces, periods (.), hyphens (-), apostrophes (')
+- ❌ Invalid: `J` (too short), `John123` (contains numbers)
+
+#### email
+
+- Optional
+- Must be valid email format
+- Max length: 255 characters
+- Automatically converted to lowercase
+- Must be unique (no duplicates in database)
+- ❌ Invalid: `notanemail`, `user@`, `@domain.com`
+
+#### contact_number
+
+- Optional
+- Length: 7-25 characters
+- Allowed: Digits, spaces, `+`, `-`, `(`, `)`
+- Must be unique (no duplicates in database)
+- ❌ Invalid: `123` (too short), `abc-1234567` (contains letters)
+
+#### recruiter_name
+
+- ✅ Required
+- Must match an existing recruiter in the system
+- Case-insensitive matching
+- ❌ Invalid: Non-existent recruiter name
+
+#### client_name, department_name, job_role
+
+- ✅ All three required (used to identify job requirement)
+- Must match an existing active job profile requirement
+- Active requirement = status is "Pending" or "In Progress"
+- Matching is case-insensitive
+- ❌ Invalid: If no matching active requirement exists
+
+#### current_city / expected_city
+
+- expected_city: ✅ Required
+- current_city: Optional
+- Must exist in the locations table
+- Case-insensitive matching
+- ❌ Invalid: City not in system
+
+#### current_ctc / expected_ctc
+
+- Optional
+- Range: 0 to 10,000,000
+- Supports decimals (up to 2 decimal places)
+- Validation: `expected_ctc` must be ≥ `current_ctc`
+- ❌ Invalid: `expected_ctc: 800000, current_ctc: 1000000`
+
+#### notice_period
+
+- ✅ Required
+- Range: 0 to 365 days
+- Must be a whole number
+- ❌ Invalid: `-10`, `400`, `30.5`
+
+#### experience_years
+
+- ✅ Required
+- Range: 0 to 50 years
+- Supports decimals (e.g., `5.5` for 5.5 years)
+- ❌ Invalid: `-1`, `60`, `abc`
+
+#### linkedin_url
+
+- Optional
+- Must be a valid HTTPS/HTTP URL
+- Must match pattern: `https://linkedin.com/in/username`
+- Max length: 500 characters
+- ❌ Invalid: `https://twitter.com/user`, `linkedin.com/in/user` (missing https)
+
+---
+
+## Processing Details
+
+### Batch Processing
+
+- Records are processed in **batches of 200** for optimal database performance
+- Each batch is inserted in a single transaction
+- If a batch fails, the entire batch is rolled back
+- Successfully processed batches remain committed
+
+### Transaction Safety
+
+- Each upload runs in a database transaction
+- If any critical error occurs, all changes are rolled back
+- Row-level validation errors don't roll back the entire upload
+- Only valid rows are inserted
+
+### Duplicate Detection
+
+- **Email uniqueness:** Checked against existing candidates in database
+- **Contact number uniqueness:** Checked against existing candidates
+- **Within file:** Duplicates within the same CSV are also caught
+- Failed duplicates are reported in `failedRows`
 
 ## Notes
 
@@ -3485,8 +3794,10 @@ This document describes **all Member-related API endpoints**, including **reques
 
 Base URL:
 
-```
+````
+
 /api/member
+
 ```
 
 All endpoints require authentication.
@@ -3498,8 +3809,10 @@ All endpoints require authentication.
 All routes require a valid authenticated token.
 
 ```
+
 Authorization: Bearer <token>
-```
+
+````
 
 ---
 

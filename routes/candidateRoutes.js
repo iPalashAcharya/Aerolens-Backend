@@ -49,7 +49,12 @@ router.get('/create-data',
 );
 
 router.post('/',
-    candidateService.upload.single('resume'),
+    (req, res, next) => {
+        if (req.is('multipart/form-data')) {
+            return candidateService.upload.single('resume')(req, res, next);
+        }
+        next();
+    },
     (req, res, next) => {
         console.log("==== Parsed body BEFORE validator ====");
         console.log(JSON.stringify(req.body, null, 2));

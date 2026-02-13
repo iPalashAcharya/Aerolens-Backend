@@ -309,6 +309,8 @@ class CandidateBulkService {
             contactNumber: findValue(['contact_number', 'phone', 'mobile', 'contact', 'contactnumber']),
             email: findValue(['email', 'email_address', 'emailaddress']),
             recruiterName: findValue(['recruiter_name', 'recruiter', 'recruitername']),
+            clientName: findValue(['client_name', 'client', 'clientname']),
+            departmentName: findValue(['department_name', 'department', 'departmentname']),
             jobRole: findValue(['job_role', 'role', 'position', 'jobrole']),
             currentCity: findValue(['current_city', 'current_location', 'city', 'currentcity']),
             expectedCity: findValue(['expected_city', 'preferred_city', 'expected_location', 'expectedcity']),
@@ -327,7 +329,7 @@ class CandidateBulkService {
     async _validateRow(data, rowNumber) {
         const Joi = require('joi');
 
-        // Bulk upload schema - more lenient than regular create
+        // Bulk upload schema - must match single create validation exactly
         const bulkSchema = Joi.object({
             candidateName: Joi.string()
                 .trim()
@@ -354,15 +356,41 @@ class CandidateBulkService {
                 .trim()
                 .min(2)
                 .max(100)
-                .optional()
-                .allow(null, ''),
+                .required()
+                .messages({
+                    'any.required': 'Recruiter name is required',
+                    'string.empty': 'Recruiter name is required'
+                }),
+
+            clientName: Joi.string()
+                .trim()
+                .min(2)
+                .max(100)
+                .required()
+                .messages({
+                    'any.required': 'Client name is required',
+                    'string.empty': 'Client name is required'
+                }),
+
+            departmentName: Joi.string()
+                .trim()
+                .min(2)
+                .max(100)
+                .required()
+                .messages({
+                    'any.required': 'Department name is required',
+                    'string.empty': 'Department name is required'
+                }),
 
             jobRole: Joi.string()
                 .trim()
                 .min(2)
                 .max(100)
-                .optional()
-                .allow(null, ''),
+                .required()
+                .messages({
+                    'any.required': 'Job role is required',
+                    'string.empty': 'Job role is required'
+                }),
 
             currentCity: Joi.string()
                 .trim()
@@ -438,7 +466,7 @@ class CandidateBulkService {
     }
 
     /**
-     * Transform lookups (locations, status, recruiter)
+     * Transform lookups (locations, status, recruiter, job profile requirement)
      */
     async _transformRow(data, client) {
         const transformed = { ...data };
@@ -464,7 +492,7 @@ class CandidateBulkService {
         // Default status to 'pending'
         transformed.statusId = await this.validatorHelper.getStatusIdByName('pending', client);
 
-        // Transform recruiter name to ID (if provided)
+        // Transform recruiter name to ID
         if (data.recruiterName) {
             try {
                 transformed.recruiterId = await this.validatorHelper.getRecruiterId(
@@ -473,12 +501,30 @@ class CandidateBulkService {
                 );
                 delete transformed.recruiterName;
             } catch (error) {
-                // If recruiter not found, throw error (required field)
                 throw new Error(`Recruiter '${data.recruiterName}' not found`);
             }
         } else {
-            // Recruiter is required - use default or throw error
             throw new Error('Recruiter name is required');
+        }
+
+        // Transform job requirement lookup (client + department + role) to ID
+        if (data.clientName && data.departmentName && data.jobRole) {
+            try {
+                transformed.jobProfileRequirementId = await this.validatorHelper.getJobProfileRequirementId(
+                    data.clientName,
+                    data.departmentName,
+                    data.jobRole,
+                    client
+                );
+                // Remove the lookup fields, keep only the ID
+                delete transformed.clientName;
+                delete transformed.departmentName;
+                delete transformed.jobRole;
+            } catch (error) {
+                throw new Error(`Job requirement not found for Client: '${data.clientName}', Department: '${data.departmentName}', Role: '${data.jobRole}'`);
+            }
+        } else {
+            throw new Error('Client name, department name, and job role are all required');
         }
 
         return transformed;
@@ -618,6 +664,8 @@ class CandidateBulkService {
             'email',
             'contact_number',
             'recruiter_name',
+            'client_name',
+            'department_name',
             'job_role',
             'current_city',
             'expected_city',
@@ -635,6 +683,8 @@ class CandidateBulkService {
                 email: 'john.doe@example.com',
                 contact_number: '+91-9876543210',
                 recruiter_name: 'Jayraj',
+                client_name: 'TCS',
+                department_name: 'Engineering',
                 job_role: 'Senior Software Engineer',
                 current_city: 'Ahmedabad',
                 expected_city: 'Bangalore',
