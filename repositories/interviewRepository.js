@@ -70,8 +70,6 @@ class InterviewRepository {
                 SUM(CASE WHEN result = 'cancelled' THEN 1 ELSE 0 END) AS cancelled
             FROM interview
             WHERE deletedAt IS NULL
-            AND fromTimeUTC >= ?
-            AND fromTimeUTC <= ?;
         `;
 
             const [summaryData] = await connection.query(summaryQuery, [startUTC, endUTC]);
