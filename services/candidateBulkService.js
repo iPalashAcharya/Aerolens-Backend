@@ -69,7 +69,6 @@ class CandidateBulkService {
             const duration = ((Date.now() - startTime) / 1000).toFixed(2);
 
             return {
-                success: true,
                 summary: {
                     totalRows: this.stats.total,
                     inserted: this.stats.inserted,
@@ -601,7 +600,7 @@ class CandidateBulkService {
         if (!filePath) return;
 
         try {
-            fs.unlink(filePath);
+            await fs.promises.unlink(filePath);
             console.log(`Deleted temp file: ${filePath}`);
         } catch (err) {
             if (err.code !== 'ENOENT') {

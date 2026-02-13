@@ -1,3 +1,0 @@
-candidate_name,email,contact_number,recruiter_name,job_role,current_city,expected_city,current_ctc,expected_ctc,notice_period,experience_years,linkedin_url,notes
-John Doe,john1@example.com,+919876543210,Palash Acharya,Backend Developer,Ahmedabad,Bangalore,1200000,1500000,30,5.5,https://linkedin.com/in/johndoe,Strong Node skills
-Jane Smith,jane1@example.com,+919876543211,Palash Acharya,Frontend Developer,Ahmedabad,Bangalore,1000000,1300000,45,4,https://linkedin.com/in/janesmith,Strong React skills
