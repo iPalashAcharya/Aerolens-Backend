@@ -3,20 +3,38 @@ const multer = require('multer');
 const CandidateController = require('../controllers/candidateController');
 const CandidateService = require('../services/candidateService');
 const CandidateRepository = require('../repositories/candidateRepository');
-const CandidateValidator = require('../validators/candidateValidator');
+const CandidateBulkService = require('../services/candidateBulkService');
+const CandidateBulkController = require('../controllers/candidateBulkController');
+const {
+    CandidateValidator,
+    CandidateValidatorHelper
+} = require('../validators/candidateValidator');
 const { authenticate } = require('../middleware/authMiddleware');
 const db = require('../db');
-const cors = require('cors');
 const auditContextMiddleware = require('../middleware/auditContext');
 const AppError = require('../utils/appError');
 const cleanupS3OnError = require('../middleware/s3CleanupMiddleware');
-
-const router = express.Router();
-
-// Dependency injection
 const candidateRepository = new CandidateRepository(db);
 const candidateService = new CandidateService(candidateRepository, db);
 const candidateController = new CandidateController(candidateService);
+
+// Initialize validator helper
+const validatorHelper = new CandidateValidatorHelper(db);
+
+// Initialize bulk service
+const candidateBulkService = new CandidateBulkService(
+    candidateRepository,
+    validatorHelper,
+    db
+);
+
+// Initialize bulk controller
+const candidateBulkController = new CandidateBulkController(
+    candidateBulkService,
+    candidateService
+);
+
+const router = express.Router();
 
 router.use(authenticate);
 router.use(auditContextMiddleware);
@@ -132,6 +150,19 @@ router.patch('/:id',
 router.delete('/:id',
     CandidateValidator.validateDelete,
     candidateController.deleteCandidate
+);
+
+router.post(
+    '/bulk-upload',
+    authenticate,
+    candidateBulkController.upload.single('file'),
+    candidateBulkController.uploadBulk
+);
+// Download template
+router.get(
+    '/bulk-upload/template',
+    authenticate,
+    candidateBulkController.downloadTemplate
 );
 
 module.exports = router;

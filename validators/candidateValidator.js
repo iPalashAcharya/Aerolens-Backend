@@ -1037,4 +1037,7 @@ class CandidateValidator {
     }
 }
 
-module.exports = CandidateValidator;
+module.exports = {
+    CandidateValidator,
+    CandidateValidatorHelper
+};

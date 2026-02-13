@@ -876,6 +876,79 @@ class CandidateRepository {
         }
     }
 
+    // Add this method to your CandidateRepository class
+
+    /**
+     * Bulk insert candidates - optimized for large batches
+     * Uses single INSERT with multiple value sets
+     */
+    async bulkInsert(candidates, client) {
+        const connection = client;
+
+        try {
+            if (!candidates || candidates.length === 0) {
+                return 0;
+            }
+
+            const placeholders = candidates.map(() =>
+                '(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+            ).join(', ');
+
+            const query = `
+            INSERT INTO candidate(
+                candidateName,
+                contactNumber,
+                email,
+                recruiterId,
+                jobRole,
+                appliedForJobProfileId,
+                expectedLocation,
+                currentLocation,
+                currentCTC,
+                expectedCTC,
+                noticePeriod,
+                experienceYears,
+                linkedinProfileUrl,
+                resumeFilename,
+                resumeOriginalName,
+                resumeUploadDate,
+                notes,
+                statusId
+            )
+            VALUES ${placeholders};
+        `;
+
+            const values = candidates.flatMap(c => [
+                c.candidateName,
+                c.contactNumber ?? null,
+                c.email ?? null,
+                c.recruiterId,
+                c.jobRole ?? null,
+                c.jobProfileRequirementId ?? null,  // important
+                c.expectedLocation ?? null,
+                c.currentLocation ?? null,
+                c.currentCTC ?? null,
+                c.expectedCTC ?? null,
+                c.noticePeriod,
+                c.experienceYears,
+                c.linkedinProfileUrl ?? null,
+                null,   // resumeFilename
+                null,   // resumeOriginalName
+                null,   // resumeUploadDate
+                c.notes ?? null,
+                c.statusId
+            ]);
+
+            const [result] = await connection.execute(query, values);
+
+            return result.affectedRows;
+
+        } catch (error) {
+            console.error("🔥 REAL DB ERROR:", error);
+            throw error;
+        }
+    }
+
     _handleDatabaseError(error) {
         console.error('Database error:', error);
 
