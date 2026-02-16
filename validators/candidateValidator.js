@@ -485,6 +485,12 @@ const candidateSchemas = {
             .optional()
             .messages({
                 'string.base': 'Notes must be text'
+            }),
+        vendorId: Joi.number()
+            .allow('')
+            .optional()
+            .messages({
+                'number.base': 'Vendor ID must be a number'
             })
     }).custom((value, helpers) => {
         if (value.expectedCTC < value.currentCTC) {
@@ -692,6 +698,12 @@ const candidateSchemas = {
             .optional()
             .messages({
                 'string.base': 'Notes must be text'
+            }),
+        vendorId: Joi.number()
+            .allow('')
+            .optional()
+            .messages({
+                'number.base': 'Vendor ID must be a number'
             })
     }).min(1)
         .custom((value, helpers) => {

@@ -418,7 +418,8 @@ class InterviewRepository {
                 ON i.interviewerId = interviewer.memberId
             LEFT JOIN member scheduler
                 ON i.scheduledById = scheduler.memberId
-            WHERE i.isActive=TRUE AND i.deletedAt IS NULL;
+            WHERE i.isActive=TRUE AND i.deletedAt IS NULL
+            ORDER BY i.createdAt DESC;
             `;
             /*const numLimit = Math.max(1, parseInt(limit, 10) ?? 10);
             const numOffset = Math.max(0, parseInt(offset, 10) ?? 0);*/

@@ -87,18 +87,21 @@ class CandidateRepository {
         SELECT locationId,cityName AS city,country,stateName AS state FROM location
     `);
 
-        const [recruiters, locations, jobProfiles] =
+        const vendorPromise = connection.query(`SELECT vendorId, vendorName FROM recruitmentVendor WHERE isActive = TRUE`);
+
+        const [recruiters, locations, jobProfiles, vendors] =
             await Promise.all([
                 recruitersPromise,
                 locationPromise,
-                jobProfilePromise
+                jobProfilePromise,
+                vendorPromise
             ]);
 
         return {
             recruiters: recruiters[0],
-            //status: status[0],
             locations: locations[0],
-            jobProfiles: jobProfiles[0]
+            jobProfiles: jobProfiles[0],
+            vendors: vendors[0]
         };
     }
 
@@ -106,8 +109,8 @@ class CandidateRepository {
         const connection = client;
         console.log(candidateData);
         try {
-            const query = `INSERT INTO candidate(candidateName,contactNumber,email,recruiterId,jobRole,appliedForJobProfileId,expectedLocation,currentLocation,currentCTC,expectedCTC,noticePeriod,experienceYears,linkedinProfileUrl, resumeFilename, resumeOriginalName, resumeUploadDate,notes,statusId)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`
+            const query = `INSERT INTO candidate(candidateName,contactNumber,email,recruiterId,jobRole,appliedForJobProfileId,expectedLocation,currentLocation,currentCTC,expectedCTC,noticePeriod,experienceYears,linkedinProfileUrl, resumeFilename, resumeOriginalName, resumeUploadDate,notes,statusId,vendorId)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`
 
             const [result] = await connection.execute(query, [
                 candidateData.candidateName,
@@ -127,7 +130,8 @@ class CandidateRepository {
                 null,
                 null,
                 candidateData.notes ?? null,
-                candidateData.statusId
+                candidateData.statusId,
+                candidateData.vendorId ?? null
             ]);
 
             return {
@@ -154,6 +158,8 @@ class CandidateRepository {
             c.contactNumber,
             c.email,
             c.recruiterId,
+            c.vendorId,
+            v.vendorName,
 
             m.memberName AS recruiterName,
             m.memberContact AS recruiterContact,
@@ -203,6 +209,8 @@ class CandidateRepository {
 
         LEFT JOIN member m
             ON m.memberId = c.recruiterId
+        LEFT JOIN recruitmentVendor v
+            ON v.vendorId = c.vendorId
 
         WHERE c.candidateId = ?
         AND c.isActive = TRUE;
@@ -486,7 +494,7 @@ class CandidateRepository {
 
             // Filter only allowed fields for security
             const allowedFields = [
-                'candidateName', 'contactNumber', 'email', 'recruiterId',
+                'candidateName', 'contactNumber', 'email', 'recruiterId', 'vendorId',
                 'jobRole', 'appliedForJobProfileId', 'expectedLocation', 'currentLocation', 'currentCTC', 'expectedCTC', 'noticePeriod', 'experienceYears', 'linkedinProfileUrl', 'resume', 'notes'
             ];
 
@@ -616,6 +624,8 @@ class CandidateRepository {
             c.contactNumber,
             c.email,
             c.recruiterId,
+            c.vendorId,
+            v.vendorName,
 
             m.memberName AS recruiterName,
             m.memberContact AS recruiterContact,
@@ -665,6 +675,8 @@ class CandidateRepository {
 
         LEFT JOIN member m
             ON m.memberId = c.recruiterId
+        LEFT JOIN recruitmentVendor v
+            ON v.vendorId = c.vendorId
 
         WHERE c.isActive = TRUE
         `;
@@ -913,7 +925,8 @@ class CandidateRepository {
                 resumeOriginalName,
                 resumeUploadDate,
                 notes,
-                statusId
+                statusId,
+                vendorId
             )
             VALUES ${placeholders};
         `;
@@ -936,7 +949,8 @@ class CandidateRepository {
                 null,   // resumeOriginalName
                 null,   // resumeUploadDate
                 c.notes ?? null,
-                c.statusId
+                c.statusId,
+                c.vendorId ?? null
             ]);
 
             const [result] = await connection.execute(query, values);
