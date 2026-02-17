@@ -171,7 +171,7 @@ class MemberRepository {
         } catch (error) {
             throw new AppError('Database error while finding member', 500, 'DB_ERROR', error.message);
         } finally {
-            connection.release();
+            if (!client) connection.release();
         }
     }
 

@@ -2916,7 +2916,8 @@ GET /candidate
       "statusName": "Pending",
       "resumeFilename": "resumes/candidate_38_1763722838929.docx",
       "resumeOriginalName": "AICTE_Internship_2024_Project_Report_Template_2.docx",
-      "resumeUploadDate": "2025-11-21T05:30:40.000Z"
+      "resumeUploadDate": "2025-11-21T05:30:40.000Z",
+      "referredBy": null
     },
     {
       "candidateId": 40,
@@ -2945,7 +2946,8 @@ GET /candidate
       "statusName": "Pending",
       "resumeFilename": null,
       "resumeOriginalName": null,
-      "resumeUploadDate": null
+      "resumeUploadDate": null,
+      "referredBy": null
     }
   ]
 }
@@ -2992,7 +2994,8 @@ GET /candidate/:id
     "statusName": "Selected",
     "resumeFilename": "resumes/candidate_70_1763726746068.docx",
     "resumeOriginalName": "AICTE_Internship_2024_Project_Report_Template_2.docx",
-    "resumeUploadDate": "2025-11-21T06:35:46.000Z"
+    "resumeUploadDate": "2025-11-21T06:35:46.000Z",
+    "referredBy": null
   }
 }
 ```
@@ -3212,6 +3215,7 @@ Content-Type: multipart/form-data
 | resume                  | File        | PDF resume, max 5MB (optional)                                                  |
 | notes                   | string      | notes about candidates (optional)                                               |
 | vendorId                | Number      | Vendor ID of the vendor associated with the candidate (Optional)                |
+| referredBy              | String      | Name of the person that referred the candidate (Optional)                       |
 
 **Response:**
 
@@ -3258,6 +3262,7 @@ Content-Type: multipart/form-data
 | resume | File | PDF resume, max 5MB (optional) |
 | notes | string | notes about candidates (optional) |
 | vendorId | Number | the ID of the vendor that the candidate is associated with|
+| referredBy | String | Name of the person that referred the candidate |
 
 ```json
 {
@@ -3426,6 +3431,7 @@ POST /candidate/bulk-upload
 | linkedin_url   | String | ❌ No    | LinkedIn profile URL (valid format)                  | `https://linkedin.com/in/johndoe` |
 | notes          | String | ❌ No    | Additional notes/comments                            | `Strong React skills`             |
 | vendorName     | String | ❌ No    | vendor name that the candidate is associated with    | `Recruitment Inc`                 |
+| referredBy     | String | No       | name of the person that referred the candidate       | `Dharmesh`                        |
 
 ### Column Name Variations
 

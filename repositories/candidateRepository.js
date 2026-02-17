@@ -109,8 +109,8 @@ class CandidateRepository {
         const connection = client;
         console.log(candidateData);
         try {
-            const query = `INSERT INTO candidate(candidateName,contactNumber,email,recruiterId,jobRole,appliedForJobProfileId,expectedLocation,currentLocation,currentCTC,expectedCTC,noticePeriod,experienceYears,linkedinProfileUrl, resumeFilename, resumeOriginalName, resumeUploadDate,notes,statusId,vendorId)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`
+            const query = `INSERT INTO candidate(candidateName,contactNumber,email,recruiterId,jobRole,appliedForJobProfileId,expectedLocation,currentLocation,currentCTC,expectedCTC,noticePeriod,experienceYears,linkedinProfileUrl, resumeFilename, resumeOriginalName, resumeUploadDate,notes,statusId,vendorId,referredBy)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`
 
             const [result] = await connection.execute(query, [
                 candidateData.candidateName,
@@ -131,7 +131,8 @@ class CandidateRepository {
                 null,
                 candidateData.notes ?? null,
                 candidateData.statusId,
-                candidateData.vendorId ?? null
+                candidateData.vendorId ?? null,
+                candidateData.referredBy ?? null
             ]);
 
             return {
@@ -193,7 +194,8 @@ class CandidateRepository {
             c.resumeFilename,
             c.resumeOriginalName,
             c.resumeUploadDate,
-            c.notes
+            c.notes,
+            c.referredBy
 
         FROM candidate c
 
@@ -495,7 +497,7 @@ class CandidateRepository {
             // Filter only allowed fields for security
             const allowedFields = [
                 'candidateName', 'contactNumber', 'email', 'recruiterId', 'vendorId',
-                'jobRole', 'appliedForJobProfileId', 'expectedLocation', 'currentLocation', 'currentCTC', 'expectedCTC', 'noticePeriod', 'experienceYears', 'linkedinProfileUrl', 'resume', 'notes'
+                'jobRole', 'appliedForJobProfileId', 'expectedLocation', 'currentLocation', 'currentCTC', 'expectedCTC', 'noticePeriod', 'experienceYears', 'linkedinProfileUrl', 'resume', 'notes', 'referredBy'
             ];
 
             const filteredData = {};
@@ -659,7 +661,8 @@ class CandidateRepository {
             c.resumeFilename,
             c.resumeOriginalName,
             c.resumeUploadDate,
-            c.notes
+            c.notes,
+            c.referredBy
 
         FROM candidate c
 
@@ -926,7 +929,8 @@ class CandidateRepository {
                 resumeUploadDate,
                 notes,
                 statusId,
-                vendorId
+                vendorId,
+                referredBy
             )
             VALUES ${placeholders};
         `;
@@ -950,7 +954,8 @@ class CandidateRepository {
                 null,   // resumeUploadDate
                 c.notes ?? null,
                 c.statusId,
-                c.vendorId ?? null
+                c.vendorId ?? null,
+                c.referredBy ?? null
             ]);
 
             const [result] = await connection.execute(query, values);
