@@ -87,7 +87,7 @@ class CandidateRepository {
         SELECT locationId,cityName AS city,country,stateName AS state FROM location
     `);
 
-        const vendorPromise = connection.query(`SELECT vendorId, vendorName FROM recruitmentVendor WHERE isActive = TRUE`);
+        const vendorPromise = connection.query(`SELECT vendorId, vendorName FROM recruitmentVendor`);
 
         const [recruiters, locations, jobProfiles, vendors] =
             await Promise.all([
