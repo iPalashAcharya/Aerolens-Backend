@@ -2898,6 +2898,8 @@ GET /candidate
       "recruiterName": null,
       "recruiterContact": null,
       "recruiterEmail": null,
+      "vendorId": 3,
+      "vendorName": "Random Vendor A",
       "jobProfileRequirementId": 1,
       "jobRole": "SDE",
       "preferredJobLocation": {
@@ -2914,7 +2916,8 @@ GET /candidate
       "statusName": "Pending",
       "resumeFilename": "resumes/candidate_38_1763722838929.docx",
       "resumeOriginalName": "AICTE_Internship_2024_Project_Report_Template_2.docx",
-      "resumeUploadDate": "2025-11-21T05:30:40.000Z"
+      "resumeUploadDate": "2025-11-21T05:30:40.000Z",
+      "referredBy": null
     },
     {
       "candidateId": 40,
@@ -2925,6 +2928,8 @@ GET /candidate
       "recruiterName": null,
       "recruiterContact": null,
       "recruiterEmail": null,
+      "vendorId": 3,
+      "vendorName": "Random Vendor A",
       "jobProfileRequirementId": 1,
       "jobRole": "Software Devloper",
       "preferredJobLocation": {
@@ -2941,7 +2946,8 @@ GET /candidate
       "statusName": "Pending",
       "resumeFilename": null,
       "resumeOriginalName": null,
-      "resumeUploadDate": null
+      "resumeUploadDate": null,
+      "referredBy": null
     }
   ]
 }
@@ -2968,6 +2974,8 @@ GET /candidate/:id
     "recruiterName": "Palash Acharya",
     "recruiterContact": "+91-9876543210",
     "recruiterEmail": "palash.acharya@aerolens.in",
+    "vendorId": 3,
+    "vendorName": "Random Vendor A",
     "jobProfileRequirementId": 1,
     "jobRole": "SDE-2",
     "expectedLocation": {
@@ -2986,7 +2994,8 @@ GET /candidate/:id
     "statusName": "Selected",
     "resumeFilename": "resumes/candidate_70_1763726746068.docx",
     "resumeOriginalName": "AICTE_Internship_2024_Project_Report_Template_2.docx",
-    "resumeUploadDate": "2025-11-21T06:35:46.000Z"
+    "resumeUploadDate": "2025-11-21T06:35:46.000Z",
+    "referredBy": null
   }
 }
 ```
@@ -3007,7 +3016,7 @@ GET /candidate/create-data
     "recruiters": [
       {
         "recruiterId": 1,
-        "recruiterName": "Palash Acharya"
+        "recruiterName": "Palash Acharya (Random Vendor A)"
       },
       {
         "recruiterId": 420,
@@ -3018,16 +3027,18 @@ GET /candidate/create-data
         "recruiterName": "Bhavin Trivedi"
       },
       {
-        "recruiterId": 447,
-        "recruiterName": "Random User"
+        "recruiterId": 459,
+        "recruiterName": "Demo Vendor (Random Vendor A)"
       },
       {
-        "recruiterId": 454,
-        "recruiterName": "Test User"
-      },
+        "recruiterId": 461,
+        "recruiterName": "Testing Demo (Random Vendor A)"
+      }
+    ],
+    "vendors": [
       {
-        "recruiterId": 455,
-        "recruiterName": "Testing New Field"
+        "vendorId": 3,
+        "vendorName": "Random Vendor A"
       }
     ],
     "locations": [
@@ -3070,6 +3081,48 @@ GET /candidate/create-data
     ],
     "jobProfiles": [
       {
+        "jobProfileRequirementId": 34,
+        "positions": 5,
+        "receivedOn": "2026-01-22 13:15:39",
+        "estimatedCloseDate": "2026-03-15 00:00:00",
+        "jobProfileId": 10,
+        "jobRole": "devops",
+        "experienceText": null,
+        "experienceMinYears": null,
+        "experienceMaxYears": null,
+        "clientId": 4,
+        "clientName": "Google ( Alphabet ) Test",
+        "departmentId": 83,
+        "departmentName": "check",
+        "locationId": 1,
+        "city": "Ahmedabad",
+        "state": "Gujarat",
+        "country": "India",
+        "statusId": 7,
+        "statusName": "Pending"
+      },
+      {
+        "jobProfileRequirementId": 31,
+        "positions": 1,
+        "receivedOn": "2025-12-18 11:43:34",
+        "estimatedCloseDate": "2025-12-24 00:00:00",
+        "jobProfileId": 10,
+        "jobRole": "devops",
+        "experienceText": null,
+        "experienceMinYears": null,
+        "experienceMaxYears": null,
+        "clientId": 4,
+        "clientName": "Google ( Alphabet ) Test",
+        "departmentId": 83,
+        "departmentName": "check",
+        "locationId": 1,
+        "city": "Ahmedabad",
+        "state": "Gujarat",
+        "country": "India",
+        "statusId": 4,
+        "statusName": "In Progress"
+      },
+      {
         "jobProfileRequirementId": 30,
         "positions": 1,
         "receivedOn": "2025-12-16 11:19:37",
@@ -3097,6 +3150,27 @@ GET /candidate/create-data
         "estimatedCloseDate": "2025-12-24 00:00:00",
         "jobProfileId": 8,
         "jobRole": "Backend Engineer",
+        "experienceText": null,
+        "experienceMinYears": null,
+        "experienceMaxYears": null,
+        "clientId": 4,
+        "clientName": "Google ( Alphabet ) Test",
+        "departmentId": 83,
+        "departmentName": "check",
+        "locationId": 1,
+        "city": "Ahmedabad",
+        "state": "Gujarat",
+        "country": "India",
+        "statusId": 4,
+        "statusName": "In Progress"
+      },
+      {
+        "jobProfileRequirementId": 28,
+        "positions": 1,
+        "receivedOn": "2025-12-16 10:59:43",
+        "estimatedCloseDate": "2025-12-24 00:00:00",
+        "jobProfileId": 7,
+        "jobRole": "Backend Developer",
         "experienceText": null,
         "experienceMinYears": null,
         "experienceMaxYears": null,
@@ -3140,6 +3214,8 @@ Content-Type: multipart/form-data
 | linkedinProfileUrl      | String      | LinkedIn URL (optional)                                                         |
 | resume                  | File        | PDF resume, max 5MB (optional)                                                  |
 | notes                   | string      | notes about candidates (optional)                                               |
+| vendorId                | Number      | Vendor ID of the vendor associated with the candidate (Optional)                |
+| referredBy              | String      | Name of the person that referred the candidate (Optional)                       |
 
 **Response:**
 
@@ -3185,6 +3261,8 @@ Content-Type: multipart/form-data
 | linkedinProfileUrl | String | LinkedIn URL (optional) |
 | resume | File | PDF resume, max 5MB (optional) |
 | notes | string | notes about candidates (optional) |
+| vendorId | Number | the ID of the vendor that the candidate is associated with|
+| referredBy | String | Name of the person that referred the candidate |
 
 ```json
 {
@@ -3352,6 +3430,8 @@ POST /candidate/bulk-upload
 | expected_ctc   | Number | ❌ No    | Expected CTC in INR (must be ≥ current CTC)          | `1500000`                         |
 | linkedin_url   | String | ❌ No    | LinkedIn profile URL (valid format)                  | `https://linkedin.com/in/johndoe` |
 | notes          | String | ❌ No    | Additional notes/comments                            | `Strong React skills`             |
+| vendorName     | String | ❌ No    | vendor name that the candidate is associated with    | `Recruitment Inc`                 |
+| referredBy     | String | No       | name of the person that referred the candidate       | `Dharmesh`                        |
 
 ### Column Name Variations
 

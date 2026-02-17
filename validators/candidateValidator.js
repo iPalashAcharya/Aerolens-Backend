@@ -485,7 +485,25 @@ const candidateSchemas = {
             .optional()
             .messages({
                 'string.base': 'Notes must be text'
-            })
+            }),
+        vendorId: Joi.number()
+            .allow('')
+            .optional()
+            .messages({
+                'number.base': 'Vendor ID must be a number'
+            }),
+        referredBy: Joi.string()
+            .trim()
+            .min(2)
+            .max(150)
+            .pattern(/^[a-zA-Z\s.'-]+$/)
+            .optional()
+            .allow('')
+            .messages({
+                'string.min': 'Referred by must be at least 2 characters long',
+                'string.max': 'Referred by cannot exceed 150 characters',
+                'string.pattern.base': 'Referred by can only contain letters, spaces, periods, hyphens and apostrophes'
+            }),
     }).custom((value, helpers) => {
         if (value.expectedCTC < value.currentCTC) {
             return helpers.error('custom.ctcRange');
@@ -692,7 +710,26 @@ const candidateSchemas = {
             .optional()
             .messages({
                 'string.base': 'Notes must be text'
-            })
+            }),
+        vendorId: Joi.number()
+            .allow('')
+            .optional()
+            .messages({
+                'number.base': 'Vendor ID must be a number'
+            }),
+        referredBy: Joi.string()
+            .trim()
+            .min(2)
+            .max(150)
+            .pattern(/^[a-zA-Z\s.'-]+$/)
+            .optional()
+            .allow('')
+            .messages({
+                'string.min': 'Referred by must be at least 2 characters long',
+                'string.max': 'Referred by cannot exceed 150 characters',
+                'string.pattern.base': 'Referred by can only contain letters, spaces, periods, hyphens and apostrophes'
+            }),
+
     }).min(1)
         .custom((value, helpers) => {
             // CTC validation if both are provided

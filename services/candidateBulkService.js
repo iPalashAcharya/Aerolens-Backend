@@ -319,7 +319,8 @@ class CandidateBulkService {
             noticePeriod: findValue(['notice_period', 'notice', 'noticeperiod']),
             experienceYears: findValue(['experience_years', 'experience', 'exp', 'experienceyears']),
             linkedinProfileUrl: findValue(['linkedin_url', 'linkedin', 'linkedinprofileurl']),
-            notes: findValue(['notes', 'comments', 'remarks'])
+            notes: findValue(['notes', 'comments', 'remarks']),
+            vendorName: findValue(['vendor_name', 'vendor', 'vendorname'])
         };
     }
 
@@ -441,7 +442,12 @@ class CandidateBulkService {
 
             notes: Joi.string()
                 .optional()
-                .allow(null, '')
+                .allow(null, ''),
+            vendorName: Joi.string()
+                .trim()
+                .optional()
+                .min(2)
+                .max(100)
         }).custom((value, helpers) => {
             if (value.expectedCTC && value.currentCTC && value.expectedCTC < value.currentCTC) {
                 return helpers.error('custom.ctcRange');
@@ -674,7 +680,8 @@ class CandidateBulkService {
             'notice_period',
             'experience_years',
             'linkedin_url',
-            'notes'
+            'notes',
+            'vendor_name'
         ];
 
         const sampleData = [
@@ -693,7 +700,8 @@ class CandidateBulkService {
                 notice_period: 30,
                 experience_years: 5.5,
                 linkedin_url: 'https://linkedin.com/in/johndoe',
-                notes: 'Strong React and Node.js skills'
+                notes: 'Strong React and Node.js skills',
+                vendor_name: 'Tech Recruiters Inc.'
             }
         ];
 
