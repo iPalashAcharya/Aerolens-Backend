@@ -85,7 +85,7 @@ async function startServer() {
         const jobProfileRequirementRoutes = require('./routes/jobProfileRequirementRoutes');
         const contactRoutes = require('./routes/contact');
         const candidateRoutes = require('./routes/candidateRoutes');
-        const CandidateValidator = require('./validators/candidateValidator');
+        const { CandidateValidator } = require('./validators/candidateValidator');
         const lookupRoutes = require('./routes/lookupRoutes');
         const memberRoutes = require('./routes/memberRoutes');
         const locationRoutes = require('./routes/locationRoutes');

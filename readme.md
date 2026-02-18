@@ -2555,6 +2555,10 @@ Create a new job profile requirement for a client.
 }
 ```
 
+````
+
+**Note:** All structured content is converted to plain text on the backend. Bullet points are separated by newlines (`\n`), and paragraphs are separated by double newlines (`\n\n`).
+
 ---
 
 ## Get All Job Profile Requirements
@@ -2856,13 +2860,1064 @@ Valid work arrangement values (case-insensitive):
 
 ---
 
+**Base URL:** `/api/jobProfileRequirement`
+
+**Authentication:** All endpoints require authentication via the `authenticate` middleware.
+
+---
+
+## Table of Contents
+
+- [Create Job Profile Requirement](#create-job-profile-requirement)
+- [Get All Job Profile Requirements](#get-all-job-profile-requirements)
+- [Get Job Profile Requirement by ID](#get-job-profile-requirement-by-id)
+- [Update Job Profile Requirement](#update-job-profile-requirement)
+- [Delete Job Profile Requirement](#delete-job-profile-requirement)
+
+---
+
+## Create Job Profile Requirement
+
+Create a new job profile requirement for a client.
+
+**Endpoint:** `POST /`
+
+**Content-Type:** `application/json`
+
+### Request Body
+
+| Field              | Type    | Required | Description                                | Constraints                                        |
+| ------------------ | ------- | -------- | ------------------------------------------ | -------------------------------------------------- |
+| jobProfileId       | integer | Yes      | ID of the job profile                      | Positive integer                                   |
+| clientId           | integer | Yes      | ID of the client                           | Positive integer                                   |
+| departmentId       | integer | Yes      | ID of the department                       | Positive integer                                   |
+| positions          | integer | Yes      | Number of positions to fill                | Positive integer                                   |
+| estimatedCloseDate | string  | Yes      | Expected closing date                      | YYYY-MM-DD format, cannot be in the past           |
+| workArrangement    | string  | Yes      | Work arrangement type                      | 'remote', 'onsite', or 'hybrid'                    |
+| location           | object  | Yes      | Location details                           | See below                                          |
+| location.country   | string  | Yes      | Country name                               | Lowercase                                          |
+| location.city      | string  | Yes      | City name                                  | 2-100 characters                                   |
+| status             | string  | No       | Requirement status (defaults to 'pending') | 'pending', 'in progress', 'closed', or 'cancelled' |
+
+### Example Request
+
+```json
+{
+  "success": true,
+  "message": "Candidates retrieved successfully",
+  "data": [
+    {
+      "candidateId": 38,
+      "candidateName": "Yash Prajapati",
+      "contactNumber": "9870654321",
+      "email": "jaivals21@testing.com",
+      "recruiterId": null,
+      "recruiterName": null,
+      "recruiterContact": null,
+      "recruiterEmail": null,
+      "vendorId": 3,
+      "vendorName": "Random Vendor A",
+      "jobProfileRequirementId": 1,
+      "jobRole": "SDE",
+      "preferredJobLocation": {
+        "city": "Ahemedabad",
+        "country": "India"
+      },
+      "currentCTC": 23,
+      "expectedCTC": 33,
+      "noticePeriod": 30,
+      "experienceYears": 1,
+      "linkedinProfileUrl": "https://www.linkedin.com/in/aksh-patel1/",
+      "createdAt": "2025-09-27T06:09:13.000Z",
+      "updatedAt": "2025-11-21T05:30:40.000Z",
+      "statusName": "Pending",
+      "resumeFilename": "resumes/candidate_38_1763722838929.docx",
+      "resumeOriginalName": "AICTE_Internship_2024_Project_Report_Template_2.docx",
+      "resumeUploadDate": "2025-11-21T05:30:40.000Z",
+      "referredBy": null
+    },
+    {
+      "candidateId": 40,
+      "candidateName": "Parth",
+      "contactNumber": "9898200321",
+      "email": "parth@gmail.com",
+      "recruiterId": null,
+      "recruiterName": null,
+      "recruiterContact": null,
+      "recruiterEmail": null,
+      "vendorId": 3,
+      "vendorName": "Random Vendor A",
+      "jobProfileRequirementId": 1,
+      "jobRole": "Software Devloper",
+      "preferredJobLocation": {
+        "city": "Ahemedabad",
+        "country": "India"
+      },
+      "currentCTC": 300,
+      "expectedCTC": 600,
+      "noticePeriod": 60,
+      "experienceYears": 3,
+      "linkedinProfileUrl": "https://www.linkedin.com/in/meghana-kaki-0862b8167/",
+      "createdAt": "2025-09-27T06:14:07.000Z",
+      "updatedAt": "2025-09-27T06:14:07.000Z",
+      "statusName": "Pending",
+      "resumeFilename": null,
+      "resumeOriginalName": null,
+      "resumeUploadDate": null,
+      "referredBy": null
+    }
+  ]
+}
+```
+
+### Success Response
+
+**Status Code:** `201 Created`
+
+```json
+{
+  "success": true,
+  "message": "Candidate retrieved successfully",
+  "data": {
+    "candidateId": 70,
+    "candidateName": "Palash A",
+    "contactNumber": "999999999",
+    "email": "random@exmaple.com",
+    "recruiterId": 1,
+    "recruiterName": "Palash Acharya",
+    "recruiterContact": "+91-9876543210",
+    "recruiterEmail": "palash.acharya@aerolens.in",
+    "vendorId": 3,
+    "vendorName": "Random Vendor A",
+    "jobProfileRequirementId": 1,
+    "jobRole": "SDE-2",
+    "expectedLocation": {
+      "city": "Ahemedabad",
+      "country": "India"
+    },
+    "currentLocation": {
+      "city": "Ahemedabad",
+      "country": "India"
+    },
+    "currentCTC": 10,
+    "expectedCTC": 12,
+    "noticePeriod": 15,
+    "experienceYears": 2,
+    "linkedinProfileUrl": "https://www.linkedin.com/in/palash-acharya-684732294/",
+    "statusName": "Selected",
+    "resumeFilename": "resumes/candidate_70_1763726746068.docx",
+    "resumeOriginalName": "AICTE_Internship_2024_Project_Report_Template_2.docx",
+    "resumeUploadDate": "2025-11-21T06:35:46.000Z",
+    "referredBy": null
+  }
+}
+```
+
+### Error Responses
+
+**Status Code:** `400 Bad Request`
+
+```json
+{
+  "status": "error",
+  "message": "Validation failed",
+  "errorCode": "VALIDATION_ERROR",
+  "data": {
+    "recruiters": [
+      {
+        "recruiterId": 1,
+        "recruiterName": "Palash Acharya (Random Vendor A)"
+      },
+      {
+        "recruiterId": 420,
+        "recruiterName": "Jaival Suthar"
+      },
+      {
+        "recruiterId": 445,
+        "recruiterName": "Bhavin Trivedi"
+      },
+      {
+        "recruiterId": 459,
+        "recruiterName": "Demo Vendor (Random Vendor A)"
+      },
+      {
+        "recruiterId": 461,
+        "recruiterName": "Testing Demo (Random Vendor A)"
+      }
+    ],
+    "vendors": [
+      {
+        "vendorId": 3,
+        "vendorName": "Random Vendor A"
+      }
+    ],
+    "locations": [
+      {
+        "locationId": 1,
+        "city": "Ahmedabad",
+        "country": "India",
+        "state": "Gujarat"
+      },
+      {
+        "locationId": 2,
+        "city": "Bangalore",
+        "country": "India",
+        "state": "Karnataka"
+      },
+      {
+        "locationId": 3,
+        "city": "Mountain View",
+        "country": "United States",
+        "state": "California"
+      },
+      {
+        "locationId": 4,
+        "city": "San Francisco",
+        "country": "United States",
+        "state": "California"
+      },
+      {
+        "locationId": 6,
+        "city": "Hyderabad",
+        "country": "India",
+        "state": "Telangana"
+      },
+      {
+        "field": "jobProfileId",
+        "message": "Job Profile ID is required"
+      }
+    ],
+    "jobProfiles": [
+      {
+        "jobProfileRequirementId": 34,
+        "positions": 5,
+        "receivedOn": "2026-01-22 13:15:39",
+        "estimatedCloseDate": "2026-03-15 00:00:00",
+        "jobProfileId": 10,
+        "jobRole": "devops",
+        "experienceText": null,
+        "experienceMinYears": null,
+        "experienceMaxYears": null,
+        "clientId": 4,
+        "clientName": "Google ( Alphabet ) Test",
+        "departmentId": 83,
+        "departmentName": "check",
+        "locationId": 1,
+        "city": "Ahmedabad",
+        "state": "Gujarat",
+        "country": "India",
+        "statusId": 7,
+        "statusName": "Pending"
+      },
+      {
+        "jobProfileRequirementId": 31,
+        "positions": 1,
+        "receivedOn": "2025-12-18 11:43:34",
+        "estimatedCloseDate": "2025-12-24 00:00:00",
+        "jobProfileId": 10,
+        "jobRole": "devops",
+        "experienceText": null,
+        "experienceMinYears": null,
+        "experienceMaxYears": null,
+        "clientId": 4,
+        "clientName": "Google ( Alphabet ) Test",
+        "departmentId": 83,
+        "departmentName": "check",
+        "locationId": 1,
+        "city": "Ahmedabad",
+        "state": "Gujarat",
+        "country": "India",
+        "statusId": 4,
+        "statusName": "In Progress"
+      },
+      {
+        "jobProfileRequirementId": 30,
+        "positions": 1,
+        "receivedOn": "2025-12-16 11:19:37",
+        "estimatedCloseDate": "2025-12-24 00:00:00",
+        "jobProfileId": 9,
+        "jobRole": "Backend dev",
+        "experienceText": null,
+        "experienceMinYears": null,
+        "experienceMaxYears": null,
+        "clientId": 4,
+        "clientName": "Google ( Alphabet ) Test",
+        "departmentId": 83,
+        "departmentName": "check",
+        "locationId": 1,
+        "city": "Ahmedabad",
+        "state": "Gujarat",
+        "country": "India",
+        "statusId": 4,
+        "statusName": "In Progress"
+      },
+      {
+        "jobProfileRequirementId": 29,
+        "positions": 1,
+        "receivedOn": "2025-12-16 11:07:23",
+        "estimatedCloseDate": "2025-12-24 00:00:00",
+        "jobProfileId": 8,
+        "jobRole": "Backend Engineer",
+        "experienceText": null,
+        "experienceMinYears": null,
+        "experienceMaxYears": null,
+        "clientId": 4,
+        "clientName": "Google ( Alphabet ) Test",
+        "departmentId": 83,
+        "departmentName": "check",
+        "locationId": 1,
+        "city": "Ahmedabad",
+        "state": "Gujarat",
+        "country": "India",
+        "statusId": 4,
+        "statusName": "In Progress"
+      },
+      {
+        "jobProfileRequirementId": 28,
+        "positions": 1,
+        "receivedOn": "2025-12-16 10:59:43",
+        "estimatedCloseDate": "2025-12-24 00:00:00",
+        "jobProfileId": 7,
+        "jobRole": "Backend Developer",
+        "experienceText": null,
+        "experienceMinYears": null,
+        "experienceMaxYears": null,
+        "clientId": 4,
+        "clientName": "Google ( Alphabet ) Test",
+        "departmentId": 83,
+        "departmentName": "check",
+        "locationId": 1,
+        "city": "Ahmedabad",
+        "state": "Gujarat",
+        "country": "India",
+        "statusId": 4,
+        "statusName": "In Progress"
+      }
+    ]
+  }
+}
+```
+
+---
+
+### Create Candidate (with optional resume upload)
+
+POST /candidate
+Content-Type: multipart/form-data
+**Request Body (form-data):**
+
+| Field                   | Type        | Description                                                                     |
+| ----------------------- | ----------- | ------------------------------------------------------------------------------- |
+| candidateName           | String      | Candidate full name (required)                                                  |
+| contactNumber           | String      | Phone number (optional)                                                         |
+| email                   | String      | Email address (optional)                                                        |
+| recruiterId             | String      | Recruiter Id (required) [must be in member table]                               |
+| jobRole                 | String      | Job title (optional, soon to be depricated)                                     |
+| jobProfileRequirementId | Number      | Job Profile Requirement Id (required) [must be in jobProfile Requirement table] |
+| expectedLocation        | JSON Object | must be a json object with city and country attributes (required)               |
+| currentCTC              | Number      | Current CTC in INR [supports decimals ie 12.5] (optional)                       |
+| expectedCTC             | Number      | Expected CTC in INR [supports decimal ie 12.5] (optional)                       |
+| noticePeriod            | Number      | Notice period in days (required)                                                |
+| experienceYears         | Number      | Years of experience (required) [supports decimal]                               |
+| linkedinProfileUrl      | String      | LinkedIn URL (optional)                                                         |
+| resume                  | File        | PDF resume, max 5MB (optional)                                                  |
+| notes                   | string      | notes about candidates (optional)                                               |
+| vendorId                | Number      | Vendor ID of the vendor associated with the candidate (Optional)                |
+| referredBy              | String      | Name of the person that referred the candidate (Optional)                       |
+
+**Response:**
+
+```json
+{
+  "status": "error",
+  "message": "Job profile with ID 999 does not exist",
+  "errorCode": "JOB_PROFILE_NOT_FOUND",
+  "data": {
+    "candidateId": 81,
+    "candidateName": "Pedri Gonzales",
+    "recruiterId": 1,
+    "appliedForJobProfileId": 28,
+    "expectedLocation": 1,
+    "noticePeriod": 30,
+    "experienceYears": 2.2,
+    "statusId": 9,
+    "createdOn": "2026-01-20T12:05:03.201Z"
+  }
+}
+```
+
+---
+
+### Update Candidate
+
+PATCH /candidate/:id
+Content-Type: multipart/form-data
+
+**Request Body (JSON) - fields to update:**
+| Field | Type | Description |
+| ------------------ | ----------- | --------------------------------------------------------- |
+| candidateName | String | Candidate full name (optional) |
+| contactNumber | String | Phone number (optional) |
+| email | String | Email address (optional) |
+| recruiterId | String | Recruiter Id (optional) [must be in member table] |
+| jobRole | String | Job title (optional) [soon to be depricated] |
+| jobProfileRequirementId | Number | job profile Requirement ID must be in jobProfileRequirementTable |
+| expectedLocation | JSON Object | must be a json object with city and country attributes |
+| currentCTC | Number | Current CTC in INR [supports decimals ie 12.5] (optional) |
+| expectedCTC | Number | Expected CTC in INR [supports decimal ie 12.5] (optional) |
+| noticePeriod | Number | Notice period in days (optional) |
+| experienceYears | Number | Years of experience (optional) [supports decimal] |
+| linkedinProfileUrl | String | LinkedIn URL (optional) |
+| resume | File | PDF resume, max 5MB (optional) |
+| notes | string | notes about candidates (optional) |
+| vendorId | Number | the ID of the vendor that the candidate is associated with|
+| referredBy | String | Name of the person that referred the candidate |
+
+```json
+{
+  "status": "error",
+  "message": "A job profile requirement with this job profile already exists for this client and department",
+  "errorCode": "DUPLICATE_JOB_REQUIREMENT"
+}
+```
+
+---
+
+## Get All Job Profile Requirements
+
+Retrieve all job profile requirements.
+
+**Endpoint:** `GET /`
+
+### Success Response
+
+**Status Code:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "message": "Job Profile Requirements retrieved successfully",
+  "data": [
+    {
+      "jobProfileRequirementId": 1,
+      "jobProfileId": 1,
+      "jobRole": "Senior Software Engineer",
+      "clientId": 5,
+      "clientName": "Tech Corp",
+      "departmentId": 3,
+      "departmentName": "Engineering",
+      "positions": 10,
+      "receivedOn": "2026-01-29",
+      "estimatedCloseDate": "2026-03-15",
+      "workArrangement": "hybrid",
+      "location": {
+        "country": "india",
+        "city": "Bangalore"
+      },
+      "status": "pending"
+    }
+  ]
+}
+```
+
+---
+
+## Get Job Profile Requirement by ID
+
+Retrieve a specific job profile requirement by ID.
+
+**Endpoint:** `GET /:id`
+
+### Path Parameters
+
+| Parameter | Type    | Required | Description                |
+| --------- | ------- | -------- | -------------------------- |
+| id        | integer | Yes      | Job profile requirement ID |
+
+### Success Response
+
+**Status Code:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "message": "Job Profile Requirement retrieved successfully",
+  "data": {
+    "jobProfileRequirementId": 1,
+    "jobProfileId": 1,
+    "jobRole": "Senior Software Engineer",
+    "clientId": 5,
+    "clientName": "Tech Corp",
+    "departmentId": 3,
+    "departmentName": "Engineering",
+    "positions": 10,
+    "receivedOn": "2026-01-29",
+    "estimatedCloseDate": "2026-03-15",
+    "workArrangement": "hybrid",
+    "location": {
+      "country": "india",
+      "city": "Bangalore"
+    },
+    "status": "pending"
+  }
+}
+```
+
+### Error Response
+
+**Status Code:** `404 Not Found`
+
+```json
+{
+  "status": "error",
+  "message": "Job profile requirement with ID 999 not found",
+  "errorCode": "JOB_PROFILE_REQUIREMENT_NOT_FOUND"
+}
+```
+
+---
+
+## Update Job Profile Requirement
+
+Update an existing job profile requirement.
+
+**Endpoint:** `PATCH /:id`
+
+**Content-Type:** `application/json`
+
+### Path Parameters
+
+| Parameter | Type    | Required | Description                |
+| --------- | ------- | -------- | -------------------------- |
+| id        | integer | Yes      | Job profile requirement ID |
+
+### Request Body
+
+All fields are optional. Only include fields you want to update.
+
+| Field              | Type    | Description                 | Constraints                                        |
+| ------------------ | ------- | --------------------------- | -------------------------------------------------- |
+| jobProfileId       | integer | ID of the job profile       | Positive integer                                   |
+| positions          | integer | Number of positions to fill | Positive integer                                   |
+| estimatedCloseDate | string  | Expected closing date       | YYYY-MM-DD format, cannot be in the past           |
+| workArrangement    | string  | Work arrangement type       | 'remote', 'onsite', or 'hybrid'                    |
+| location           | object  | Location details            | See below                                          |
+| location.country   | string  | Country name                | Lowercase                                          |
+| location.city      | string  | City name                   | 2-100 characters                                   |
+| status             | string  | Requirement status          | 'pending', 'in progress', 'closed', or 'cancelled' |
+
+### Example Request
+
+```json
+{
+  "positions": 15,
+  "status": "in progress",
+  "estimatedCloseDate": "2026-04-30"
+}
+```
+
+### Success Response
+
+**Status Code:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "message": "Job Profile Requirement updated successfully",
+  "data": {
+    "jobProfileRequirementId": 1,
+    "jobProfileId": 1,
+    "jobRole": "Senior Software Engineer",
+    "clientId": 5,
+    "clientName": "Tech Corp",
+    "departmentId": 3,
+    "departmentName": "Engineering",
+    "positions": 15,
+    "receivedOn": "2026-01-29",
+    "estimatedCloseDate": "2026-04-30",
+    "workArrangement": "hybrid",
+    "location": {
+      "country": "india",
+      "city": "Bangalore"
+    },
+    "status": "in progress"
+  }
+}
+```
+
+### Upload Candidates in Bulk
+
+```
+POST /candidate/bulk-upload
+```
+
+**Content-Type:** `multipart/form-data`
+
+**Authentication:** Required (Bearer token)
+
+---
+
+## Request
+
+### Form Data
+
+| Field | Type | Required | Description                                 |
+| ----- | ---- | -------- | ------------------------------------------- |
+| file  | File | Yes      | CSV or Excel file (`.csv`, `.xlsx`, `.xls`) |
+
+### File Requirements
+
+- **Max file size:** 10 MB
+- **Max rows:** 50,000 candidates
+- **Supported formats:** CSV, XLSX, XLS
+- **Encoding:** UTF-8 (for CSV)
+
+---
+
+## CSV Format
+
+### Required Columns
+
+| Column Name      | Type   | Required | Description                                      | Example                    |
+| ---------------- | ------ | -------- | ------------------------------------------------ | -------------------------- |
+| candidate_name   | String | ✅ Yes   | Full name (2-100 chars, letters/spaces/.-' only) | `John Doe`                 |
+| recruiter_name   | String | ✅ Yes   | Recruiter name (must exist in system)            | `Jayraj`                   |
+| client_name      | String | ✅ Yes   | Client name (must exist in system)               | `TCS`                      |
+| department_name  | String | ✅ Yes   | Department name (must exist in system)           | `Engineering`              |
+| job_role         | String | ✅ Yes   | Job role (must match active requirement)         | `Senior Software Engineer` |
+| expected_city    | String | ✅ Yes   | Preferred work location                          | `Bangalore`                |
+| notice_period    | Number | ✅ Yes   | Notice period in days (0-365)                    | `30`                       |
+| experience_years | Number | ✅ Yes   | Years of experience (0-50, supports decimals)    | `5.5`                      |
+
+### Optional Columns
+
+| Column Name    | Type   | Required | Description                                          | Example                           |
+| -------------- | ------ | -------- | ---------------------------------------------------- | --------------------------------- |
+| email          | String | ❌ No    | Email address (valid format)                         | `john.doe@example.com`            |
+| contact_number | String | ❌ No    | Phone number (7-25 chars, +/digits/spaces/()-)       | `+91-9876543210`                  |
+| current_city   | String | ❌ No    | Current location                                     | `Ahmedabad`                       |
+| current_ctc    | Number | ❌ No    | Current CTC in INR (0-10,000,000, supports decimals) | `1200000`                         |
+| expected_ctc   | Number | ❌ No    | Expected CTC in INR (must be ≥ current CTC)          | `1500000`                         |
+| linkedin_url   | String | ❌ No    | LinkedIn profile URL (valid format)                  | `https://linkedin.com/in/johndoe` |
+| notes          | String | ❌ No    | Additional notes/comments                            | `Strong React skills`             |
+| vendorName     | String | ❌ No    | vendor name that the candidate is associated with    | `Recruitment Inc`                 |
+| referredBy     | String | No       | name of the person that referred the candidate       | `Dharmesh`                        |
+
+### Column Name Variations
+
+The system accepts flexible column naming (case-insensitive, with underscores or spaces):
+
+- **candidate_name:** `name`, `full_name`, `candidatename`
+- **recruiter_name:** `recruiter`, `recruitername`
+- **client_name:** `client`, `clientname`
+- **department_name:** `department`, `departmentname`
+- **job_role:** `role`, `position`, `jobrole`
+- **contact_number:** `phone`, `mobile`, `contact`, `contactnumber`
+- **current_city:** `current_location`, `city`, `currentcity`
+- **expected_city:** `preferred_city`, `expected_location`, `expectedcity`
+- **current_ctc:** `currentctc`, `current_salary`
+- **expected_ctc:** `expectedctc`, `expected_salary`
+- **notice_period:** `notice`, `noticeperiod`
+- **experience_years:** `experience`, `exp`, `experienceyears`
+- **linkedin_url:** `linkedin`, `linkedinprofileurl`
+
+---
+
+## Sample CSV File
+
+```csv
+candidate_name,email,contact_number,recruiter_name,client_name,department_name,job_role,current_city,expected_city,current_ctc,expected_ctc,notice_period,experience_years,linkedin_url,notes
+John Doe,john.doe@example.com,+91-9876543210,Jayraj,TCS,Engineering,Senior Software Engineer,Ahmedabad,Bangalore,1200000,1500000,30,5.5,https://linkedin.com/in/johndoe,Strong React and Node.js skills
+Jane Smith,jane.smith@example.com,+91-9876543211,Khushi,Infosys,Marketing,Product Manager,Mumbai,Bangalore,1800000,2200000,60,7,https://linkedin.com/in/janesmith,Excellent product vision
+Raj Patel,raj.patel@example.com,+91-9876543212,Yash,Wipro,Engineering,Backend Developer,Pune,Ahmedabad,900000,1100000,15,3.5,https://linkedin.com/in/rajpatel,Expert in Java
+```
+
+---
+
+## Response Format
+
+### Success Response (All Records Inserted)
+
+**Status Code:** `201 Created`
+
+```json
+{
+  "success": true,
+  "message": "Bulk upload completed",
+  "data": {
+    "summary": {
+      "totalRows": 10,
+      "inserted": 10,
+      "failed": 0,
+      "skipped": 0,
+      "processingTime": "2.34s"
+    },
+    "failedRows": [],
+    "hasMoreErrors": false
+  }
+}
+```
+
+### Partial Success Response (Some Failures)
+
+**Status Code:** `207 Multi-Status`
+
+```json
+{
+  "success": true,
+  "message": "Bulk upload completed",
+  "data": {
+    "summary": {
+      "totalRows": 10,
+      "inserted": 7,
+      "failed": 3,
+      "skipped": 0,
+      "processingTime": "2.15s"
+    },
+    "failedRows": [
+      {
+        "row": 3,
+        "error": "Duplicate email: existing@example.com"
+      },
+      {
+        "row": 5,
+        "error": "Recruiter 'InvalidName' not found"
+      },
+      {
+        "row": 8,
+        "error": "No active job requirement found for Client: 'ABC Corp', Department: 'Sales', Role: 'Manager'"
+      }
+    ],
+    "hasMoreErrors": false
+  }
+}
+```
+
+### Response Fields
+
+| Field                    | Type    | Description                                            |
+| ------------------------ | ------- | ------------------------------------------------------ |
+| `summary.totalRows`      | Number  | Total number of data rows processed (excludes header)  |
+| `summary.inserted`       | Number  | Number of candidates successfully created              |
+| `summary.failed`         | Number  | Number of rows that failed validation/insertion        |
+| `summary.skipped`        | Number  | Number of rows skipped (reserved for future use)       |
+| `summary.processingTime` | String  | Total processing time in seconds                       |
+| `failedRows`             | Array   | List of failed rows with error details (max 100 shown) |
+| `failedRows[].row`       | Number  | Row number in the file (1-indexed, includes header)    |
+| `failedRows[].error`     | String  | Specific error message for that row                    |
+| `hasMoreErrors`          | Boolean | `true` if more than 100 errors occurred                |
+
+---
+
+## Error Responses
+
+### File Validation Errors
+
+**Status Code:** `400 Bad Request`
+
+```json
+{
+  "success": false,
+  "message": "Invalid file format. Only CSV and Excel files are allowed.",
+  "error": {
+    "code": "INVALID_FILE_FORMAT"
+  }
+}
+```
+
+**Common File Errors:**
+
+| Error Code            | Description                         |
+| --------------------- | ----------------------------------- |
+| `NO_FILE_UPLOADED`    | No file provided in request         |
+| `INVALID_FILE_FORMAT` | File is not CSV or Excel            |
+| `FILE_TOO_LARGE`      | File exceeds 10 MB limit            |
+| `ROW_LIMIT_EXCEEDED`  | File contains more than 50,000 rows |
+
+### Row Validation Errors
+
+These errors appear in the `failedRows` array:
+
+| Error Type                 | Example Message                                                                          |
+| -------------------------- | ---------------------------------------------------------------------------------------- |
+| **Missing Required Field** | `"Candidate name is required"`                                                           |
+| **Invalid Format**         | `"Email must be a valid email address"`                                                  |
+| **Out of Range**           | `"Experience years cannot exceed 50"`                                                    |
+| **Duplicate Entry**        | `"Duplicate email: john@example.com"`                                                    |
+| **Not Found**              | `"Recruiter 'John Smith' not found"`                                                     |
+| **Job Requirement**        | `"No active job requirement found for Client: 'TCS', Department: 'HR', Role: 'Manager'"` |
+| **CTC Validation**         | `"Expected CTC should not be less than current CTC"`                                     |
+| **LinkedIn URL**           | `"LinkedIn URL must be in format: https://linkedin.com/in/username"`                     |
+
+---
+
+## Validation Rules
+
+### Field-Specific Rules
+
+#### candidate_name
+
+- ✅ Required
+- Min length: 2 characters
+- Max length: 100 characters
+- Allowed: Letters, spaces, periods (.), hyphens (-), apostrophes (')
+- ❌ Invalid: `J` (too short), `John123` (contains numbers)
+
+#### email
+
+- Optional
+- Must be valid email format
+- Max length: 255 characters
+- Automatically converted to lowercase
+- Must be unique (no duplicates in database)
+- ❌ Invalid: `notanemail`, `user@`, `@domain.com`
+
+#### contact_number
+
+- Optional
+- Length: 7-25 characters
+- Allowed: Digits, spaces, `+`, `-`, `(`, `)`
+- Must be unique (no duplicates in database)
+- ❌ Invalid: `123` (too short), `abc-1234567` (contains letters)
+
+#### recruiter_name
+
+- ✅ Required
+- Must match an existing recruiter in the system
+- Case-insensitive matching
+- ❌ Invalid: Non-existent recruiter name
+
+#### client_name, department_name, job_role
+
+- ✅ All three required (used to identify job requirement)
+- Must match an existing active job profile requirement
+- Active requirement = status is "Pending" or "In Progress"
+- Matching is case-insensitive
+- ❌ Invalid: If no matching active requirement exists
+
+#### current_city / expected_city
+
+- expected_city: ✅ Required
+- current_city: Optional
+- Must exist in the locations table
+- Case-insensitive matching
+- ❌ Invalid: City not in system
+
+#### current_ctc / expected_ctc
+
+- Optional
+- Range: 0 to 10,000,000
+- Supports decimals (up to 2 decimal places)
+- Validation: `expected_ctc` must be ≥ `current_ctc`
+- ❌ Invalid: `expected_ctc: 800000, current_ctc: 1000000`
+
+#### notice_period
+
+- ✅ Required
+- Range: 0 to 365 days
+- Must be a whole number
+- ❌ Invalid: `-10`, `400`, `30.5`
+
+#### experience_years
+
+- ✅ Required
+- Range: 0 to 50 years
+- Supports decimals (e.g., `5.5` for 5.5 years)
+- ❌ Invalid: `-1`, `60`, `abc`
+
+#### linkedin_url
+
+- Optional
+- Must be a valid HTTPS/HTTP URL
+- Must match pattern: `https://linkedin.com/in/username`
+- Max length: 500 characters
+- ❌ Invalid: `https://twitter.com/user`, `linkedin.com/in/user` (missing https)
+
+---
+
+## Processing Details
+
+### Batch Processing
+
+- Records are processed in **batches of 200** for optimal database performance
+- Each batch is inserted in a single transaction
+- If a batch fails, the entire batch is rolled back
+- Successfully processed batches remain committed
+
+### Transaction Safety
+
+- Each upload runs in a database transaction
+- If any critical error occurs, all changes are rolled back
+- Row-level validation errors don't roll back the entire upload
+- Only valid rows are inserted
+
+### Duplicate Detection
+
+- **Email uniqueness:** Checked against existing candidates in database
+- **Contact number uniqueness:** Checked against existing candidates
+- **Within file:** Duplicates within the same CSV are also caught
+- Failed duplicates are reported in `failedRows`
+
+## Notes
+
+- Resume files must be PDFs and no larger than 5MB.
+- Email and contact number must be unique across candidates.
+- Statuses include: selected, rejected, interview pending.
+- Locations include: Ahmedabad, Bangalore, San Francisco.
+
+---
+
+# Lookup Endpoints
+
+Base URL
+/lookup
+
+**Status Code:** `400 Bad Request`
+
+```json
+{
+  "status": "error",
+  "message": "Cannot update a job profile requirement that is closed",
+  "errorCode": "JOB_PROFILE_REQUIREMENT_UPDATE_NOT_ALLOWED"
+}
+```
+
+```json
+{
+  "status": "error",
+  "message": "Validation failed",
+  "errorCode": "VALIDATION_ERROR",
+  "data": {
+    "validationErrors": [
+      {
+        "field": "object.min",
+        "message": "At least one field must be provided for update"
+      }
+    ]
+  }
+}
+```
+
+**Status Code:** `404 Not Found`
+
+```json
+{
+  "status": "error",
+  "message": "Job profile requirement with ID 999 not found",
+  "errorCode": "JOB_PROFILE_REQUIREMENT_NOT_FOUND"
+}
+```
+
+---
+
+## Delete Job Profile Requirement
+
+Delete a job profile requirement.
+
+**Endpoint:** `DELETE /:id`
+
+### Path Parameters
+
+| Parameter | Type    | Required | Description                |
+| --------- | ------- | -------- | -------------------------- |
+| id        | integer | Yes      | Job profile requirement ID |
+
+### Success Response
+
+**Status Code:** `200 OK`
+
+```json
+{
+  "status": "success",
+  "message": "Job Profile Requirement deleted successfully",
+  "data": null
+}
+```
+
+### Error Response
+
+**Status Code:** `404 Not Found`
+
+```json
+{
+  "status": "error",
+  "message": "Job profile requirement with ID 999 not found",
+  "errorCode": "JOB_PROFILE_REQUIREMENT_NOT_FOUND"
+}
+```
+
+---
+
+## Location Object Format
+
+The `location` field in requests accepts an object with the following structure:
+
+```json
+{
+  "country": "india",
+  "city": "Bangalore"
+}
+```
+
+**Notes:**
+
+- Both `country` and `city` are required when creating a requirement
+- When updating, at least one field (`country` or `city`) must be provided
+- City names are validated against the `location` table in the database
+- Country values should be lowercase
+
+---
+
+## Status Values
+
+Valid status values (case-insensitive):
+
+- `pending` - Default status for new requirements
+- `in progress` - Actively being worked on
+- `closed` - Successfully filled
+- `cancelled` - No longer needed
+
+**Note:** Requirements with status `closed` or `cancelled` cannot be updated.
+
+---
+
+## Work Arrangement Values
+
+Valid work arrangement values (case-insensitive):
+
+- `remote` - Fully remote position
+- `onsite` - On-site only position
+- `hybrid` - Mix of remote and on-site work
+
+---
+
+## Common Error Codes
+
+| Error Code                                 | HTTP Status | Description                                    |
+| ------------------------------------------ | ----------- | ---------------------------------------------- |
+| VALIDATION_ERROR                           | 400         | Request validation failed                      |
+| SEARCH_VALIDATION_ERROR                    | 400         | Search parameters validation failed            |
+| INVALID_REQUEST                            | 400         | Missing or invalid request data                |
+| JOB_PROFILE_NOT_FOUND                      | 404         | Referenced job profile does not exist          |
+| INVALID_LOCATION                           | 400         | Invalid location/city name                     |
+| INVALID_STATUS                             | 400         | Invalid status value                           |
+| JOB_PROFILE_REQUIREMENT_NOT_FOUND          | 404         | Job profile requirement not found              |
+| JOB_PROFILE_REQUIREMENT_UPDATE_NOT_ALLOWED | 400         | Cannot update closed or cancelled requirements |
+| BULK_UPDATE_ERROR                          | 400         | Some records failed during bulk update         |
+
+---
+
 # Candidate API CRUD
 
 A structured **Node.js + Express.js API** for managing candidates, with validation, error handling, pagination, searching, and database safety.
 
 ---
 
-## Features
+````
+
+/api/member
+
+```
 
 - Full **CRUD operations** for candidates
 - **Input validation** using Joi
@@ -2876,7 +3931,11 @@ A structured **Node.js + Express.js API** for managing candidates, with validati
 
 ## API Endpoints
 
-## Endpoints and Examples
+```
+
+Authorization: Bearer <token>
+
+````
 
 ### Get All Candidates
 
@@ -4165,6 +5224,451 @@ Update Request Validation
 | **state**              | Optional, 1–100 chars if provided   | Same as create                                   |
 | **At least one field** | Required                            | "At least one field must be provided for update" |
 | **Unknown fields**     | Stripped automatically              | –                                                |
+
+At least one field Required "At least one field must be provided for update"
+Unknown fields Stripped automatically -
+Path Parameter Validation
+
+| **Parameter**  | **Rule**                   | **Error Message**                                                  |
+| -------------- | -------------------------- | ------------------------------------------------------------------ |
+| **locationId** | Required, positive integer | "Location Id must be positive" or "Location Id must be an integer" |
+
+Error Handling
+Error Response Structure
+
+All error responses follow this format:
+
+{
+"success": false,
+"message": "Human-readable error message",
+"errorCode": "MACHINE_READABLE_CODE",
+"statusCode": 400,
+"validationErrors": [],
+"metadata": {}
+}
+
+# Interview Management API
+
+A comprehensive REST API for managing interview scheduling, tracking, and reporting with timezone support and conflict detection.
+
+## Table of Contents
+
+- [Authentication](#authentication)
+- [Endpoints](#endpoints)
+  - [Get All Interviews](#get-all-interviews)
+  - [Get Interview by ID](#get-interview-by-id)
+  - [Get Interviews by Candidate](#get-interviews-by-candidate)
+  - [Get Create Form Data](#get-create-form-data)
+  - [Get Finalize Form Data](#get-finalize-form-data)
+  - [Create Interview](#create-interview)
+  - [Schedule Next Round](#schedule-next-round)
+  - [Update Interview](#update-interview)
+  - [Finalize Interview](#finalize-interview)
+  - [Delete Interview](#delete-interview)
+  - [Get Interview Tracker](#get-interview-tracker)
+  - [Get Overall Summary](#get-overall-summary)
+  - [Get Monthly Summary](#get-monthly-summary)
+  - [Get Daily Summary](#get-daily-summary)
+- [Error Responses](#error-responses)
+
+---
+
+## Authentication
+
+All endpoints require authentication via Bearer token.
+
+```http
+Authorization: Bearer <your-token>
+```
+
+---
+
+## Endpoints
+
+### Get All Interviews
+
+Retrieve all active interviews.
+
+**Endpoint:** `GET /interview`
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Interview entries retrieved successfully",
+  "data": [
+    {
+      "interviewId": 1,
+      "roundNumber": 1,
+      "totalInterviews": 2,
+      "interviewDate": "2026-01-15",
+      "fromTime": "2026-01-15T09:00:00.000Z",
+      "toTime": "2026-01-15T10:00:00.000Z",
+      "eventTimezone": "Asia/Kolkata",
+      "eventTimestamp": "2025-12-15T14:30:00.000+05:30",
+      "candidateIsActive": 0,
+      "candidateIsDeleted": 1,
+      "durationMinutes": 60,
+      "candidateId": 5,
+      "candidateName": "John Doe",
+      "interviewerId": 3,
+      "interviewerName": "Jane Smith",
+      "scheduledById": 2,
+      "scheduledByName": "HR Manager",
+      "result": "Pending",
+      "recruiterNotes": "Technical round",
+      "interviewerFeedback": null,
+      "meetingUrl": "https://meet.example.com/interview-123",
+      "isActive": true
+    }
+  ]
+}
+```
+
+---
+
+### Get Interview by ID
+
+Retrieve a specific interview by its ID.
+
+**Endpoint:** `GET /interview/:interviewId`
+
+**Parameters:**
+
+- `interviewId` (path) - Interview ID (positive integer)
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Interview entry retrieved successfully",
+  "data": {
+    "interviewId": 1,
+    "roundNumber": 1,
+    "totalInterviews": 2,
+    "interviewDate": "2026-01-15",
+    "fromTime": "2026-01-15T09:00:00.000Z",
+    "toTime": "2026-01-15T10:00:00.000Z",
+    "eventTimezone": "Asia/Kolkata",
+    "eventTimestamp": "2025-12-15T14:30:00.000+05:30",
+    "candidateIsActive": 0,
+    "candidateIsDeleted": 1,
+    "durationMinutes": 60,
+    "candidateId": 5,
+    "candidateName": "John Doe",
+    "interviewerId": 3,
+    "interviewerName": "Jane Smith",
+    "scheduledById": 2,
+    "scheduledByName": "HR Manager",
+    "result": "Pending",
+    "recruiterNotes": "Technical round",
+    "interviewerFeedback": null,
+    "meetingUrl": "https://meet.example.com/interview-123"
+  }
+}
+```
+
+---
+
+### Get Interviews by Candidate
+
+Retrieve all interviews for a specific candidate.
+
+**Endpoint:** `GET /interview/candidate/:candidateId`
+
+**Parameters:**
+
+- `candidateId` (path) - Candidate ID (positive integer)
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Candidate interviews retrieved successfully",
+  "data": {
+    "candidateId": 5,
+    "totalRounds": 2,
+    "data": [
+      {
+        "interviewId": 1,
+        "roundNumber": 1,
+        "totalInterviews": 2,
+        "interviewDate": "2026-01-15",
+        "fromTime": "2026-01-15T09:00:00.000Z",
+        "toTime": "2026-01-15T10:00:00.000Z",
+        "eventTimezone": "Asia/Kolkata",
+        "eventTimestamp": "2025-12-15T14:30:00.000+05:30",
+        "durationMinutes": 60,
+        "result": "Selected",
+        "meetingUrl": "https://meet.example.com/interview-123",
+        "interviewerId": 3,
+        "interviewerName": "Jane Smith"
+      },
+      {
+        "interviewId": 2,
+        "roundNumber": 2,
+        "totalInterviews": 2,
+        "interviewDate": "2026-01-20",
+        "fromTime": "2026-01-20T14:00:00.000Z",
+        "toTime": "2026-01-20T15:30:00.000Z",
+        "eventTimezone": "Asia/Kolkata",
+        "eventTimestamp": "2025-12-15T14:30:00.000+05:30",
+        "durationMinutes": 90,
+        "result": "Pending",
+        "meetingUrl": null,
+        "interviewerId": 4,
+        "interviewerName": "Bob Johnson"
+      }
+    ]
+  }
+}
+```
+
+---
+
+### Get Create Form Data
+
+Retrieve data needed for the interview creation form.
+
+**Endpoint:** `GET /interview/create-data`
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Interview Form Data retrieved successfully",
+  "data": {
+    "interviewers": [
+      {
+        "interviewerId": 3,
+        "interviewerName": "Jane Smith"
+      },
+      {
+        "interviewerId": 4,
+        "interviewerName": "Bob Johnson"
+      }
+    ],
+    "recruiters": [
+      {
+        "recruiterId": 2,
+        "recruiterName": "HR Manager"
+      }
+    ]
+  }
+}
+```
+
+---
+
+### Get Finalize Form Data
+
+Retrieve current data for finalizing an interview.
+
+**Endpoint:** `GET /interview/:interviewId/finalize-data`
+
+**Parameters:**
+
+- `interviewId` (path) - Interview ID (positive integer)
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Finalize Interview Form Data retrieved successfully",
+  "data": {
+    "interviewId": 1,
+    "result": "pending",
+    "recruiterNotes": "Technical round",
+    "interviewerFeedback": null,
+    "meetingUrl": "https://meet.example.com/interview-123"
+  }
+}
+```
+
+---
+
+### Create Interview
+
+Create a new interview for a candidate.
+
+**Endpoint:** `POST /interview/:candidateId`
+
+**Parameters:**
+
+- `candidateId` (path) - Candidate ID (positive integer)
+
+**Request Body:**
+
+```json
+{
+  "interviewDate": "2026-01-15",
+  "fromTime": "09:00",
+  "durationMinutes": 60,
+  "eventTimezone": "Asia/Kolkata",
+  "interviewerId": 3,
+  "scheduledById": 2,
+  "result": "pending",
+  "recruiterNotes": "Technical round - focus on algorithms",
+  "interviewerFeedback": null
+}
+```
+
+**Validation Rules:**
+
+- `interviewDate`: Required, format YYYY-MM-DD
+- `fromTime`: Required, format HH:MM (00:00-23:59)
+- `durationMinutes`: Required, integer, min 15, max 480
+- `eventTimezone`: Required, valid IANA timezone (e.g., Asia/Kolkata)
+- `interviewerId`: Required, positive integer
+- `scheduledById`: Required, positive integer
+- `result`: Optional, one of: pending, selected, rejected, cancelled (default: pending)
+- `recruiterNotes`: Optional, max 1000 characters
+- `interviewerFeedback`: Optional, max 2000 characters
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "interview created successfully",
+  "data": {
+    "interviewId": 1,
+    "roundNumber": 1,
+    "totalInterviews": 1,
+    "interviewDate": "2026-01-15",
+    "fromTime": "2026-01-15T09:00:00.000Z",
+    "toTime": "2026-01-15T10:00:00.000Z",
+    "durationMinutes": 60,
+    "candidateId": 5,
+    "candidateName": "John Doe",
+    "interviewerId": 3,
+    "interviewerName": "Jane Smith",
+    "scheduledById": 2,
+    "scheduledByName": "HR Manager",
+    "result": "Pending",
+    "recruiterNotes": "Technical round - focus on algorithms",
+    "interviewerFeedback": null
+  }
+}
+```
+
+---
+
+### Schedule Next Round
+
+Schedule an additional interview round for a candidate.
+
+**Endpoint:** `POST /interview/:candidateId/rounds`
+
+**Parameters:**
+
+- `candidateId` (path) - Candidate ID (positive integer)
+
+**Request Body:**
+
+```json
+{
+  "interviewDate": "2026-01-20",
+  "fromTime": "14:00",
+  "durationMinutes": 90,
+  "eventTimezone": "Asia/Kolkata",
+  "interviewerId": 4,
+  "scheduledById": 2
+}
+```
+
+**Validation Rules:**
+
+- Same as Create Interview, but without optional fields (result, notes, feedback)
+- Requires at least one previous interview for the candidate
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Successfully scheduled round 2 for candidate",
+  "data": {
+    "interviewId": 2,
+    "roundNumber": 2,
+    "totalInterviews": 2,
+    "interviewDate": "2026-01-20",
+    "fromTime": "2026-01-20T14:00:00.000Z",
+    "toTime": "2026-01-20T15:30:00.000Z",
+    "durationMinutes": 90,
+    "candidateId": 5,
+    "candidateName": "John Doe",
+    "interviewerId": 4,
+    "interviewerName": "Bob Johnson",
+    "scheduledById": 2,
+    "scheduledByName": "HR Manager",
+    "result": "Pending",
+    "recruiterNotes": null,
+    "interviewerFeedback": null
+  }
+}
+```
+
+---
+
+### Update Interview
+
+Update interview details. When updating time-related fields, all three (interviewDate, fromTime, eventTimezone) must be provided together.
+
+**Endpoint:** `PATCH /interview/:interviewId`
+
+**Parameters:**
+
+- `interviewId` (path) - Interview ID (positive integer)
+
+**Request Body:**
+
+```json
+{
+  "interviewDate": "2026-01-16",
+  "fromTime": "10:00",
+  "eventTimezone": "Asia/Kolkata",
+  "durationMinutes": 90,
+  "interviewerId": 4
+}
+```
+
+**Validation Rules:**
+
+- At least one field must be provided
+- If updating time: `interviewDate`, `fromTime`, and `eventTimezone` are all required together
+- `durationMinutes`: Optional, integer, min 15, max 480
+- `interviewerId`: Optional, positive integer
+- `scheduledById`: Optional, positive integer
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "message": "Interview entry updated successfully",
+  "data": {
+    "interviewId": 1,
+    "candidateId": 5,
+    "interviewDate": "2026-01-16",
+    "fromTime": "10:00",
+    "eventTimezone": "Asia/Kolkata",
+    "durationMinutes": 90,
+    "interviewerId": 4
+  }
+}
+```
+
+---
+
+### Finalize Interview
+
+Update interview result and feedback.
 
 At least one field Required "At least one field must be provided for update"
 Unknown fields Stripped automatically -

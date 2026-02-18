@@ -137,6 +137,58 @@ class CandidateValidatorHelper {
         }
     }
 
+    // Add this method to the CandidateValidatorHelper class (after getRecruiterId method)
+
+    async getJobProfileRequirementId(clientName, departmentName, jobRole, client = null) {
+        this._resetCacheIfNeeded();
+
+        if (!clientName || !departmentName || !jobRole) {
+            throw new AppError(
+                'Client name, department name, and job role are all required to identify job requirement',
+                400,
+                'INCOMPLETE_JOB_REQUIREMENT_INFO'
+            );
+        }
+
+        const connection = client || await this.db.getConnection();
+
+        try {
+            const query = `
+            SELECT jpr.jobProfileRequirementId 
+            FROM jobProfileRequirement jpr
+            INNER JOIN client c ON c.clientId = jpr.clientId
+            INNER JOIN department d ON d.departmentId = jpr.departmentId
+            WHERE LOWER(c.clientName) = LOWER(?)
+            AND LOWER(d.departmentName) = LOWER(?)
+            AND LOWER(jpr.jobRole) = LOWER(?)
+            AND jpr.statusId IN (
+                SELECT lookupKey FROM lookup 
+                WHERE tag = 'profileStatus' 
+                AND value IN ('Pending', 'In Progress')
+            )
+            LIMIT 1
+        `;
+
+            const [rows] = await connection.execute(query, [
+                clientName.trim(),
+                departmentName.trim(),
+                jobRole.trim()
+            ]);
+
+            if (rows.length === 0) {
+                throw new AppError(
+                    `No active job requirement found for Client: '${clientName}', Department: '${departmentName}', Role: '${jobRole}'`,
+                    400,
+                    'JOB_REQUIREMENT_NOT_FOUND'
+                );
+            }
+
+            return rows[0].jobProfileRequirementId;
+        } finally {
+            if (!client) connection.release();
+        }
+    }
+
     async transformLocation(locationName, client = null) {
         this._resetCacheIfNeeded();
         if (!locationName) return null;
@@ -433,7 +485,25 @@ const candidateSchemas = {
             .optional()
             .messages({
                 'string.base': 'Notes must be text'
-            })
+            }),
+        vendorId: Joi.number()
+            .allow('')
+            .optional()
+            .messages({
+                'number.base': 'Vendor ID must be a number'
+            }),
+        referredBy: Joi.string()
+            .trim()
+            .min(2)
+            .max(150)
+            .pattern(/^[a-zA-Z\s.'-]+$/)
+            .optional()
+            .allow('')
+            .messages({
+                'string.min': 'Referred by must be at least 2 characters long',
+                'string.max': 'Referred by cannot exceed 150 characters',
+                'string.pattern.base': 'Referred by can only contain letters, spaces, periods, hyphens and apostrophes'
+            }),
     }).custom((value, helpers) => {
         if (value.expectedCTC < value.currentCTC) {
             return helpers.error('custom.ctcRange');
@@ -460,6 +530,7 @@ const candidateSchemas = {
             .trim()
             .pattern(/^[+]?[\d\s()-]{7,25}$/)
             .optional()
+            .allow('', null)
             .messages({
                 'string.pattern.base': 'Contact number must be a valid phone number (7-25 characters, numbers, spaces, +, -, () allowed)'
             }),
@@ -470,6 +541,7 @@ const candidateSchemas = {
             .max(255)
             .lowercase()
             .optional()
+            .allow('', null)
             .messages({
                 'string.email': 'Email must be a valid email address',
                 'string.max': 'Email cannot exceed 255 characters'
@@ -490,7 +562,6 @@ const candidateSchemas = {
             .integer()
             .positive()
             .optional()
-            .allow(null)
             .messages({
                 'number.base': 'Recruiter ID must be a number',
                 'number.positive': 'Recruiter ID must be a positive number'
@@ -509,7 +580,6 @@ const candidateSchemas = {
             .integer()
             .positive()
             .optional()
-            .allow(null)
             .messages({
                 'any.required': 'Job Profile Requirement ID is required',
                 'number.base': 'Job Profile Requirement ID must be a number',
@@ -534,7 +604,7 @@ const candidateSchemas = {
                     "string.min": "Location's city must be at least 2 characters long",
                     "string.max": "Location's city cannot exceed 100 characters",
                 }),
-        }).optional().messages({
+        }).optional().allow(null).messages({
             "object.unknown": "Invalid location object structure",
         }),
         expectedLocation: Joi.object({
@@ -563,6 +633,7 @@ const candidateSchemas = {
             .min(0)
             .max(10000000)
             .optional()
+            .allow(null)
             .messages({
                 'number.base': 'Current CTC must be a number',
                 'number.integer': 'Current CTC must be a whole number',
@@ -575,6 +646,7 @@ const candidateSchemas = {
             .min(0)
             .max(10000000)
             .optional()
+            .allow(null)
             .messages({
                 'number.base': 'Expected CTC must be a number',
                 'number.integer': 'Expected CTC must be a whole number',
@@ -599,6 +671,7 @@ const candidateSchemas = {
             .min(0)
             .max(50)
             .optional()
+            .allow(null)
             .messages({
                 'number.base': 'Experience years must be a number',
                 'number.integer': 'Experience years must be a whole number',
@@ -612,7 +685,7 @@ const candidateSchemas = {
             .pattern(/^https?:\/\/(www\.)?linkedin\.com\/in\/[\w-]+\/?$/)
             .max(500)
             .optional()
-            .allow('')
+            .allow('', null)
             .messages({
                 'string.uri': 'LinkedIn profile URL must be a valid URL',
                 'string.pattern.base': 'LinkedIn URL must be in format: https://linkedin.com/in/username',
@@ -636,11 +709,30 @@ const candidateSchemas = {
                 return value;
             }),*/
         notes: Joi.string()
-            .allow('')
+            .allow('', null)
             .optional()
             .messages({
                 'string.base': 'Notes must be text'
-            })
+            }),
+        vendorId: Joi.number()
+            .allow(null)
+            .optional()
+            .messages({
+                'number.base': 'Vendor ID must be a number'
+            }),
+        referredBy: Joi.string()
+            .trim()
+            .min(2)
+            .max(150)
+            .pattern(/^[a-zA-Z\s.'-]+$/)
+            .optional()
+            .allow(null, '')
+            .messages({
+                'string.min': 'Referred by must be at least 2 characters long',
+                'string.max': 'Referred by cannot exceed 150 characters',
+                'string.pattern.base': 'Referred by can only contain letters, spaces, periods, hyphens and apostrophes'
+            }),
+
     }).min(1)
         .custom((value, helpers) => {
             // CTC validation if both are provided
@@ -838,7 +930,6 @@ class CandidateValidator {
 
     static async validateUpdate(req, res, next) {
         try {
-            CandidateValidator.removeNulls(req.body);
             // Validate params
             const { error: paramsError } = candidateSchemas.params.validate(req.params, { abortEarly: false });
 
@@ -942,6 +1033,11 @@ class CandidateValidator {
             }*/
 
             // Check for duplicates (excluding current candidate)
+            Object.keys(value).forEach(key => {
+                if (value[key] === '') {
+                    value[key] = null;
+                }
+            });
             if (value.email && await CandidateValidator.helper.checkEmailExists(value.email, candidateId)) {
                 // Cleanup S3 file
                 if (req.file && req.file.key) {
@@ -1037,4 +1133,7 @@ class CandidateValidator {
     }
 }
 
-module.exports = CandidateValidator;
+module.exports = {
+    CandidateValidator,
+    CandidateValidatorHelper
+};

@@ -70,8 +70,6 @@ class InterviewRepository {
                 SUM(CASE WHEN result = 'cancelled' THEN 1 ELSE 0 END) AS cancelled
             FROM interview
             WHERE deletedAt IS NULL
-            AND fromTimeUTC >= ?
-            AND fromTimeUTC <= ?;
         `;
 
             const [summaryData] = await connection.query(summaryQuery, [startUTC, endUTC]);
@@ -420,7 +418,8 @@ class InterviewRepository {
                 ON i.interviewerId = interviewer.memberId
             LEFT JOIN member scheduler
                 ON i.scheduledById = scheduler.memberId
-            WHERE i.isActive=TRUE AND i.deletedAt IS NULL;
+            WHERE i.isActive=TRUE AND i.deletedAt IS NULL
+            ORDER BY i.fromTimeUTC DESC;
             `;
             /*const numLimit = Math.max(1, parseInt(limit, 10) ?? 10);
             const numOffset = Math.max(0, parseInt(offset, 10) ?? 0);*/
@@ -577,35 +576,6 @@ class InterviewRepository {
     async getFormData(client, interviewId = null) {
         const connection = client;
 
-        /*const interviewPromise = interviewId
-            ? connection.query(
-                `SELECT
-                i.interviewId,
-                i.interviewDate,
-                i.fromTime,
-                i.durationMinutes,
-                c.candidateId,
-                c.candidateName,
-                interviewer.memberId AS interviewerId,
-                interviewer.memberName AS interviewerName,
-                scheduler.memberId AS scheduledById,
-                scheduler.memberName AS scheduledByName,
-                i.result,
-                i.recruiterNotes,
-                i.interviewerFeedback
-            FROM interview i
-            LEFT JOIN candidate c
-                ON i.candidateId = c.candidateId
-            LEFT JOIN member interviewer
-                ON i.interviewerId = interviewer.memberId
-            LEFT JOIN member scheduler
-                ON i.scheduledById = scheduler.memberId
-            WHERE i.interviewId = ? AND i.isActive=TRUE;`,
-                [interviewId]
-            )
-            // FIX: return mysql2-like structure [rows, fields]
-            : Promise.resolve([[], []]);*/
-
         const interviewersPromise = connection.query(`
         SELECT memberId AS interviewerId, memberName AS interviewerName
         FROM member
@@ -620,13 +590,11 @@ class InterviewRepository {
 
         const [interviewers, recruiters] =
             await Promise.all([
-                //interviewPromise,
                 interviewersPromise,
                 recruitersPromise,
             ]);
 
         return {
-            //interview: null,
             interviewers: interviewers[0],
             recruiters: recruiters[0]
         };
@@ -644,96 +612,6 @@ class InterviewRepository {
             this._handleDatabaseError();
         }
     }
-
-    /*async replaceInterviewRounds(interviewId, rounds, client) {
-        const connection = client;
-
-        try {
-            await connection.execute(
-                `DELETE FROM interview_rounds WHERE interviewId = ?`,
-                [interviewId]
-            );
-
-            if (rounds && rounds.length > 0) {
-                const values = rounds.map(round => [
-                    interviewId,
-                    round.roundNumber,
-                    round.roundTypeId,
-                    round.interviewerId,
-                    round.feedback || null
-                ]);
-
-                const placeholders = values.map(() => '(?, ?, ?, ?, ?)').join(',');
-                const flatValues = values.flat();
-
-                await connection.execute(
-                    `INSERT INTO interview_rounds (interviewId, roundNumber, roundTypeId, interviewerId, feedback) 
-                     VALUES ${placeholders}`,
-                    flatValues
-                );
-            }
-
-            return { success: true, roundsCount: rounds?.length || 0 };
-        } catch (error) {
-            throw new AppError(
-                'Database error while replacing interview rounds',
-                500,
-                'DB_ERROR',
-                error.message
-            );
-        }
-    }*/
-
-    /*async renumberCandidateRounds(candidateId, client) {
-        const connection = client;
-
-        // Fetch active interviews in deterministic order
-        const [rows] = await connection.query(
-            `
-        SELECT interviewId
-        FROM interview
-        WHERE candidateId = ? AND isActive = TRUE
-        ORDER BY interviewDate ASC, fromTime ASC, interviewId ASC
-        `,
-            [candidateId]
-        );
-
-        const total = rows.length;
-        if (total === 0) return 0;
-
-        /*
-         * PHASE 1: Break uniqueness
-         * Move roundNumber into a safe negative range
-         
-        let temp = -1;
-        for (const row of rows) {
-            await connection.execute(
-                `
-            UPDATE interview
-            SET roundNumber = ?
-            WHERE interviewId = ?
-            `,
-                [temp--, row.interviewId]
-            );
-        }
-
-        /*
-         * PHASE 2: Assign correct round numbers
-         
-        let round = 1;
-        for (const row of rows) {
-            await connection.execute(
-                `
-            UPDATE interview
-            SET roundNumber = ?, totalInterviews = ?
-            WHERE interviewId = ?
-            `,
-                [round++, total, row.interviewId]
-            );
-        }
-
-        return total;
-    }*/
 
     async create(candidateId, interviewData, client) {
         const connection = client;

@@ -87,18 +87,21 @@ class CandidateRepository {
         SELECT locationId,cityName AS city,country,stateName AS state FROM location
     `);
 
-        const [recruiters, locations, jobProfiles] =
+        const vendorPromise = connection.query(`SELECT vendorId, vendorName FROM recruitmentVendor`);
+
+        const [recruiters, locations, jobProfiles, vendors] =
             await Promise.all([
                 recruitersPromise,
                 locationPromise,
-                jobProfilePromise
+                jobProfilePromise,
+                vendorPromise
             ]);
 
         return {
             recruiters: recruiters[0],
-            //status: status[0],
             locations: locations[0],
-            jobProfiles: jobProfiles[0]
+            jobProfiles: jobProfiles[0],
+            vendors: vendors[0]
         };
     }
 
@@ -106,8 +109,8 @@ class CandidateRepository {
         const connection = client;
         console.log(candidateData);
         try {
-            const query = `INSERT INTO candidate(candidateName,contactNumber,email,recruiterId,jobRole,appliedForJobProfileId,expectedLocation,currentLocation,currentCTC,expectedCTC,noticePeriod,experienceYears,linkedinProfileUrl, resumeFilename, resumeOriginalName, resumeUploadDate,notes,statusId)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`
+            const query = `INSERT INTO candidate(candidateName,contactNumber,email,recruiterId,jobRole,appliedForJobProfileId,expectedLocation,currentLocation,currentCTC,expectedCTC,noticePeriod,experienceYears,linkedinProfileUrl, resumeFilename, resumeOriginalName, resumeUploadDate,notes,statusId,vendorId,referredBy)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`
 
             const [result] = await connection.execute(query, [
                 candidateData.candidateName,
@@ -127,7 +130,9 @@ class CandidateRepository {
                 null,
                 null,
                 candidateData.notes ?? null,
-                candidateData.statusId
+                candidateData.statusId,
+                candidateData.vendorId ?? null,
+                candidateData.referredBy ?? null
             ]);
 
             return {
@@ -154,6 +159,8 @@ class CandidateRepository {
             c.contactNumber,
             c.email,
             c.recruiterId,
+            c.vendorId,
+            v.vendorName,
 
             m.memberName AS recruiterName,
             m.memberContact AS recruiterContact,
@@ -187,7 +194,8 @@ class CandidateRepository {
             c.resumeFilename,
             c.resumeOriginalName,
             c.resumeUploadDate,
-            c.notes
+            c.notes,
+            c.referredBy
 
         FROM candidate c
 
@@ -203,6 +211,8 @@ class CandidateRepository {
 
         LEFT JOIN member m
             ON m.memberId = c.recruiterId
+        LEFT JOIN recruitmentVendor v
+            ON v.vendorId = c.vendorId
 
         WHERE c.candidateId = ?
         AND c.isActive = TRUE;
@@ -486,8 +496,8 @@ class CandidateRepository {
 
             // Filter only allowed fields for security
             const allowedFields = [
-                'candidateName', 'contactNumber', 'email', 'recruiterId',
-                'jobRole', 'appliedForJobProfileId', 'expectedLocation', 'currentLocation', 'currentCTC', 'expectedCTC', 'noticePeriod', 'experienceYears', 'linkedinProfileUrl', 'resume', 'notes'
+                'candidateName', 'contactNumber', 'email', 'recruiterId', 'vendorId',
+                'jobRole', 'appliedForJobProfileId', 'expectedLocation', 'currentLocation', 'currentCTC', 'expectedCTC', 'noticePeriod', 'experienceYears', 'linkedinProfileUrl', 'resume', 'notes', 'referredBy'
             ];
 
             const filteredData = {};
@@ -616,6 +626,8 @@ class CandidateRepository {
             c.contactNumber,
             c.email,
             c.recruiterId,
+            c.vendorId,
+            v.vendorName,
 
             m.memberName AS recruiterName,
             m.memberContact AS recruiterContact,
@@ -649,7 +661,8 @@ class CandidateRepository {
             c.resumeFilename,
             c.resumeOriginalName,
             c.resumeUploadDate,
-            c.notes
+            c.notes,
+            c.referredBy
 
         FROM candidate c
 
@@ -665,6 +678,8 @@ class CandidateRepository {
 
         LEFT JOIN member m
             ON m.memberId = c.recruiterId
+        LEFT JOIN recruitmentVendor v
+            ON v.vendorId = c.vendorId
 
         WHERE c.isActive = TRUE
         `;
@@ -876,16 +891,92 @@ class CandidateRepository {
         }
     }
 
+    // Add this method to your CandidateRepository class
+
+    /**
+     * Bulk insert candidates - optimized for large batches
+     * Uses single INSERT with multiple value sets
+     */
+    async bulkInsert(candidates, client) {
+        const connection = client;
+
+        try {
+            if (!candidates || candidates.length === 0) {
+                return 0;
+            }
+
+            const placeholders = candidates.map(() =>
+                '(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+            ).join(', ');
+
+            const query = `
+            INSERT INTO candidate(
+                candidateName,
+                contactNumber,
+                email,
+                recruiterId,
+                jobRole,
+                appliedForJobProfileId,
+                expectedLocation,
+                currentLocation,
+                currentCTC,
+                expectedCTC,
+                noticePeriod,
+                experienceYears,
+                linkedinProfileUrl,
+                resumeFilename,
+                resumeOriginalName,
+                resumeUploadDate,
+                notes,
+                statusId,
+                vendorId,
+                referredBy
+            )
+            VALUES ${placeholders};
+        `;
+
+            const values = candidates.flatMap(c => [
+                c.candidateName,
+                c.contactNumber ?? null,
+                c.email ?? null,
+                c.recruiterId,
+                c.jobRole ?? null,
+                c.jobProfileRequirementId ?? null,  // important
+                c.expectedLocation ?? null,
+                c.currentLocation ?? null,
+                c.currentCTC ?? null,
+                c.expectedCTC ?? null,
+                c.noticePeriod,
+                c.experienceYears,
+                c.linkedinProfileUrl ?? null,
+                null,   // resumeFilename
+                null,   // resumeOriginalName
+                null,   // resumeUploadDate
+                c.notes ?? null,
+                c.statusId,
+                c.vendorId ?? null,
+                c.referredBy ?? null
+            ]);
+
+            const [result] = await connection.execute(query, values);
+
+            return result.affectedRows;
+
+        } catch (error) {
+            console.error("REAL DB ERROR:", error);
+            throw error;
+        }
+    }
+
     _handleDatabaseError(error) {
         console.error('Database error:', error);
 
         switch (error.code) {
             case 'ER_DUP_ENTRY':
                 throw new AppError(
-                    'A job profile with this role already exists for this client',
+                    'A Candidate Already exists with the same unique field value',
                     409,
-                    'DUPLICATE_ENTRY',
-                    { field: 'jobRole' }
+                    'DUPLICATE_ENTRY'
                 );
 
             case 'ER_DATA_TOO_LONG':
