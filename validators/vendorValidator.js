@@ -32,7 +32,16 @@ const vendorSchemas = {
             .messages({
                 'string.email': 'Vendor email must be a valid email address',
                 'string.max': 'Vendor email cannot exceed 255 characters'
-            })
+            }),
+        contactPersonName: Joi.string()
+            .trim()
+            .min(2)
+            .max(100)
+            .optional()
+            .messages({
+                'string.min': 'Contact person name must be at least 2 characters long',
+                'string.max': 'Contact person name cannot exceed 100 characters'
+            }),
     }),
 
     update: Joi.object({
@@ -65,7 +74,17 @@ const vendorSchemas = {
             .messages({
                 'string.email': 'Vendor email must be a valid email address',
                 'string.max': 'Vendor email cannot exceed 255 characters'
-            })
+            }),
+        contactPersonName: Joi.string()
+            .trim()
+            .min(2)
+            .max(100)
+            .optional()
+            .allow('', null)
+            .messages({
+                'string.min': 'Contact person name must be at least 2 characters long',
+                'string.max': 'Contact person name cannot exceed 100 characters'
+            }),
     }).min(1).messages({
         'object.min': 'At least one field (vendorName,vendorPhone or vendorEmail) must be provided for update'
     }),

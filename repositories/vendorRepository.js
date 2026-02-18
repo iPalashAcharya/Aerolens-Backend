@@ -10,7 +10,7 @@ class VendorRepository {
 
         try {
             const query = `
-            SELECT vendorId, vendorName, vendorPhone, vendorEmail
+            SELECT vendorId, vendorName, vendorPhone, vendorEmail, contactPersonName
             FROM recruitmentVendor
             `;
 
@@ -26,14 +26,15 @@ class VendorRepository {
 
         try {
             const query = `
-            INSERT INTO recruitmentVendor (vendorName, vendorEmail,vendorPhone ) 
-            VALUES (?, ?, ?)
+            INSERT INTO recruitmentVendor (vendorName, vendorEmail,vendorPhone, contactPersonName) ) 
+            VALUES (?, ?, ?, ?)
             `;
 
             const [result] = await connection.execute(query, [
                 vendorData.vendorName,
                 vendorData.vendorEmail,
-                vendorData.vendorPhone
+                vendorData.vendorPhone,
+                vendorData.contactPersonName
             ]);
 
             return {
@@ -50,7 +51,7 @@ class VendorRepository {
 
         try {
             const query = `
-            SELECT vendorId, vendorName, vendorPhone, vendorEmail
+            SELECT vendorId, vendorName, vendorPhone, vendorEmail, contactPersonName
             FROM recruitmentVendor 
             WHERE vendorId = ?
             `;
@@ -66,7 +67,7 @@ class VendorRepository {
         const connection = client;
 
         try {
-            const allowedFields = ['vendorName', 'vendorPhone', 'vendorEmail'];
+            const allowedFields = ['vendorName', 'vendorPhone', 'vendorEmail', 'contactPersonName'];
 
             const sanitizedData = Object.fromEntries(
                 Object.entries(updateData).filter(
