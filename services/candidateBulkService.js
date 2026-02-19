@@ -123,7 +123,7 @@ class CandidateBulkService {
                 objectMode: true, // Each chunk is a parsed row object {column:value}
                 transform: async (row, encoding, callback) => {
                     rowNumber++;
-                    this.stats.total++;
+                    //this.stats.total++;
 
                     try {
                         // Safety limit check
@@ -202,7 +202,7 @@ class CandidateBulkService {
                         continue;
                     }
 
-                    this.stats.total++;
+                    //this.stats.total++;
 
                     // Safety limit
                     if (this.stats.total > this.MAX_ROWS) {
@@ -265,8 +265,20 @@ class CandidateBulkService {
             // Step 1: Map CSV/Excel columns to database schema
             const mapped = this._mapRowToSchema(rawRow);
 
+            const hasAnyValue = Object.values(mapped).some(
+                v => v !== null && v !== undefined && String(v).trim() !== ''
+            );
+            if (!hasAnyValue) {
+                this.stats.skipped++;
+                return null;
+            }
+
+            this.stats.total++;
+
+            const coerced = this._coerceRowTypes(mapped);
+
             // Step 2: Validate mapped data
-            const validated = await this._validateRow(mapped, rowNumber);
+            const validated = await this._validateRow(coerced, rowNumber);
 
             if (!validated) {
                 return null; // Skip row
@@ -287,6 +299,51 @@ class CandidateBulkService {
             }
             throw new Error(error.message || 'Row processing failed');
         }
+    }
+
+    _coerceRowTypes(row) {
+        const coerced = { ...row };
+
+        if (coerced.linkedinProfileUrl) {
+            try {
+                const url = new URL(coerced.linkedinProfileUrl);
+                coerced.linkedinProfileUrl = url.origin + url.pathname.replace(/\/?$/, '/');
+            } catch {
+                // Leave as-is for validation to catch invalid URLs
+            }
+        }
+
+        // Fields that must be strings — strip whitespace, convert null-ish to null
+        const stringFields = [
+            'candidateName', 'contactNumber', 'email', 'recruiterName',
+            'clientName', 'departmentName', 'jobRole', 'currentCity',
+            'expectedCity', 'linkedinProfileUrl', 'notes',
+            'vendorName', 'referredBy'
+        ];
+
+        for (const field of stringFields) {
+            const val = coerced[field];
+            if (val === null || val === undefined || String(val).trim() === '') {
+                coerced[field] = null;
+            } else {
+                coerced[field] = String(val).trim();
+            }
+        }
+
+        // Fields that must be numbers
+        const numberFields = ['currentCTC', 'expectedCTC', 'noticePeriod', 'experienceYears'];
+
+        for (const field of numberFields) {
+            const val = coerced[field];
+            if (val === null || val === undefined || String(val).trim() === '') {
+                coerced[field] = null;
+            } else {
+                const parsed = Number(val);
+                coerced[field] = isNaN(parsed) ? val : parsed; // leave bad values for Joi to reject
+            }
+        }
+
+        return coerced;
     }
 
     /**
@@ -436,22 +493,23 @@ class CandidateBulkService {
             linkedinProfileUrl: Joi.string()
                 .trim()
                 .uri({ scheme: ['http', 'https'] })
-                .pattern(/^https?:\/\/(www\.)?linkedin\.com\/in\/[\w-]+\/?$/)
+                .pattern(/^https?:\/\/(www\.)?linkedin\.com\/in\/[^/?#\s]+\/?$/)
                 .max(500)
                 .optional()
                 .allow(null, ''),
-
             notes: Joi.string()
                 .optional()
                 .allow(null, ''),
             vendorName: Joi.string()
                 .trim()
                 .optional()
+                .allow(null, '')
                 .min(2)
                 .max(100),
             referredBy: Joi.string()
                 .trim()
                 .optional()
+                .allow(null, '')
                 .min(2)
                 .max(100)
         }).custom((value, helpers) => {
