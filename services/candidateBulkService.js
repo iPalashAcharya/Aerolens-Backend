@@ -511,11 +511,6 @@ class CandidateBulkService {
                 .optional()
                 .allow(null, '')
                 .min(2)
-                .max(100),
-            referredBy: Joi.string()
-                .trim()
-                .optional()
-                .min(2)
                 .max(100)
         }).custom((value, helpers) => {
             if (value.expectedCTC && value.currentCTC && value.expectedCTC < value.currentCTC) {
