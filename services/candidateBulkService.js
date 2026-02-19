@@ -586,12 +586,14 @@ class CandidateBulkService {
                     data.jobRole,
                     client
                 );
+                console.log(transformed.jobProfileRequirementId);
                 // Remove the lookup fields, keep only the ID
                 delete transformed.clientName;
                 delete transformed.departmentName;
                 delete transformed.jobRole;
             } catch (error) {
-                throw new Error(`Job requirement not found for Client: '${data.clientName}', Department: '${data.departmentName}', Role: '${data.jobRole}'`);
+                console.log(error);
+                throw error;
             }
         } else {
             throw new Error('Client name, department name, and job role are all required');
