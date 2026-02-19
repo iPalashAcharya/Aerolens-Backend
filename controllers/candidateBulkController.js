@@ -80,13 +80,23 @@ class CandidateBulkController {
                 userAgent: req.get('user-agent')
             });
 
-            return ApiResponse.success(
-                res,
-                result,
-                'Bulk upload completed',
-                result.summary.failed > 0 ? 207 : 201 // 207 Multi-Status if partial success
-            );
+            const { inserted, failed } = result.summary;
 
+            let statusCode;
+            let message;
+
+            if (failed === 0) {
+                statusCode = 201;
+                message = 'Bulk upload completed successfully. All candidates were imported.';
+            } else if (inserted === 0) {
+                statusCode = 400;
+                message = 'Bulk upload failed. No candidates were imported.';
+            } else {
+                statusCode = 207;
+                message = `Bulk upload partially completed. ${inserted} candidates imported, ${failed} failed.`;
+            }
+
+            return ApiResponse.success(res, result, message, statusCode);
         } catch (error) {
             next(error);
         }
