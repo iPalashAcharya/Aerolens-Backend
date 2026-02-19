@@ -320,7 +320,8 @@ class CandidateBulkService {
             experienceYears: findValue(['experience_years', 'experience', 'exp', 'experienceyears']),
             linkedinProfileUrl: findValue(['linkedin_url', 'linkedin', 'linkedinprofileurl']),
             notes: findValue(['notes', 'comments', 'remarks']),
-            vendorName: findValue(['vendor_name', 'vendor', 'vendorname'])
+            vendorName: findValue(['vendor_name', 'vendor', 'vendorname']),
+            referredBy: findValue(['referred_by', 'referrer', 'referredby'])
         };
     }
 
@@ -444,6 +445,11 @@ class CandidateBulkService {
                 .optional()
                 .allow(null, ''),
             vendorName: Joi.string()
+                .trim()
+                .optional()
+                .min(2)
+                .max(100),
+            referredBy: Joi.string()
                 .trim()
                 .optional()
                 .min(2)
@@ -681,7 +687,8 @@ class CandidateBulkService {
             'experience_years',
             'linkedin_url',
             'notes',
-            'vendor_name'
+            'vendor_name',
+            'referred_by'
         ];
 
         const sampleData = [
@@ -701,7 +708,8 @@ class CandidateBulkService {
                 experience_years: 5.5,
                 linkedin_url: 'https://linkedin.com/in/johndoe',
                 notes: 'Strong React and Node.js skills',
-                vendor_name: 'Tech Recruiters Inc.'
+                vendor_name: 'Tech Recruiters Inc.',
+                referred_by: 'Jane Smith'
             }
         ];
 
