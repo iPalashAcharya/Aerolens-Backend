@@ -512,13 +512,6 @@ class CandidateBulkService {
                 .allow(null, '')
                 .min(2)
                 .max(100)
-        }).custom((value, helpers) => {
-            if (value.expectedCTC && value.currentCTC && value.expectedCTC < value.currentCTC) {
-                return helpers.error('custom.ctcRange');
-            }
-            return value;
-        }).messages({
-            'custom.ctcRange': 'Expected CTC should not be less than current CTC'
         });
 
         const { error, value } = bulkSchema.validate(data, {

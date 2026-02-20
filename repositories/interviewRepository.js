@@ -198,21 +198,19 @@ class InterviewRepository {
 
             const query = `
             SELECT
-                -- Interview
                 DATE(i.fromTimeUTC) AS interviewDate,
                 DATE_FORMAT(i.fromTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS interviewFromTime,
                 i.interviewerFeedback,
 
-                -- Candidate
+                jp.jobRole AS jobRole,
+
                 c.candidateId,
                 c.candidateName,
                 c.contactNumber AS candidatePhone,
                 c.email AS candidateEmail,
-                c.jobRole,
                 c.experienceYears,
                 c.noticePeriod,
 
-                -- Expected joining location as JSON
                 JSON_OBJECT(
                     'locationId', loc.locationId,
                     'city', loc.cityName,
@@ -220,17 +218,21 @@ class InterviewRepository {
                     'country', loc.country
                 ) AS expectedJoiningLocation,
 
-                -- Interviewer
                 interviewer.memberId AS interviewerId,
                 interviewer.memberName AS interviewerName,
 
-                -- Recruiter
                 recruiter.memberName AS recruiterName
 
             FROM interview i
 
             JOIN candidate c
                 ON i.candidateId = c.candidateId
+
+            LEFT JOIN jobProfileRequirement jpr
+                ON c.appliedForJobProfileId = jpr.jobProfileRequirementId
+
+            LEFT JOIN jobProfile jp
+                ON jpr.jobProfileId = jp.jobProfileId
 
             LEFT JOIN location loc
                 ON c.expectedLocation = loc.locationId
@@ -303,30 +305,49 @@ class InterviewRepository {
 
             // Get detailed interviews - USE UTC TIMESTAMPS
             const detailsQuery = `
-        SELECT
-            i.interviewerId,
-            c.candidateId,
-            c.candidateName,
-            c.jobRole AS role,
-            CONCAT('R', CAST(RANK() OVER (
-                PARTITION BY i.candidateId
-                ORDER BY i.fromTimeUTC ASC, i.interviewId ASC
-            ) AS CHAR)) AS round,
-            DATE_FORMAT(i.fromTimeUTC, '%d-%b') AS date,
-            i.result,
-            i.interviewerFeedback AS feedback,
-            recruiter.memberId AS recruiterId,
-            recruiter.memberName AS recruiterName
-        FROM interview i
-        LEFT JOIN candidate c ON i.candidateId = c.candidateId
-        LEFT JOIN member recruiter ON c.recruiterId = recruiter.memberId
-        WHERE i.fromTimeUTC >= ?
-            AND i.fromTimeUTC <= ?
-            AND i.deletedAt IS NULL
-            AND i.isActive = TRUE
-            ${interviewerId ? 'AND i.interviewerId = ?' : ''}
-        ORDER BY i.interviewerId, i.fromTimeUTC DESC;
-        `;
+                SELECT
+                    i.interviewerId,
+
+                    c.candidateId,
+                    c.candidateName,
+
+                    -- Job Role via Job Profile Requirement
+                    jp.jobRole AS role,
+
+                    CONCAT('R', CAST(RANK() OVER (
+                        PARTITION BY i.candidateId
+                        ORDER BY i.fromTimeUTC ASC, i.interviewId ASC
+                    ) AS CHAR)) AS round,
+
+                    DATE_FORMAT(i.fromTimeUTC, '%d-%b') AS date,
+                    i.result,
+                    i.interviewerFeedback AS feedback,
+
+                    recruiter.memberId AS recruiterId,
+                    recruiter.memberName AS recruiterName
+
+                FROM interview i
+
+                LEFT JOIN candidate c
+                    ON i.candidateId = c.candidateId
+
+                LEFT JOIN jobProfileRequirement jpr
+                    ON c.appliedForJobProfileId = jpr.jobProfileRequirementId
+
+                LEFT JOIN jobProfile jp
+                    ON jpr.jobProfileId = jp.jobProfileId
+
+                LEFT JOIN member recruiter
+                    ON c.recruiterId = recruiter.memberId
+
+                WHERE i.fromTimeUTC >= ?
+                    AND i.fromTimeUTC <= ?
+                    AND i.deletedAt IS NULL
+                    AND i.isActive = TRUE
+                    ${interviewerId ? 'AND i.interviewerId = ?' : ''}
+
+                ORDER BY i.interviewerId, i.fromTimeUTC DESC;
+                `;
 
             const [interviewDetails] = await connection.query(detailsQuery, params);
 
