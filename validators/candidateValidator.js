@@ -494,13 +494,6 @@ const candidateSchemas = {
                 'string.max': 'Referred by cannot exceed 150 characters',
                 'string.pattern.base': 'Referred by can only contain letters, spaces, periods, hyphens and apostrophes'
             }),
-    }).custom((value, helpers) => {
-        if (value.expectedCTC < value.currentCTC) {
-            return helpers.error('custom.ctcRange');
-        }
-        return value;
-    }).messages({
-        'custom.ctcRange': 'Expected CTC should not be less than current CTC'
     }),
 
     update: Joi.object({
@@ -714,20 +707,9 @@ const candidateSchemas = {
                 'string.pattern.base': 'Referred by can only contain letters, spaces, periods, hyphens and apostrophes'
             }),
 
-    }).min(1)
-        .custom((value, helpers) => {
-            // CTC validation if both are provided
-            if (value.currentCTC !== undefined && value.expectedCTC !== undefined) {
-                if (value.expectedCTC < value.currentCTC) {
-                    return helpers.error('custom.ctcRange');
-                }
-            }
-            return value;
-        })
-        .messages({
-            'object.min': 'At least one field must be provided for update',
-            'custom.ctcRange': 'Expected CTC should not be less than current CTC'
-        }),
+    }).messages({
+        'object.min': 'At least one field must be provided for update'
+    }),
 
     search: Joi.object({
         candidateName: Joi.string().trim().min(1).max(100).optional(),
