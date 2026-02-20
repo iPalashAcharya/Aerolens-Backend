@@ -194,7 +194,8 @@ class CandidateRepository {
             c.resumeOriginalName,
             c.resumeUploadDate,
             c.notes,
-            c.referredBy
+            c.referredBy,
+            c.createdAt AS dateOfEntry
 
         FROM candidate c
 
