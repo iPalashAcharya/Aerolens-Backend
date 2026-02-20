@@ -109,7 +109,7 @@ class CandidateRepository {
         const connection = client;
         console.log(candidateData);
         try {
-            const query = `INSERT INTO candidate(candidateName,contactNumber,email,recruiterId,jobRole,appliedForJobProfileId,expectedLocation,currentLocation,currentCTC,expectedCTC,noticePeriod,experienceYears,linkedinProfileUrl, resumeFilename, resumeOriginalName, resumeUploadDate,notes,statusId,vendorId,referredBy)
+            const query = `INSERT INTO candidate(candidateName,contactNumber,email,recruiterId,appliedForJobProfileId,expectedLocation,currentLocation,currentCTC,expectedCTC,noticePeriod,experienceYears,linkedinProfileUrl, resumeFilename, resumeOriginalName, resumeUploadDate,notes,statusId,vendorId,referredBy)
             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`
 
             const [result] = await connection.execute(query, [
@@ -117,7 +117,6 @@ class CandidateRepository {
                 candidateData.contactNumber ?? null,
                 candidateData.email ?? null,
                 candidateData.recruiterId,
-                candidateData.jobRole ?? null,
                 candidateData.jobProfileRequirementId ?? null,
                 candidateData.expectedLocation !== undefined ? candidateData.expectedLocation : null,
                 candidateData.currentLocation !== undefined ? candidateData.currentLocation : null,
@@ -497,7 +496,7 @@ class CandidateRepository {
             // Filter only allowed fields for security
             const allowedFields = [
                 'candidateName', 'contactNumber', 'email', 'recruiterId', 'vendorId',
-                'jobRole', 'appliedForJobProfileId', 'expectedLocation', 'currentLocation', 'currentCTC', 'expectedCTC', 'noticePeriod', 'experienceYears', 'linkedinProfileUrl', 'resume', 'notes', 'referredBy'
+                'appliedForJobProfileId', 'expectedLocation', 'currentLocation', 'currentCTC', 'expectedCTC', 'noticePeriod', 'experienceYears', 'linkedinProfileUrl', 'resume', 'notes', 'referredBy'
             ];
 
             const filteredData = {};
@@ -906,7 +905,7 @@ class CandidateRepository {
             }
 
             const placeholders = candidates.map(() =>
-                '(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                '(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
             ).join(', ');
 
             const query = `
@@ -915,7 +914,6 @@ class CandidateRepository {
                 contactNumber,
                 email,
                 recruiterId,
-                jobRole,
                 appliedForJobProfileId,
                 expectedLocation,
                 currentLocation,
@@ -940,7 +938,6 @@ class CandidateRepository {
                 c.contactNumber ?? null,
                 c.email ?? null,
                 c.recruiterId,
-                c.jobRole ?? null,
                 c.jobProfileRequirementId ?? null,  // important
                 c.expectedLocation ?? null,
                 c.currentLocation ?? null,

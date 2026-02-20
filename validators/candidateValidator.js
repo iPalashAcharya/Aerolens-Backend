@@ -158,9 +158,10 @@ class CandidateValidatorHelper {
             FROM jobProfileRequirement jpr
             INNER JOIN client c ON c.clientId = jpr.clientId
             INNER JOIN department d ON d.departmentId = jpr.departmentId
+            INNER JOIN jobProfile jp ON jpr.jobProfileId = jobProfile.jobProfileId
             WHERE LOWER(c.clientName) = LOWER(?)
             AND LOWER(d.departmentName) = LOWER(?)
-            AND LOWER(jpr.jobRole) = LOWER(?)
+            AND LOWER(jp.jobRole) = LOWER(?)
             AND jpr.statusId IN (
                 SELECT lookupKey FROM lookup 
                 WHERE tag = 'profileStatus' 
@@ -337,17 +338,6 @@ const candidateSchemas = {
                 'any.required': 'Recruiter ID is required',
                 'number.base': 'Recruiter ID must be a number',
                 'number.positive': 'Recruiter ID must be a positive number'
-            }),
-        jobRole: Joi.string()
-            .trim()
-            .min(2)
-            .max(100)
-            .optional()
-            .allow('')
-            .messages({
-                'string.empty': 'Job role is required',
-                'string.min': 'Job role must be at least 2 characters long',
-                'string.max': 'Job role cannot exceed 100 characters'
             }),
 
         jobProfileRequirementId: Joi.number()
@@ -567,15 +557,6 @@ const candidateSchemas = {
                 'number.positive': 'Recruiter ID must be a positive number'
             }),
 
-        jobRole: Joi.string()
-            .trim()
-            .min(2)
-            .max(100)
-            .optional()
-            .messages({
-                'string.min': 'Job role must be at least 2 characters long',
-                'string.max': 'Job role cannot exceed 100 characters'
-            }),
         jobProfileRequirementId: Joi.number()
             .integer()
             .positive()
