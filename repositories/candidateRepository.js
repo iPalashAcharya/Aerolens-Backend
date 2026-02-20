@@ -110,7 +110,7 @@ class CandidateRepository {
         console.log(candidateData);
         try {
             const query = `INSERT INTO candidate(candidateName,contactNumber,email,recruiterId,appliedForJobProfileId,expectedLocation,currentLocation,currentCTC,expectedCTC,noticePeriod,experienceYears,linkedinProfileUrl, resumeFilename, resumeOriginalName, resumeUploadDate,notes,statusId,vendorId,referredBy)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`
 
             const [result] = await connection.execute(query, [
                 candidateData.candidateName,
