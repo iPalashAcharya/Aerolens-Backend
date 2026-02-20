@@ -581,6 +581,7 @@ class CandidateBulkService {
                     data.jobRole,
                     client
                 );
+                console.log(transformed.jobProfileRequirementId);
                 // Remove the lookup fields, keep only the ID
                 delete transformed.clientName;
                 delete transformed.departmentName;
