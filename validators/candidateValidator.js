@@ -154,21 +154,21 @@ class CandidateValidatorHelper {
 
         try {
             const query = `
-            SELECT jpr.jobProfileRequirementId 
-            FROM jobProfileRequirement jpr
-            INNER JOIN client c ON c.clientId = jpr.clientId
-            INNER JOIN department d ON d.departmentId = jpr.departmentId
-            INNER JOIN jobProfile jp ON jpr.jobProfileId = jobProfile.jobProfileId
-            WHERE LOWER(c.clientName) = LOWER(?)
-            AND LOWER(d.departmentName) = LOWER(?)
-            AND LOWER(jp.jobRole) = LOWER(?)
-            AND jpr.statusId IN (
-                SELECT lookupKey FROM lookup 
-                WHERE tag = 'profileStatus' 
-                AND value IN ('Pending', 'In Progress')
-            )
-            LIMIT 1
-        `;
+                SELECT jpr.jobProfileRequirementId 
+                FROM jobProfileRequirement jpr
+                INNER JOIN client c ON c.clientId = jpr.clientId
+                INNER JOIN department d ON d.departmentId = jpr.departmentId
+                INNER JOIN jobProfile jp ON jpr.jobProfileId = jp.jobProfileId
+                WHERE LOWER(c.clientName) = LOWER(?)
+                AND LOWER(d.departmentName) = LOWER(?)
+                AND LOWER(jp.jobRole) = LOWER(?)
+                AND jpr.statusId IN (
+                    SELECT lookupKey FROM lookup 
+                    WHERE tag = 'profileStatus' 
+                    AND value IN ('Pending', 'In Progress')
+                )
+                LIMIT 1
+            `;
 
             const [rows] = await connection.execute(query, [
                 clientName.trim(),

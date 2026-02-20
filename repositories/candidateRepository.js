@@ -661,7 +661,8 @@ class CandidateRepository {
             c.resumeOriginalName,
             c.resumeUploadDate,
             c.notes,
-            c.referredBy
+            c.referredBy,
+            c.createdAt AS dateOfEntry
 
         FROM candidate c
 
@@ -681,6 +682,7 @@ class CandidateRepository {
             ON v.vendorId = c.vendorId
 
         WHERE c.isActive = TRUE
+        ORDER BY c.createdAt DESC
         `;
             const params = [];
             if (limit) {
