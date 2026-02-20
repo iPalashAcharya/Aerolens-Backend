@@ -241,7 +241,7 @@ class CandidateValidatorHelper {
         const connection = client || await this.db.getConnection();
 
         try {
-            let query = `SELECT candidateId FROM candidate WHERE email = ?`;
+            let query = `SELECT candidateId FROM candidate WHERE email = ? AND isActive = TRUE AND deletedAt IS NULL`;
             const params = [email];
 
             if (excludeCandidateId) {
@@ -260,7 +260,7 @@ class CandidateValidatorHelper {
         const connection = client || await this.db.getConnection();
 
         try {
-            let query = `SELECT candidateId FROM candidate WHERE contactNumber = ?`;
+            let query = `SELECT candidateId FROM candidate WHERE contactNumber = ? AND isActive = TRUE AND deletedAt IS NULL`;
             const params = [contactNumber];
 
             if (excludeCandidateId) {
