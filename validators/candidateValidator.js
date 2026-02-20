@@ -274,6 +274,35 @@ class CandidateValidatorHelper {
             if (!client) connection.release();
         }
     }
+
+    async getVendorIdByName(vendorName, client = null) {
+        const connection = client || await this.db.getConnection();
+        try {
+            const query = `SELECT vendorId FROM recruitmentVendor WHERE LOWER(vendorName) = LOWER(?)`;
+            const [rows] = await connection.execute(query, [vendorName.trim()]);
+
+            if (rows.length === 0) {
+                throw new AppError(
+                    `Invalid vendor name: '${vendorName}'. Vendor does not exist.`,
+                    400,
+                    'INVALID_VENDOR_NAME'
+                );
+            }
+            return rows[0].vendorId;
+        } catch (error) {
+            if (error instanceof AppError) {
+                throw error;
+            }
+            throw new AppError(
+                `Database error while validating vendor name: ${error.message}`,
+                500,
+                'DATABASE_ERROR'
+            );
+
+        } finally {
+            if (!client) connection.release();
+        }
+    }
 }
 
 // Schema definitions

@@ -554,7 +554,9 @@ class CandidateBulkService {
 
         // Default status to 'pending'
         transformed.statusId = await this.validatorHelper.getStatusIdByName('pending', client);
-
+        if (data.vendorName) {
+            transformed.vendorId = await this.validatorHelper.getVendorIdByName(data.vendorName, client);
+        }
         // Transform recruiter name to ID
         if (data.recruiterName) {
             try {
@@ -564,7 +566,7 @@ class CandidateBulkService {
                 );
                 delete transformed.recruiterName;
             } catch (error) {
-                throw new Error(`Recruiter '${data.recruiterName}' not found`);
+                throw error;
             }
         } else {
             throw new Error('Recruiter name is required');
@@ -584,7 +586,7 @@ class CandidateBulkService {
                 delete transformed.departmentName;
                 delete transformed.jobRole;
             } catch (error) {
-                throw new Error(`Job requirement not found for Client: '${data.clientName}', Department: '${data.departmentName}', Role: '${data.jobRole}'`);
+                throw error;
             }
         } else {
             throw new Error('Client name, department name, and job role are all required');
