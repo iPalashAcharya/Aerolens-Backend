@@ -198,6 +198,7 @@ class InterviewRepository {
 
             const query = `
             SELECT
+                i.interviewId,
                 DATE(i.fromTimeUTC) AS interviewDate,
                 DATE_FORMAT(i.fromTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS interviewFromTime,
                 i.interviewerFeedback,
@@ -319,7 +320,7 @@ class InterviewRepository {
                         ORDER BY i.fromTimeUTC ASC, i.interviewId ASC
                     ) AS CHAR)) AS round,
 
-                    DATE_FORMAT(i.fromTimeUTC, '%d-%b') AS date,
+                    DATE(fromTimeUTC) AS date,
                     i.result,
                     i.interviewerFeedback AS feedback,
 
