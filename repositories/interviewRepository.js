@@ -277,30 +277,30 @@ class InterviewRepository {
 
             // Get interviewer statistics - USE UTC TIMESTAMPS
             const statsQuery = `
-        SELECT
-            m.memberId AS interviewerId,
-            m.memberName AS interviewerName,
-            COUNT(i.interviewId) AS totalInterviews,
-            COUNT(i.interviewId) AS interviewsConducted,
-            CAST(COUNT(i.interviewId) AS UNSIGNED) AS totalInterviews,
-            CAST(SUM(CASE WHEN i.result = 'pending' THEN 1 ELSE 0 END) AS UNSIGNED) AS pending,
-            CAST(SUM(CASE WHEN i.result = 'selected' THEN 1 ELSE 0 END) AS UNSIGNED) AS selected,
-            CAST(SUM(CASE WHEN i.result = 'rejected' THEN 1 ELSE 0 END) AS UNSIGNED) AS rejected,
-            CAST(SUM(CASE WHEN i.result = 'cancelled' THEN 1 ELSE 0 END) AS UNSIGNED) AS cancelled,
-            CAST(0 AS UNSIGNED) AS cancelledByCandidates
-        FROM member m
-        LEFT JOIN interview i
-            ON i.interviewerId = m.memberId
-            AND i.fromTimeUTC >= ?
-            AND i.fromTimeUTC <= ?
-            AND i.deletedAt IS NULL
-            AND i.isActive = TRUE
-        WHERE m.isActive = TRUE
-            ${interviewerFilter}
-        GROUP BY m.memberId, m.memberName
-        HAVING totalInterviews > 0
-        ORDER BY m.memberName;
-        `;
+            SELECT
+                m.memberId AS interviewerId,
+                m.memberName AS interviewerName,
+                COUNT(i.interviewId) AS totalInterviews,
+                COUNT(i.interviewId) AS interviewsConducted,
+                CAST(COUNT(i.interviewId) AS UNSIGNED) AS totalInterviews,
+                CAST(SUM(CASE WHEN i.result = 'pending' THEN 1 ELSE 0 END) AS UNSIGNED) AS pending,
+                CAST(SUM(CASE WHEN i.result = 'selected' THEN 1 ELSE 0 END) AS UNSIGNED) AS selected,
+                CAST(SUM(CASE WHEN i.result = 'rejected' THEN 1 ELSE 0 END) AS UNSIGNED) AS rejected,
+                CAST(SUM(CASE WHEN i.result = 'cancelled' THEN 1 ELSE 0 END) AS UNSIGNED) AS cancelled,
+                CAST(0 AS UNSIGNED) AS cancelledByCandidates
+            FROM member m
+            LEFT JOIN interview i
+                ON i.interviewerId = m.memberId
+                AND i.fromTimeUTC >= ?
+                AND i.fromTimeUTC <= ?
+                AND i.deletedAt IS NULL
+                AND i.isActive = TRUE
+            WHERE m.isActive = TRUE
+                ${interviewerFilter}
+            GROUP BY m.memberId, m.memberName
+            HAVING totalInterviews > 0
+            ORDER BY m.memberName;
+            `;
 
             const [interviewerStats] = await connection.query(statsQuery, params);
 
@@ -320,8 +320,7 @@ class InterviewRepository {
                         ORDER BY i.fromTimeUTC ASC, i.interviewId ASC
                     ) AS CHAR)) AS round,
 
-                    DATE(fromTimeUTC) AS date,
-                    DATE_FORMAT(i.fromTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS interviewFromTime,
+                    DATE_FORMAT(i.fromTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS date,
                     i.result,
                     i.interviewerFeedback AS feedback,
 
