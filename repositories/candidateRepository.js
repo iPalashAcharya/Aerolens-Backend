@@ -663,7 +663,7 @@ class CandidateRepository {
             c.resumeUploadDate,
             c.notes,
             c.referredBy,
-            c.createdAt AS dateOfEntry
+            DATE_FORMAT(c.createdAt, '%Y-%m-%dT%H:%i:%sZ') AS dateOfEntry
 
         FROM candidate c
 

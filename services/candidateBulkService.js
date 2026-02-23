@@ -772,6 +772,166 @@ class CandidateBulkService {
             sampleData
         };
     }
+    async processBulkVendorPatch(file) {
+        const startTime = Date.now();
+        const stats = { total: 0, patched: 0, failed: 0, skipped: 0 };
+        const failedRows = [];
+
+        try {
+            this._validateFile(file);
+
+            const ext = path.extname(file.originalname).toLowerCase();
+            if (!['.xlsx', '.xls', '.csv'].includes(ext)) {
+                throw new AppError('Unsupported file format', 400, 'INVALID_FILE_FORMAT');
+            }
+
+            // Extract rows from file
+            const rows = ext === '.csv'
+                ? await this._extractRowsFromCSV(file.path)
+                : await this._extractRowsFromExcel(file.path);
+
+            await this._cleanupFile(file.path);
+
+            const client = await this.db.getConnection();
+            try {
+                await client.beginTransaction();
+
+                for (const { raw, rowNumber } of rows) {
+                    const mapped = this._mapRowToSchema(raw);
+                    stats.total++;
+
+                    // Skip rows with no vendor
+                    if (!mapped.vendorName) {
+                        stats.skipped++;
+                        continue;
+                    }
+
+                    // Need at least email or contact to identify the candidate
+                    if (!mapped.email && !mapped.contactNumber) {
+                        failedRows.push({ row: rowNumber, error: 'No email or contact number to identify candidate' });
+                        stats.failed++;
+                        continue;
+                    }
+
+                    try {
+                        // Find existing candidate
+                        const candidateId = await this._findCandidateByEmailOrContact(
+                            mapped.email,
+                            mapped.contactNumber,
+                            client
+                        );
+
+                        if (!candidateId) {
+                            failedRows.push({ row: rowNumber, error: `Candidate not found (email: ${mapped.email}, contact: ${mapped.contactNumber})` });
+                            stats.failed++;
+                            continue;
+                        }
+
+                        // Resolve vendor name to ID
+                        const vendorId = await this.validatorHelper.getVendorIdByName(mapped.vendorName, client);
+
+                        // Only update if vendorId is currently null (safe — won't overwrite existing data)
+                        await client.execute(
+                            `UPDATE candidate SET vendorId = ? WHERE candidateId = ? AND vendorId IS NULL`,
+                            [vendorId, candidateId]
+                        );
+
+                        stats.patched++;
+                    } catch (err) {
+                        failedRows.push({ row: rowNumber, error: err.message });
+                        stats.failed++;
+                    }
+                }
+
+                await client.commit();
+            } catch (err) {
+                await client.rollback();
+                throw err;
+            } finally {
+                client.release();
+            }
+
+            const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+            return {
+                summary: { ...stats, processingTime: `${duration}s` },
+                failedRows
+            };
+
+        } catch (error) {
+            if (file?.path) await this._cleanupFile(file.path);
+            if (error instanceof AppError) throw error;
+            throw new AppError('Vendor patch failed', 500, 'VENDOR_PATCH_ERROR', { originalError: error.message });
+        }
+    }
+
+    async _findCandidateByEmailOrContact(email, contactNumber, client) {
+        if (email) {
+            const [rows] = await client.execute(
+                `SELECT candidateId FROM candidate WHERE email = ? AND isActive = TRUE AND deletedAt IS NULL`,
+                [email]
+            );
+            if (rows.length > 0) return rows[0].candidateId;
+        }
+
+        if (contactNumber) {
+            const [rows] = await client.execute(
+                `SELECT candidateId FROM candidate WHERE contactNumber = ? AND isActive = TRUE AND deletedAt IS NULL`,
+                [contactNumber]
+            );
+            if (rows.length > 0) return rows[0].candidateId;
+        }
+
+        return null;
+    }
+
+    async _extractRowsFromExcel(filePath) {
+        const rows = [];
+        const workbook = new ExcelJS.stream.xlsx.WorkbookReader(filePath, {
+            sharedStrings: 'cache', hyperlinks: 'ignore', styles: 'ignore'
+        });
+
+        let headers = [];
+        let rowNumber = 0;
+
+        for await (const worksheet of workbook) {
+            for await (const row of worksheet) {
+                rowNumber++;
+                if (rowNumber === 1) {
+                    headers = row.values.slice(1).map(h =>
+                        String(h || '').trim().toLowerCase().replace(/\s+/g, '_')
+                    );
+                    continue;
+                }
+                const raw = {};
+                const values = row.values.slice(1);
+                headers.forEach((header, idx) => {
+                    if (header) {
+                        const val = values[idx];
+                        raw[header] = val != null ? String(val).trim() : null;
+                    }
+                });
+                rows.push({ raw, rowNumber });
+            }
+        }
+        return rows;
+    }
+
+    async _extractRowsFromCSV(filePath) {
+        const rows = [];
+        return new Promise((resolve, reject) => {
+            let rowNumber = 1;
+            fs.createReadStream(filePath, { encoding: 'utf8' })
+                .pipe(csv({
+                    mapHeaders: ({ header }) => header.trim().toLowerCase().replace(/\s+/g, '_')
+                }))
+                .on('data', (raw) => {
+                    rowNumber++;
+                    rows.push({ raw, rowNumber });
+                })
+                .on('end', () => resolve(rows))
+                .on('error', reject);
+        });
+    }
 }
 
 module.exports = CandidateBulkService;

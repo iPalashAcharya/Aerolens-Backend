@@ -321,6 +321,7 @@ class InterviewRepository {
                     ) AS CHAR)) AS round,
 
                     DATE(fromTimeUTC) AS date,
+                    DATE_FORMAT(i.fromTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS interviewFromTime,
                     i.result,
                     i.interviewerFeedback AS feedback,
 
@@ -364,6 +365,7 @@ class InterviewRepository {
                     role: interview.role,
                     round: interview.round,
                     date: interview.date,
+                    interviewFromTime: interview.interviewFromTime,
                     result: interview.result,
                     feedback: interview.feedback,
                     recruiterId: interview.recruiterId,
