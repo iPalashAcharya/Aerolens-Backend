@@ -332,6 +332,23 @@ const interviewSchemas = {
                 'any.required': 'Timezone is required'
             })
     }),
+    dailyInterviewerCapacityQuery: Joi.object({
+        date: Joi.string()
+            .pattern(/^\d{4}-\d{2}-\d{2}$/)
+            .required()
+            .messages({
+                'string.pattern.base': 'startDate must be in YYYY-MM-DD format',
+                'any.required': 'startDate is required'
+            }),
+        timezone: Joi.string()
+            .trim()
+            .pattern(/^[A-Za-z_]+\/[A-Za-z_]+$/)
+            .required()
+            .messages({
+                'string.pattern.base': 'Timezone must be a valid IANA timezone (e.g. Asia/Kolkata)',
+                'any.required': 'Timezone is required'
+            })
+    }),
     trackerQuery: Joi.object({
         filter: Joi.string()
             .valid('today', 'past7days', 'custom')
@@ -566,6 +583,24 @@ class InterviewValidator {
             stripUnknown: true
         });
 
+        if (error) {
+            throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', {
+                validationErrors: error.details.map(detail => ({
+                    field: detail.path[0],
+                    message: detail.message
+                }))
+            });
+        }
+
+        req.validatedQuery = value;
+        next();
+    }
+
+    static validateInterviewerDailyQuery(req, res, next) {
+        const { value, error } = interviewSchemas.dailyInterviewerCapacityQuery.validate(req.query, {
+            abortEarly: false,
+            stripUnknown: true
+        }); 
         if (error) {
             throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', {
                 validationErrors: error.details.map(detail => ({
