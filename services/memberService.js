@@ -1,10 +1,50 @@
 const AppError = require('../utils/appError');
 const auditLogService = require('./auditLogService');
+const cityTz = require("city-timezones");
 
 class MemberService {
     constructor(memberRepository, db) {
         this.db = db;
         this.memberRepository = memberRepository;
+    }
+
+    async updateTimezoneForMember(member, client) {
+        try {
+            // If no location → timezone stays null
+            if (!member.locationId) {
+                return null;
+            }
+
+            // Fetch city + country from location table
+            const location = await this.memberRepository.getLocationById(member.locationId, client);
+
+            if (!location || !location.city || !location.country) {
+                return null;
+            }
+
+            const { city, country } = location;
+
+            // Lookup timezone using city-timezones
+            const matches = cityTz.findFromCityStateProvince(city);
+
+            let zone = null;
+
+            if (matches && matches.length > 0) {
+                // Ensure same country
+                const match = matches.find(m => m.country === country)
+                    || matches[0];
+
+                zone = match.timezone || null;
+            }
+
+            // Update DB
+            await this.memberRepository.updateTimezone(member.memberId, zone, client);
+            return zone;
+
+        } catch (err) {
+            console.error("Timezone calculation failed:", err);
+            return null; // fail silently but safe
+        }
     }
 
     async getMemberFormData() {
@@ -168,6 +208,11 @@ class MemberService {
                     updateData,
                     client
                 );
+            }
+            // If locationId changed → recalculate timezone
+            if (updateData.locationId !== undefined && updateData.locationId !== null) {
+                const member = await this.memberRepository.findMemberById(memberId, client);
+                await this.updateTimezoneForMember(member, client);
             }
 
             if (auditContext) {
