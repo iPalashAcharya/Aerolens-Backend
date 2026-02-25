@@ -12,7 +12,6 @@ class MemberService {
         try {
             // If no location → timezone stays null
             if (!member.locationId) {
-                await this.memberRepository.updateTimezone(member.memberId, null, client);
                 return null;
             }
 
@@ -20,7 +19,6 @@ class MemberService {
             const location = await this.memberRepository.getLocationById(member.locationId, client);
 
             if (!location || !location.city || !location.country) {
-                await this.memberRepository.updateTimezone(member.memberId, null, client);
                 return null;
             }
 

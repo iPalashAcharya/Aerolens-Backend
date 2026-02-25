@@ -91,7 +91,7 @@ class MemberRepository {
         try {
             const [rows] = await connection.execute(
                 `SELECT m.memberId, m.memberName, m.memberContact, m.email, m.password, l.value AS designation,
-                        m.isRecruiter, m.isActive, m.lastLogin, m.createdAt, m.updatedAt, m.locationId, m.memberTimezone
+                        m.isRecruiter, m.isActive, m.lastLogin, m.createdAt, m.updatedAt
                  FROM member m INNER JOIN lookup l
                  ON m.designation = l.lookupKey
                  WHERE m.memberId = ? AND m.isActive=TRUE`,
@@ -416,7 +416,7 @@ class MemberRepository {
         try {
             const [rows] = await connection.execute(
                 `SELECT memberId, memberName, memberContact, email, password, designation,
-                        isRecruiter, isActive, lastLogin, createdAt, updatedAt, locationId, memberTimezone
+                        isRecruiter, isActive, lastLogin, createdAt, updatedAt
                  FROM member 
                  WHERE email = ?`,
                 [email]
