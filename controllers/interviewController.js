@@ -132,6 +132,23 @@ class InterviewController {
         );
     });
 
+    getInterviewerDailyCapacity = catchAsync(async (req, res) => {
+        const { date, timezone } = req.validatedQuery;
+        const interviewerId = parseInt(req.params.interviewerId);
+
+        const data = await this.interviewService.getInterviewerDailyCapacity(
+            interviewerId,
+            date,
+            timezone
+        );
+
+        return ApiResponse.success(
+            res,
+            data,
+            "Interviewer capacity data retrieved successfully"
+        );
+    });
+
     createInterview = catchAsync(async (req, res) => {
         const interview = await this.interviewService.createInterview(
             parseInt(req.params.candidateId),

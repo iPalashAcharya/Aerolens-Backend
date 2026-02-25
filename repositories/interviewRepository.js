@@ -916,6 +916,52 @@ class InterviewRepository {
         }
     }
 
+    async getInterviewerDailyStatsUTC(interviewerId, startUTC, endUTC, client) {
+        const connection = client;
+
+        try {
+            // 1. Get interviewer capacity
+            const [cap] = await connection.execute(
+                `SELECT interviewerCapacity 
+                FROM member 
+                WHERE memberId = ?`,
+                [interviewerId]
+            );
+
+            // 2. Count interviews in the UTC range
+            const [count] = await connection.execute(
+                `SELECT COUNT(*) AS count
+                FROM interview
+                WHERE interviewerId = ?
+                AND deletedAt IS NULL
+                AND isActive = TRUE
+                AND fromTimeUTC >= ?
+                AND fromTimeUTC < ?`,
+                [interviewerId, startUTC, endUTC]
+            );
+
+            // 3. Get scheduled time stamps
+            const [times] = await connection.execute(
+                `SELECT fromTimeUTC
+                FROM interview
+                WHERE interviewerId = ?
+                AND deletedAt IS NULL
+                AND isActive = TRUE
+                AND fromTimeUTC >= ?
+                AND fromTimeUTC < ?`,
+                [interviewerId, startUTC, endUTC]
+            );
+
+            return {
+                capacity: cap[0]?.interviewerCapacity ?? 0,
+                scheduledCount: count[0]?.count ?? 0,
+                scheduledTimesUTC: times.map(t => t.fromTimeUTC)
+            };
+        } catch (error) {
+            this._handleDatabaseError(error, 'getInterviewerDailyStatsUTC');
+        }
+    }
+
     _handleDatabaseError(error, operation) {
         if (error.code === 'ER_DUP_ENTRY') {
             if (error.message.includes('uq_active_interviewer_slot')) {

@@ -588,6 +588,32 @@ class InterviewService {
         }
     }*/
 
+    async getInterviewerDailyCapacity(interviewerId, date, userTimezone) {
+        const client = await this.db.getConnection();
+
+        try {
+            const { startUTC, endUTC } =
+                DateConverter.getUTCRangeForUserDate(date, userTimezone);
+
+            const stats = await this.interviewRepository.getInterviewerDailyStatsUTC(
+                interviewerId,
+                startUTC,
+                endUTC,
+                client
+            );
+
+            return {
+                interviewerId,
+                capacity: stats.capacity,
+                scheduledCount: stats.scheduledCount,
+                scheduledTimesUTC: stats.scheduledTimesUTC,
+                isFull: stats.scheduledCount >= stats.capacity
+            };
+        } finally {
+            client.release();
+        }
+    }
+
     async createInterview(candidateId, interviewData, auditContext) {
         const client = await this.db.getConnection();
         try {
