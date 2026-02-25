@@ -593,7 +593,7 @@ class InterviewService {
 
         try {
             const { startUTC, endUTC } =
-                DateConverter.getUTCRangeForUserDate(date, userTimezone);
+                DateConverter.getUTCRangeFromLocalDates(date, date, userTimezone);
 
             const stats = await this.interviewRepository.getInterviewerDailyStatsUTC(
                 interviewerId,

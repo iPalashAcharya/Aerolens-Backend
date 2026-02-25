@@ -942,7 +942,7 @@ class InterviewRepository {
 
             // 3. Get scheduled time stamps
             const [times] = await connection.execute(
-                `SELECT fromTimeUTC
+                `SELECT DATE_FORMAT(fromTimeUTC,'%Y-%m-%dT%H:%i:%sZ') AS fromTimeUTC
                 FROM interview
                 WHERE interviewerId = ?
                 AND deletedAt IS NULL
