@@ -1,8 +1,12 @@
-const db = require("../db");
-const MemberRepository = require("../repositories/memberRepository");
-const MemberService = require("../services/memberService");
+const fetchSecrets = require("../config/secrets");
 
 (async () => {
+    await fetchSecrets();
+
+    const db = require("../db");
+    const MemberRepository = require("../repositories/memberRepository");
+    const MemberService = require("../services/memberService");
+
     const repo = new MemberRepository();
     const service = new MemberService(repo, db);
 
