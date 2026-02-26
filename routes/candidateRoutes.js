@@ -170,4 +170,11 @@ router.get(
     candidateBulkController.downloadTemplate
 );
 
+router.post(
+    '/bulk-upload/patch-vendors',
+    authenticate,
+    candidateBulkController.upload.single('file'),
+    candidateBulkController.patchVendors
+);
+
 module.exports = router;

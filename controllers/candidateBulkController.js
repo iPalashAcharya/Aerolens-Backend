@@ -170,6 +170,19 @@ class CandidateBulkController {
             'Upload history retrieved'
         );
     });
+
+    patchVendors = catchAsync(async (req, res, next) => {
+        if (!req.file) throw new AppError('No file uploaded', 400, 'NO_FILE_UPLOADED');
+
+        const result = await this.candidateBulkService.processBulkVendorPatch(req.file);
+        const { patched, failed } = result.summary;
+
+        const message = failed === 0
+            ? `Vendor patch complete. ${patched} records updated.`
+            : `Vendor patch done. ${patched} updated, ${failed} failed.`;
+
+        return ApiResponse.success(res, result, message, 200);
+    });
 }
 
 module.exports = CandidateBulkController;

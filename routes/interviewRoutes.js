@@ -20,6 +20,15 @@ router.get('/',
     interviewController.getAll
 );
 
+router.get(
+  '/capacity/interviewer-daily/:interviewerId',
+  InterviewValidator.validateInterviewerDailyQuery,
+  interviewController.getInterviewerDailyCapacity
+);
+// router.get('/capacity/interviewer-daily/:interviewerId', (req, res) => {
+//     res.json({ hit: true, params: req.params, query: req.query });
+// });
+
 router.get('/create-data',
     interviewController.getCreateData
 );
@@ -32,11 +41,6 @@ router.get('/:interviewId/finalize-data',
 router.get('/candidate/:candidateId',
     InterviewValidator.validateParams,
     interviewController.getInterviewsByCandidateId
-);
-
-router.get('/:interviewId',
-    InterviewValidator.validateParams,
-    interviewController.getById
 );
 
 router.get('/report/tracker',
@@ -65,6 +69,7 @@ router.get('/report/interviewer-workload',
     interviewController.getInterviewerWorkloadReport
 );
 
+
 router.post('/:candidateId',
     InterviewValidator.validateParams,
     InterviewValidator.validateCreate,
@@ -92,6 +97,11 @@ router.put('/:interviewId/finalize',
 router.delete('/:interviewId',
     InterviewValidator.validateParams,
     interviewController.deleteInterview
+);
+
+router.get('/:interviewId',
+    InterviewValidator.validateParams,
+    interviewController.getById
 );
 
 module.exports = router;

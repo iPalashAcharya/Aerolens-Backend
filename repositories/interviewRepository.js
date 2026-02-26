@@ -198,6 +198,7 @@ class InterviewRepository {
 
             const query = `
             SELECT
+                i.interviewId,
                 DATE(i.fromTimeUTC) AS interviewDate,
                 DATE_FORMAT(i.fromTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS interviewFromTime,
                 i.interviewerFeedback,
@@ -276,30 +277,30 @@ class InterviewRepository {
 
             // Get interviewer statistics - USE UTC TIMESTAMPS
             const statsQuery = `
-        SELECT
-            m.memberId AS interviewerId,
-            m.memberName AS interviewerName,
-            COUNT(i.interviewId) AS totalInterviews,
-            COUNT(i.interviewId) AS interviewsConducted,
-            CAST(COUNT(i.interviewId) AS UNSIGNED) AS totalInterviews,
-            CAST(SUM(CASE WHEN i.result = 'pending' THEN 1 ELSE 0 END) AS UNSIGNED) AS pending,
-            CAST(SUM(CASE WHEN i.result = 'selected' THEN 1 ELSE 0 END) AS UNSIGNED) AS selected,
-            CAST(SUM(CASE WHEN i.result = 'rejected' THEN 1 ELSE 0 END) AS UNSIGNED) AS rejected,
-            CAST(SUM(CASE WHEN i.result = 'cancelled' THEN 1 ELSE 0 END) AS UNSIGNED) AS cancelled,
-            CAST(0 AS UNSIGNED) AS cancelledByCandidates
-        FROM member m
-        LEFT JOIN interview i
-            ON i.interviewerId = m.memberId
-            AND i.fromTimeUTC >= ?
-            AND i.fromTimeUTC <= ?
-            AND i.deletedAt IS NULL
-            AND i.isActive = TRUE
-        WHERE m.isActive = TRUE
-            ${interviewerFilter}
-        GROUP BY m.memberId, m.memberName
-        HAVING totalInterviews > 0
-        ORDER BY m.memberName;
-        `;
+            SELECT
+                m.memberId AS interviewerId,
+                m.memberName AS interviewerName,
+                COUNT(i.interviewId) AS totalInterviews,
+                COUNT(i.interviewId) AS interviewsConducted,
+                CAST(COUNT(i.interviewId) AS UNSIGNED) AS totalInterviews,
+                CAST(SUM(CASE WHEN i.result = 'pending' THEN 1 ELSE 0 END) AS UNSIGNED) AS pending,
+                CAST(SUM(CASE WHEN i.result = 'selected' THEN 1 ELSE 0 END) AS UNSIGNED) AS selected,
+                CAST(SUM(CASE WHEN i.result = 'rejected' THEN 1 ELSE 0 END) AS UNSIGNED) AS rejected,
+                CAST(SUM(CASE WHEN i.result = 'cancelled' THEN 1 ELSE 0 END) AS UNSIGNED) AS cancelled,
+                CAST(0 AS UNSIGNED) AS cancelledByCandidates
+            FROM member m
+            LEFT JOIN interview i
+                ON i.interviewerId = m.memberId
+                AND i.fromTimeUTC >= ?
+                AND i.fromTimeUTC <= ?
+                AND i.deletedAt IS NULL
+                AND i.isActive = TRUE
+            WHERE m.isActive = TRUE
+                ${interviewerFilter}
+            GROUP BY m.memberId, m.memberName
+            HAVING totalInterviews > 0
+            ORDER BY m.memberName;
+            `;
 
             const [interviewerStats] = await connection.query(statsQuery, params);
 
@@ -319,7 +320,7 @@ class InterviewRepository {
                         ORDER BY i.fromTimeUTC ASC, i.interviewId ASC
                     ) AS CHAR)) AS round,
 
-                    DATE_FORMAT(i.fromTimeUTC, '%d-%b') AS date,
+                    DATE_FORMAT(i.fromTimeUTC, '%Y-%m-%dT%H:%i:%sZ') AS date,
                     i.result,
                     i.interviewerFeedback AS feedback,
 
@@ -363,6 +364,7 @@ class InterviewRepository {
                     role: interview.role,
                     round: interview.round,
                     date: interview.date,
+                    interviewFromTime: interview.interviewFromTime,
                     result: interview.result,
                     feedback: interview.feedback,
                     recruiterId: interview.recruiterId,
@@ -911,6 +913,52 @@ class InterviewRepository {
         } catch (error) {
             if (error instanceof AppError) { throw error; }
             this._handleDatabaseError(error);
+        }
+    }
+
+    async getInterviewerDailyStatsUTC(interviewerId, startUTC, endUTC, client) {
+        const connection = client;
+
+        try {
+            // 1. Get interviewer capacity
+            const [cap] = await connection.execute(
+                `SELECT interviewerCapacity 
+                FROM member 
+                WHERE memberId = ?`,
+                [interviewerId]
+            );
+
+            // 2. Count interviews in the UTC range
+            const [count] = await connection.execute(
+                `SELECT COUNT(*) AS count
+                FROM interview
+                WHERE interviewerId = ?
+                AND deletedAt IS NULL
+                AND isActive = TRUE
+                AND fromTimeUTC >= ?
+                AND fromTimeUTC < ?`,
+                [interviewerId, startUTC, endUTC]
+            );
+
+            // 3. Get scheduled time stamps
+            const [times] = await connection.execute(
+                `SELECT DATE_FORMAT(fromTimeUTC,'%Y-%m-%dT%H:%i:%sZ') AS fromTimeUTC
+                FROM interview
+                WHERE interviewerId = ?
+                AND deletedAt IS NULL
+                AND isActive = TRUE
+                AND fromTimeUTC >= ?
+                AND fromTimeUTC < ?`,
+                [interviewerId, startUTC, endUTC]
+            );
+
+            return {
+                capacity: cap[0]?.interviewerCapacity ?? 0,
+                scheduledCount: count[0]?.count ?? 0,
+                scheduledTimesUTC: times.map(t => t.fromTimeUTC)
+            };
+        } catch (error) {
+            this._handleDatabaseError(error, 'getInterviewerDailyStatsUTC');
         }
     }
 

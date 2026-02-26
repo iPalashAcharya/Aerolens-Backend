@@ -121,6 +121,7 @@ class MemberRepository {
             m.lastLogin,
             m.createdAt,
             m.updatedAt,
+            m.locationId,
             loc.cityName,
             loc.country,
             c.clientId,
@@ -128,6 +129,7 @@ class MemberRepository {
             m.organisation,
             m.isInterviewer,
             m.interviewerCapacity,
+            m.memberTimezone,
             JSON_ARRAYAGG(
                 JSON_OBJECT(
                     'skillId', isk.skillId,
@@ -158,7 +160,7 @@ class MemberRepository {
         GROUP BY
             m.memberId, m.memberName, m.memberContact, m.email, l.value,
             m.isRecruiter, m.isActive, m.lastLogin, m.createdAt, m.updatedAt,
-            loc.cityName, loc.country, c.clientName,
+            loc.cityName, loc.country, c.clientName, m.locationId,
             m.organisation, m.isInterviewer, m.interviewerCapacity;`,
                 [memberId]
             );
@@ -356,6 +358,8 @@ class MemberRepository {
             m.lastLogin,
             m.createdAt,
             m.updatedAt,
+            m.locationId,
+            m.memberTimezone,
             loc.cityName AS city,
             loc.country,
             c.clientId,
@@ -434,6 +438,8 @@ class MemberRepository {
                 `SELECT m.memberId, m.memberName, m.memberContact, m.email, l.value AS designation, m.isRecruiter, m.isActive, m.lastLogin,
                 m.createdAt,
                 m.updatedAt,
+                m.locationId,
+                m.memberTimezone,
                 loc.cityName AS city,
                 loc.country,
                 c.clientName,
@@ -630,6 +636,36 @@ class MemberRepository {
             this._handleDatabaseError(error);
         }
     }
+
+    async updateTimezone(memberId, timezone, client) {
+        const connection = client;
+        try {
+            const [result] = await connection.execute(
+                `UPDATE member SET memberTimezone = ? WHERE memberId = ?`,
+                [timezone, memberId]
+            );
+            return result.affectedRows > 0;
+        } catch (err) {
+            throw new AppError(
+                "Database error while updating timezone",
+                500,
+                "DB_TIMEZONE_UPDATE_ERROR",
+                err.message
+            );
+        }
+    }
+
+    async getLocationById(locationId, client) {
+    const connection = client;
+
+    const [rows] = await connection.execute(
+        `SELECT cityName AS city, stateName AS state, country 
+         FROM location WHERE locationId = ?`,
+        [locationId]
+    );
+
+    return rows[0] || null;
+}
 }
 
 module.exports = MemberRepository;
