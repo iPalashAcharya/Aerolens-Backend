@@ -6,6 +6,6 @@ services:
     ports:
       - "3001:3000"
     environment:
-      - AWS_REGION=ap-south-1
-      - SECRET_NAME=dev/myapp/secrets
+      - AWS_REGION=${AWS_REGION}
+      - SECRET_NAME=${SECRET_NAME}
     restart: always

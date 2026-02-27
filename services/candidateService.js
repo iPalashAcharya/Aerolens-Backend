@@ -15,8 +15,14 @@ const s3Config = {
 const s3Client = new S3Client(s3Config);
 
 const S3_BUCKET_NAME = process.env.AWS_S3_BUCKET;
-const S3_RESUME_FOLDER = 'resumes/';
-
+let S3_RESUME_FOLDER;
+if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'staging') {
+    S3_RESUME_FOLDER = 'development/resumes/';
+} else if (process.env.NODE_ENV === 'production') {
+    S3_RESUME_FOLDER = 'resumes/';
+} else {
+    S3_RESUME_FOLDER = 'development/resumes/';
+}
 class CandidateService {
     constructor(candidateRepository, db) {
         this.candidateRepository = candidateRepository;
@@ -695,6 +701,7 @@ class CandidateService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'DELETE',
+                oldValues: candidate,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
                 timestamp: auditContext.timestamp
