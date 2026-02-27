@@ -13,7 +13,14 @@ const s3Config = {
 const s3Client = new S3Client(s3Config);
 
 const S3_BUCKET_NAME = process.env.AWS_S3_BUCKET;
-const S3_JD_FOLDER = 'jd-descriptions/';
+let S3_JD_FOLDER;
+if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'staging') {
+    S3_JD_FOLDER = 'development/jd/';
+} else if (process.env.NODE_ENV === 'production') {
+    S3_JD_FOLDER = 'jd-descriptions/';
+} else {
+    S3_JD_FOLDER = 'development/jd/';
+}
 
 class JobProfileService {
     constructor(jobProfileRepository, db) {

@@ -8,7 +8,7 @@ async function fetchSecrets() {
 
     console.log('Fetching secrets from AWS Secrets Manager...');
 
-    const secretName = process.env.SECRET_NAME || '/myapp/prod/env';
+    const secretName = process.env.SECRET_NAME || 'dev/myapp/secrets';
     const region = process.env.AWS_REGION || 'ap-south-1';
 
     const client = new SecretsManagerClient({ region });
