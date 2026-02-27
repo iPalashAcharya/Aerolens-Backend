@@ -288,6 +288,7 @@ class ClientService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'DELETE',
+                oldValues: client,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
                 timestamp: auditContext.timestamp

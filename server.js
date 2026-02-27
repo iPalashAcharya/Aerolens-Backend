@@ -2,10 +2,10 @@ require('dotenv').config();
 
 console.log("MODE:", process.env.MODE);
 
-if (process.env.MODE === 'LOCAL') {
+if (process.env.NODE_ENV === 'development') {
     console.log('Running in LOCAL mode - using .env file');
 } else {
-    console.log('Running in NON-LOCAL mode:', process.env.MODE);
+    console.log('Running in NON-LOCAL mode:', process.env.NODE_ENV);
 }
 
 const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client-secrets-manager');
@@ -20,8 +20,12 @@ async function fetchSecrets() {
     try {
         console.log('Fetching secrets from AWS Secrets Manager...');
 
-        const secretName = process.env.SECRET_NAME || '/myapp/prod/env';
+        const secretName = process.env.SECRET_NAME;
         const region = process.env.AWS_REGION || 'ap-south-1';
+        if (!secretName) {
+            console.log('✓ No SECRET_NAME provided — using local .env');
+            return;
+        }
 
         if (!secretName || !region) {
             throw new Error('SECRET_NAME and AWS_REGION must be set');
