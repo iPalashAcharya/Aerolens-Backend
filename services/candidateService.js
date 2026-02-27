@@ -701,6 +701,7 @@ class CandidateService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'DELETE',
+                oldValues: candidate,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
                 timestamp: auditContext.timestamp

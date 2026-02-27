@@ -687,6 +687,7 @@ class JobProfileService {
                 await auditLogService.logAction({
                     userId: auditContext.userId,
                     action: 'DELETE',
+                    oldValues: jobProfile,
                     ipAddress: auditContext.ipAddress,
                     userAgent: auditContext.userAgent,
                     timestamp: auditContext.timestamp
