@@ -8,8 +8,12 @@ async function fetchSecrets() {
 
     console.log('Fetching secrets from AWS Secrets Manager...');
 
-    const secretName = process.env.SECRET_NAME || 'dev/myapp/secrets';
+    const secretName = process.env.SECRET_NAME;
     const region = process.env.AWS_REGION || 'ap-south-1';
+    if (!secretName) {
+        console.log('✓ No SECRET_NAME provided — using local .env');
+        return;
+    }
 
     const client = new SecretsManagerClient({ region });
 
