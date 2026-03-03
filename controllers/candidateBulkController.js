@@ -9,9 +9,10 @@ const fs = require('fs');
  * Controller for bulk candidate uploads
  */
 class CandidateBulkController {
-    constructor(candidateBulkService, candidateService) {
+    constructor(candidateBulkService, candidateService, auditLogService) {
         this.candidateBulkService = candidateBulkService;
         this.candidateService = candidateService;
+        this.auditLogService = auditLogService;
         this._initializeUpload();
     }
 
@@ -79,6 +80,25 @@ class CandidateBulkController {
                 ipAddress: req.ip,
                 userAgent: req.get('user-agent')
             });
+            try {
+                await this.auditLogService.logAction({
+                    ...req.auditContext,
+                    action: 'BULK_CANDIDATE_UPLOAD',
+                    oldValues: null,
+                    newValues: {
+                        summary: result.summary,
+                        failedRows: result.failedRows,
+                        hasMoreErrors: result.hasMoreErrors
+                    },
+                    reason: {
+                        fileName: req.file.originalname,
+                        fileSize: req.file.size,
+                        mimeType: req.file.mimetype
+                    }
+                });
+            } catch (auditErr) {
+                console.error('Audit log failed for bulk upload:', auditErr);
+            }
 
             const { inserted, failed } = result.summary;
 

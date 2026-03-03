@@ -844,9 +844,20 @@ class InterviewRepository {
                 [interviewId]
             );
 
-            const [result] = await client.execute(
-                `UPDATE interview SET isActive=FALSE,deletedAt=NOW() WHERE interviewId=?`,
+            /*const [result] = await client.execute(
+                `UPDATE interview SET isActive=FALSE,deletedAt=NOW() WHERE interviewId=? AND isActive=TRUE`,
                 [interviewId]
+            );*/
+            const [result] = await client.execute(
+                `UPDATE interview 
+             SET 
+                isActive = CASE WHEN interviewId = ? THEN FALSE ELSE isActive END,
+                deletedAt = CASE WHEN interviewId = ? THEN NOW() ELSE deletedAt END,
+                updatedAt = NOW()
+             WHERE interviewId = ? 
+               AND isActive = TRUE 
+               AND deletedAt IS NULL`,
+                [interviewId, interviewId, interviewId]
             );
 
             return {

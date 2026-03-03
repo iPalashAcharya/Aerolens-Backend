@@ -96,6 +96,7 @@ class InterviewService {
         );
 
         if (candidateRows.length > 0) {
+            console.error('[OVERLAP DEBUG] Conflicting row found:', JSON.stringify(candidateRows[0]));
             throw new AppError(
                 'Candidate already has an overlapping interview',
                 409,
@@ -952,7 +953,7 @@ class InterviewService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'UPDATE',
-                previousValues: existingInterview,
+                oldValues: existingInterview,
                 newValues: finalizedInterview,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
@@ -986,7 +987,7 @@ class InterviewService {
         try {
             await client.beginTransaction();
 
-            const exists = await this.interviewRepository.exists(interviewId, client);
+            const exists = await this.interviewRepository.getById(interviewId, client);
             if (!exists) {
                 throw new AppError(
                     `Interview entry with ${interviewId} not found`,
@@ -1016,6 +1017,7 @@ class InterviewService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'DELETE',
+                oldValues: exists,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
                 timestamp: auditContext.timestamp

@@ -112,8 +112,8 @@ class ContactService {
         const connection = await this.db.getConnection();
         try {
             await connection.beginTransaction();
-            const client = await this.contactRepository.getById(contactId, connection);
-            if (!client) {
+            const contact = await this.contactRepository.getById(contactId, connection);
+            if (!contact) {
                 throw new AppError(
                     `Contact Person with ID ${contactId} not found`,
                     404,
@@ -136,6 +136,7 @@ class ContactService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'DELETE',
+                oldValues: contact,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
                 timestamp: auditContext.timestamp

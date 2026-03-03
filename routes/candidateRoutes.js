@@ -14,6 +14,7 @@ const db = require('../db');
 const auditContextMiddleware = require('../middleware/auditContext');
 const AppError = require('../utils/appError');
 const cleanupS3OnError = require('../middleware/s3CleanupMiddleware');
+const auditLogService = require('../services/auditLogService');
 const resumeBulkQueue = require('../queues/resumeBulkQueue');
 const candidateRepository = new CandidateRepository(db);
 const candidateService = new CandidateService(candidateRepository, db);
@@ -41,7 +42,8 @@ const candidateBulkService = new CandidateBulkService(
 // Initialize bulk controller
 const candidateBulkController = new CandidateBulkController(
     candidateBulkService,
-    candidateService
+    candidateService,
+    auditLogService
 );
 
 const router = express.Router();
