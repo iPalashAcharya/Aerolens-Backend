@@ -986,7 +986,7 @@ class InterviewService {
         try {
             await client.beginTransaction();
 
-            const exists = await this.interviewRepository.findById(interviewId, client);
+            const exists = await this.interviewRepository.getById(interviewId, client);
             if (!exists) {
                 throw new AppError(
                     `Interview entry with ${interviewId} not found`,
