@@ -96,6 +96,7 @@ class InterviewService {
         );
 
         if (candidateRows.length > 0) {
+            console.error('[OVERLAP DEBUG] Conflicting row found:', JSON.stringify(candidateRows[0]));
             throw new AppError(
                 'Candidate already has an overlapping interview',
                 409,
