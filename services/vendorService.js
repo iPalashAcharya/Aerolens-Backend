@@ -37,7 +37,7 @@ class VendorService {
 
             vendorData.vendorPhone = normalize(vendorData.vendorPhone);
             vendorData.vendorEmail = normalize(vendorData.vendorEmail);
-
+            vendorData.contactPersonName = normalize(vendorData.contactPersonName);
             const exists = await this.vendorRepository.exists(
                 vendorData.vendorPhone,
                 vendorData.vendorEmail,
@@ -141,7 +141,11 @@ class VendorService {
                 updateData.vendorEmail = normalize(updateData.vendorEmail);
             }
 
-            const allowedFields = ['vendorName', 'vendorPhone', 'vendorEmail'];
+            if ('contactPersonName' in updateData) {
+                updateData.contactPersonName = normalize(updateData.contactPersonName);
+            }
+
+            const allowedFields = ['vendorName', 'vendorPhone', 'vendorEmail', 'contactPersonName'];
 
             updateData = Object.fromEntries(
                 Object.entries(updateData).filter(([key]) =>
