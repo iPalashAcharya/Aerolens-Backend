@@ -88,20 +88,37 @@ class CandidateRepository {
     `);
 
         const vendorPromise = connection.query(`SELECT vendorId, vendorName FROM recruitmentVendor`);
+        const currencyPromise = connection.query(`
+            SELECT lookupKey AS currencyId, value AS currencyName
+            FROM lookup
+            WHERE tag = 'currency'
+            ORDER BY value
+        `);
 
-        const [recruiters, locations, jobProfiles, vendors] =
+        const compensationTypePromise = connection.query(`
+            SELECT lookupKey AS compensationTypeId, value AS compensationTypeName
+            FROM lookup
+            WHERE tag = 'compensationType'
+            ORDER BY value
+        `);
+
+        const [recruiters, locations, jobProfiles, vendors, currencies, compensationTypes] =
             await Promise.all([
                 recruitersPromise,
                 locationPromise,
                 jobProfilePromise,
-                vendorPromise
+                vendorPromise,
+                currencyPromise,
+                compensationTypePromise
             ]);
 
         return {
             recruiters: recruiters[0],
             locations: locations[0],
             jobProfiles: jobProfiles[0],
-            vendors: vendors[0]
+            vendors: vendors[0],
+            currencies: currencies[0],
+            compensationTypes: compensationTypes[0]
         };
     }
 
