@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const { Worker } = require('bullmq');
 const AdmZip = require('adm-zip');
 const pdfParse = require('pdf-parse');
@@ -47,8 +49,8 @@ function extractEmail(text) {
 async function uploadToS3(buffer, key, originalName) {
     const ext = path.extname(originalName).toLowerCase();
     const contentTypeMap = {
-        '.pdf':  'application/pdf',
-        '.doc':  'application/msword',
+        '.pdf': 'application/pdf',
+        '.doc': 'application/msword',
         '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     };
 
@@ -150,7 +152,7 @@ const resumeBulkWorker = new Worker(
 
                         } catch (err) {
                             console.error(`[Worker] DB/S3 error — file: ${fileName}`, err);
-                            try { await client.rollback(); } catch (_) {}
+                            try { await client.rollback(); } catch (_) { }
                             await incrementBatchCounters(batchId, { failed: 1, processed: 1 });
                         } finally {
                             client.release(); // always released
