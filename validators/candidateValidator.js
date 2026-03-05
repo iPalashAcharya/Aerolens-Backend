@@ -444,6 +444,64 @@ const candidateSchemas = {
                 'number.max': 'Expected CTC cannot exceed 1,00,00,000',
             }),
 
+        currentCTCAmount: Joi.number()
+            .precision(2)
+            .min(0)
+            .max(100000000)
+            .optional()
+            .allow(null)
+            .messages({
+                'number.base': 'Current CTC amount must be a number',
+                'number.min': 'Current CTC amount cannot be negative'
+            }),
+
+        currentCTCCurrencyId: Joi.number()
+            .integer()
+            .positive()
+            .optional()
+            .allow(null)
+            .messages({
+                'number.base': 'Current CTC currency must be a valid lookup ID'
+            }),
+
+        currentCTCTypeId: Joi.number()
+            .integer()
+            .positive()
+            .optional()
+            .allow(null)
+            .messages({
+                'number.base': 'Current CTC type must be a valid lookup ID'
+            }),
+
+        expectedCTCAmount: Joi.number()
+            .precision(2)
+            .min(0)
+            .max(100000000)
+            .optional()
+            .allow(null)
+            .messages({
+                'number.base': 'Expected CTC amount must be a number',
+                'number.min': 'Expected CTC amount cannot be negative'
+            }),
+
+        expectedCTCCurrencyId: Joi.number()
+            .integer()
+            .positive()
+            .optional()
+            .allow(null)
+            .messages({
+                'number.base': 'Expected CTC currency must be a valid lookup ID'
+            }),
+
+        expectedCTCTypeId: Joi.number()
+            .integer()
+            .positive()
+            .optional()
+            .allow(null)
+            .messages({
+                'number.base': 'Expected CTC type must be a valid lookup ID'
+            }),
+
         noticePeriod: Joi.number()
             .integer()
             .min(0)
@@ -656,6 +714,45 @@ const candidateSchemas = {
                 'number.min': 'Expected CTC cannot be negative',
                 'number.max': 'Expected CTC cannot exceed 1,00,00,000'
             }),
+
+        /* ---------------- NEW STRUCTURED CTC FIELDS ---------------- */
+        currentCTCAmount: Joi.number()
+            .precision(2)
+            .min(0)
+            .max(100000000)
+            .optional()
+            .allow(null),
+
+        currentCTCCurrencyId: Joi.number()
+            .integer()
+            .positive()
+            .optional()
+            .allow(null),
+
+        currentCTCTypeId: Joi.number()
+            .integer()
+            .positive()
+            .optional()
+            .allow(null),
+
+        expectedCTCAmount: Joi.number()
+            .precision(2)
+            .min(0)
+            .max(100000000)
+            .optional()
+            .allow(null),
+
+        expectedCTCCurrencyId: Joi.number()
+            .integer()
+            .positive()
+            .optional()
+            .allow(null),
+
+        expectedCTCTypeId: Joi.number()
+            .integer()
+            .positive()
+            .optional()
+            .allow(null),
 
         noticePeriod: Joi.number()
             .integer()
