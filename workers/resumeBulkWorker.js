@@ -21,7 +21,14 @@ const { redisConnection } = require('../queues/resumeBulkQueue');
 // ----------------------------------------
 
 const S3_BUCKET_NAME = process.env.AWS_S3_BUCKET;
-const S3_RESUME_FOLDER = 'resumes/';
+let S3_RESUME_FOLDER;
+if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'staging') {
+    S3_RESUME_FOLDER = 'development/resumes/';
+} else if (process.env.NODE_ENV === 'production') {
+    S3_RESUME_FOLDER = 'resumes/';
+} else {
+    S3_RESUME_FOLDER = 'development/resumes/';
+}
 
 const s3Client = new S3Client({ region: process.env.AWS_REGION });
 const candidateRepo = new CandidateRepository(db);
