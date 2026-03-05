@@ -85,6 +85,20 @@ class CandidateService {
         });
     }
 
+    normalizeCompensationFields(data) {
+        return {
+            ...data,
+
+            currentCTCAmount: data.currentCTCAmount ?? null,
+            currentCTCCurrencyId: data.currentCTCCurrencyId ?? null,
+            currentCTCTypeId: data.currentCTCTypeId ?? null,
+
+            expectedCTCAmount: data.expectedCTCAmount ?? null,
+            expectedCTCCurrencyId: data.expectedCTCCurrencyId ?? null,
+            expectedCTCTypeId: data.expectedCTCTypeId ?? null
+        };
+    }
+
     async deleteFromS3(s3Key) {
         try {
             const command = new DeleteObjectCommand({
@@ -546,7 +560,8 @@ class CandidateService {
                 );
             }
 
-            const candidate = await this.candidateRepository.create(candidateData, client);
+            const normalizedData = this.normalizeCompensationFields(candidateData);
+            const candidate = await this.candidateRepository.create(normalizedData, client);
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'CREATE',
@@ -651,7 +666,8 @@ class CandidateService {
                 }
             }
 
-            const candidate = await this.candidateRepository.update(candidateId, updateData, client);
+            const normalizedData = this.normalizeCompensationFields(updateData);
+            const candidate = await this.candidateRepository.update(candidateId, normalizedData, client);
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'UPDATE',

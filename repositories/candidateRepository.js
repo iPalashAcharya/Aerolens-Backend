@@ -88,20 +88,37 @@ class CandidateRepository {
     `);
 
         const vendorPromise = connection.query(`SELECT vendorId, vendorName FROM recruitmentVendor`);
+        const currencyPromise = connection.query(`
+            SELECT lookupKey AS currencyId, value AS currencyName
+            FROM lookup
+            WHERE tag = 'currency'
+            ORDER BY value
+        `);
 
-        const [recruiters, locations, jobProfiles, vendors] =
+        const compensationTypePromise = connection.query(`
+            SELECT lookupKey AS compensationTypeId, value AS compensationTypeName
+            FROM lookup
+            WHERE tag = 'compensationType'
+            ORDER BY value
+        `);
+
+        const [recruiters, locations, jobProfiles, vendors, currencies, compensationTypes] =
             await Promise.all([
                 recruitersPromise,
                 locationPromise,
                 jobProfilePromise,
-                vendorPromise
+                vendorPromise,
+                currencyPromise,
+                compensationTypePromise
             ]);
 
         return {
             recruiters: recruiters[0],
             locations: locations[0],
             jobProfiles: jobProfiles[0],
-            vendors: vendors[0]
+            vendors: vendors[0],
+            currencies: currencies[0],
+            compensationTypes: compensationTypes[0]
         };
     }
 
@@ -109,8 +126,8 @@ class CandidateRepository {
         const connection = client;
         console.log(candidateData);
         try {
-            const query = `INSERT INTO candidate(candidateName,contactNumber,email,recruiterId,appliedForJobProfileId,expectedLocation,currentLocation,currentCTC,expectedCTC,noticePeriod,experienceYears,linkedinProfileUrl, resumeFilename, resumeOriginalName, resumeUploadDate,notes,statusId,vendorId,referredBy)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`
+            const query = `INSERT INTO candidate(candidateName,contactNumber,email,recruiterId,appliedForJobProfileId,expectedLocation,currentLocation,currentCTC,expectedCTC, currentCTCAmount, currentCTCCurrencyId, currentCTCTypeId, expectedCTCAmount, expectedCTCCurrencyId, expectedCTCTypeId, noticePeriod, experienceYears, linkedinProfileUrl, resumeFilename, resumeOriginalName, resumeUploadDate, notes, statusId, vendorId, referredBy)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`
 
             const [result] = await connection.execute(query, [
                 candidateData.candidateName,
@@ -122,6 +139,12 @@ class CandidateRepository {
                 candidateData.currentLocation !== undefined ? candidateData.currentLocation : null,
                 candidateData.currentCTC ?? null,
                 candidateData.expectedCTC ?? null,
+                candidateData.currentCTCAmount ?? null,
+                candidateData.currentCTCCurrencyId ?? null,
+                candidateData.currentCTCTypeId ?? null,
+                candidateData.expectedCTCAmount ?? null,
+                candidateData.expectedCTCCurrencyId ?? null,
+                candidateData.expectedCTCTypeId ?? null,
                 candidateData.noticePeriod,
                 candidateData.experienceYears,
                 candidateData.linkedinProfileUrl !== undefined ? candidateData.linkedinProfileUrl : null,
@@ -186,6 +209,12 @@ class CandidateRepository {
 
             c.currentCTC,
             c.expectedCTC,
+            c.currentCTCAmount,
+            c.currentCTCCurrencyId,
+            c.currentCTCTypeId,
+            c.expectedCTCAmount,
+            c.expectedCTCCurrencyId,
+            c.expectedCTCTypeId,
             c.noticePeriod,
             c.experienceYears,
             c.linkedinProfileUrl,
@@ -576,7 +605,7 @@ class CandidateRepository {
             // Filter only allowed fields for security
             const allowedFields = [
                 'candidateName', 'contactNumber', 'email', 'recruiterId', 'vendorId',
-                'appliedForJobProfileId', 'expectedLocation', 'currentLocation', 'currentCTC', 'expectedCTC', 'noticePeriod', 'experienceYears', 'linkedinProfileUrl', 'resume', 'notes', 'referredBy'
+                'appliedForJobProfileId', 'expectedLocation', 'currentLocation', 'currentCTC', 'expectedCTC', 'currentCTCAmount', 'currentCTCCurrencyId', 'currentCTCTypeId', 'expectedCTCAmount', 'expectedCTCCurrencyId', 'expectedCTCTypeId', 'noticePeriod', 'experienceYears', 'linkedinProfileUrl', 'resume', 'notes', 'referredBy'
             ];
 
             const filteredData = {};
