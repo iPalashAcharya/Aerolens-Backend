@@ -15,9 +15,19 @@ const auditContextMiddleware = require('../middleware/auditContext');
 const AppError = require('../utils/appError');
 const cleanupS3OnError = require('../middleware/s3CleanupMiddleware');
 const auditLogService = require('../services/auditLogService');
+const { resumeBulkQueue } = require('../queues/resumeBulkQueue');
 const candidateRepository = new CandidateRepository(db);
 const candidateService = new CandidateService(candidateRepository, db);
 const candidateController = new CandidateController(candidateService);
+
+// === RESUME BULK UPLOAD (ZIP) ===
+const ResumeBulkUploadController = require('../controllers/resumeBulkUploadController');
+const resumeBulkUploadController = new ResumeBulkUploadController(resumeBulkQueue);
+
+const bulkZipMulter = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 50 * 1024 * 1024 } // 50MB ZIP
+});
 
 // Initialize validator helper
 const validatorHelper = new CandidateValidatorHelper(db);
@@ -177,6 +187,25 @@ router.post(
     authenticate,
     candidateBulkController.upload.single('file'),
     candidateBulkController.patchVendors
+);
+
+// ===============================
+// 📂 Resume Bulk ZIP Upload
+// ===============================
+
+// 1) Upload ZIP → returns batchId
+router.post(
+    '/resume-bulk-upload',
+    bulkZipMulter.single('zipFile'),
+    (req, res, next) =>
+        resumeBulkUploadController.uploadZip(req, res, next)
+);
+
+// 2) Poll status using batchId
+router.get(
+    '/resume-bulk-upload/:batchId/status',
+    (req, res, next) =>
+        resumeBulkUploadController.getBatchStatus(req, res, next)
 );
 
 module.exports = router;
