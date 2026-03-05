@@ -280,17 +280,96 @@ class CandidateRepository {
             }
 
             const query = `
-            SELECT c.candidateId, c.candidateName, c.contactNumber, c.email, c.recruiterName, 
-                   c.jobRole, loc.value AS preferredJobLocation, c.currentCTC, c.expectedCTC, c.noticePeriod, 
-                   c.experienceYears, c.linkedinProfileUrl, c.createdAt, c.updatedAt,
-                   stat.value AS statusName, c.resumeFilename, c.resumeOriginalName, c.resumeUploadDate
+            SELECT
+                c.candidateId,
+                c.candidateName,
+                c.contactNumber,
+                c.email,
+                c.recruiterId,
+                c.vendorId,
+                v.vendorName,
+
+                m.memberName AS recruiterName,
+                m.memberContact AS recruiterContact,
+                m.email AS recruiterEmail,
+
+                jpReq.jobProfileRequirementId,
+                jp.jobRole AS jobRole,
+
+                COALESCE(
+                    (
+                        SELECT JSON_OBJECT('country', loc.country, 'city', loc.cityName)
+                        FROM location loc
+                        WHERE loc.locationId = c.expectedLocation
+                    )
+                ) AS expectedLocation,
+
+                COALESCE(
+                    (
+                        SELECT JSON_OBJECT('country', loc.country, 'city', loc.cityName)
+                        FROM location loc
+                        WHERE loc.locationId = c.currentLocation
+                    )
+                ) AS currentLocation,
+
+                c.currentCTC,
+                c.expectedCTC,
+                c.noticePeriod,
+                c.experienceYears,
+                c.linkedinProfileUrl,
+                stat.value AS statusName,
+                c.resumeFilename,
+                c.resumeOriginalName,
+                c.resumeUploadDate,
+                c.notes,
+                c.referredBy,
+                c.createdAt AS dateOfEntry
+
             FROM candidate c
-            LEFT JOIN lookup stat ON c.statusId = stat.lookupKey and stat.tag = 'candidateStatus'
-            LEFT JOIN lookup loc ON c.preferredJobLocation = loc.lookupKey and loc.tag = 'location'
-            WHERE c.email = ? AND c.isActive = TRUE`;
+
+            LEFT JOIN jobProfileRequirement jpReq
+                ON c.appliedForJobProfileId = jpReq.jobProfileRequirementId
+
+            LEFT JOIN jobProfile jp
+                ON jpReq.jobProfileId = jp.jobProfileId  
+
+            LEFT JOIN lookup stat
+                ON c.statusId = stat.lookupKey
+                AND stat.tag = 'candidateStatus'
+
+            LEFT JOIN member m
+                ON m.memberId = c.recruiterId
+
+            LEFT JOIN recruitmentVendor v
+                ON v.vendorId = c.vendorId
+
+            WHERE LOWER(c.email) = LOWER(?)
+            AND c.isActive = TRUE;
+            `;
 
             const [rows] = await connection.execute(query, [email]);
+
+            rows.forEach(row => {
+                if (typeof row.expectedLocation === 'string') {
+                    row.expectedLocation = JSON.parse(row.expectedLocation);
+                }
+
+                if (typeof row.currentLocation === 'string') {
+                    row.currentLocation = JSON.parse(row.currentLocation);
+                }
+
+                row.currentCTC =
+                    row.currentCTC !== null ? Number(row.currentCTC) : null;
+
+                row.expectedCTC =
+                    row.expectedCTC !== null ? Number(row.expectedCTC) : null;
+
+                row.experienceYears =
+                    row.experienceYears !== null ? Number(row.experienceYears) : null;
+            });
+
             return rows[0] || null;
+
         } catch (error) {
             if (error instanceof AppError) { throw error; }
             this._handleDatabaseError(error);
