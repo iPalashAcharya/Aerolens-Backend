@@ -6733,7 +6733,8 @@ Authorization: Bearer <JWT_TOKEN>
   "vendorId": 1,
   "vendorName": "ABC Recruiters",
   "vendorPhone": "+91 9876543210",
-  "vendorEmail": "contact@abcrecruiters.com"
+  "vendorEmail": "contact@abcrecruiters.com",
+  "contactPersonName": "Rahul Sharma"
 }
 ```
 
@@ -6762,7 +6763,8 @@ GET /vendor
       "vendorId": 1,
       "vendorName": "ABC Recruiters",
       "vendorPhone": "+91 9876543210",
-      "vendorEmail": "contact@abcrecruiters.com"
+      "vendorEmail": "contact@abcrecruiters.com",
+      "contactPersonName": "Rahul Sharma"
     }
   ]
 }
@@ -6784,11 +6786,12 @@ POST /vendor
 {
   "vendorName": "ABC Recruiters",
   "vendorPhone": "+91 9876543210",
-  "vendorEmail": "contact@abcrecruiters.com"
+  "vendorEmail": "contact@abcrecruiters.com",
+  "contactPersonName": "Rahul Sharma"
 }
 ```
 
-> `vendorPhone` and `vendorEmail` are optional
+> vendorPhone, vendorEmail and contactPersonName are optional
 
 ### ➤ Response (201 Created)
 
@@ -6800,7 +6803,8 @@ POST /vendor
     "vendorId": 1,
     "vendorName": "ABC Recruiters",
     "vendorPhone": "+91 9876543210",
-    "vendorEmail": "contact@abcrecruiters.com"
+    "vendorEmail": "contact@abcrecruiters.com",
+    "contactPersonName": "Rahul Sharma"
   }
 }
 ```
@@ -6825,7 +6829,8 @@ GET /vendor/:vendorId
     "vendorId": 1,
     "vendorName": "ABC Recruiters",
     "vendorPhone": "+91 9876543210",
-    "vendorEmail": "contact@abcrecruiters.com"
+    "vendorEmail": "contact@abcrecruiters.com",
+    "contactPersonName": "Rahul Sharma"
   }
 }
 ```
@@ -6858,7 +6863,8 @@ PATCH /vendor/:vendorId
     "vendorId": 1,
     "vendorName": "ABC Recruiters",
     "vendorPhone": "+91 9999999999",
-    "vendorEmail": "contact@abcrecruiters.com"
+    "vendorEmail": "contact@abcrecruiters.com",
+    "contactPersonName": "Rahul Sharma"
   }
 }
 ```
@@ -6954,3 +6960,168 @@ All errors follow a **consistent structure**.
 - Error codes are **stable and frontend-safe**
 
 ---
+
+## Create Candidate
+
+**Endpoint:** `POST /candidate`
+
+Creates a new candidate record.
+
+This API supports the **new structured compensation fields** which allow storing salary with **currency and compensation type**.
+
+---
+
+### Request Body
+
+| Field                   | Type   | Required | Description                     |
+| ----------------------- | ------ | -------- | ------------------------------- |
+| candidateName           | string | Yes      | Full name of the candidate      |
+| recruiterId             | number | Yes      | ID of the recruiter             |
+| vendorId                | number | No       | Recruitment vendor ID           |
+| jobProfileRequirementId | number | No       | Job profile requirement ID      |
+| noticePeriod            | number | No       | Candidate notice period in days |
+| experienceYears         | number | No       | Total experience in years       |
+
+### Compensation Fields
+
+| Field                 | Type   | Required | Description                      |
+| --------------------- | ------ | -------- | -------------------------------- |
+| currentCTCAmount      | number | No       | Current compensation amount      |
+| currentCTCCurrencyId  | number | No       | Currency ID from lookup          |
+| currentCTCTypeId      | number | No       | Compensation type ID from lookup |
+| expectedCTCAmount     | number | No       | Expected compensation amount     |
+| expectedCTCCurrencyId | number | No       | Currency ID from lookup          |
+| expectedCTCTypeId     | number | No       | Compensation type ID from lookup |
+
+---
+
+### Example Request
+
+```json
+{
+  "candidateName": "Tribhuvan",
+  "recruiterId": 468,
+  "vendorId": 32,
+  "jobProfileRequirementId": 53,
+  "noticePeriod": 12,
+  "experienceYears": 30,
+
+  "currentCTCAmount": 1200000,
+  "currentCTCCurrencyId": 51,
+  "currentCTCTypeId": 52,
+
+  "expectedCTCAmount": 1500000,
+  "expectedCTCCurrencyId": 51,
+  "expectedCTCTypeId": 52
+}
+```
+
+---
+
+### Response
+
+```json
+{
+  "success": true,
+  "message": "Candidate created successfully",
+  "data": {
+    "candidateId": 102
+  }
+}
+```
+
+---
+
+## Fetch Candidate Create Form Data
+
+**Endpoint:** `GET /candidate/create-data`
+
+Returns all dropdown values required to render the **Candidate Create Form**.
+
+This includes recruiters, vendors, locations, job profiles, and compensation lookup values.
+
+---
+
+### Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "recruiters": [],
+    "vendors": [],
+    "locations": [],
+    "jobProfiles": [],
+
+    "currencies": [
+      {
+        "currencyId": 51,
+        "currencyName": "INR"
+      }
+    ],
+
+    "compensationTypes": [
+      {
+        "compensationTypeId": 52,
+        "compensationTypeName": "Annual"
+      }
+    ]
+  }
+}
+```
+
+---
+
+### Frontend Implementation
+
+Use the values returned from `/candidate/create-data` to populate dropdowns.
+Only display label/value. No id must be displayed in Dropdown.
+
+#### Currency Dropdown
+
+| Label | Value |
+| ----- | ----- |
+| INR   | 51    |
+
+#### Compensation Type Dropdown
+
+| Label  | Value |
+| ------ | ----- |
+| Annual | 52    |
+
+Frontend must send the **ID values** in API requests.
+
+Correct:
+
+```
+currentCTCCurrencyId: 51
+currentCTCTypeId: 52
+```
+
+Incorrect:
+
+```
+currency: "INR"
+type: "Annual"
+```
+
+---
+
+### UI Layout Recommendation
+
+```
+Current Compensation
+[ Amount ] [ Currency Dropdown ] [ Type Dropdown ]
+
+Expected Compensation
+[ Amount ] [ Currency Dropdown ] [ Type Dropdown ]
+```
+
+---
+
+### Notes
+
+* Currency and Compensation Type values are sourced from the **lookup table**.
+* Do **not hardcode dropdown values in frontend**.
+* Always fetch them from `/candidate/create-data`.
+
