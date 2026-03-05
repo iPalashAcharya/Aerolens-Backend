@@ -5,4 +5,7 @@ const resumeBulkQueue = new Queue('resume-bulk-queue', {
     connection: redisConnection
 });
 
-module.exports = resumeBulkQueue;
+module.exports = {
+    resumeBulkQueue,
+    redisConnection
+};

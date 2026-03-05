@@ -48,7 +48,7 @@ class ResumeBulkUploadService {
             console.error('[ResumeBulkUploadService] uploadZipAndStartBatch error:', error);
             if (error instanceof AppError) throw error;
             throw new AppError(
-                'Failed to enqueue bulk resume upload job',
+                error.message, // 👈 show real error temporarily
                 500,
                 'BULK_UPLOAD_ENQUEUE_FAILED'
             );

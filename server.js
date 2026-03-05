@@ -286,7 +286,7 @@ async function startServer() {
         CandidateValidator.init(db);
         MemberValidator.init(db);
         scheduledJobs.initializeAll();
-
+        require('./workers/resumeBulkWorker');
         app.use('/auth/login', loginLimiter);
         app.use('/auth/register', strictLimiter);
         app.use('/auth/forgot-password', strictLimiter);
