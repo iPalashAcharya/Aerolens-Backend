@@ -8,4 +8,15 @@ services:
     environment:
       - AWS_REGION=${AWS_REGION}
       - SECRET_NAME=${SECRET_NAME}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     restart: always
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    container_name: aerolens-redis
+    restart: always
+    ports:
+      - "6379:6379"
