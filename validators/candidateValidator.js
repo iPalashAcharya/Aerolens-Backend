@@ -581,6 +581,37 @@ const candidateSchemas = {
                 'string.max': 'Referred by cannot exceed 150 characters',
                 'string.pattern.base': 'Referred by can only contain letters, spaces, periods, hyphens and apostrophes'
             }),
+    })
+    .custom((value, helpers) => {
+        // ── Current CTC group: all 3 present or all 3 absent ──
+        const currentCTCFields = [
+            value.currentCTCAmount,
+            value.currentCTCCurrencyId,
+            value.currentCTCTypeId
+        ];
+        const currentCTCProvided = currentCTCFields.filter(f => f !== undefined && f !== null);
+
+        if (currentCTCProvided.length > 0 && currentCTCProvided.length < 3) {
+            return helpers.error('custom.currentCTCIncomplete');
+        }
+
+        // ── Expected CTC group: all 3 present or all 3 absent ──
+        const expectedCTCFields = [
+            value.expectedCTCAmount,
+            value.expectedCTCCurrencyId,
+            value.expectedCTCTypeId
+        ];
+        const expectedCTCProvided = expectedCTCFields.filter(f => f !== undefined && f !== null);
+
+        if (expectedCTCProvided.length > 0 && expectedCTCProvided.length < 3) {
+            return helpers.error('custom.expectedCTCIncomplete');
+        }
+
+        return value;
+    })
+    .messages({
+        'custom.currentCTCIncomplete': 'Current CTC requires all three fields together: currentCTCAmount, currentCTCCurrencyId, and currentCTCTypeId',
+        'custom.expectedCTCIncomplete': 'Expected CTC requires all three fields together: expectedCTCAmount, expectedCTCCurrencyId, and expectedCTCTypeId',
     }),
 
     update: Joi.object({
@@ -833,8 +864,38 @@ const candidateSchemas = {
                 'string.pattern.base': 'Referred by can only contain letters, spaces, periods, hyphens and apostrophes'
             }),
 
-    }).messages({
-        'object.min': 'At least one field must be provided for update'
+    })
+    .custom((value, helpers) => {
+        // ── Current CTC group: all 3 present or all 3 absent ──
+        const currentCTCFields = [
+            value.currentCTCAmount,
+            value.currentCTCCurrencyId,
+            value.currentCTCTypeId
+        ];
+        const currentCTCProvided = currentCTCFields.filter(f => f !== undefined && f !== null);
+
+        if (currentCTCProvided.length > 0 && currentCTCProvided.length < 3) {
+            return helpers.error('custom.currentCTCIncomplete');
+        }
+
+        // ── Expected CTC group: all 3 present or all 3 absent ──
+        const expectedCTCFields = [
+            value.expectedCTCAmount,
+            value.expectedCTCCurrencyId,
+            value.expectedCTCTypeId
+        ];
+        const expectedCTCProvided = expectedCTCFields.filter(f => f !== undefined && f !== null);
+
+        if (expectedCTCProvided.length > 0 && expectedCTCProvided.length < 3) {
+            return helpers.error('custom.expectedCTCIncomplete');
+        }
+
+        return value;
+    })
+    .messages({
+        'object.min': 'At least one field must be provided for update',
+        'custom.currentCTCIncomplete': 'Current CTC requires all three fields together: currentCTCAmount, currentCTCCurrencyId, and currentCTCTypeId',
+        'custom.expectedCTCIncomplete': 'Expected CTC requires all three fields together: expectedCTCAmount, expectedCTCCurrencyId, and expectedCTCTypeId'
     }),
 
     search: Joi.object({
