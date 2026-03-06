@@ -948,6 +948,23 @@ class InterviewService {
                 );
             }
 
+            const interviewStartUTC = DateTime.fromJSDate(existingInterview.fromTimeUTC, { zone: 'utc' });
+            const nowUTC = DateTime.utc();
+
+            if (nowUTC < interviewStartUTC) {
+                throw new AppError(
+                    'Interview result cannot be recorded prior to the scheduled interview time. ' +
+                    'Finalization is only permitted once the interview has commenced.',
+                    422,
+                    'INTERVIEW_NOT_YET_CONDUCTED',
+                    {
+                        interviewId,
+                        scheduledAt: interviewStartUTC.toISO(),
+                        currentTime: nowUTC.toISO()
+                    }
+                );
+            }
+            
             const finalizedInterview = await this.interviewRepository.finalize(interviewId, finalData, client);
 
             await auditLogService.logAction({
