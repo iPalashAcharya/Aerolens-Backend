@@ -444,7 +444,8 @@ class CandidateRepository {
         try {
             let query = `
             SELECT c.candidateId, c.candidateName, c.contactNumber, c.email, c.recruiterName,
-                   c.jobRole, loc.value AS preferredJobLocation, c.currentCTC, c.expectedCTC, c.noticePeriod,
+                   c.jobRole, loc.value AS preferredJobLocation, c.currentCTC, c.expectedCTC, c.currentCTCAmount, c.currentCTCCurrencyId, c.currentCTCTypeId,
+                   c.expectedCTCAmount, c.expectedCTCCurrencyId, c.expectedCTCTypeId, c.noticePeriod,
                    c.experienceYears, c.linkedinProfileUrl, c.createdAt, c.updatedAt,
                    stat.value AS statusName, c.resumeFilename, c.resumeOriginalName, c.resumeUploadDate
             FROM candidate c
@@ -762,6 +763,12 @@ class CandidateRepository {
 
             c.currentCTC,
             c.expectedCTC,
+            c.currentCTCAmount,
+            c.currentCTCCurrencyId,
+            c.currentCTCTypeId,
+            c.expectedCTCAmount,
+            c.expectedCTCCurrencyId,
+            c.expectedCTCTypeId,
             c.noticePeriod,
             c.experienceYears,
             c.linkedinProfileUrl,
