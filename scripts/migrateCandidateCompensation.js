@@ -11,10 +11,6 @@
  * India → INR + ANNUAL
  * USA   → USD + HOURLY
  */
-
-require('dotenv').config();
-const mysql = require('mysql2/promise');
-
 async function runMigration() {
 
     const database = require('../db');
@@ -149,9 +145,9 @@ async function runMigration() {
         await db.rollback();
 
         console.log("Transaction rolled back.");
+    } finally {
+        db.release();
     }
-
-    await db.end();
 }
 
 runMigration();
