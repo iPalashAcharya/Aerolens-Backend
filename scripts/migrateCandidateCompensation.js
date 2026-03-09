@@ -13,8 +13,7 @@
  */
 async function runMigration() {
 
-    const database = require('../db');
-    const db = await database.getConnection();
+    const db = await require('../db').getConnection();
 
     console.log("Connected to database");
 
