@@ -62,7 +62,7 @@ jobs:
         run: |
           INSTANCE_ID="${{ vars.INSTANCE_ID }}"
           COMPOSE_FILE="${{ vars.PROD_COMPOSE_FILE }}"
-          SERVICE="backend"
+          SERVICE="backend-dev"
           IMAGE_TAG="${{ github.sha }}"
           ECR_REG="${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com"
 

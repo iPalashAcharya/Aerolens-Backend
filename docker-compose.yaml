@@ -1,6 +1,5 @@
 services:
   backend-dev:
-    build: .
     image: aerolens-portal-backend-dev:latest
     container_name: aerolens-portal-backend-dev
     ports:
