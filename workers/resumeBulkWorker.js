@@ -5,7 +5,6 @@ const AdmZip = require('adm-zip');
 const pdfParse = require('pdf-parse');
 const pLimit = require('p-limit');
 const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
-const { fromIni } = require('@aws-sdk/credential-providers');
 const path = require('path');
 
 const CandidateRepository = require('../repositories/candidateRepository');
@@ -34,8 +33,7 @@ if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'staging'
 }
 
 const s3Client = new S3Client({
-    region: process.env.AWS_REGION,
-    credentials: fromIni()
+    region: process.env.AWS_REGION
 });
 const candidateRepo = new CandidateRepository(db);
 const limit = pLimit(5);
