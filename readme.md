@@ -6733,7 +6733,8 @@ Authorization: Bearer <JWT_TOKEN>
   "vendorId": 1,
   "vendorName": "ABC Recruiters",
   "vendorPhone": "+91 9876543210",
-  "vendorEmail": "contact@abcrecruiters.com"
+  "vendorEmail": "contact@abcrecruiters.com",
+  "contactPersonName": "Rahul Sharma"
 }
 ```
 
@@ -6762,7 +6763,8 @@ GET /vendor
       "vendorId": 1,
       "vendorName": "ABC Recruiters",
       "vendorPhone": "+91 9876543210",
-      "vendorEmail": "contact@abcrecruiters.com"
+      "vendorEmail": "contact@abcrecruiters.com",
+      "contactPersonName": "Rahul Sharma"
     }
   ]
 }
@@ -6784,11 +6786,12 @@ POST /vendor
 {
   "vendorName": "ABC Recruiters",
   "vendorPhone": "+91 9876543210",
-  "vendorEmail": "contact@abcrecruiters.com"
+  "vendorEmail": "contact@abcrecruiters.com",
+  "contactPersonName": "Rahul Sharma"
 }
 ```
 
-> `vendorPhone` and `vendorEmail` are optional
+> vendorPhone, vendorEmail and contactPersonName are optional
 
 ### ➤ Response (201 Created)
 
@@ -6800,7 +6803,8 @@ POST /vendor
     "vendorId": 1,
     "vendorName": "ABC Recruiters",
     "vendorPhone": "+91 9876543210",
-    "vendorEmail": "contact@abcrecruiters.com"
+    "vendorEmail": "contact@abcrecruiters.com",
+    "contactPersonName": "Rahul Sharma"
   }
 }
 ```
@@ -6825,7 +6829,8 @@ GET /vendor/:vendorId
     "vendorId": 1,
     "vendorName": "ABC Recruiters",
     "vendorPhone": "+91 9876543210",
-    "vendorEmail": "contact@abcrecruiters.com"
+    "vendorEmail": "contact@abcrecruiters.com",
+    "contactPersonName": "Rahul Sharma"
   }
 }
 ```
@@ -6858,7 +6863,8 @@ PATCH /vendor/:vendorId
     "vendorId": 1,
     "vendorName": "ABC Recruiters",
     "vendorPhone": "+91 9999999999",
-    "vendorEmail": "contact@abcrecruiters.com"
+    "vendorEmail": "contact@abcrecruiters.com",
+    "contactPersonName": "Rahul Sharma"
   }
 }
 ```
@@ -6954,3 +6960,430 @@ All errors follow a **consistent structure**.
 - Error codes are **stable and frontend-safe**
 
 ---
+
+## Create Candidate
+
+**Endpoint:** `POST /candidate`
+
+Creates a new candidate record.
+
+This API supports the **new structured compensation fields** which allow storing salary with **currency and compensation type**.
+
+---
+
+### Request Body
+
+| Field                   | Type   | Required | Description                     |
+| ----------------------- | ------ | -------- | ------------------------------- |
+| candidateName           | string | Yes      | Full name of the candidate      |
+| recruiterId             | number | Yes      | ID of the recruiter             |
+| vendorId                | number | No       | Recruitment vendor ID           |
+| jobProfileRequirementId | number | No       | Job profile requirement ID      |
+| noticePeriod            | number | No       | Candidate notice period in days |
+| experienceYears         | number | No       | Total experience in years       |
+
+### Compensation Fields
+
+| Field                 | Type   | Required | Description                      |
+| --------------------- | ------ | -------- | -------------------------------- |
+| currentCTCAmount      | number | No       | Current compensation amount      |
+| currentCTCCurrencyId  | number | No       | Currency ID from lookup          |
+| currentCTCTypeId      | number | No       | Compensation type ID from lookup |
+| expectedCTCAmount     | number | No       | Expected compensation amount     |
+| expectedCTCCurrencyId | number | No       | Currency ID from lookup          |
+| expectedCTCTypeId     | number | No       | Compensation type ID from lookup |
+
+---
+
+### Example Request
+
+```json
+{
+  "candidateName": "Tribhuvan",
+  "recruiterId": 468,
+  "vendorId": 32,
+  "jobProfileRequirementId": 53,
+  "noticePeriod": 12,
+  "experienceYears": 30,
+
+  "currentCTCAmount": 1200000,
+  "currentCTCCurrencyId": 51,
+  "currentCTCTypeId": 52,
+
+  "expectedCTCAmount": 1500000,
+  "expectedCTCCurrencyId": 51,
+  "expectedCTCTypeId": 52
+}
+```
+
+---
+
+### Response
+
+```json
+{
+  "success": true,
+  "message": "Candidate created successfully",
+  "data": {
+    "candidateId": 102
+  }
+}
+```
+
+---
+
+## Fetch Candidate Create Form Data
+
+**Endpoint:** `GET /candidate/create-data`
+
+Returns all dropdown values required to render the **Candidate Create Form**.
+
+This includes recruiters, vendors, locations, job profiles, and compensation lookup values.
+
+---
+
+### Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "recruiters": [],
+    "vendors": [],
+    "locations": [],
+    "jobProfiles": [],
+
+    "currencies": [
+      {
+        "currencyId": 51,
+        "currencyName": "INR"
+      }
+    ],
+
+    "compensationTypes": [
+      {
+        "compensationTypeId": 52,
+        "compensationTypeName": "Annual"
+      }
+    ]
+  }
+}
+```
+
+---
+
+### Frontend Implementation
+
+Use the values returned from `/candidate/create-data` to populate dropdowns.
+Only display label/value. No id must be displayed in Dropdown.
+
+#### Currency Dropdown
+
+| Label | Value |
+| ----- | ----- |
+| INR   | 51    |
+
+#### Compensation Type Dropdown
+
+| Label  | Value |
+| ------ | ----- |
+| Annual | 52    |
+
+Frontend must send the **ID values** in API requests.
+
+Correct:
+
+```
+currentCTCCurrencyId: 51
+currentCTCTypeId: 52
+```
+
+Incorrect:
+
+```
+currency: "INR"
+type: "Annual"
+```
+
+---
+
+### UI Layout Recommendation
+
+```
+Current Compensation
+[ Amount ] [ Currency Dropdown ] [ Type Dropdown ]
+
+Expected Compensation
+[ Amount ] [ Currency Dropdown ] [ Type Dropdown ]
+```
+
+---
+
+### Notes
+
+* Currency and Compensation Type values are sourced from the **lookup table**.
+* Do **not hardcode dropdown values in frontend**.
+* Always fetch them from `/candidate/create-data`.
+
+# 📂 Bulk Resume ZIP Upload — API Reference
+
+> Upload a ZIP of PDF resumes. The system asynchronously matches each resume to a candidate via email extracted from PDF text, then links it to their profile.
+
+---
+
+## 🔁 How It Works
+
+```
+1. POST /candidate/resume-bulk-upload   →  Upload ZIP, get batchId back immediately
+2. GET  /candidate/resume-bulk-upload/:batchId/status  →  Poll until COMPLETED
+```
+
+No waiting. The upload returns instantly. You poll for progress.
+
+---
+
+## 📤 Upload ZIP
+
+### `POST /candidate/resume-bulk-upload`
+
+Upload a `.zip` file containing PDF resumes. Returns a `batchId` to track processing.
+
+#### Request
+
+| Property | Value |
+|---|---|
+| Method | `POST` |
+| URL | `/candidate/resume-bulk-upload` |
+| Auth | Required (Bearer Token) |
+| Content-Type | `multipart/form-data` |
+
+#### Form Data
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `zipFile` | `File` (.zip) | ✅ Yes | ZIP archive containing PDF resumes. Max size: **50MB** |
+
+#### Example — Axios
+
+```js
+const formData = new FormData();
+formData.append('zipFile', file); // file = File object from input
+
+const response = await axios.post('/candidate/resume-bulk-upload', formData, {
+  headers: {
+    'Content-Type': 'multipart/form-data',
+    'Authorization': `Bearer ${token}`
+  }
+});
+
+const { batchId } = response.data;
+```
+
+#### Example — Fetch
+
+```js
+const formData = new FormData();
+formData.append('zipFile', file);
+
+const response = await fetch('/candidate/resume-bulk-upload', {
+  method: 'POST',
+  headers: { 'Authorization': `Bearer ${token}` },
+  body: formData
+});
+
+const { batchId } = await response.json();
+```
+
+#### Success Response `200 OK`
+
+```json
+{
+  "status": "success",
+  "batchId": "5e735438-d401-4c60-97f4-e026b15781fd"
+}
+```
+
+#### Error Responses
+
+| Status | Error Code | Cause |
+|---|---|---|
+| `400` | `MISSING_ZIP_FILE` | No file attached in request |
+| `500` | `BULK_UPLOAD_ENQUEUE_FAILED` | Internal queue error |
+
+---
+
+## 📊 Poll Batch Status
+
+### `GET /candidate/resume-bulk-upload/:batchId/status`
+
+Poll this endpoint after upload to track processing progress. Keep polling until `status` is `COMPLETED` or `FAILED`.
+
+#### Request
+
+| Property | Value |
+|---|---|
+| Method | `GET` |
+| URL | `/candidate/resume-bulk-upload/:batchId/status` |
+| Auth | Required (Bearer Token) |
+
+#### URL Parameter
+
+| Param | Type | Description |
+|---|---|---|
+| `batchId` | `string` (UUID) | The `batchId` returned from the upload endpoint |
+
+#### Example — Axios
+
+```js
+const response = await axios.get(`/candidate/resume-bulk-upload/${batchId}/status`, {
+  headers: { 'Authorization': `Bearer ${token}` }
+});
+
+const { data } = response.data;
+console.log(data.status);     // PENDING | PROCESSING | COMPLETED | FAILED
+console.log(data.linked);     // number of resumes successfully linked
+```
+
+#### Success Response `200 OK`
+
+```json
+{
+  "status": "success",
+  "batchId": "5e735438-d401-4c60-97f4-e026b15781fd",
+  "data": {
+    "status": "COMPLETED",
+    "totalFiles": 10,
+    "processed": 10,
+    "linked": 6,
+    "skipped_no_match": 3,
+    "skipped_already_exists": 1,
+    "failed": 0,
+    "errorMessage": null,
+    "createdAt": "2026-03-04T14:48:31.895Z",
+    "completedAt": "2026-03-04T14:48:35.123Z"
+  }
+}
+```
+
+#### Response Fields — `data` Object
+
+| Field | Type | Description |
+|---|---|---|
+| `status` | `string` | Current batch status. See status lifecycle below |
+| `totalFiles` | `number` | Total PDF files found inside the ZIP |
+| `processed` | `number` | PDFs processed so far (success + skip + fail) |
+| `linked` | `number` | Resumes successfully matched and linked to a candidate |
+| `skipped_no_match` | `number` | PDFs where email wasn't found in DB |
+| `skipped_already_exists` | `number` | Candidate already had a resume — not overwritten |
+| `failed` | `number` | PDFs that errored during processing |
+| `errorMessage` | `string \| null` | Populated only on fatal `FAILED` status |
+| `createdAt` | `ISO string` | When the batch was created |
+| `completedAt` | `ISO string \| null` | When processing finished (`null` if still running) |
+
+#### Error Responses
+
+| Status | Error Code | Cause |
+|---|---|---|
+| `404` | `BATCH_NOT_FOUND` | Invalid `batchId` or batch expired (TTL: 1 hour) |
+
+---
+
+## 🔄 Batch Status Lifecycle
+
+```
+PENDING  →  PROCESSING  →  COMPLETED
+                        ↘  FAILED
+```
+
+| Status | Meaning |
+|---|---|
+| `PENDING` | Job queued, worker hasn't started yet |
+| `PROCESSING` | Worker is actively processing PDFs |
+| `COMPLETED` | All PDFs processed (check counters for results) |
+| `FAILED` | Fatal error — check `errorMessage` field |
+
+> ⚠️ Batch state expires after **1 hour**. Polling after that returns `404`.
+
+---
+
+## 🛠️ Recommended Polling Implementation
+
+```js
+async function pollBatchStatus(batchId, token, onProgress) {
+  const INTERVAL_MS = 3000; // poll every 3 seconds
+  const TERMINAL = ['COMPLETED', 'FAILED'];
+
+  return new Promise((resolve, reject) => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await axios.get(
+          `/candidate/resume-bulk-upload/${batchId}/status`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+
+        const { data } = res.data;
+        onProgress?.(data); // update UI
+
+        if (TERMINAL.includes(data.status)) {
+          clearInterval(interval);
+          data.status === 'COMPLETED' ? resolve(data) : reject(data);
+        }
+
+      } catch (err) {
+        clearInterval(interval);
+        reject(err);
+      }
+    }, INTERVAL_MS);
+  });
+}
+
+// Usage
+const result = await pollBatchStatus(batchId, token, (progress) => {
+  console.log(`${progress.processed}/${progress.totalFiles} processed`);
+  console.log(`Linked: ${progress.linked}`);
+});
+```
+
+---
+
+## 📋 How Resume Matching Works
+
+> **Filename does not matter.** The system reads text inside the PDF.
+
+```
+PDF text parsed
+      ↓
+Email extracted via regex
+      ↓
+DB lookup: candidate WHERE email = extractedEmail
+      ↓
+Match found + no existing resume?
+      ↓ YES                    ↓ NO
+Upload to S3          skipped_no_match++
+Link to candidate     or skipped_already_exists++
+linked++
+```
+
+#### What to tell users preparing the ZIP:
+- ✅ Each PDF must contain the candidate's **email address** in the text
+- ✅ Any filename is fine — `john_resume.pdf`, `cv_final_v2.pdf`, anything
+- ✅ ZIP can contain 1–300 PDFs
+- ❌ Scanned image PDFs (non-text) will not be parsed — they'll show as `failed`
+- ❌ Existing resumes are **not overwritten** — counted as `skipped_already_exists`
+
+---
+
+## 📦 ZIP File Requirements
+
+| Property | Requirement |
+|---|---|
+| Format | `.zip` |
+| Max size | `50MB` |
+| Contents | PDF files only (non-PDFs are ignored) |
+| Nesting | Flat or nested folders — both work |
+| PDF type | Text-based PDFs only (not scanned images) |
+
+---
+
+*For questions or issues, check the `errorMessage` field on `FAILED` status or contact the backend team.*
+

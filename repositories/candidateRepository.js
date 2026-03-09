@@ -88,20 +88,37 @@ class CandidateRepository {
     `);
 
         const vendorPromise = connection.query(`SELECT vendorId, vendorName FROM recruitmentVendor`);
+        const currencyPromise = connection.query(`
+            SELECT lookupKey AS currencyId, value AS currencyName
+            FROM lookup
+            WHERE tag = 'currency'
+            ORDER BY value
+        `);
 
-        const [recruiters, locations, jobProfiles, vendors] =
+        const compensationTypePromise = connection.query(`
+            SELECT lookupKey AS compensationTypeId, value AS compensationTypeName
+            FROM lookup
+            WHERE tag = 'compensationType'
+            ORDER BY value
+        `);
+
+        const [recruiters, locations, jobProfiles, vendors, currencies, compensationTypes] =
             await Promise.all([
                 recruitersPromise,
                 locationPromise,
                 jobProfilePromise,
-                vendorPromise
+                vendorPromise,
+                currencyPromise,
+                compensationTypePromise
             ]);
 
         return {
             recruiters: recruiters[0],
             locations: locations[0],
             jobProfiles: jobProfiles[0],
-            vendors: vendors[0]
+            vendors: vendors[0],
+            currencies: currencies[0],
+            compensationTypes: compensationTypes[0]
         };
     }
 
@@ -109,8 +126,8 @@ class CandidateRepository {
         const connection = client;
         console.log(candidateData);
         try {
-            const query = `INSERT INTO candidate(candidateName,contactNumber,email,recruiterId,appliedForJobProfileId,expectedLocation,currentLocation,currentCTC,expectedCTC,noticePeriod,experienceYears,linkedinProfileUrl, resumeFilename, resumeOriginalName, resumeUploadDate,notes,statusId,vendorId,referredBy)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`
+            const query = `INSERT INTO candidate(candidateName,contactNumber,email,recruiterId,appliedForJobProfileId,expectedLocation,currentLocation,currentCTC,expectedCTC, currentCTCAmount, currentCTCCurrencyId, currentCTCTypeId, expectedCTCAmount, expectedCTCCurrencyId, expectedCTCTypeId, noticePeriod, experienceYears, linkedinProfileUrl, resumeFilename, resumeOriginalName, resumeUploadDate, notes, statusId, vendorId, referredBy)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`
 
             const [result] = await connection.execute(query, [
                 candidateData.candidateName,
@@ -122,6 +139,12 @@ class CandidateRepository {
                 candidateData.currentLocation !== undefined ? candidateData.currentLocation : null,
                 candidateData.currentCTC ?? null,
                 candidateData.expectedCTC ?? null,
+                candidateData.currentCTCAmount ?? null,
+                candidateData.currentCTCCurrencyId ?? null,
+                candidateData.currentCTCTypeId ?? null,
+                candidateData.expectedCTCAmount ?? null,
+                candidateData.expectedCTCCurrencyId ?? null,
+                candidateData.expectedCTCTypeId ?? null,
                 candidateData.noticePeriod,
                 candidateData.experienceYears,
                 candidateData.linkedinProfileUrl !== undefined ? candidateData.linkedinProfileUrl : null,
@@ -186,6 +209,12 @@ class CandidateRepository {
 
             c.currentCTC,
             c.expectedCTC,
+            c.currentCTCAmount,
+            c.currentCTCCurrencyId,
+            c.currentCTCTypeId,
+            c.expectedCTCAmount,
+            c.expectedCTCCurrencyId,
+            c.expectedCTCTypeId,
             c.noticePeriod,
             c.experienceYears,
             c.linkedinProfileUrl,
@@ -251,17 +280,96 @@ class CandidateRepository {
             }
 
             const query = `
-            SELECT c.candidateId, c.candidateName, c.contactNumber, c.email, c.recruiterName, 
-                   c.jobRole, loc.value AS preferredJobLocation, c.currentCTC, c.expectedCTC, c.noticePeriod, 
-                   c.experienceYears, c.linkedinProfileUrl, c.createdAt, c.updatedAt,
-                   stat.value AS statusName, c.resumeFilename, c.resumeOriginalName, c.resumeUploadDate
+            SELECT
+                c.candidateId,
+                c.candidateName,
+                c.contactNumber,
+                c.email,
+                c.recruiterId,
+                c.vendorId,
+                v.vendorName,
+
+                m.memberName AS recruiterName,
+                m.memberContact AS recruiterContact,
+                m.email AS recruiterEmail,
+
+                jpReq.jobProfileRequirementId,
+                jp.jobRole AS jobRole,
+
+                COALESCE(
+                    (
+                        SELECT JSON_OBJECT('country', loc.country, 'city', loc.cityName)
+                        FROM location loc
+                        WHERE loc.locationId = c.expectedLocation
+                    )
+                ) AS expectedLocation,
+
+                COALESCE(
+                    (
+                        SELECT JSON_OBJECT('country', loc.country, 'city', loc.cityName)
+                        FROM location loc
+                        WHERE loc.locationId = c.currentLocation
+                    )
+                ) AS currentLocation,
+
+                c.currentCTC,
+                c.expectedCTC,
+                c.noticePeriod,
+                c.experienceYears,
+                c.linkedinProfileUrl,
+                stat.value AS statusName,
+                c.resumeFilename,
+                c.resumeOriginalName,
+                c.resumeUploadDate,
+                c.notes,
+                c.referredBy,
+                c.createdAt AS dateOfEntry
+
             FROM candidate c
-            LEFT JOIN lookup stat ON c.statusId = stat.lookupKey and stat.tag = 'candidateStatus'
-            LEFT JOIN lookup loc ON c.preferredJobLocation = loc.lookupKey and loc.tag = 'location'
-            WHERE c.email = ? AND c.isActive = TRUE`;
+
+            LEFT JOIN jobProfileRequirement jpReq
+                ON c.appliedForJobProfileId = jpReq.jobProfileRequirementId
+
+            LEFT JOIN jobProfile jp
+                ON jpReq.jobProfileId = jp.jobProfileId  
+
+            LEFT JOIN lookup stat
+                ON c.statusId = stat.lookupKey
+                AND stat.tag = 'candidateStatus'
+
+            LEFT JOIN member m
+                ON m.memberId = c.recruiterId
+
+            LEFT JOIN recruitmentVendor v
+                ON v.vendorId = c.vendorId
+
+            WHERE LOWER(c.email) = LOWER(?)
+            AND c.isActive = TRUE;
+            `;
 
             const [rows] = await connection.execute(query, [email]);
+
+            rows.forEach(row => {
+                if (typeof row.expectedLocation === 'string') {
+                    row.expectedLocation = JSON.parse(row.expectedLocation);
+                }
+
+                if (typeof row.currentLocation === 'string') {
+                    row.currentLocation = JSON.parse(row.currentLocation);
+                }
+
+                row.currentCTC =
+                    row.currentCTC !== null ? Number(row.currentCTC) : null;
+
+                row.expectedCTC =
+                    row.expectedCTC !== null ? Number(row.expectedCTC) : null;
+
+                row.experienceYears =
+                    row.experienceYears !== null ? Number(row.experienceYears) : null;
+            });
+
             return rows[0] || null;
+
         } catch (error) {
             if (error instanceof AppError) { throw error; }
             this._handleDatabaseError(error);
@@ -336,7 +444,8 @@ class CandidateRepository {
         try {
             let query = `
             SELECT c.candidateId, c.candidateName, c.contactNumber, c.email, c.recruiterName,
-                   c.jobRole, loc.value AS preferredJobLocation, c.currentCTC, c.expectedCTC, c.noticePeriod,
+                   c.jobRole, loc.value AS preferredJobLocation, c.currentCTC, c.expectedCTC, c.currentCTCAmount, c.currentCTCCurrencyId, c.currentCTCTypeId,
+                   c.expectedCTCAmount, c.expectedCTCCurrencyId, c.expectedCTCTypeId, c.noticePeriod,
                    c.experienceYears, c.linkedinProfileUrl, c.createdAt, c.updatedAt,
                    stat.value AS statusName, c.resumeFilename, c.resumeOriginalName, c.resumeUploadDate
             FROM candidate c
@@ -497,7 +606,7 @@ class CandidateRepository {
             // Filter only allowed fields for security
             const allowedFields = [
                 'candidateName', 'contactNumber', 'email', 'recruiterId', 'vendorId',
-                'appliedForJobProfileId', 'expectedLocation', 'currentLocation', 'currentCTC', 'expectedCTC', 'noticePeriod', 'experienceYears', 'linkedinProfileUrl', 'resume', 'notes', 'referredBy'
+                'appliedForJobProfileId', 'expectedLocation', 'currentLocation', 'currentCTC', 'expectedCTC', 'currentCTCAmount', 'currentCTCCurrencyId', 'currentCTCTypeId', 'expectedCTCAmount', 'expectedCTCCurrencyId', 'expectedCTCTypeId', 'noticePeriod', 'experienceYears', 'linkedinProfileUrl', 'resume', 'notes', 'referredBy'
             ];
 
             const filteredData = {};
@@ -654,6 +763,12 @@ class CandidateRepository {
 
             c.currentCTC,
             c.expectedCTC,
+            c.currentCTCAmount,
+            c.currentCTCCurrencyId,
+            c.currentCTCTypeId,
+            c.expectedCTCAmount,
+            c.expectedCTCCurrencyId,
+            c.expectedCTCTypeId,
             c.noticePeriod,
             c.experienceYears,
             c.linkedinProfileUrl,

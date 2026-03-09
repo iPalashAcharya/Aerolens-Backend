@@ -444,6 +444,64 @@ const candidateSchemas = {
                 'number.max': 'Expected CTC cannot exceed 1,00,00,000',
             }),
 
+        currentCTCAmount: Joi.number()
+            .precision(2)
+            .min(0)
+            .max(100000000)
+            .optional()
+            .allow(null)
+            .messages({
+                'number.base': 'Current CTC amount must be a number',
+                'number.min': 'Current CTC amount cannot be negative'
+            }),
+
+        currentCTCCurrencyId: Joi.number()
+            .integer()
+            .positive()
+            .optional()
+            .allow(null)
+            .messages({
+                'number.base': 'Current CTC currency must be a valid lookup ID'
+            }),
+
+        currentCTCTypeId: Joi.number()
+            .integer()
+            .positive()
+            .optional()
+            .allow(null)
+            .messages({
+                'number.base': 'Current CTC type must be a valid lookup ID'
+            }),
+
+        expectedCTCAmount: Joi.number()
+            .precision(2)
+            .min(0)
+            .max(100000000)
+            .optional()
+            .allow(null)
+            .messages({
+                'number.base': 'Expected CTC amount must be a number',
+                'number.min': 'Expected CTC amount cannot be negative'
+            }),
+
+        expectedCTCCurrencyId: Joi.number()
+            .integer()
+            .positive()
+            .optional()
+            .allow(null)
+            .messages({
+                'number.base': 'Expected CTC currency must be a valid lookup ID'
+            }),
+
+        expectedCTCTypeId: Joi.number()
+            .integer()
+            .positive()
+            .optional()
+            .allow(null)
+            .messages({
+                'number.base': 'Expected CTC type must be a valid lookup ID'
+            }),
+
         noticePeriod: Joi.number()
             .integer()
             .min(0)
@@ -523,6 +581,37 @@ const candidateSchemas = {
                 'string.max': 'Referred by cannot exceed 150 characters',
                 'string.pattern.base': 'Referred by can only contain letters, spaces, periods, hyphens and apostrophes'
             }),
+    })
+    .custom((value, helpers) => {
+        // ── Current CTC group: all 3 present or all 3 absent ──
+        const currentCTCFields = [
+            value.currentCTCAmount,
+            value.currentCTCCurrencyId,
+            value.currentCTCTypeId
+        ];
+        const currentCTCProvided = currentCTCFields.filter(f => f !== undefined && f !== null);
+
+        if (currentCTCProvided.length > 0 && currentCTCProvided.length < 3) {
+            return helpers.error('custom.currentCTCIncomplete');
+        }
+
+        // ── Expected CTC group: all 3 present or all 3 absent ──
+        const expectedCTCFields = [
+            value.expectedCTCAmount,
+            value.expectedCTCCurrencyId,
+            value.expectedCTCTypeId
+        ];
+        const expectedCTCProvided = expectedCTCFields.filter(f => f !== undefined && f !== null);
+
+        if (expectedCTCProvided.length > 0 && expectedCTCProvided.length < 3) {
+            return helpers.error('custom.expectedCTCIncomplete');
+        }
+
+        return value;
+    })
+    .messages({
+        'custom.currentCTCIncomplete': 'Current CTC requires all three fields together: currentCTCAmount, currentCTCCurrencyId, and currentCTCTypeId',
+        'custom.expectedCTCIncomplete': 'Expected CTC requires all three fields together: expectedCTCAmount, expectedCTCCurrencyId, and expectedCTCTypeId',
     }),
 
     update: Joi.object({
@@ -657,6 +746,45 @@ const candidateSchemas = {
                 'number.max': 'Expected CTC cannot exceed 1,00,00,000'
             }),
 
+        /* ---------------- NEW STRUCTURED CTC FIELDS ---------------- */
+        currentCTCAmount: Joi.number()
+            .precision(2)
+            .min(0)
+            .max(100000000)
+            .optional()
+            .allow(null),
+
+        currentCTCCurrencyId: Joi.number()
+            .integer()
+            .positive()
+            .optional()
+            .allow(null),
+
+        currentCTCTypeId: Joi.number()
+            .integer()
+            .positive()
+            .optional()
+            .allow(null),
+
+        expectedCTCAmount: Joi.number()
+            .precision(2)
+            .min(0)
+            .max(100000000)
+            .optional()
+            .allow(null),
+
+        expectedCTCCurrencyId: Joi.number()
+            .integer()
+            .positive()
+            .optional()
+            .allow(null),
+
+        expectedCTCTypeId: Joi.number()
+            .integer()
+            .positive()
+            .optional()
+            .allow(null),
+
         noticePeriod: Joi.number()
             .integer()
             .min(0)
@@ -736,8 +864,38 @@ const candidateSchemas = {
                 'string.pattern.base': 'Referred by can only contain letters, spaces, periods, hyphens and apostrophes'
             }),
 
-    }).messages({
-        'object.min': 'At least one field must be provided for update'
+    })
+    .custom((value, helpers) => {
+        // ── Current CTC group: all 3 present or all 3 absent ──
+        const currentCTCFields = [
+            value.currentCTCAmount,
+            value.currentCTCCurrencyId,
+            value.currentCTCTypeId
+        ];
+        const currentCTCProvided = currentCTCFields.filter(f => f !== undefined && f !== null);
+
+        if (currentCTCProvided.length > 0 && currentCTCProvided.length < 3) {
+            return helpers.error('custom.currentCTCIncomplete');
+        }
+
+        // ── Expected CTC group: all 3 present or all 3 absent ──
+        const expectedCTCFields = [
+            value.expectedCTCAmount,
+            value.expectedCTCCurrencyId,
+            value.expectedCTCTypeId
+        ];
+        const expectedCTCProvided = expectedCTCFields.filter(f => f !== undefined && f !== null);
+
+        if (expectedCTCProvided.length > 0 && expectedCTCProvided.length < 3) {
+            return helpers.error('custom.expectedCTCIncomplete');
+        }
+
+        return value;
+    })
+    .messages({
+        'object.min': 'At least one field must be provided for update',
+        'custom.currentCTCIncomplete': 'Current CTC requires all three fields together: currentCTCAmount, currentCTCCurrencyId, and currentCTCTypeId',
+        'custom.expectedCTCIncomplete': 'Expected CTC requires all three fields together: expectedCTCAmount, expectedCTCCurrencyId, and expectedCTCTypeId'
     }),
 
     search: Joi.object({

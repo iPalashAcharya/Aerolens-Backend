@@ -88,7 +88,9 @@ class CandidateController {
                 recruiters: formData.recruiters,
                 vendors: formData.vendors,
                 locations: formData.locations,
-                jobProfiles: formData.jobProfiles
+                jobProfiles: formData.jobProfiles,
+                currencies: formData.currencies,
+                compensationTypes: formData.compensationTypes
             }
         });
     });
