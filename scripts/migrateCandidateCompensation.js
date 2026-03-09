@@ -11,13 +11,16 @@
  * India → INR + ANNUAL
  * USA   → USD + HOURLY
  */
+const fetchSecrets = require("../config/secrets");
 async function runMigration() {
 
+    await fetchSecrets();
     const db = await require('../db').getConnection();
 
     console.log("Connected to database");
 
     try {
+
 
         await db.beginTransaction();
 
