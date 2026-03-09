@@ -18,7 +18,7 @@ const mysql = require('mysql2/promise');
 async function runMigration() {
 
     const database = require('../db');
-    const db = await this.database.getConnection();
+    const db = await database.getConnection();
 
     console.log("Connected to database");
 
