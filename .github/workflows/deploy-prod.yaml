@@ -71,5 +71,5 @@ jobs:
               aws ecr get-login-password --region ${{ vars.AWS_REGION }} | docker login --username AWS --password-stdin ${ECR_REG} && \
               docker pull ${ECR_REG}/aerolens-portal-backend:${IMAGE_TAG} && \
               docker tag ${ECR_REG}/aerolens-portal-backend:${IMAGE_TAG} aerolens-portal-backend-prod:latest && \
-              SECRET_NAME=/myapp/prod/env AWS_REGION=${{ vars.AWS_REGION }} docker-compose -f ${{ vars.PROD_COMPOSE_FILE }} up -d --remove-orphans --force-recreate backend-dev' ]" \
+              SECRET_NAME=/myapp/prod/env AWS_REGION=${{ vars.AWS_REGION }} docker-compose -f ${{ vars.PROD_COMPOSE_FILE }} up -d --remove-orphans --force-recreate backend' ]" \
             --region ${{ vars.AWS_REGION }}
