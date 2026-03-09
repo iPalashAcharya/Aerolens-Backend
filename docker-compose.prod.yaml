@@ -1,7 +1,7 @@
 services:
   backend-dev:
     image: aerolens-portal-backend-prod:latest
-    container_name: aerolens-portal-backend-dev
+    container_name: aerolens-portal-backend-prod
     ports:
       - "3000:3000"
     environment:

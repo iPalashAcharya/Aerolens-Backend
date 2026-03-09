@@ -66,10 +66,11 @@ jobs:
             --instance-ids "${{ vars.INSTANCE_ID }}" \
             --document-name "AWS-RunShellScript" \
             --comment "Prod deploy ${IMAGE_TAG}" \
-            --parameters commands="[ 'cd ${{ vars.PROD_FOLDER_LOCATION }} && \
+            --parameters commands="[ 'set -ex && \
+              cd ${{ vars.PROD_FOLDER_LOCATION }} && \
               git fetch origin main && git reset --hard origin/main && \
               aws ecr get-login-password --region ${{ vars.AWS_REGION }} | docker login --username AWS --password-stdin ${ECR_REG} && \
               docker pull ${ECR_REG}/aerolens-portal-backend:${IMAGE_TAG} && \
               docker tag ${ECR_REG}/aerolens-portal-backend:${IMAGE_TAG} aerolens-portal-backend-prod:latest && \
-              SECRET_NAME=/myapp/prod/env AWS_REGION=${{ vars.AWS_REGION }} docker-compose -f ${{ vars.PROD_COMPOSE_FILE }} up -d --remove-orphans --force-recreate backend' ]" \
+              SECRET_NAME=/myapp/prod/env AWS_REGION=${{ vars.AWS_REGION }} docker-compose -f ${{ vars.PROD_COMPOSE_FILE }} up -d --remove-orphans --force-recreate backend-dev' ]" \
             --region ${{ vars.AWS_REGION }}
