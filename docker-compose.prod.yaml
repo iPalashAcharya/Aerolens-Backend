@@ -1,0 +1,21 @@
+services:
+  backend:
+    image: aerolens-portal-backend-prod:latest
+    container_name: aerolens-portal-backend-prod
+    ports:
+      - "3000:3000"
+    environment:
+      - AWS_REGION=${AWS_REGION}
+      - SECRET_NAME=${SECRET_NAME}
+      - REDIS_HOST=redis-prod
+      - REDIS_PORT=6380
+    restart: always
+    depends_on:
+      - redis-prod
+
+  redis-prod:
+    image: redis:7-alpine
+    container_name: aerolens-redis-prod
+    restart: always
+    ports:
+      - "6380:6379"
