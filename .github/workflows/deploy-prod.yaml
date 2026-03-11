@@ -98,5 +98,18 @@ jobs:
             --output text)
 
           echo "Status: $STATUS"
-          echo "Stderr: $OUTPUT"
+          echo "=== STDOUT ==="
+          aws ssm get-command-invocation \
+            --command-id "$CMD_ID" \
+            --instance-id "${{ vars.INSTANCE_ID }}" \
+            --region ${{ vars.AWS_REGION }} \
+            --query "StandardOutputContent" \
+            --output text
+          echo "=== STDERR ==="
+          aws ssm get-command-invocation \
+            --command-id "$CMD_ID" \
+            --instance-id "${{ vars.INSTANCE_ID }}" \
+            --region ${{ vars.AWS_REGION }} \
+            --query "StandardErrorContent" \
+            --output text
           [ "$STATUS" = "Success" ] || exit 1
