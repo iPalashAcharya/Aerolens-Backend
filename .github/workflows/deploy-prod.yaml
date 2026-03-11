@@ -61,48 +61,14 @@ jobs:
 
       - name: Deploy to prod via SSM
         run: |
-          CMD_ID=$(aws ssm send-command \
-            --instance-ids "${{ vars.INSTANCE_ID }}" \
-            --document-name "AWS-RunShellScript" \
-            --comment "Prod deploy ${{ github.sha }}" \
-            --parameters commands="[ 'set -ex && \
-              aws ecr get-login-password --region ${{ vars.AWS_REGION }} | docker login --username AWS --password-stdin ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com && \
-              docker pull ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/aerolens-portal-backend:${{ github.sha }} && \
-              docker tag ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/aerolens-portal-backend:${{ github.sha }} aerolens-portal-backend-prod:latest && \
-              SECRET_NAME=/myapp/prod/env AWS_REGION=${{ vars.AWS_REGION }} docker-compose -f ${{ vars.PROD_COMPOSE_FILE }} up -d --remove-orphans --force-recreate backend' ]" \
-            --region ${{ vars.AWS_REGION }} \
-            --query "Command.CommandId" \
-            --output text)
-
-          echo "SSM Command ID: $CMD_ID"
-
-          aws ssm wait command-executed \
-            --command-id "$CMD_ID" \
-            --instance-id "${{ vars.INSTANCE_ID }}" \
-            --region ${{ vars.AWS_REGION }} || true
-
-          STATUS=$(aws ssm get-command-invocation \
-            --command-id "$CMD_ID" \
-            --instance-id "${{ vars.INSTANCE_ID }}" \
-            --region ${{ vars.AWS_REGION }} \
-            --query "Status" \
-            --output text)
-
-          echo "Status: $STATUS"
-          echo "=== STDOUT ==="
-          aws ssm get-command-invocation \
-            --command-id "$CMD_ID" \
-            --instance-id "${{ vars.INSTANCE_ID }}" \
-            --region ${{ vars.AWS_REGION }} \
-            --query "StandardOutputContent" \
-            --output text
-
-          echo "=== STDERR ==="
-          aws ssm get-command-invocation \
-            --command-id "$CMD_ID" \
-            --instance-id "${{ vars.INSTANCE_ID }}" \
-            --region ${{ vars.AWS_REGION }} \
-            --query "StandardErrorContent" \
-            --output text
-
-          [ "$STATUS" = "Success" ] || exit 1
+          aws ssm send-command \
+           --instance-ids "${{ vars.INSTANCE_ID }}" \
+           --document-name "AWS-RunShellScript" \
+           --comment "Prod deploy ${{ github.sha }}" \
+           --parameters commands="[ 'set -ex && \
+             cd ${{ vars.PROD_FOLDER_LOCATION }} && \
+             aws ecr get-login-password --region ${{ vars.AWS_REGION }} | docker login --username AWS --password-stdin ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com && \
+             docker pull ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/aerolens-portal-backend:${{ github.sha }} && \
+             docker tag ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/aerolens-portal-backend:${{ github.sha }} aerolens-portal-backend-prod:latest && \
+             SECRET_NAME=/myapp/prod/env AWS_REGION=${{ vars.AWS_REGION }} docker-compose -f ${{ vars.PROD_COMPOSE_FILE }} up -d --remove-orphans --force-recreate backend' ]" \
+           --region ${{ vars.AWS_REGION }}

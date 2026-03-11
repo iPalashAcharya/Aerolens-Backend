@@ -62,7 +62,6 @@ jobs:
            --comment "Deploy dev ${{ github.sha }}" \
            --parameters commands="[ 'set -ex && \
              cd ${{ vars.DEV_FOLDER_LOCATION }} && \
-             git fetch origin development && git reset --hard origin/development && \
              aws ecr get-login-password --region ${{ vars.AWS_REGION }} | docker login --username AWS --password-stdin ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com && \
              docker pull ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/aerolens-portal-backend-dev:${{ github.sha }} && \
              docker tag ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/aerolens-portal-backend-dev:${{ github.sha }} aerolens-portal-backend-dev:latest && \
