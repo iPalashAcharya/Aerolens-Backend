@@ -56,20 +56,15 @@ jobs:
 
       - name: Send SSM command to deploy (dev instance)
         run: |
-          INSTANCE_ID="${{vars.INSTANCE_ID}}"
-          COMPOSE_FILE="${{vars.DEV_COMPOSE_FILE}}"
-          SERVICE="backend-dev"
-          IMAGE_TAG="${{ github.sha }}"
-          ECR_REG="${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com"
-
           aws ssm send-command \
-            --instance-ids "$INSTANCE_ID" \
-            --document-name "AWS-RunShellScript" \
-            --comment "Deploy dev ${IMAGE_TAG}" \
-            --parameters commands="[ 'cd ${{vars.DEV_FOLDER_LOCATION}} && \
-              git fetch origin development && git reset --hard origin/development && \
-              aws ecr get-login-password --region ${{vars.AWS_REGION}} | docker login --username AWS --password-stdin ${ECR_REG} && \
-              docker pull ${ECR_REG}/aerolens-portal-backend-dev:${IMAGE_TAG} && \
-              docker tag ${ECR_REG}/aerolens-portal-backend-dev:${IMAGE_TAG} aerolens-portal-backend-dev:latest && \
-              SECRET_NAME=dev/myapp/secrets AWS_REGION=${{vars.AWS_REGION}} docker-compose -f ${COMPOSE_FILE} up -d --remove-orphans --force-recreate ${SERVICE}' ]" \
-            --region ${{vars.AWS_REGION}}
+           --instance-ids "${{ vars.INSTANCE_ID }}" \
+           --document-name "AWS-RunShellScript" \
+           --comment "Deploy dev ${{ github.sha }}" \
+           --parameters commands="[ 'set -ex && \
+             cd ${{ vars.DEV_FOLDER_LOCATION }} && \
+             git fetch origin development && git reset --hard origin/development && \
+             aws ecr get-login-password --region ${{ vars.AWS_REGION }} | docker login --username AWS --password-stdin ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com && \
+             docker pull ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/aerolens-portal-backend-dev:${{ github.sha }} && \
+             docker tag ${{ vars.AWS_ACCOUNT_ID }}.dkr.ecr.${{ vars.AWS_REGION }}.amazonaws.com/aerolens-portal-backend-dev:${{ github.sha }} aerolens-portal-backend-dev:latest && \
+             SECRET_NAME=dev/myapp/secrets AWS_REGION=${{ vars.AWS_REGION }} docker-compose -f ${{ vars.DEV_COMPOSE_FILE }} up -d --remove-orphans --force-recreate backend-dev' ]" \
+           --region ${{ vars.AWS_REGION }}

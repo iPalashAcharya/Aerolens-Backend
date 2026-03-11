@@ -2919,6 +2919,8 @@ Create a new job profile requirement for a client.
       "vendorName": "Random Vendor A",
       "jobProfileRequirementId": 1,
       "jobRole": "SDE",
+      "workModeId": 54,
+      "workMode": "Hybrid",
       "preferredJobLocation": {
         "city": "Ahemedabad",
         "country": "India"
@@ -2949,6 +2951,8 @@ Create a new job profile requirement for a client.
       "vendorName": "Random Vendor A",
       "jobProfileRequirementId": 1,
       "jobRole": "Software Devloper",
+      "workModeId": 55,
+      "workMode": "Remote",
       "preferredJobLocation": {
         "city": "Ahemedabad",
         "country": "India"
@@ -2991,6 +2995,8 @@ Create a new job profile requirement for a client.
     "vendorName": "Random Vendor A",
     "jobProfileRequirementId": 1,
     "jobRole": "SDE-2",
+    "workModeId": 53,
+    "workMode": "Onsite",
     "expectedLocation": {
       "city": "Ahemedabad",
       "country": "India"
@@ -3215,6 +3221,7 @@ Content-Type: multipart/form-data
 | jobRole                 | String      | Job title (optional, soon to be depricated)                                     |
 | jobProfileRequirementId | Number      | Job Profile Requirement Id (required) [must be in jobProfile Requirement table] |
 | expectedLocation        | JSON Object | must be a json object with city and country attributes (required)               |
+| workModeId              | Number      | Work mode Id (optional) [must be in lookup table where tag = 'workMode']        |
 | currentCTC              | Number      | Current CTC in INR [supports decimals ie 12.5] (optional)                       |
 | expectedCTC             | Number      | Expected CTC in INR [supports decimal ie 12.5] (optional)                       |
 | noticePeriod            | Number      | Notice period in days (required)                                                |
@@ -3238,6 +3245,8 @@ Content-Type: multipart/form-data
     "recruiterId": 1,
     "appliedForJobProfileId": 28,
     "expectedLocation": 1,
+    "workModeId": 53,
+    "workMode": "Onsite",
     "noticePeriod": 30,
     "experienceYears": 2.2,
     "statusId": 9,
@@ -3263,6 +3272,7 @@ Content-Type: multipart/form-data
 | jobRole | String | Job title (optional) [soon to be depricated] |
 | jobProfileRequirementId | Number | job profile Requirement ID must be in jobProfileRequirementTable |
 | expectedLocation | JSON Object | must be a json object with city and country attributes |
+| workModeId | Number | work mode ID must be in lookup table where tag = 'workMode' |
 | currentCTC | Number | Current CTC in INR [supports decimals ie 12.5] (optional) |
 | expectedCTC | Number | Expected CTC in INR [supports decimal ie 12.5] (optional) |
 | noticePeriod | Number | Notice period in days (optional) |
@@ -3959,6 +3969,8 @@ GET /candidate
       "recruiterEmail": null,
       "jobProfileRequirementId": 1,
       "jobRole": "SDE",
+      "workModeId": 54,
+      "workMode": "Hybrid",
       "preferredJobLocation": {
         "city": "Ahemedabad",
         "country": "India"
@@ -3986,6 +3998,8 @@ GET /candidate
       "recruiterEmail": null,
       "jobProfileRequirementId": 1,
       "jobRole": "Software Devloper",
+      "workModeId": 55,
+      "workMode": "Remote",
       "preferredJobLocation": {
         "city": "Ahemedabad",
         "country": "India"
@@ -4029,6 +4043,8 @@ GET /candidate/:id
     "recruiterEmail": "palash.acharya@aerolens.in",
     "jobProfileRequirementId": 1,
     "jobRole": "SDE-2",
+    "workModeId": 53,
+    "workMode": "Onsite",
     "expectedLocation": {
       "city": "Ahemedabad",
       "country": "India"
@@ -4192,6 +4208,7 @@ Content-Type: multipart/form-data
 | jobRole                 | String      | Job title (optional, soon to be depricated)                                     |
 | jobProfileRequirementId | Number      | Job Profile Requirement Id (required) [must be in jobProfile Requirement table] |
 | expectedLocation        | JSON Object | must be a json object with city and country attributes (required)               |
+| workModeId              | Number      | Work mode Id (optional) [must be in lookup table where tag = 'workMode']        |
 | currentCTC              | Number      | Current CTC in INR [supports decimals ie 12.5] (optional)                       |
 | expectedCTC             | Number      | Expected CTC in INR [supports decimal ie 12.5] (optional)                       |
 | noticePeriod            | Number      | Notice period in days (required)                                                |
@@ -4212,6 +4229,8 @@ Content-Type: multipart/form-data
     "recruiterId": 1,
     "appliedForJobProfileId": 28,
     "expectedLocation": 1,
+    "workModeId": 53,
+    "workMode": "Onsite",
     "noticePeriod": 30,
     "experienceYears": 2.2,
     "statusId": 9,
@@ -4237,6 +4256,7 @@ Content-Type: multipart/form-data
 | jobRole | String | Job title (optional) [soon to be depricated] |
 | jobProfileRequirementId | Number | job profile Requirement ID must be in jobProfileRequirementTable |
 | expectedLocation | JSON Object | must be a json object with city and country attributes |
+| workModeId | Number | work mode ID must be in lookup table where tag = 'workMode' |
 | currentCTC | Number | Current CTC in INR [supports decimals ie 12.5] (optional) |
 | expectedCTC | Number | Expected CTC in INR [supports decimal ie 12.5] (optional) |
 | noticePeriod | Number | Notice period in days (optional) |
@@ -4261,6 +4281,8 @@ Content-Type: multipart/form-data
     "candidateId": 124,
     "candidateName": "Jane Smith",
     "jobRole": "Senior Backend Developer",
+    "workModeId": 54,
+    "workMode": "Hybrid",
     "expectedCTC": 1500000,
     "statusName": "Pending"
   }
@@ -6979,6 +7001,7 @@ This API supports the **new structured compensation fields** which allow storing
 | recruiterId             | number | Yes      | ID of the recruiter             |
 | vendorId                | number | No       | Recruitment vendor ID           |
 | jobProfileRequirementId | number | No       | Job profile requirement ID      |
+| workModeId              | number | No       | Work mode ID from lookup        |
 | noticePeriod            | number | No       | Candidate notice period in days |
 | experienceYears         | number | No       | Total experience in years       |
 
@@ -7003,6 +7026,7 @@ This API supports the **new structured compensation fields** which allow storing
   "recruiterId": 468,
   "vendorId": 32,
   "jobProfileRequirementId": 53,
+  "workModeId": 54,
   "noticePeriod": 12,
   "experienceYears": 30,
 

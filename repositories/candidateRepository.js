@@ -94,6 +94,12 @@ class CandidateRepository {
             WHERE tag = 'currency'
             ORDER BY value
         `);
+        const workModePromise = connection.query(`
+        SELECT lookupKey AS workModeId, value AS workMode
+        FROM lookup
+        WHERE tag = 'workMode'
+        ORDER BY value
+        `);
 
         const compensationTypePromise = connection.query(`
             SELECT lookupKey AS compensationTypeId, value AS compensationTypeName
@@ -102,14 +108,15 @@ class CandidateRepository {
             ORDER BY value
         `);
 
-        const [recruiters, locations, jobProfiles, vendors, currencies, compensationTypes] =
+        const [recruiters, locations, jobProfiles, vendors, currencies, compensationTypes, workModes] =
             await Promise.all([
                 recruitersPromise,
                 locationPromise,
                 jobProfilePromise,
                 vendorPromise,
                 currencyPromise,
-                compensationTypePromise
+                compensationTypePromise,
+                workModePromise
             ]);
 
         return {
@@ -118,7 +125,8 @@ class CandidateRepository {
             jobProfiles: jobProfiles[0],
             vendors: vendors[0],
             currencies: currencies[0],
-            compensationTypes: compensationTypes[0]
+            compensationTypes: compensationTypes[0],
+            workModes: workModes[0]
         };
     }
 
@@ -126,8 +134,8 @@ class CandidateRepository {
         const connection = client;
         console.log(candidateData);
         try {
-            const query = `INSERT INTO candidate(candidateName,contactNumber,email,recruiterId,appliedForJobProfileId,expectedLocation,currentLocation,currentCTC,expectedCTC, currentCTCAmount, currentCTCCurrencyId, currentCTCTypeId, expectedCTCAmount, expectedCTCCurrencyId, expectedCTCTypeId, noticePeriod, experienceYears, linkedinProfileUrl, resumeFilename, resumeOriginalName, resumeUploadDate, notes, statusId, vendorId, referredBy)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`
+            const query = `INSERT INTO candidate(candidateName,contactNumber,email,recruiterId,appliedForJobProfileId,expectedLocation,currentLocation,currentCTC,expectedCTC, currentCTCAmount, currentCTCCurrencyId, currentCTCTypeId, expectedCTCAmount, expectedCTCCurrencyId, expectedCTCTypeId, noticePeriod, experienceYears, linkedinProfileUrl, resumeFilename, resumeOriginalName, resumeUploadDate, workModeId, notes, statusId, vendorId, referredBy)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);`
 
             const [result] = await connection.execute(query, [
                 candidateData.candidateName,
@@ -151,6 +159,7 @@ class CandidateRepository {
                 null,
                 null,
                 null,
+                candidateData.workModeId,
                 candidateData.notes ?? null,
                 candidateData.statusId,
                 candidateData.vendorId ?? null,
@@ -219,6 +228,8 @@ class CandidateRepository {
             c.experienceYears,
             c.linkedinProfileUrl,
             stat.value AS statusName,
+            c.workModeId,
+            wm.value AS workMode,
             c.resumeFilename,
             c.resumeOriginalName,
             c.resumeUploadDate,
@@ -237,6 +248,10 @@ class CandidateRepository {
         LEFT JOIN lookup stat
             ON c.statusId = stat.lookupKey
             AND stat.tag = 'candidateStatus'
+        
+        LEFT JOIN lookup wm
+        ON wm.lookupKey = c.workModeId
+        AND wm.tag = 'workMode'
 
         LEFT JOIN member m
             ON m.memberId = c.recruiterId
@@ -606,7 +621,7 @@ class CandidateRepository {
             // Filter only allowed fields for security
             const allowedFields = [
                 'candidateName', 'contactNumber', 'email', 'recruiterId', 'vendorId',
-                'appliedForJobProfileId', 'expectedLocation', 'currentLocation', 'currentCTC', 'expectedCTC', 'currentCTCAmount', 'currentCTCCurrencyId', 'currentCTCTypeId', 'expectedCTCAmount', 'expectedCTCCurrencyId', 'expectedCTCTypeId', 'noticePeriod', 'experienceYears', 'linkedinProfileUrl', 'resume', 'notes', 'referredBy'
+                'appliedForJobProfileId', 'expectedLocation', 'currentLocation', 'currentCTC', 'expectedCTC', 'currentCTCAmount', 'currentCTCCurrencyId', 'currentCTCTypeId', 'expectedCTCAmount', 'expectedCTCCurrencyId', 'expectedCTCTypeId', 'noticePeriod', 'experienceYears', 'linkedinProfileUrl', 'resume', 'workModeId', 'notes', 'referredBy'
             ];
 
             const filteredData = {};
@@ -773,6 +788,8 @@ class CandidateRepository {
             c.experienceYears,
             c.linkedinProfileUrl,
             stat.value AS statusName,
+            c.workModeId,
+            wm.value AS workMode,
             c.resumeFilename,
             c.resumeOriginalName,
             c.resumeUploadDate,
@@ -791,6 +808,10 @@ class CandidateRepository {
         LEFT JOIN lookup stat
             ON c.statusId = stat.lookupKey
             AND stat.tag = 'candidateStatus'
+
+        LEFT JOIN lookup wm
+            ON wm.lookupKey = c.workModeId
+            AND wm.tag = 'workMode'
 
         LEFT JOIN member m
             ON m.memberId = c.recruiterId
