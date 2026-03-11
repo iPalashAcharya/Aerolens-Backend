@@ -90,7 +90,8 @@ class CandidateController {
                 locations: formData.locations,
                 jobProfiles: formData.jobProfiles,
                 currencies: formData.currencies,
-                compensationTypes: formData.compensationTypes
+                compensationTypes: formData.compensationTypes,
+                workModes: formData.workModes
             }
         });
     });

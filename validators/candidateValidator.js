@@ -501,6 +501,15 @@ const candidateSchemas = {
             .messages({
                 'number.base': 'Expected CTC type must be a valid lookup ID'
             }),
+        
+        workModeId: Joi.number()
+            .integer()
+            .positive()
+            .required()
+            .messages({
+                'any.required': 'Work mode is required',
+                'number.base': 'Work mode must be a valid lookup ID'
+            }),
 
         noticePeriod: Joi.number()
             .integer()
@@ -784,6 +793,15 @@ const candidateSchemas = {
             .positive()
             .optional()
             .allow(null),
+
+        workModeId: Joi.number()
+            .integer()
+            .positive()
+            .required()
+            .messages({
+                'any.required': 'Work mode is required',
+                'number.base': 'Work mode must be a valid lookup ID'
+            }),
 
         noticePeriod: Joi.number()
             .integer()
