@@ -9,9 +9,12 @@ class OfferService {
     async createOffer(offerData, auditContext) {
         const client = await this.db.getConnection();
         try {
+            await client.beginTransaction();
             const offer = await this.offerRepository.createOffer(offerData, client);
+            await client.commit();
             return offer;
         } catch (error) {
+            await client.rollback();
             if (error instanceof AppError) throw error;
             console.error('Error creating offer:', error.stack);
             throw new AppError('Failed to create offer', 500, 'OFFER_CREATION_ERROR', { operation: 'createOffer' });
