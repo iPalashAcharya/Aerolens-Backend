@@ -7538,6 +7538,34 @@ Data sources:
 - member
 - jobProfileRequirement
 
+#### 4. Delete Offer (Soft Delete)
+
+**DELETE** `/offers/:offerId`
+
+Soft deletes an offer by marking it as deleted. The record is not permanently removed.
+
+**Behavior:**
+
+- Updates the offer record: `isDeleted = 1`, `deletedAt = NOW()`
+- Offer is excluded from all GET endpoints
+- Action is recorded in the audit log
+
+**Response** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Offer deleted successfully"
+}
+```
+
+**Notes:**
+
+- Offers are never permanently deleted.
+- Deleted offers are excluded from all GET endpoints.
+- The action is recorded in the audit log.
+- Used when an offer must be withdrawn or removed from the active lifecycle.
+
 ### Implementation Files
 
 Offer module components are located in:

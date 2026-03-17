@@ -20,6 +20,8 @@ router.get('/form-data', offerController.getOfferFormData);
 
 router.get('/', offerController.getOffers);
 
+router.delete('/:offerId', offerController.deleteOffer);
+
 router.post('/:candidateId', OfferValidator.validateCreate, offerController.createOffer);
 
 module.exports = router;

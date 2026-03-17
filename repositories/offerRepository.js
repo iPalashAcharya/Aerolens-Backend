@@ -74,12 +74,41 @@ class OfferRepository {
             LEFT JOIN lookup let ON let.lookupKey = o.employmentTypeLookupId AND let.tag = 'employmentType'
             LEFT JOIN lookup wm ON wm.lookupKey = o.workModelLookupId AND wm.tag = 'workMode'
             LEFT JOIN member m ON m.memberId = o.createdBy
+            WHERE o.isDeleted = 0
             ORDER BY o.createdAt DESC
             `;
             const [rows] = await connection.query(query);
             return rows;
         } catch (error) {
             this._handleDatabaseError(error, 'getOffers');
+        }
+    }
+
+    async getOfferById(offerId, client) {
+        const connection = client;
+        try {
+            const [rows] = await connection.execute(
+                'SELECT * FROM offer WHERE offerId = ? AND isDeleted = 0',
+                [offerId]
+            );
+            return rows[0] || null;
+        } catch (error) {
+            this._handleDatabaseError(error, 'getOfferById');
+        }
+    }
+
+    async softDeleteOffer(offerId, client) {
+        const connection = client;
+        try {
+            const [result] = await connection.execute(
+                `UPDATE offer
+                 SET isDeleted = 1, deletedAt = NOW()
+                 WHERE offerId = ? AND isDeleted = 0`,
+                [offerId]
+            );
+            return result.affectedRows;
+        } catch (error) {
+            this._handleDatabaseError(error, 'softDeleteOffer');
         }
     }
 
