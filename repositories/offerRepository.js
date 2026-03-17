@@ -139,8 +139,8 @@ class OfferRepository {
         const connection = client;
         try {
             await connection.execute(
-                `INSERT INTO offer_revision (offerId, previousCTC, newCTC, previousJoiningDate, newJoiningDate, reason, revisedBy, createdAt)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+                `INSERT INTO offer_revision (offerId, previousCTC, newCTC, previousJoiningDate, newJoiningDate, reason, revisedBy)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
                 [
                     offerId,
                     revisionData.previousCTC,
