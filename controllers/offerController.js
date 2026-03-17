@@ -27,6 +27,18 @@ class OfferController {
         return ApiResponse.success(res, null, 'Offer deleted successfully');
     });
 
+    terminateOffer = catchAsync(async (req, res) => {
+        const offerId = parseInt(req.params.offerId, 10);
+        const terminatedBy = req.auditContext.userId;
+        const terminationData = {
+            terminationDate: req.body.terminationDate,
+            terminationReason: req.body.terminationReason,
+            terminatedBy
+        };
+        await this.offerService.terminateOffer(offerId, terminationData, req.auditContext);
+        return ApiResponse.success(res, null, 'Offer terminated successfully');
+    });
+
     getOfferFormData = catchAsync(async (req, res) => {
         const formData = await this.offerService.getOfferFormData();
         res.status(200).json({

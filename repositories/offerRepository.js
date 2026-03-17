@@ -112,6 +112,29 @@ class OfferRepository {
         }
     }
 
+    async terminateOffer(offerId, terminationData, client) {
+        const connection = client;
+        try {
+            await connection.execute(
+                `INSERT INTO offer_termination (offerId, terminationDate, terminationReason, terminatedBy, createdAt)
+                 VALUES (?, ?, ?, ?, NOW())`,
+                [
+                    offerId,
+                    terminationData.terminationDate,
+                    terminationData.terminationReason,
+                    terminationData.terminatedBy
+                ]
+            );
+            const [result] = await connection.execute(
+                `UPDATE offer SET offerStatus = 'TERMINATED' WHERE offerId = ? AND isDeleted = 0`,
+                [offerId]
+            );
+            return result.affectedRows;
+        } catch (error) {
+            this._handleDatabaseError(error, 'terminateOffer');
+        }
+    }
+
     async getOfferFormData(client) {
         const connection = client;
 

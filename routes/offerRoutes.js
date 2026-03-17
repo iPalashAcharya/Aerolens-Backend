@@ -22,6 +22,8 @@ router.get('/', offerController.getOffers);
 
 router.delete('/:offerId', offerController.deleteOffer);
 
+router.post('/:offerId/terminate', OfferValidator.validateTerminate, offerController.terminateOffer);
+
 router.post('/:candidateId', OfferValidator.validateCreate, offerController.createOffer);
 
 module.exports = router;

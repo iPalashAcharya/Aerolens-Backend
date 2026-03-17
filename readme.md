@@ -7566,6 +7566,50 @@ Soft deletes an offer by marking it as deleted. The record is not permanently re
 - The action is recorded in the audit log.
 - Used when an offer must be withdrawn or removed from the active lifecycle.
 
+#### 5. Terminate Offer
+
+**POST** `/offers/:offerId/terminate`
+
+Terminates an existing offer. Records the termination in the `offer_termination` table and updates the offer status to `TERMINATED`. Only non-deleted offers can be terminated.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| terminationDate | string | Yes | Date in YYYY-MM-DD format |
+| terminationReason | string | Yes | Reason for termination |
+
+**Example request body:**
+
+```json
+{
+  "terminationDate": "2026-04-15",
+  "terminationReason": "Candidate declined"
+}
+```
+
+**Behavior:**
+
+- Inserts a row into `offer_termination` (offerId, terminationDate, terminationReason, terminatedBy, createdAt).
+- Updates the offer: `offerStatus = 'TERMINATED'`.
+- Both operations run in a single transaction; both succeed or both fail.
+- `terminatedBy` is set from the logged-in user (audit context).
+- Action is recorded in the audit log.
+
+**Response** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Offer terminated successfully"
+}
+```
+
+**Notes:**
+
+- Only offers that exist and are not deleted (`isDeleted = 0`) can be terminated.
+- Termination details are stored in the `offer_termination` table for audit and reporting.
+
 ### Implementation Files
 
 Offer module components are located in:
