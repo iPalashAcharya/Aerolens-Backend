@@ -7,7 +7,12 @@ class OfferController {
     }
 
     createOffer = catchAsync(async (req, res) => {
-        const offer = await this.offerService.createOffer(req.body, req.auditContext);
+        const candidateId = parseInt(req.params.candidateId, 10);
+        const createdBy = req.auditContext.userId;
+        const offer = await this.offerService.createOffer(
+            { ...req.body, candidateId, createdBy },
+            req.auditContext
+        );
         return ApiResponse.success(res, offer, 'Offer created successfully', 201);
     });
 

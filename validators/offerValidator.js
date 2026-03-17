@@ -3,8 +3,6 @@ const AppError = require('../utils/appError');
 
 const offerSchemas = {
     create: Joi.object({
-        candidateId: Joi.number().integer().positive().required()
-            .messages({ 'any.required': 'Candidate ID is required' }),
         jobProfileRequirementId: Joi.number().integer().positive().required()
             .messages({ 'any.required': 'Job profile requirement ID is required' }),
         vendorId: Joi.number().integer().positive().optional().allow(null),

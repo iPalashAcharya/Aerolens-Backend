@@ -20,6 +20,6 @@ router.get('/form-data', offerController.getOfferFormData);
 
 router.get('/', offerController.getOffers);
 
-router.post('/', OfferValidator.validateCreate, offerController.createOffer);
+router.post('/:candidateId', OfferValidator.validateCreate, offerController.createOffer);
 
 module.exports = router;

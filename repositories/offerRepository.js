@@ -14,8 +14,8 @@ class OfferRepository {
                 employmentTypeLookupId, workModelLookupId, joiningDate, offeredCTCAmount,
                 currencyLookupId, compensationTypeLookupId, variablePay, joiningBonus,
                 offerLetterSent, serviceAgreementSent, ndaSent, codeOfConductSent,
-                offerStatus, offerVersion
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                offerStatus, offerVersion, createdBy
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             const [result] = await connection.execute(query, [
                 offerData.candidateId,
@@ -35,7 +35,8 @@ class OfferRepository {
                 offerData.ndaSent ?? null,
                 offerData.codeOfConductSent ?? null,
                 offerData.offerStatus ?? 'PENDING',
-                offerData.offerVersion ?? 1
+                offerData.offerVersion ?? 1,
+                offerData.createdBy
             ]);
             const offerId = result.insertId;
             const [rows] = await connection.execute(
@@ -56,19 +57,23 @@ class OfferRepository {
                 o.offerId,
                 c.candidateName,
                 jp.jobRole,
-                o.employmentTypeLookupId,
-                o.workModelLookupId,
+                let.value AS employmentTypeName,
+                wm.value AS workModeName,
                 o.joiningDate,
                 o.offeredCTCAmount,
                 o.offerStatus,
                 o.offerVersion,
                 o.variablePay,
                 o.joiningBonus,
+                m.memberName AS createdByName,
                 DATE_FORMAT(o.createdAt, '%Y-%m-%dT%H:%i:%sZ') AS createdAt
             FROM offer o
             LEFT JOIN candidate c ON c.candidateId = o.candidateId
             LEFT JOIN jobProfileRequirement jpr ON jpr.jobProfileRequirementId = o.jobProfileRequirementId
             LEFT JOIN jobProfile jp ON jp.jobProfileId = jpr.jobProfileId
+            LEFT JOIN lookup let ON let.lookupKey = o.employmentTypeLookupId AND let.tag = 'employmentType'
+            LEFT JOIN lookup wm ON wm.lookupKey = o.workModelLookupId AND wm.tag = 'workMode'
+            LEFT JOIN member m ON m.memberId = o.createdBy
             ORDER BY o.createdAt DESC
             `;
             const [rows] = await connection.query(query);
