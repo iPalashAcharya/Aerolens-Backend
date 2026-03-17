@@ -41,6 +41,19 @@ const offerSchemas = {
             }),
         terminationReason: Joi.string().trim().required()
             .messages({ 'any.required': 'Termination reason is required' })
+    }),
+    revision: Joi.object({
+        newCTC: Joi.number().min(0).required()
+            .messages({ 'any.required': 'New CTC is required' }),
+        newJoiningDate: Joi.string()
+            .pattern(/^\d{4}-\d{2}-\d{2}$/)
+            .required()
+            .messages({
+                'string.pattern.base': 'New joining date must be YYYY-MM-DD',
+                'any.required': 'New joining date is required'
+            }),
+        reason: Joi.string().trim().required()
+            .messages({ 'any.required': 'Reason is required' })
     })
 };
 
@@ -64,6 +77,23 @@ class OfferValidator {
 
     static validateTerminate(req, res, next) {
         const { value, error } = offerSchemas.terminate.validate(req.body, {
+            abortEarly: false,
+            stripUnknown: true
+        });
+        if (error) {
+            throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', {
+                validationErrors: error.details.map(detail => ({
+                    field: detail.path[0],
+                    message: detail.message
+                }))
+            });
+        }
+        req.body = value;
+        next();
+    }
+
+    static validateRevision(req, res, next) {
+        const { value, error } = offerSchemas.revision.validate(req.body, {
             abortEarly: false,
             stripUnknown: true
         });

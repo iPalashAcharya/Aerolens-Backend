@@ -135,6 +135,34 @@ class OfferRepository {
         }
     }
 
+    async reviseOffer(offerId, revisionData, client) {
+        const connection = client;
+        try {
+            await connection.execute(
+                `INSERT INTO offer_revision (offerId, previousCTC, newCTC, previousJoiningDate, newJoiningDate, reason, revisedBy, createdAt)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+                [
+                    offerId,
+                    revisionData.previousCTC,
+                    revisionData.newCTC,
+                    revisionData.previousJoiningDate,
+                    revisionData.newJoiningDate,
+                    revisionData.reason,
+                    revisionData.revisedBy
+                ]
+            );
+            const [result] = await connection.execute(
+                `UPDATE offer
+                 SET offeredCTCAmount = ?, joiningDate = ?, offerVersion = offerVersion + 1
+                 WHERE offerId = ? AND isDeleted = 0`,
+                [revisionData.newCTC, revisionData.newJoiningDate, offerId]
+            );
+            return result.affectedRows;
+        } catch (error) {
+            this._handleDatabaseError(error, 'reviseOffer');
+        }
+    }
+
     async getOfferFormData(client) {
         const connection = client;
 

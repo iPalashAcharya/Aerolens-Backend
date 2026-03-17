@@ -7610,6 +7610,52 @@ Terminates an existing offer. Records the termination in the `offer_termination`
 - Only offers that exist and are not deleted (`isDeleted = 0`) can be terminated.
 - Termination details are stored in the `offer_termination` table for audit and reporting.
 
+#### 6. Revise Offer
+
+**POST** `/offers/:offerId/revise`
+
+Revises an existing offer and stores revision history in `offer_revision`. Previous CTC and joining date are recorded before the offer is updated; `offerVersion` is incremented.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| newCTC | number | Yes | New offered CTC amount |
+| newJoiningDate | string | Yes | New joining date (YYYY-MM-DD) |
+| reason | string | Yes | Reason for the revision |
+
+**Example request body:**
+
+```json
+{
+  "newCTC": 1200000,
+  "newJoiningDate": "2026-05-01",
+  "reason": "CTC and date updated per discussion"
+}
+```
+
+**Behavior:**
+
+- Previous offer values (CTC, joining date) are stored in `offer_revision`.
+- Offer is updated with new `offeredCTCAmount`, `joiningDate`, and `offerVersion` is incremented.
+- All operations run in a single transaction.
+- `revisedBy` is set from the logged-in user (audit context).
+- Action is recorded in the audit log.
+
+**Response** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Offer revised successfully"
+}
+```
+
+**Notes:**
+
+- Only non-deleted offers can be revised.
+- Revision history is stored in the `offer_revision` table for audit and reporting.
+
 ### Implementation Files
 
 Offer module components are located in:

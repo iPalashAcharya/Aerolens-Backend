@@ -39,6 +39,19 @@ class OfferController {
         return ApiResponse.success(res, null, 'Offer terminated successfully');
     });
 
+    reviseOffer = catchAsync(async (req, res) => {
+        const offerId = parseInt(req.params.offerId, 10);
+        const revisedBy = req.auditContext.userId;
+        const revisionData = {
+            newCTC: req.body.newCTC,
+            newJoiningDate: req.body.newJoiningDate,
+            reason: req.body.reason,
+            revisedBy
+        };
+        await this.offerService.reviseOffer(offerId, revisionData, req.auditContext);
+        return ApiResponse.success(res, null, 'Offer revised successfully');
+    });
+
     getOfferFormData = catchAsync(async (req, res) => {
         const formData = await this.offerService.getOfferFormData();
         res.status(200).json({

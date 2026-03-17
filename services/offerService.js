@@ -131,6 +131,58 @@ class OfferService {
             client.release();
         }
     }
+
+    async reviseOffer(offerId, revisionData, auditContext) {
+        const client = await this.db.getConnection();
+        try {
+            await client.beginTransaction();
+
+            const offer = await this.offerRepository.getOfferById(offerId, client);
+            if (!offer) {
+                throw new AppError('Offer not found or already deleted', 404, 'OFFER_NOT_FOUND');
+            }
+
+            const fullRevisionData = {
+                previousCTC: offer.offeredCTCAmount,
+                previousJoiningDate: offer.joiningDate,
+                newCTC: revisionData.newCTC,
+                newJoiningDate: revisionData.newJoiningDate,
+                reason: revisionData.reason,
+                revisedBy: auditContext.userId
+            };
+
+            const affectedRows = await this.offerRepository.reviseOffer(offerId, fullRevisionData, client);
+            if (affectedRows === 0) {
+                throw new AppError('Offer not found or already deleted', 404, 'OFFER_NOT_FOUND');
+            }
+
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'REVISE',
+                newValues: {
+                    entityType: 'OFFER',
+                    entityId: offerId,
+                    description: 'Offer revised',
+                    newCTC: revisionData.newCTC,
+                    newJoiningDate: revisionData.newJoiningDate,
+                    reason: revisionData.reason,
+                    offerVersion: (offer.offerVersion || 0) + 1
+                },
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, client);
+
+            await client.commit();
+        } catch (error) {
+            await client.rollback();
+            if (error instanceof AppError) throw error;
+            console.error('Error revising offer:', error.stack);
+            throw new AppError('Failed to revise offer', 500, 'OFFER_REVISION_ERROR', { operation: 'reviseOffer', offerId });
+        } finally {
+            client.release();
+        }
+    }
 }
 
 module.exports = OfferService;
