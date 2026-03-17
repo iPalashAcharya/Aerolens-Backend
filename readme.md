@@ -7411,3 +7411,149 @@ linked++
 
 *For questions or issues, check the `errorMessage` field on `FAILED` status or contact the backend team.*
 
+---
+
+## Offer Module
+
+This module supports the **Initiate Onboarding workflow** after a candidate is selected.
+
+The module follows the existing backend architecture:
+
+**routes → controller → service → repository**
+
+The implementation uses:
+
+- raw SQL queries (mysql2)
+- Joi validation
+- ApiResponse response format
+- AppError error handling
+- auditContextMiddleware for tracking the logged-in user
+
+### Database Table
+
+The module operates on the `offer` table.
+
+Important fields include:
+
+- offerId
+- candidateId
+- jobProfileRequirementId
+- vendorId
+- reportingManagerId
+- employmentTypeLookupId
+- workModelLookupId
+- joiningDate
+- offeredCTCAmount
+- currencyLookupId
+- compensationTypeLookupId
+- variablePay
+- joiningBonus
+- offerLetterSent
+- serviceAgreementSent
+- ndaSent
+- codeOfConductSent
+- offerStatus
+- offerVersion
+- createdBy
+- createdAt
+- updatedAt
+
+`createdBy` stores the logged-in user who created the offer.
+
+### API Endpoints
+
+#### 1. Create Offer
+
+**POST** `/offers/:candidateId`
+
+Creates a new offer for a selected candidate. Candidate ID is provided through the URL parameter instead of the request body.
+
+**Example request body:**
+
+```json
+{
+  "jobProfileRequirementId": 5,
+  "reportingManagerId": 7,
+  "employmentTypeLookupId": 1,
+  "workModelLookupId": 4,
+  "joiningDate": "2026-04-01",
+  "ndaSent": true,
+  "codeOfConductSent": true
+}
+```
+
+Backend automatically adds:
+
+- **candidateId** — from URL parameter
+- **createdBy** — from auditContextMiddleware
+
+#### 2. Get Offers
+
+**GET** `/offers`
+
+Returns a list of all offers for the Offer page.
+
+Response includes display-friendly values for frontend tables:
+
+- offerId
+- candidateName
+- jobRole
+- employmentTypeName
+- workModeName
+- joiningDate
+- offeredCTCAmount
+- offerStatus
+- offerVersion
+- variablePay
+- joiningBonus
+- createdByName
+- createdAt
+
+Data is sorted by **createdAt DESC**.
+
+#### 3. Get Form Data
+
+**GET** `/offers/form-data`
+
+Returns lookup data required to render the **Initiate Onboarding form**.
+
+**Response structure:**
+
+```json
+{
+  "employmentTypes": [],
+  "workModes": [],
+  "currencies": [],
+  "compensationTypes": [],
+  "vendors": [],
+  "members": [],
+  "jobProfileRequirements": []
+}
+```
+
+Data sources:
+
+- lookup table (by tag)
+- recruitmentVendor
+- member
+- jobProfileRequirement
+
+### Implementation Files
+
+Offer module components are located in:
+
+- routes/offerRoutes.js
+- controllers/offerController.js
+- services/offerService.js
+- repositories/offerRepository.js
+- validators/offerValidator.js
+
+Routes are registered in **server.js**.
+
+### Notes
+
+- **candidateId** is provided through the route parameter (`/offers/:candidateId`).
+- **createdBy** is automatically populated using auditContextMiddleware.
+- The module follows the same architectural patterns used by the Candidate and Interview modules.
+- No additional frameworks or abstractions were introduced.
+
