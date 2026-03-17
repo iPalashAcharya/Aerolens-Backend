@@ -183,6 +183,56 @@ class OfferService {
             client.release();
         }
     }
+
+    async updateOfferStatus(offerId, statusData, auditContext) {
+        const client = await this.db.getConnection();
+        try {
+            await client.beginTransaction();
+
+            const offer = await this.offerRepository.getOfferById(offerId, client);
+            if (!offer) {
+                throw new AppError('Offer not found or already deleted', 404, 'OFFER_NOT_FOUND');
+            }
+
+            const fullStatusData = {
+                offerId,
+                status: statusData.status,
+                rejectionReason: statusData.rejectionReason ?? null,
+                updatedBy: auditContext.userId
+            };
+
+            await this.offerRepository.insertOfferStatus(fullStatusData, client);
+
+            const affectedRows = await this.offerRepository.updateOfferStatus(offerId, statusData.status, client);
+            if (affectedRows === 0) {
+                throw new AppError('Offer not found or already deleted', 404, 'OFFER_NOT_FOUND');
+            }
+
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'STATUS_UPDATE',
+                newValues: {
+                    entityType: 'OFFER',
+                    entityId: offerId,
+                    description: 'Offer status updated',
+                    status: statusData.status,
+                    rejectionReason: statusData.rejectionReason ?? null
+                },
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, client);
+
+            await client.commit();
+        } catch (error) {
+            await client.rollback();
+            if (error instanceof AppError) throw error;
+            console.error('Error updating offer status:', error.stack);
+            throw new AppError('Failed to update offer status', 500, 'OFFER_STATUS_UPDATE_ERROR', { operation: 'updateOfferStatus', offerId });
+        } finally {
+            client.release();
+        }
+    }
 }
 
 module.exports = OfferService;

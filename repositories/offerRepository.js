@@ -163,6 +163,37 @@ class OfferRepository {
         }
     }
 
+    async insertOfferStatus(statusData, client) {
+        const connection = client;
+        try {
+            await connection.execute(
+                `INSERT INTO offer_status_history (offerId, status, rejectionReason, updatedBy, createdAt)
+                 VALUES (?, ?, ?, ?, NOW())`,
+                [
+                    statusData.offerId,
+                    statusData.status,
+                    statusData.rejectionReason ?? null,
+                    statusData.updatedBy
+                ]
+            );
+        } catch (error) {
+            this._handleDatabaseError(error, 'insertOfferStatus');
+        }
+    }
+
+    async updateOfferStatus(offerId, status, client) {
+        const connection = client;
+        try {
+            const [result] = await connection.execute(
+                `UPDATE offer SET offerStatus = ? WHERE offerId = ? AND isDeleted = 0`,
+                [status, offerId]
+            );
+            return result.affectedRows;
+        } catch (error) {
+            this._handleDatabaseError(error, 'updateOfferStatus');
+        }
+    }
+
     async getOfferFormData(client) {
         const connection = client;
 

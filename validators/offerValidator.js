@@ -54,6 +54,19 @@ const offerSchemas = {
             }),
         reason: Joi.string().trim().required()
             .messages({ 'any.required': 'Reason is required' })
+    }),
+    statusUpdate: Joi.object({
+        status: Joi.string().valid('ACCEPTED', 'REJECTED').required()
+            .messages({
+                'any.only': 'Status must be ACCEPTED or REJECTED',
+                'any.required': 'Status is required'
+            }),
+        rejectionReason: Joi.string().trim()
+            .when('status', {
+                is: 'REJECTED',
+                then: Joi.required().messages({ 'any.required': 'Rejection reason is required when status is REJECTED' }),
+                otherwise: Joi.optional().allow(null, '')
+            })
     })
 };
 
@@ -94,6 +107,23 @@ class OfferValidator {
 
     static validateRevision(req, res, next) {
         const { value, error } = offerSchemas.revision.validate(req.body, {
+            abortEarly: false,
+            stripUnknown: true
+        });
+        if (error) {
+            throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', {
+                validationErrors: error.details.map(detail => ({
+                    field: detail.path[0],
+                    message: detail.message
+                }))
+            });
+        }
+        req.body = value;
+        next();
+    }
+
+    static validateStatusUpdate(req, res, next) {
+        const { value, error } = offerSchemas.statusUpdate.validate(req.body, {
             abortEarly: false,
             stripUnknown: true
         });

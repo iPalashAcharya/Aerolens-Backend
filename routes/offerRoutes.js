@@ -26,6 +26,8 @@ router.post('/:offerId/terminate', OfferValidator.validateTerminate, offerContro
 
 router.post('/:offerId/revise', OfferValidator.validateRevision, offerController.reviseOffer);
 
+router.post('/:offerId/status', OfferValidator.validateStatusUpdate, offerController.updateOfferStatus);
+
 router.post('/:candidateId', OfferValidator.validateCreate, offerController.createOffer);
 
 module.exports = router;

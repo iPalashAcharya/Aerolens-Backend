@@ -52,6 +52,18 @@ class OfferController {
         return ApiResponse.success(res, null, 'Offer revised successfully');
     });
 
+    updateOfferStatus = catchAsync(async (req, res) => {
+        const offerId = parseInt(req.params.offerId, 10);
+        const updatedBy = req.auditContext.userId;
+        const statusData = {
+            status: req.body.status,
+            rejectionReason: req.body.rejectionReason ?? null,
+            updatedBy
+        };
+        await this.offerService.updateOfferStatus(offerId, statusData, req.auditContext);
+        return ApiResponse.success(res, null, 'Offer status updated successfully');
+    });
+
     getOfferFormData = catchAsync(async (req, res) => {
         const formData = await this.offerService.getOfferFormData();
         res.status(200).json({

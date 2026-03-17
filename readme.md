@@ -7656,6 +7656,59 @@ Revises an existing offer and stores revision history in `offer_revision`. Previ
 - Only non-deleted offers can be revised.
 - Revision history is stored in the `offer_revision` table for audit and reporting.
 
+#### 7. Update Offer Status
+
+**POST** `/offers/:offerId/status`
+
+Updates the status of an offer and records the status change in `offer_status_history`. Typical statuses include `ACCEPTED` and `REJECTED`.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| status | string | Yes | One of: `ACCEPTED`, `REJECTED` |
+| rejectionReason | string | When status = REJECTED | Reason for rejection (required when status is REJECTED) |
+
+**Example — offer accepted:**
+
+```json
+{
+  "status": "ACCEPTED"
+}
+```
+
+**Example — offer rejected:**
+
+```json
+{
+  "status": "REJECTED",
+  "rejectionReason": "Candidate accepted another offer"
+}
+```
+
+**Behavior:**
+
+- Inserts a record into `offer_status_history` (offerId, status, rejectionReason, updatedBy, createdAt).
+- Updates `offerStatus` in the `offer` table.
+- Both operations run in a single transaction.
+- `updatedBy` is set from the logged-in user (audit context).
+- Action is recorded in the audit log.
+
+**Response** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Offer status updated successfully"
+}
+```
+
+**Notes:**
+
+- Only non-deleted offers can have their status updated.
+- Every status change is recorded in `offer_status_history` for lifecycle traceability.
+- The offer table always reflects the latest status.
+
 ### Implementation Files
 
 Offer module components are located in:
