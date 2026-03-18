@@ -40,7 +40,12 @@ class OfferRepository {
             ]);
             const offerId = result.insertId;
             const [rows] = await connection.execute(
-                'SELECT * FROM offer WHERE offerId = ?',
+                `SELECT offerId, candidateId, jobProfileRequirementId, vendorId, reportingManagerId,
+                        employmentTypeLookupId, workModelLookupId, joiningDate, offeredCTCAmount,
+                        currencyLookupId, compensationTypeLookupId, variablePay, joiningBonus,
+                        offerLetterSent, serviceAgreementSent, ndaSent, codeOfConductSent,
+                        offerStatus, offerVersion, createdBy, createdAt, updatedAt, isDeleted, deletedAt
+                 FROM offer WHERE offerId = ?`,
                 [offerId]
             );
             return rows[0] || null;
@@ -74,12 +79,138 @@ class OfferRepository {
             LEFT JOIN lookup let ON let.lookupKey = o.employmentTypeLookupId AND let.tag = 'employmentType'
             LEFT JOIN lookup wm ON wm.lookupKey = o.workModelLookupId AND wm.tag = 'workMode'
             LEFT JOIN member m ON m.memberId = o.createdBy
+            WHERE o.isDeleted = 0
             ORDER BY o.createdAt DESC
             `;
             const [rows] = await connection.query(query);
             return rows;
         } catch (error) {
             this._handleDatabaseError(error, 'getOffers');
+        }
+    }
+
+    async getOfferById(offerId, client) {
+        const connection = client;
+        try {
+            const [rows] = await connection.execute(
+                `SELECT
+                    o.offerId, o.candidateId, o.jobProfileRequirementId, o.vendorId, o.reportingManagerId,
+                    o.employmentTypeLookupId, o.workModelLookupId, o.joiningDate, o.offeredCTCAmount,
+                    o.currencyLookupId, o.compensationTypeLookupId, o.variablePay, o.joiningBonus,
+                    o.offerLetterSent, o.serviceAgreementSent, o.ndaSent, o.codeOfConductSent,
+                    o.offerStatus, o.offerVersion, o.createdBy, o.createdAt, o.updatedAt,
+                    o.isDeleted, o.deletedAt,
+                    let.value AS employmentTypeName
+                 FROM offer o
+                 LEFT JOIN lookup let ON let.lookupKey = o.employmentTypeLookupId AND let.tag = 'employmentType'
+                 WHERE o.offerId = ? AND o.isDeleted = 0`,
+                [offerId]
+            );
+            return rows[0] || null;
+        } catch (error) {
+            this._handleDatabaseError(error, 'getOfferById');
+        }
+    }
+
+    async softDeleteOffer(offerId, client) {
+        const connection = client;
+        try {
+            const [result] = await connection.execute(
+                `UPDATE offer
+                 SET isDeleted = 1, deletedAt = NOW()
+                 WHERE offerId = ? AND isDeleted = 0`,
+                [offerId]
+            );
+            return result.affectedRows;
+        } catch (error) {
+            this._handleDatabaseError(error, 'softDeleteOffer');
+        }
+    }
+
+    async terminateOffer(offerId, terminationData, client) {
+        const connection = client;
+        try {
+            await connection.execute(
+                `INSERT INTO offer_termination (offerId, terminationDate, terminationReason, terminatedBy)
+                 VALUES (?, ?, ?, ?)`,
+                [
+                    offerId,
+                    terminationData.terminationDate,
+                    terminationData.terminationReason,
+                    terminationData.terminatedBy
+                ]
+            );
+            const [result] = await connection.execute(
+                `UPDATE offer SET offerStatus = 'TERMINATED' WHERE offerId = ? AND isDeleted = 0`,
+                [offerId]
+            );
+            return result.affectedRows;
+        } catch (error) {
+            this._handleDatabaseError(error, 'terminateOffer');
+        }
+    }
+
+    async reviseOffer(offerId, revisionData, client) {
+        const connection = client;
+        try {
+            await connection.execute(
+                `INSERT INTO offer_revision (offerId, previousCTC, newCTC, previousJoiningDate, newJoiningDate, reason, revisedBy)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    offerId,
+                    revisionData.previousCTC,
+                    revisionData.newCTC,
+                    revisionData.previousJoiningDate,
+                    revisionData.newJoiningDate,
+                    revisionData.reason,
+                    revisionData.revisedBy
+                ]
+            );
+            const [result] = await connection.execute(
+                `UPDATE offer
+                 SET offeredCTCAmount = ?, joiningDate = ?, offerVersion = offerVersion + 1
+                 WHERE offerId = ? AND isDeleted = 0`,
+                [revisionData.newCTC, revisionData.newJoiningDate, offerId]
+            );
+            return result.affectedRows;
+        } catch (error) {
+            this._handleDatabaseError(error, 'reviseOffer');
+        }
+    }
+
+    async insertOfferStatus(statusData, client) {
+        const connection = client;
+        const toTinyInt = (v) => (v !== undefined && v !== null ? (v ? 1 : 0) : null);
+        try {
+            await connection.execute(
+                `INSERT INTO offer_status_history (offerId, status, decisionDate, signedOfferLetterReceived, signedServiceAgreementReceived, signedNDAReceived, signedCodeOfConductReceived, rejectionReason)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    statusData.offerId,
+                    statusData.status,
+                    statusData.decisionDate,
+                    toTinyInt(statusData.signedOfferLetterReceived),
+                    toTinyInt(statusData.signedServiceAgreementReceived),
+                    toTinyInt(statusData.signedNDAReceived),
+                    toTinyInt(statusData.signedCodeOfConductReceived),
+                    statusData.rejectionReason ?? null
+                ]
+            );
+        } catch (error) {
+            this._handleDatabaseError(error, 'insertOfferStatus');
+        }
+    }
+
+    async updateOfferStatus(offerId, status, client) {
+        const connection = client;
+        try {
+            const [result] = await connection.execute(
+                `UPDATE offer SET offerStatus = ? WHERE offerId = ? AND isDeleted = 0`,
+                [status, offerId]
+            );
+            return result.affectedRows;
+        } catch (error) {
+            this._handleDatabaseError(error, 'updateOfferStatus');
         }
     }
 

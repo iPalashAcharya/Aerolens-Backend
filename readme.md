@@ -7538,6 +7538,220 @@ Data sources:
 - member
 - jobProfileRequirement
 
+#### 4. Delete Offer (Soft Delete)
+
+**DELETE** `/offers/:offerId`
+
+Soft deletes an offer by marking it as deleted. The record is not permanently removed.
+
+**Behavior:**
+
+- Updates the offer record: `isDeleted = 1`, `deletedAt = NOW()`
+- Offer is excluded from all GET endpoints
+- Action is recorded in the audit log
+
+**Response** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Offer deleted successfully"
+}
+```
+
+**Notes:**
+
+- Offers are never permanently deleted.
+- Deleted offers are excluded from all GET endpoints.
+- The action is recorded in the audit log.
+- Used when an offer must be withdrawn or removed from the active lifecycle.
+
+#### 5. Terminate Offer
+
+**POST** `/offers/:offerId/terminate`
+
+Terminates an existing offer. Records the termination in the `offer_termination` table and updates the offer status to `TERMINATED`. Only non-deleted offers can be terminated.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| terminationDate | string | Yes | Date in YYYY-MM-DD format |
+| terminationReason | string | Yes | Reason for termination |
+
+**Example request body:**
+
+```json
+{
+  "terminationDate": "2026-04-15",
+  "terminationReason": "Candidate declined"
+}
+```
+
+**Behavior:**
+
+- Inserts a row into `offer_termination` (offerId, terminationDate, terminationReason, terminatedBy, createdAt).
+- Updates the offer: `offerStatus = 'TERMINATED'`.
+- Both operations run in a single transaction; both succeed or both fail.
+- `terminatedBy` is set from the logged-in user (audit context).
+- Action is recorded in the audit log.
+
+**Response** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Offer terminated successfully"
+}
+```
+
+**Notes:**
+
+- Only offers that exist and are not deleted (`isDeleted = 0`) can be terminated.
+- Termination details are stored in the `offer_termination` table for audit and reporting.
+
+#### 6. Revise Offer
+
+**POST** `/offers/:offerId/revise`
+
+Revises an existing offer and stores revision history in `offer_revision`. Previous CTC and joining date are recorded before the offer is updated; `offerVersion` is incremented.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| reason | string | Yes | Non-empty. Required in every request. |
+| newCTC | number | At least one | Optional; min 0. At least one of `newCTC` or `newJoiningDate` must be sent. |
+| newJoiningDate | string | At least one | Optional; YYYY-MM-DD. At least one of `newCTC` or `newJoiningDate` must be sent. |
+
+Reason alone is not valid; send at least one of `newCTC` or `newJoiningDate`. If only one is sent, the other is taken from the current offer.
+
+**Example — both CTC and joining date changed:**
+
+```json
+{
+  "newCTC": 20,
+  "newJoiningDate": "2026-07-15",
+  "reason": "CTC revised after final negotiation with candidate"
+}
+```
+
+**Example — only CTC changed:**
+
+```json
+{
+  "newCTC": 22,
+  "reason": "CTC revised after final negotiation"
+}
+```
+
+**Example — only joining date changed:**
+
+```json
+{
+  "newJoiningDate": "2026-08-01",
+  "reason": "Joining date deferred by candidate"
+}
+```
+
+**Behavior:**
+
+- Previous offer values (CTC, joining date) are stored in `offer_revision`.
+- Offer is updated with new `offeredCTCAmount`, `joiningDate`, and `offerVersion` is incremented.
+- If only `newCTC` is sent, joining date remains the current offer value; if only `newJoiningDate` is sent, CTC remains the current value.
+- If both new CTC and new joining date equal the current values, the API returns 400 `REVISION_NO_CHANGE`.
+- All operations run in a single transaction. `revisedBy` is set from the logged-in user (audit context). Action is recorded in the audit log.
+
+**Response** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Offer revised successfully"
+}
+```
+
+**Notes:**
+
+- Only non-deleted offers can be revised.
+- Revision history is stored in the `offer_revision` table for audit and reporting.
+
+#### 7. Update Offer Status
+
+**POST** `/offers/:offerId/status`
+
+Updates the status of an offer and records the status change in `offer_status_history`. Status update is **conditional and tied to Initial Onboarding**: `status` and `decisionDate` are always required; when **ACCEPTED**, signed-document flags depend on **employment type** (from the offer); when **REJECTED**, `rejectionReason` is required.
+
+**Request body — conditional rules:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| status | string | Yes | One of: `ACCEPTED`, `REJECTED` |
+| decisionDate | string | Yes | Date in YYYY-MM-DD format. |
+| signedNDAReceived | boolean | When status = ACCEPTED | Required when status is ACCEPTED. |
+| signedCodeOfConductReceived | boolean | When status = ACCEPTED | Required when status is ACCEPTED. |
+| signedOfferLetterReceived | boolean | When status = ACCEPTED and employment type = **Employee** | Required when offer’s employment type is Employee (lookup value "Employee", case-insensitive). |
+| signedServiceAgreementReceived | boolean | When status = ACCEPTED and employment type = **Consultant/Contractor** | Required when offer’s employment type is not Employee (e.g. Consultant, Contractor). |
+| rejectionReason | string | When status = REJECTED | Required when status is REJECTED. |
+
+Employment type is taken from the offer (set at Initiate Onboarding). The backend resolves it via the `lookup` table (tag `employmentType`): if the value is exactly **"Employee"** (case-insensitive), `signedOfferLetterReceived` is required; otherwise **signedServiceAgreementReceived** is required.
+
+**Example — offer accepted (employment type = Employee):**
+
+```json
+{
+  "status": "ACCEPTED",
+  "decisionDate": "2026-03-15",
+  "signedOfferLetterReceived": true,
+  "signedNDAReceived": true,
+  "signedCodeOfConductReceived": true
+}
+```
+
+**Example — offer accepted (employment type = Consultant/Contractor):**
+
+```json
+{
+  "status": "ACCEPTED",
+  "decisionDate": "2026-03-15",
+  "signedServiceAgreementReceived": true,
+  "signedNDAReceived": true,
+  "signedCodeOfConductReceived": true
+}
+```
+
+**Example — offer rejected:**
+
+```json
+{
+  "status": "REJECTED",
+  "decisionDate": "2026-03-15",
+  "rejectionReason": "Candidate accepted another offer"
+}
+```
+
+**Behavior:**
+
+- Inserts a record into `offer_status_history` (offerId, status, decisionDate, signedOfferLetterReceived, signedServiceAgreementReceived, signedNDARreceived, signedCodeOfConductReceived, rejectionReason). `createdAt` uses the database default.
+- Updates `offerStatus` in the `offer` table.
+- Both operations run in a single transaction. Action is recorded in the audit log (action `UPDATE`).
+
+**Response** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Offer status updated successfully"
+}
+```
+
+**Notes:**
+
+- Only non-deleted offers can have their status updated.
+- Every status change is recorded in `offer_status_history` for lifecycle traceability.
+- The offer table always reflects the latest status.
+- For detailed sample payloads and error notes, see **docs/offer-api-sample-payloads.md**.
+
 ### Implementation Files
 
 Offer module components are located in:
