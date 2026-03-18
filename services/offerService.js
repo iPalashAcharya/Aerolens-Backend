@@ -149,12 +149,11 @@ class OfferService {
                 return isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
             };
             const currentJoiningDate = formatDateForDb(offer.joiningDate);
+            const newJoiningDate = formatDateForDb(revisionData.newJoiningDate);
             const effectiveNewCTC = revisionData.newCTC !== undefined && revisionData.newCTC !== null
                 ? revisionData.newCTC
                 : (offer.offeredCTCAmount ?? null);
-            const effectiveNewJoiningDate = (revisionData.newJoiningDate && String(revisionData.newJoiningDate).trim() !== '')
-                ? revisionData.newJoiningDate
-                : currentJoiningDate;
+            const effectiveNewJoiningDate = newJoiningDate ?? currentJoiningDate;
 
             const previousCTC = offer.offeredCTCAmount ?? null;
             const ctcUnchanged = Number(previousCTC) === Number(effectiveNewCTC);
