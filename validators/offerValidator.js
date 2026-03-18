@@ -43,23 +43,56 @@ const offerSchemas = {
             .messages({ 'any.required': 'Termination reason is required' })
     }),
     revision: Joi.object({
-        newCTC: Joi.number().min(0).required()
-            .messages({ 'any.required': 'New CTC is required' }),
+        newCTC: Joi.number().min(0).optional().allow(null),
         newJoiningDate: Joi.string()
             .pattern(/^\d{4}-\d{2}-\d{2}$/)
-            .required()
+            .optional()
+            .allow(null, '')
             .messages({
-                'string.pattern.base': 'New joining date must be YYYY-MM-DD',
-                'any.required': 'New joining date is required'
+                'string.pattern.base': 'New joining date must be YYYY-MM-DD'
             }),
         reason: Joi.string().trim().required()
             .messages({ 'any.required': 'Reason is required' })
-    }),
+    })
+        .custom((value, helpers) => {
+            const hasNewCTC = value.newCTC !== undefined && value.newCTC !== null;
+            const hasNewJoiningDate = value.newJoiningDate !== undefined && value.newJoiningDate !== null && String(value.newJoiningDate).trim() !== '';
+            if (!hasNewCTC && !hasNewJoiningDate) {
+                return helpers.error('custom.revisionRequiresAtLeastOne');
+            }
+            return value;
+        })
+        .messages({
+            'custom.revisionRequiresAtLeastOne': 'At least one of newCTC or newJoiningDate is required (reason alone is not enough)'
+        }),
     statusUpdate: Joi.object({
         status: Joi.string().valid('ACCEPTED', 'REJECTED').required()
             .messages({
                 'any.only': 'Status must be ACCEPTED or REJECTED',
                 'any.required': 'Status is required'
+            }),
+        decisionDate: Joi.string()
+            .pattern(/^\d{4}-\d{2}-\d{2}$/)
+            .required()
+            .messages({
+                'string.pattern.base': 'Decision date must be YYYY-MM-DD',
+                'any.required': 'Decision date is required'
+            }),
+        signedOfferLetterReceived: Joi.boolean()
+            .when('status', { is: 'ACCEPTED', then: Joi.optional().allow(null), otherwise: Joi.optional().allow(null) }),
+        signedServiceAgreementReceived: Joi.boolean()
+            .when('status', { is: 'ACCEPTED', then: Joi.optional().allow(null), otherwise: Joi.optional().allow(null) }),
+        signedNDAReceived: Joi.boolean()
+            .when('status', {
+                is: 'ACCEPTED',
+                then: Joi.required().messages({ 'any.required': 'Signed NDA received is required when status is ACCEPTED' }),
+                otherwise: Joi.optional().allow(null)
+            }),
+        signedCodeOfConductReceived: Joi.boolean()
+            .when('status', {
+                is: 'ACCEPTED',
+                then: Joi.required().messages({ 'any.required': 'Signed code of conduct received is required when status is ACCEPTED' }),
+                otherwise: Joi.optional().allow(null)
             }),
         rejectionReason: Joi.string().trim()
             .when('status', {

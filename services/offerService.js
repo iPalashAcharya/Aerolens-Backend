@@ -108,7 +108,7 @@ class OfferService {
 
             await auditLogService.logAction({
                 userId: auditContext.userId,
-                action: 'TERMINATE',
+                action: 'UPDATE',
                 newValues: {
                     entityType: 'OFFER',
                     entityId: offerId,
@@ -142,11 +142,36 @@ class OfferService {
                 throw new AppError('Offer not found or already deleted', 404, 'OFFER_NOT_FOUND');
             }
 
+            const formatDateForDb = (d) => {
+                if (d == null) return null;
+                if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+                const date = d instanceof Date ? d : new Date(d);
+                return isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
+            };
+            const currentJoiningDate = formatDateForDb(offer.joiningDate);
+            const effectiveNewCTC = revisionData.newCTC !== undefined && revisionData.newCTC !== null
+                ? revisionData.newCTC
+                : (offer.offeredCTCAmount ?? null);
+            const effectiveNewJoiningDate = (revisionData.newJoiningDate && String(revisionData.newJoiningDate).trim() !== '')
+                ? revisionData.newJoiningDate
+                : currentJoiningDate;
+
+            const previousCTC = offer.offeredCTCAmount ?? null;
+            const ctcUnchanged = Number(previousCTC) === Number(effectiveNewCTC);
+            const joiningDateUnchanged = (currentJoiningDate || '') === (effectiveNewJoiningDate || '');
+            if (ctcUnchanged && joiningDateUnchanged) {
+                throw new AppError(
+                    'No change: new CTC and new joining date are the same as current values. Revise at least one.',
+                    400,
+                    'REVISION_NO_CHANGE'
+                );
+            }
+
             const fullRevisionData = {
-                previousCTC: offer.offeredCTCAmount,
-                previousJoiningDate: offer.joiningDate,
-                newCTC: revisionData.newCTC,
-                newJoiningDate: revisionData.newJoiningDate,
+                previousCTC: offer.offeredCTCAmount ?? null,
+                previousJoiningDate: currentJoiningDate,
+                newCTC: effectiveNewCTC,
+                newJoiningDate: effectiveNewJoiningDate,
                 reason: revisionData.reason,
                 revisedBy: auditContext.userId
             };
@@ -158,13 +183,13 @@ class OfferService {
 
             await auditLogService.logAction({
                 userId: auditContext.userId,
-                action: 'REVISE',
+                action: 'UPDATE',
                 newValues: {
                     entityType: 'OFFER',
                     entityId: offerId,
                     description: 'Offer revised',
-                    newCTC: revisionData.newCTC,
-                    newJoiningDate: revisionData.newJoiningDate,
+                    newCTC: effectiveNewCTC,
+                    newJoiningDate: effectiveNewJoiningDate,
                     reason: revisionData.reason,
                     offerVersion: (offer.offerVersion || 0) + 1
                 },
@@ -194,11 +219,29 @@ class OfferService {
                 throw new AppError('Offer not found or already deleted', 404, 'OFFER_NOT_FOUND');
             }
 
+            if (statusData.status === 'ACCEPTED') {
+                const employmentTypeName = (offer.employmentTypeName || '').trim().toLowerCase();
+                const isEmployee = employmentTypeName === 'employee';
+                if (isEmployee) {
+                    if (statusData.signedOfferLetterReceived !== true) {
+                        throw new AppError('Signed offer letter received is required when status is ACCEPTED and employment type is Employee', 400, 'VALIDATION_ERROR', { field: 'signedOfferLetterReceived' });
+                    }
+                } else {
+                    if (statusData.signedServiceAgreementReceived !== true) {
+                        throw new AppError('Signed service agreement received is required when status is ACCEPTED and employment type is Consultant/Contractor', 400, 'VALIDATION_ERROR', { field: 'signedServiceAgreementReceived' });
+                    }
+                }
+            }
+
             const fullStatusData = {
                 offerId,
                 status: statusData.status,
-                rejectionReason: statusData.rejectionReason ?? null,
-                updatedBy: auditContext.userId
+                decisionDate: statusData.decisionDate,
+                signedOfferLetterReceived: statusData.signedOfferLetterReceived,
+                signedServiceAgreementReceived: statusData.signedServiceAgreementReceived,
+                signedNDAReceived: statusData.signedNDAReceived,
+                signedCodeOfConductReceived: statusData.signedCodeOfConductReceived,
+                rejectionReason: statusData.rejectionReason ?? null
             };
 
             await this.offerRepository.insertOfferStatus(fullStatusData, client);
@@ -210,7 +253,7 @@ class OfferService {
 
             await auditLogService.logAction({
                 userId: auditContext.userId,
-                action: 'STATUS_UPDATE',
+                action: 'UPDATE',
                 newValues: {
                     entityType: 'OFFER',
                     entityId: offerId,

@@ -54,11 +54,14 @@ class OfferController {
 
     updateOfferStatus = catchAsync(async (req, res) => {
         const offerId = parseInt(req.params.offerId, 10);
-        const updatedBy = req.auditContext.userId;
         const statusData = {
             status: req.body.status,
-            rejectionReason: req.body.rejectionReason ?? null,
-            updatedBy
+            decisionDate: req.body.decisionDate,
+            signedOfferLetterReceived: req.body.signedOfferLetterReceived,
+            signedServiceAgreementReceived: req.body.signedServiceAgreementReceived,
+            signedNDAReceived: req.body.signedNDAReceived,
+            signedCodeOfConductReceived: req.body.signedCodeOfConductReceived,
+            rejectionReason: req.body.rejectionReason ?? null
         };
         await this.offerService.updateOfferStatus(offerId, statusData, req.auditContext);
         return ApiResponse.success(res, null, 'Offer status updated successfully');

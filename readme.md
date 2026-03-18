@@ -7620,17 +7620,37 @@ Revises an existing offer and stores revision history in `offer_revision`. Previ
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| newCTC | number | Yes | New offered CTC amount |
-| newJoiningDate | string | Yes | New joining date (YYYY-MM-DD) |
-| reason | string | Yes | Reason for the revision |
+| reason | string | Yes | Non-empty. Required in every request. |
+| newCTC | number | At least one | Optional; min 0. At least one of `newCTC` or `newJoiningDate` must be sent. |
+| newJoiningDate | string | At least one | Optional; YYYY-MM-DD. At least one of `newCTC` or `newJoiningDate` must be sent. |
 
-**Example request body:**
+Reason alone is not valid; send at least one of `newCTC` or `newJoiningDate`. If only one is sent, the other is taken from the current offer.
+
+**Example — both CTC and joining date changed:**
 
 ```json
 {
-  "newCTC": 1200000,
-  "newJoiningDate": "2026-05-01",
-  "reason": "CTC and date updated per discussion"
+  "newCTC": 20,
+  "newJoiningDate": "2026-07-15",
+  "reason": "CTC revised after final negotiation with candidate"
+}
+```
+
+**Example — only CTC changed:**
+
+```json
+{
+  "newCTC": 22,
+  "reason": "CTC revised after final negotiation"
+}
+```
+
+**Example — only joining date changed:**
+
+```json
+{
+  "newJoiningDate": "2026-08-01",
+  "reason": "Joining date deferred by candidate"
 }
 ```
 
@@ -7638,9 +7658,9 @@ Revises an existing offer and stores revision history in `offer_revision`. Previ
 
 - Previous offer values (CTC, joining date) are stored in `offer_revision`.
 - Offer is updated with new `offeredCTCAmount`, `joiningDate`, and `offerVersion` is incremented.
-- All operations run in a single transaction.
-- `revisedBy` is set from the logged-in user (audit context).
-- Action is recorded in the audit log.
+- If only `newCTC` is sent, joining date remains the current offer value; if only `newJoiningDate` is sent, CTC remains the current value.
+- If both new CTC and new joining date equal the current values, the API returns 400 `REVISION_NO_CHANGE`.
+- All operations run in a single transaction. `revisedBy` is set from the logged-in user (audit context). Action is recorded in the audit log.
 
 **Response** `200 OK`
 
@@ -7660,20 +7680,43 @@ Revises an existing offer and stores revision history in `offer_revision`. Previ
 
 **POST** `/offers/:offerId/status`
 
-Updates the status of an offer and records the status change in `offer_status_history`. Typical statuses include `ACCEPTED` and `REJECTED`.
+Updates the status of an offer and records the status change in `offer_status_history`. Status update is **conditional and tied to Initial Onboarding**: `status` and `decisionDate` are always required; when **ACCEPTED**, signed-document flags depend on **employment type** (from the offer); when **REJECTED**, `rejectionReason` is required.
 
-**Request body:**
+**Request body — conditional rules:**
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | status | string | Yes | One of: `ACCEPTED`, `REJECTED` |
-| rejectionReason | string | When status = REJECTED | Reason for rejection (required when status is REJECTED) |
+| decisionDate | string | Yes | Date in YYYY-MM-DD format. |
+| signedNDAReceived | boolean | When status = ACCEPTED | Required when status is ACCEPTED. |
+| signedCodeOfConductReceived | boolean | When status = ACCEPTED | Required when status is ACCEPTED. |
+| signedOfferLetterReceived | boolean | When status = ACCEPTED and employment type = **Employee** | Required when offer’s employment type is Employee (lookup value "Employee", case-insensitive). |
+| signedServiceAgreementReceived | boolean | When status = ACCEPTED and employment type = **Consultant/Contractor** | Required when offer’s employment type is not Employee (e.g. Consultant, Contractor). |
+| rejectionReason | string | When status = REJECTED | Required when status is REJECTED. |
 
-**Example — offer accepted:**
+Employment type is taken from the offer (set at Initiate Onboarding). The backend resolves it via the `lookup` table (tag `employmentType`): if the value is exactly **"Employee"** (case-insensitive), `signedOfferLetterReceived` is required; otherwise **signedServiceAgreementReceived** is required.
+
+**Example — offer accepted (employment type = Employee):**
 
 ```json
 {
-  "status": "ACCEPTED"
+  "status": "ACCEPTED",
+  "decisionDate": "2026-03-15",
+  "signedOfferLetterReceived": true,
+  "signedNDAReceived": true,
+  "signedCodeOfConductReceived": true
+}
+```
+
+**Example — offer accepted (employment type = Consultant/Contractor):**
+
+```json
+{
+  "status": "ACCEPTED",
+  "decisionDate": "2026-03-15",
+  "signedServiceAgreementReceived": true,
+  "signedNDAReceived": true,
+  "signedCodeOfConductReceived": true
 }
 ```
 
@@ -7682,17 +7725,16 @@ Updates the status of an offer and records the status change in `offer_status_hi
 ```json
 {
   "status": "REJECTED",
+  "decisionDate": "2026-03-15",
   "rejectionReason": "Candidate accepted another offer"
 }
 ```
 
 **Behavior:**
 
-- Inserts a record into `offer_status_history` (offerId, status, rejectionReason, updatedBy, createdAt).
+- Inserts a record into `offer_status_history` (offerId, status, decisionDate, signedOfferLetterReceived, signedServiceAgreementReceived, signedNDARreceived, signedCodeOfConductReceived, rejectionReason). `createdAt` uses the database default.
 - Updates `offerStatus` in the `offer` table.
-- Both operations run in a single transaction.
-- `updatedBy` is set from the logged-in user (audit context).
-- Action is recorded in the audit log.
+- Both operations run in a single transaction. Action is recorded in the audit log (action `UPDATE`).
 
 **Response** `200 OK`
 
@@ -7708,6 +7750,7 @@ Updates the status of an offer and records the status change in `offer_status_hi
 - Only non-deleted offers can have their status updated.
 - Every status change is recorded in `offer_status_history` for lifecycle traceability.
 - The offer table always reflects the latest status.
+- For detailed sample payloads and error notes, see **docs/offer-api-sample-payloads.md**.
 
 ### Implementation Files
 

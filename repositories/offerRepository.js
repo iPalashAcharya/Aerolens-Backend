@@ -88,7 +88,10 @@ class OfferRepository {
         const connection = client;
         try {
             const [rows] = await connection.execute(
-                'SELECT * FROM offer WHERE offerId = ? AND isDeleted = 0',
+                `SELECT o.*, let.value AS employmentTypeName
+                 FROM offer o
+                 LEFT JOIN lookup let ON let.lookupKey = o.employmentTypeLookupId AND let.tag = 'employmentType'
+                 WHERE o.offerId = ? AND o.isDeleted = 0`,
                 [offerId]
             );
             return rows[0] || null;
@@ -116,8 +119,8 @@ class OfferRepository {
         const connection = client;
         try {
             await connection.execute(
-                `INSERT INTO offer_termination (offerId, terminationDate, terminationReason, terminatedBy, createdAt)
-                 VALUES (?, ?, ?, ?, NOW())`,
+                `INSERT INTO offer_termination (offerId, terminationDate, terminationReason, terminatedBy)
+                 VALUES (?, ?, ?, ?)`,
                 [
                     offerId,
                     terminationData.terminationDate,
@@ -165,15 +168,20 @@ class OfferRepository {
 
     async insertOfferStatus(statusData, client) {
         const connection = client;
+        const toTinyInt = (v) => (v !== undefined && v !== null ? (v ? 1 : 0) : null);
         try {
             await connection.execute(
-                `INSERT INTO offer_status_history (offerId, status, rejectionReason, updatedBy, createdAt)
-                 VALUES (?, ?, ?, ?, NOW())`,
+                `INSERT INTO offer_status_history (offerId, status, decisionDate, signedOfferLetterReceived, signedServiceAgreementReceived, signedNDAReceived, signedCodeOfConductReceived, rejectionReason)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     statusData.offerId,
                     statusData.status,
-                    statusData.rejectionReason ?? null,
-                    statusData.updatedBy
+                    statusData.decisionDate,
+                    toTinyInt(statusData.signedOfferLetterReceived),
+                    toTinyInt(statusData.signedServiceAgreementReceived),
+                    toTinyInt(statusData.signedNDAReceived),
+                    toTinyInt(statusData.signedCodeOfConductReceived),
+                    statusData.rejectionReason ?? null
                 ]
             );
         } catch (error) {
