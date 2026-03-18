@@ -40,7 +40,12 @@ class OfferRepository {
             ]);
             const offerId = result.insertId;
             const [rows] = await connection.execute(
-                'SELECT * FROM offer WHERE offerId = ?',
+                `SELECT offerId, candidateId, jobProfileRequirementId, vendorId, reportingManagerId,
+                        employmentTypeLookupId, workModelLookupId, joiningDate, offeredCTCAmount,
+                        currencyLookupId, compensationTypeLookupId, variablePay, joiningBonus,
+                        offerLetterSent, serviceAgreementSent, ndaSent, codeOfConductSent,
+                        offerStatus, offerVersion, createdBy, createdAt, updatedAt, isDeleted, deletedAt
+                 FROM offer WHERE offerId = ?`,
                 [offerId]
             );
             return rows[0] || null;
@@ -88,7 +93,14 @@ class OfferRepository {
         const connection = client;
         try {
             const [rows] = await connection.execute(
-                `SELECT o.*, let.value AS employmentTypeName
+                `SELECT
+                    o.offerId, o.candidateId, o.jobProfileRequirementId, o.vendorId, o.reportingManagerId,
+                    o.employmentTypeLookupId, o.workModelLookupId, o.joiningDate, o.offeredCTCAmount,
+                    o.currencyLookupId, o.compensationTypeLookupId, o.variablePay, o.joiningBonus,
+                    o.offerLetterSent, o.serviceAgreementSent, o.ndaSent, o.codeOfConductSent,
+                    o.offerStatus, o.offerVersion, o.createdBy, o.createdAt, o.updatedAt,
+                    o.isDeleted, o.deletedAt,
+                    let.value AS employmentTypeName
                  FROM offer o
                  LEFT JOIN lookup let ON let.lookupKey = o.employmentTypeLookupId AND let.tag = 'employmentType'
                  WHERE o.offerId = ? AND o.isDeleted = 0`,
