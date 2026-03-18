@@ -19,7 +19,7 @@ const offerSchemas = {
                 'string.pattern.base': 'Joining date must be YYYY-MM-DD',
                 'any.required': 'Joining date is required'
             }),
-        offeredCTCAmount: Joi.number().min(0).optional().allow(null),
+        offeredCTCAmount: Joi.number().min(1).optional().allow(null),
         currencyLookupId: Joi.number().integer().positive().optional().allow(null),
         compensationTypeLookupId: Joi.number().integer().positive().optional().allow(null),
         variablePay: Joi.number().min(0).optional().allow(null),
@@ -43,7 +43,7 @@ const offerSchemas = {
             .messages({ 'any.required': 'Termination reason is required' })
     }),
     revision: Joi.object({
-        newCTC: Joi.number().min(0).optional().allow(null),
+        newCTC: Joi.number().min(1).optional().allow(null),
         newJoiningDate: Joi.string()
             .pattern(/^\d{4}-\d{2}-\d{2}$/)
             .optional()
@@ -78,10 +78,8 @@ const offerSchemas = {
                 'string.pattern.base': 'Decision date must be YYYY-MM-DD',
                 'any.required': 'Decision date is required'
             }),
-        signedOfferLetterReceived: Joi.boolean()
-            .when('status', { is: 'ACCEPTED', then: Joi.optional().allow(null), otherwise: Joi.optional().allow(null) }),
-        signedServiceAgreementReceived: Joi.boolean()
-            .when('status', { is: 'ACCEPTED', then: Joi.optional().allow(null), otherwise: Joi.optional().allow(null) }),
+        signedOfferLetterReceived: Joi.boolean().optional().allow(null),
+        signedServiceAgreementReceived: Joi.boolean().optional().allow(null),
         signedNDAReceived: Joi.boolean()
             .when('status', {
                 is: 'ACCEPTED',
