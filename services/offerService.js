@@ -103,6 +103,9 @@ class OfferService {
             if (!offer) {
                 throw new AppError('Offer not found or already deleted', 404, 'OFFER_NOT_FOUND');
             }
+            if ((offer.offerStatus || '').toUpperCase() !== 'ACCEPTED') {
+                throw new AppError('Offer can only be terminated when status is ACCEPTED', 400, 'TERMINATE_ONLY_ACCEPTED', { currentStatus: offer.offerStatus });
+            }
 
             await this.offerRepository.terminateOffer(offerId, terminationData, client);
 
