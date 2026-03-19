@@ -59,6 +59,28 @@ class OfferService {
         }
     }
 
+    async getOfferDetails(offerId) {
+        const client = await this.db.getConnection();
+        try {
+            const offer = await this.offerRepository.getOfferDetails(offerId, client);
+            if (!offer) {
+                throw new AppError('Offer not found or already deleted', 404, 'OFFER_NOT_FOUND');
+            }
+            const revisions = await this.offerRepository.getOfferRevisions(offerId, client);
+            return {
+                offer,
+                revisionCount: revisions.length,
+                revisions
+            };
+        } catch (error) {
+            if (error instanceof AppError) throw error;
+            console.error('Error fetching offer details:', error.stack);
+            throw new AppError('Failed to fetch offer details', 500, 'OFFER_DETAILS_ERROR', { operation: 'getOfferDetails', offerId });
+        } finally {
+            client.release();
+        }
+    }
+
     async deleteOffer(offerId, auditContext) {
         const client = await this.db.getConnection();
         try {

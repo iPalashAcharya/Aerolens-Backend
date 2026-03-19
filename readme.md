@@ -7514,7 +7514,67 @@ Response includes display-friendly values for frontend tables:
 
 Data is sorted by **createdAt DESC**.
 
-#### 3. Get Form Data
+#### 3. Get Offer Details
+
+**GET** `/offers/:offerId/details`
+
+Returns full details for a single offer for use in a view/details dialog (e.g. with `DetailsGrid` and `DetailsSection`). Includes the offer record with all display names (candidate, role, employment type, work mode, vendor, currency, compensation type, created by, reporting manager) and revision history from `offer_revision`.
+
+**Response** `200 OK`
+
+```json
+{
+  "success": true,
+  "message": "Offer details retrieved successfully",
+  "data": {
+    "offer": {
+      "offerId": 5,
+      "candidateId": 1,
+      "candidateName": "Jane Doe",
+      "jobRole": "Software Engineer",
+      "employmentTypeName": "Employee",
+      "workModeName": "Remote",
+      "vendorName": "Vendor A",
+      "currencyName": "INR",
+      "compensationTypeName": "Annual",
+      "createdByName": "Admin User",
+      "reportingManagerName": "John Manager",
+      "joiningDate": "2026-07-01",
+      "offeredCTCAmount": 20,
+      "offerStatus": "ACCEPTED",
+      "offerVersion": 2,
+      "variablePay": null,
+      "joiningBonus": null,
+      "createdAtFormatted": "2026-03-15T10:00:00Z"
+    },
+    "revisionCount": 2,
+    "revisions": [
+      {
+        "revisionId": 2,
+        "offerId": 5,
+        "previousCTC": 18,
+        "newCTC": 20,
+        "previousJoiningDate": "2026-06-01",
+        "newJoiningDate": "2026-07-01",
+        "reason": "CTC and date updated",
+        "revisedBy": 1,
+        "revisedByName": "Admin User"
+      }
+    ]
+  }
+}
+```
+
+- **offer**: Full offer row plus display fields (`candidateName`, `jobRole`, `employmentTypeName`, `workModeName`, `vendorName`, `currencyName`, `compensationTypeName`, `createdByName`, `reportingManagerName`, `createdAtFormatted`). Use this object to build `DetailsGrid` items (label/value) per section.
+- **revisionCount**: Number of times the offer was revised (length of `revisions`).
+- **revisions**: List of revision records (newest first), each with `revisionId`, `previousCTC`, `newCTC`, `previousJoiningDate`, `newJoiningDate`, `reason`, `revisedBy`, `revisedByName`. Display in a separate section or table in the dialog.
+
+**Notes:**
+
+- Returns 404 if the offer does not exist or is soft-deleted.
+- Frontend can map `offer` fields to `DetailsSection` + `DetailsGrid` (e.g. one section “Offer Information” with items from `offer`, and one “Revision History” with `revisionCount` and a list/table of `revisions`).
+
+#### 4. Get Form Data
 
 **GET** `/offers/form-data`
 
@@ -7541,7 +7601,7 @@ Data sources:
 - member
 - jobProfileRequirement
 
-#### 4. Delete Offer (Soft Delete)
+#### 5. Delete Offer (Soft Delete)
 
 **DELETE** `/offers/:offerId`
 
@@ -7569,7 +7629,7 @@ Soft deletes an offer by marking it as deleted. The record is not permanently re
 - The action is recorded in the audit log.
 - Used when an offer must be withdrawn or removed from the active lifecycle.
 
-#### 5. Terminate Offer
+#### 6. Terminate Offer
 
 **POST** `/offers/:offerId/terminate`
 
@@ -7614,7 +7674,7 @@ Terminates an existing offer. Records the termination in the `offer_termination`
 - Only offers that exist and are not deleted (`isDeleted = 0`) can be terminated.
 - Termination details are stored in the `offer_termination` table for audit and reporting.
 
-#### 6. Revise Offer
+#### 7. Revise Offer
 
 **POST** `/offers/:offerId/revise`
 
@@ -7680,7 +7740,7 @@ Reason alone is not valid; send at least one of `newCTC` or `newJoiningDate`. If
 - Only non-deleted offers can be revised.
 - Revision history is stored in the `offer_revision` table for audit and reporting.
 
-#### 7. Update Offer Status
+#### 8. Update Offer Status
 
 **POST** `/offers/:offerId/status`
 

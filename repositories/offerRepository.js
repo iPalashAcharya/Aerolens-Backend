@@ -220,6 +220,72 @@ class OfferRepository {
         }
     }
 
+    async getOfferDetails(offerId, client) {
+        const connection = client;
+        try {
+            const [rows] = await connection.execute(
+                `SELECT
+                    o.offerId, o.candidateId, o.jobProfileRequirementId, o.vendorId, o.reportingManagerId,
+                    o.employmentTypeLookupId, o.workModelLookupId, o.joiningDate, o.offeredCTCAmount,
+                    o.currencyLookupId, o.compensationTypeLookupId, o.variablePay, o.joiningBonus,
+                    o.offerLetterSent, o.serviceAgreementSent, o.ndaSent, o.codeOfConductSent,
+                    o.offerStatus, o.offerVersion, o.createdBy, o.createdAt, o.updatedAt,
+                    c.candidateName,
+                    jp.jobRole,
+                    let.value AS employmentTypeName,
+                    wm.value AS workModeName,
+                    rv.vendorName,
+                    lcur.value AS currencyName,
+                    lcomp.value AS compensationTypeName,
+                    m.memberName AS createdByName,
+                    rm.memberName AS reportingManagerName,
+                    DATE_FORMAT(o.createdAt, '%Y-%m-%dT%H:%i:%sZ') AS createdAtFormatted
+                 FROM offer o
+                 LEFT JOIN candidate c ON c.candidateId = o.candidateId
+                 LEFT JOIN jobProfileRequirement jpr ON jpr.jobProfileRequirementId = o.jobProfileRequirementId
+                 LEFT JOIN jobProfile jp ON jp.jobProfileId = jpr.jobProfileId
+                 LEFT JOIN lookup let ON let.lookupKey = o.employmentTypeLookupId AND let.tag = 'employmentType'
+                 LEFT JOIN lookup wm ON wm.lookupKey = o.workModelLookupId AND wm.tag = 'workMode'
+                 LEFT JOIN recruitmentVendor rv ON rv.vendorId = o.vendorId
+                 LEFT JOIN lookup lcur ON lcur.lookupKey = o.currencyLookupId AND lcur.tag = 'currency'
+                 LEFT JOIN lookup lcomp ON lcomp.lookupKey = o.compensationTypeLookupId AND lcomp.tag = 'compensationType'
+                 LEFT JOIN member m ON m.memberId = o.createdBy
+                 LEFT JOIN member rm ON rm.memberId = o.reportingManagerId
+                 WHERE o.offerId = ? AND o.isDeleted = 0`,
+                [offerId]
+            );
+            return rows[0] || null;
+        } catch (error) {
+            this._handleDatabaseError(error, 'getOfferDetails');
+        }
+    }
+
+    async getOfferRevisions(offerId, client) {
+        const connection = client;
+        try {
+            const [rows] = await connection.execute(
+                `SELECT
+                    rev.offerId,
+                    rev.previousCTC,
+                    rev.newCTC,
+                    rev.previousJoiningDate,
+                    rev.newJoiningDate,
+                    rev.reason,
+                    rev.revisedBy,
+                    m.memberName AS revisedByName
+                 FROM offer_revision rev
+                 LEFT JOIN member m ON m.memberId = rev.revisedBy
+                 WHERE rev.offerId = ?
+                 ORDER BY rev.previousJoiningDate DESC, rev.newCTC DESC`,
+                [offerId]
+            );
+            const list = rows || [];
+            return list.map((row, index) => ({ ...row, revisionId: index + 1 }));
+        } catch (error) {
+            this._handleDatabaseError(error, 'getOfferRevisions');
+        }
+    }
+
     async getOfferFormData(client) {
         const connection = client;
 

@@ -21,6 +21,12 @@ class OfferController {
         return ApiResponse.success(res, offers, 'Offers retrieved successfully');
     });
 
+    getOfferDetails = catchAsync(async (req, res) => {
+        const offerId = parseInt(req.params.offerId, 10);
+        const data = await this.offerService.getOfferDetails(offerId);
+        return ApiResponse.success(res, data, 'Offer details retrieved successfully');
+    });
+
     deleteOffer = catchAsync(async (req, res) => {
         const offerId = parseInt(req.params.offerId, 10);
         await this.offerService.deleteOffer(offerId, req.auditContext);
