@@ -7506,6 +7506,9 @@ Response includes display-friendly values for frontend tables:
 - offerVersion
 - variablePay
 - joiningBonus
+- vendorName
+- currencyName
+- compensationTypeName
 - createdByName
 - createdAt
 
@@ -7570,7 +7573,7 @@ Soft deletes an offer by marking it as deleted. The record is not permanently re
 
 **POST** `/offers/:offerId/terminate`
 
-Terminates an existing offer. Records the termination in the `offer_termination` table and updates the offer status to `TERMINATED`. Only non-deleted offers can be terminated.
+Terminates an existing offer. Records the termination in the `offer_termination` table and updates the offer status to `TERMINATED`. **Only offers with status ACCEPTED can be terminated;** if the offer is PENDING or REJECTED, the API returns 400 `TERMINATE_ONLY_ACCEPTED`. Only non-deleted offers can be terminated.
 
 **Request body:**
 
@@ -7607,6 +7610,7 @@ Terminates an existing offer. Records the termination in the `offer_termination`
 
 **Notes:**
 
+- Only offers with **offerStatus = ACCEPTED** can be terminated; PENDING or other statuses return 400.
 - Only offers that exist and are not deleted (`isDeleted = 0`) can be terminated.
 - Termination details are stored in the `offer_termination` table for audit and reporting.
 

@@ -70,6 +70,9 @@ class OfferRepository {
                 o.offerVersion,
                 o.variablePay,
                 o.joiningBonus,
+                rv.vendorName,
+                lcur.value AS currencyName,
+                lcomp.value AS compensationTypeName,
                 m.memberName AS createdByName,
                 DATE_FORMAT(o.createdAt, '%Y-%m-%dT%H:%i:%sZ') AS createdAt
             FROM offer o
@@ -78,6 +81,9 @@ class OfferRepository {
             LEFT JOIN jobProfile jp ON jp.jobProfileId = jpr.jobProfileId
             LEFT JOIN lookup let ON let.lookupKey = o.employmentTypeLookupId AND let.tag = 'employmentType'
             LEFT JOIN lookup wm ON wm.lookupKey = o.workModelLookupId AND wm.tag = 'workMode'
+            LEFT JOIN recruitmentVendor rv ON rv.vendorId = o.vendorId
+            LEFT JOIN lookup lcur ON lcur.lookupKey = o.currencyLookupId AND lcur.tag = 'currency'
+            LEFT JOIN lookup lcomp ON lcomp.lookupKey = o.compensationTypeLookupId AND lcomp.tag = 'compensationType'
             LEFT JOIN member m ON m.memberId = o.createdBy
             WHERE o.isDeleted = 0
             ORDER BY o.createdAt DESC
