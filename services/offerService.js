@@ -1,6 +1,8 @@
 const AppError = require('../utils/appError');
 const auditLogService = require('./auditLogService');
 
+const TERMINAL_OFFER_STATUSES = ['ACCEPTED', 'REJECTED', 'TERMINATED'];
+
 class OfferService {
     constructor(offerRepository, db) {
         this.offerRepository = offerRepository;
@@ -176,8 +178,17 @@ class OfferService {
             await client.beginTransaction();
 
             const offer = await this.offerRepository.getOfferById(offerId, client);
-            if (!offer) {
+            if (!offer || offer.isDeleted) {
                 throw new AppError('Offer not found or already deleted', 404, 'OFFER_NOT_FOUND');
+            }
+
+            const currentStatusUpper = (offer.offerStatus || '').toUpperCase();
+            if (TERMINAL_OFFER_STATUSES.includes(currentStatusUpper)) {
+                throw new AppError(
+                    `Cannot revise offer in ${offer.offerStatus} state`,
+                    400,
+                    'INVALID_OFFER_STATE'
+                );
             }
 
             const formatDateForDb = (d) => {
@@ -252,8 +263,17 @@ class OfferService {
             await client.beginTransaction();
 
             const offer = await this.offerRepository.getOfferById(offerId, client);
-            if (!offer) {
+            if (!offer || offer.isDeleted) {
                 throw new AppError('Offer not found or already deleted', 404, 'OFFER_NOT_FOUND');
+            }
+
+            const currentStatusUpper = (offer.offerStatus || '').toUpperCase();
+            if (TERMINAL_OFFER_STATUSES.includes(currentStatusUpper)) {
+                throw new AppError(
+                    `Cannot update status for offer in ${offer.offerStatus} state`,
+                    400,
+                    'INVALID_OFFER_STATE'
+                );
             }
 
             if (statusData.status === 'ACCEPTED') {

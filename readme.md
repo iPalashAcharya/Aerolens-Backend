@@ -7738,6 +7738,7 @@ Reason alone is not valid; send at least one of `newCTC` or `newJoiningDate`. If
 **Notes:**
 
 - Only non-deleted offers can be revised.
+- Offers in **ACCEPTED**, **REJECTED**, or **TERMINATED** status cannot be revised; the API returns **400** `INVALID_OFFER_STATE`. See **Offer Lifecycle Rules**.
 - Revision history is stored in the `offer_revision` table for audit and reporting.
 
 #### 8. Update Offer Status
@@ -7812,9 +7813,40 @@ Employment type is taken from the offer (set at Initiate Onboarding). The backen
 **Notes:**
 
 - Only non-deleted offers can have their status updated.
+- Offers already in **ACCEPTED**, **REJECTED**, or **TERMINATED** cannot receive further status updates (including resending the same status); the API returns **400** `INVALID_OFFER_STATE`. See **Offer Lifecycle Rules**.
 - Every status change is recorded in `offer_status_history` for lifecycle traceability.
 - The offer table always reflects the latest status.
 - For detailed sample payloads and error notes, see **docs/offer-api-sample-payloads.md**.
+
+### Offer Lifecycle Rules
+
+The service layer enforces **terminal states**. Once an offer leaves **PENDING**, revise and status-update APIs are blocked for that row.
+
+| Current `offerStatus` | Revise Offer (`POST .../revise`) | Update Offer Status (`POST .../status`) |
+|----------------------|-----------------------------------|----------------------------------------|
+| `PENDING` | Allowed (subject to other validations) | Allowed (`ACCEPTED` or `REJECTED`, subject to signed-docs / rejection rules) |
+| `ACCEPTED` | Not allowed | Not allowed (including repeating `ACCEPTED` or switching to `REJECTED`) |
+| `REJECTED` | Not allowed | Not allowed |
+| `TERMINATED` | Not allowed | Not allowed |
+
+**Behavior**
+
+- **Revise** and **update status** both load the offer with `getOfferById` (non-deleted only). If missing or soft-deleted → `404` `OFFER_NOT_FOUND`.
+- If current status is **ACCEPTED**, **REJECTED**, or **TERMINATED** → `400` `INVALID_OFFER_STATE` with a message indicating the state (e.g. cannot revise / cannot update status in that state).
+- Status comparison is **case-insensitive** (e.g. `accepted` is treated as terminal if stored in mixed case).
+- **Terminate** (`POST .../terminate`) remains separate: only **ACCEPTED** offers can be terminated, per existing rules.
+
+**Error response** (HTTP 400) — revise or status update on a terminal offer
+
+```json
+{
+  "success": false,
+  "error": "INVALID_OFFER_STATE",
+  "message": "Cannot revise offer in ACCEPTED state"
+}
+```
+
+(Message varies with operation and stored status, e.g. `Cannot update status for offer in REJECTED state`.)
 
 ### Offer Creation Constraint
 
