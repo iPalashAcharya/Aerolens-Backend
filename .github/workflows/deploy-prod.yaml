@@ -54,6 +54,7 @@ jobs:
           IMAGE="${ECR_REG}/aerolens-portal-backend:${{ github.sha }}"
 
 
+
           docker build -t "$IMAGE" .
           docker push "$IMAGE"
         env:
