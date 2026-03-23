@@ -1,6 +1,8 @@
 const AppError = require('../utils/appError');
 const auditLogService = require('./auditLogService');
 
+const TERMINAL_OFFER_STATUSES = ['ACCEPTED', 'REJECTED', 'TERMINATED'];
+
 class OfferService {
     constructor(offerRepository, db) {
         this.offerRepository = offerRepository;
@@ -11,6 +13,19 @@ class OfferService {
         const client = await this.db.getConnection();
         try {
             await client.beginTransaction();
+
+            const existingOffer = await this.offerRepository.getActiveOfferByCandidate(
+                offerData.candidateId,
+                client
+            );
+            if (existingOffer) {
+                throw new AppError(
+                    'An active offer already exists for this candidate',
+                    400,
+                    'ACTIVE_OFFER_EXISTS'
+                );
+            }
+
             const offer = await this.offerRepository.createOffer(offerData, client);
             await auditLogService.logAction({
                 userId: auditContext.userId,
@@ -54,6 +69,28 @@ class OfferService {
             if (error instanceof AppError) throw error;
             console.error('Error fetching offer form data:', error.stack);
             throw new AppError('Failed to fetch offer form data', 500, 'OFFER_FORM_DATA_ERROR', { operation: 'getOfferFormData' });
+        } finally {
+            client.release();
+        }
+    }
+
+    async getOfferDetails(offerId) {
+        const client = await this.db.getConnection();
+        try {
+            const offer = await this.offerRepository.getOfferDetails(offerId, client);
+            if (!offer) {
+                throw new AppError('Offer not found or already deleted', 404, 'OFFER_NOT_FOUND');
+            }
+            const revisions = await this.offerRepository.getOfferRevisions(offerId, client);
+            return {
+                offer,
+                revisionCount: revisions.length,
+                revisions
+            };
+        } catch (error) {
+            if (error instanceof AppError) throw error;
+            console.error('Error fetching offer details:', error.stack);
+            throw new AppError('Failed to fetch offer details', 500, 'OFFER_DETAILS_ERROR', { operation: 'getOfferDetails', offerId });
         } finally {
             client.release();
         }
@@ -141,8 +178,17 @@ class OfferService {
             await client.beginTransaction();
 
             const offer = await this.offerRepository.getOfferById(offerId, client);
-            if (!offer) {
+            if (!offer || offer.isDeleted) {
                 throw new AppError('Offer not found or already deleted', 404, 'OFFER_NOT_FOUND');
+            }
+
+            const currentStatusUpper = (offer.offerStatus || '').toUpperCase();
+            if (TERMINAL_OFFER_STATUSES.includes(currentStatusUpper)) {
+                throw new AppError(
+                    `Cannot revise offer in ${offer.offerStatus} state`,
+                    400,
+                    'INVALID_OFFER_STATE'
+                );
             }
 
             const formatDateForDb = (d) => {
@@ -217,8 +263,17 @@ class OfferService {
             await client.beginTransaction();
 
             const offer = await this.offerRepository.getOfferById(offerId, client);
-            if (!offer) {
+            if (!offer || offer.isDeleted) {
                 throw new AppError('Offer not found or already deleted', 404, 'OFFER_NOT_FOUND');
+            }
+
+            const currentStatusUpper = (offer.offerStatus || '').toUpperCase();
+            if (TERMINAL_OFFER_STATUSES.includes(currentStatusUpper)) {
+                throw new AppError(
+                    `Cannot update status for offer in ${offer.offerStatus} state`,
+                    400,
+                    'INVALID_OFFER_STATE'
+                );
             }
 
             if (statusData.status === 'ACCEPTED') {
