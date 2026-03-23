@@ -11,6 +11,19 @@ class OfferService {
         const client = await this.db.getConnection();
         try {
             await client.beginTransaction();
+
+            const existingOffer = await this.offerRepository.getActiveOfferByCandidate(
+                offerData.candidateId,
+                client
+            );
+            if (existingOffer) {
+                throw new AppError(
+                    'An active offer already exists for this candidate',
+                    400,
+                    'ACTIVE_OFFER_EXISTS'
+                );
+            }
+
             const offer = await this.offerRepository.createOffer(offerData, client);
             await auditLogService.logAction({
                 userId: auditContext.userId,

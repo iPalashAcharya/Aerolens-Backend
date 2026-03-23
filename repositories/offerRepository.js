@@ -118,6 +118,24 @@ class OfferRepository {
         }
     }
 
+    async getActiveOfferByCandidate(candidateId, client) {
+        const connection = client;
+        try {
+            const [rows] = await connection.execute(
+                `SELECT offerId
+                 FROM offer
+                 WHERE candidateId = ?
+                   AND isDeleted = 0
+                   AND offerStatus = 'PENDING'
+                 LIMIT 1`,
+                [candidateId]
+            );
+            return rows[0] || null;
+        } catch (error) {
+            this._handleDatabaseError(error, 'getActiveOfferByCandidate');
+        }
+    }
+
     async softDeleteOffer(offerId, client) {
         const connection = client;
         try {

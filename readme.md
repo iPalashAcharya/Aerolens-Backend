@@ -7816,6 +7816,37 @@ Employment type is taken from the offer (set at Initiate Onboarding). The backen
 - The offer table always reflects the latest status.
 - For detailed sample payloads and error notes, see **docs/offer-api-sample-payloads.md**.
 
+### Offer Creation Constraint
+
+**Rule**
+
+A candidate cannot have more than one active (PENDING) offer at a time.
+
+**Behavior**
+
+If an offer exists with:
+
+- `offerStatus = PENDING`
+- `isDeleted = 0`
+
+→ New offer creation is blocked.
+
+**Allowed cases**
+
+- Previous offer is **TERMINATED**
+- Previous offer is **REJECTED**
+- Previous offer is soft deleted (`isDeleted = 1`)
+
+**Error response** (HTTP 400)
+
+```json
+{
+  "success": false,
+  "error": "ACTIVE_OFFER_EXISTS",
+  "message": "An active offer already exists for this candidate"
+}
+```
+
 ### Implementation Files
 
 Offer module components are located in:
