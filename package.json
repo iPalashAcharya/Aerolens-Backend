@@ -5,7 +5,8 @@
   "type": "commonjs",
   "scripts": {
     "test": "jest",
-    "start": "node server.js"
+    "start": "node server.js",
+    "email:test": "node scripts/testInterviewEmail.js"
   },
   "keywords": [],
   "author": "",
@@ -39,6 +40,7 @@
     "mysql2": "^3.15.3",
     "node-abort-controller": "^3.1.1",
     "node-cron": "^4.2.1",
+    "nodemailer": "^8.0.3",
     "open-location-code": "^1.0.3",
     "p-limit": "^3.1.0",
     "passport": "^0.7.0",

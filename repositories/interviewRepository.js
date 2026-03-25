@@ -516,6 +516,47 @@ class InterviewRepository {
         }
     }
 
+    async getInterviewEmailContext(interviewId, client) {
+        const connection = client;
+
+        try {
+            const query = `
+            SELECT *
+            FROM (
+                SELECT
+                    i.interviewId,
+                    c.candidateName,
+                    COALESCE(jp.jobRole, 'N/A') AS role,
+                    COALESCE(loc.cityName, i.eventTimezone, 'N/A') AS location,
+                    interviewer.email AS toEmail,
+                    RANK() OVER (
+                        PARTITION BY i.candidateId
+                        ORDER BY i.fromTimeUTC ASC, i.interviewId ASC
+                    ) AS roundNumber
+                FROM interview i
+                LEFT JOIN candidate c
+                    ON i.candidateId = c.candidateId
+                LEFT JOIN member interviewer
+                    ON i.interviewerId = interviewer.memberId
+                LEFT JOIN jobProfileRequirement jpr
+                    ON c.appliedForJobProfileId = jpr.jobProfileRequirementId
+                LEFT JOIN jobProfile jp
+                    ON jpr.jobProfileId = jp.jobProfileId
+                LEFT JOIN location loc
+                    ON c.expectedLocation = loc.locationId
+                WHERE i.isActive = TRUE
+                  AND i.deletedAt IS NULL
+            ) ranked
+            WHERE ranked.interviewId = ?;
+            `;
+
+            const [rows] = await connection.query(query, [interviewId]);
+            return rows[0] || null;
+        } catch (error) {
+            this._handleDatabaseError(error, 'getInterviewEmailContext');
+        }
+    }
+
     async getInterviewsByCandidateId(candidateId, client) {
         const connection = client;
         try {

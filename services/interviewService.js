@@ -2,6 +2,7 @@ const AppError = require('../utils/appError');
 const auditLogService = require('./auditLogService');
 const { DateTime } = require('luxon');
 const DateConverter = require('../utils/dateConverter');
+const { sendInterviewEmail } = require('./emailService');
 
 class InterviewService {
     constructor(interviewRepository, db) {
@@ -61,6 +62,38 @@ class InterviewService {
         if (!obj || typeof obj[fieldName] !== "string") return;
 
         obj[fieldName] = InterviewService.capitalizeFirstLetter(obj[fieldName]);
+    }
+
+    async sendScheduledInterviewEmailByInterviewId(interviewId) {
+        let client;
+        try {
+            client = await this.db.getConnection();
+            const emailContext = await this.interviewRepository.getInterviewEmailContext(interviewId, client);
+
+            if (!emailContext) {
+                console.warn(`[INTERVIEW EMAIL] Skipped: no interview context found for interviewId=${interviewId}`);
+                return;
+            }
+
+            if (!emailContext.toEmail) {
+                console.warn(`[INTERVIEW EMAIL] Skipped: interviewer email missing for interviewId=${interviewId}`);
+                return;
+            }
+
+            await sendInterviewEmail({
+                candidateName: emailContext.candidateName || 'Candidate',
+                role: emailContext.role || 'N/A',
+                round: `Round ${emailContext.roundNumber ?? 'N/A'}`,
+                location: emailContext.location || 'N/A',
+                toEmail: emailContext.toEmail
+            });
+        } catch (error) {
+            console.error(`[INTERVIEW EMAIL] Failed for interviewId=${interviewId}:`, error.message);
+        } finally {
+            if (client) {
+                client.release();
+            }
+        }
     }
 
     async assertNoOverlaps({
@@ -664,6 +697,7 @@ class InterviewService {
             }, client);
 
             await client.commit();
+            this.sendScheduledInterviewEmailByInterviewId(result.interviewId);
             return result;
 
         } catch (error) {
@@ -840,6 +874,7 @@ class InterviewService {
             }, client);
 
             await client.commit();
+            this.sendScheduledInterviewEmailByInterviewId(updatedInterview.interviewId);
             return updatedInterview;
 
         } catch (error) {
@@ -908,6 +943,7 @@ class InterviewService {
             }, client);
 
             await client.commit();
+            this.sendScheduledInterviewEmailByInterviewId(result.interviewId);
 
             return {
                 success: true,
@@ -978,6 +1014,7 @@ class InterviewService {
             }, client);
 
             await client.commit();
+            this.sendScheduledInterviewEmailByInterviewId(finalizedInterview.interviewId);
 
             return finalizedInterview;
 
