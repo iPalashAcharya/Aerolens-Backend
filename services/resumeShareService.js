@@ -79,36 +79,45 @@ class ResumeShareService {
     }
 
     async resolveTokenOrThrow(token) {
-        const row = await this.resumeShareRepository.findByToken(token);
-        if (!row) {
-            throw new AppError('Share link not found', 404, 'SHARE_TOKEN_NOT_FOUND');
+        const client = await this.db.getConnection();
+        try{
+            const row = await this.resumeShareRepository.findByToken(token, client);
+            if (!row) {
+                throw new AppError('Share link not found', 404, 'SHARE_TOKEN_NOT_FOUND');
+            }
+            if (row.isRevoked) {
+                throw new AppError('This share link has been revoked', 403, 'SHARE_TOKEN_REVOKED');
+            }
+            const expires = new Date(row.expiresAt);
+            if (Number.isFinite(expires.getTime()) && expires.getTime() < Date.now()) {
+                throw new AppError('This share link has expired', 410, 'SHARE_TOKEN_EXPIRED');
+            }
+            return row;
+        }finally{
+            client.release();
         }
-        if (row.isRevoked) {
-            throw new AppError('This share link has been revoked', 403, 'SHARE_TOKEN_REVOKED');
-        }
-        const expires = new Date(row.expiresAt);
-        if (Number.isFinite(expires.getTime()) && expires.getTime() < Date.now()) {
-            throw new AppError('This share link has expired', 410, 'SHARE_TOKEN_EXPIRED');
-        }
-        return row;
     }
 
     async getResumePayloadForShareToken(token) {
-        const row = await this.resolveTokenOrThrow(token);
-        const resumeData = await this.candidateService.downloadResume(row.candidateId);
-        return { row, resumeData };
+        const client = await this.db.getConnection();
+        try{
+            const row = await this.resolveTokenOrThrow(token, client);
+            const resumeData = await this.candidateService.downloadResume(row.candidateId);
+            return { row, resumeData };
+        }finally{
+            client.release();
+        }
     }
 
     async revokeShareToken(token, memberId, auditContext) {
-        const row = await this.resumeShareRepository.findByToken(token);
+        const client = await this.db.getConnection();
+        const row = await this.resumeShareRepository.findByToken(token,client);
         if (!row) {
             throw new AppError('Share link not found', 404, 'SHARE_TOKEN_NOT_FOUND');
         }
         if (Number(row.createdByUserId) !== Number(memberId)) {
             throw new AppError('You are not allowed to revoke this share link', 403, 'SHARE_REVOKE_FORBIDDEN');
         }
-
-        const client = await this.db.getConnection();
         try {
             await client.beginTransaction();
             const affected = await this.resumeShareRepository.revokeByToken(token, client);
