@@ -5,9 +5,8 @@ class ResumeShareRepository {
         this.db = db;
     }
 
-    async insert(row, client = null) {
-        const own = !client;
-        const conn = client || await this.db.getConnection();
+    async insert(row, client) {
+        const conn = client;
         try {
             const sql = `
                 INSERT INTO resume_share_tokens
@@ -23,14 +22,11 @@ class ResumeShareRepository {
             ]);
         } catch (error) {
             this._handleDatabaseError(error);
-        } finally {
-            if (own) conn.release();
         }
     }
 
     async findByToken(token, client = null) {
-        const own = !client;
-        const conn = client || await this.db.getConnection();
+        const conn = client;
         try {
             const [rows] = await conn.execute(
                 `SELECT id, token, candidate_id AS candidateId, created_by_user_id AS createdByUserId,
@@ -41,14 +37,11 @@ class ResumeShareRepository {
             return rows[0] || null;
         } catch (error) {
             this._handleDatabaseError(error);
-        } finally {
-            if (own) conn.release();
         }
     }
 
     async revokeByToken(token, client = null) {
-        const own = !client;
-        const conn = client || await this.db.getConnection();
+        const conn = client;
         try {
             const [result] = await conn.execute(
                 `UPDATE resume_share_tokens SET is_revoked = TRUE WHERE token = ? AND is_revoked = FALSE`,
@@ -57,8 +50,6 @@ class ResumeShareRepository {
             return result.affectedRows || 0;
         } catch (error) {
             this._handleDatabaseError(error);
-        } finally {
-            if (own) conn.release();
         }
     }
 
