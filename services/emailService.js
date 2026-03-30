@@ -1,5 +1,5 @@
 const nodemailer = require('nodemailer');
-const { DateTime } = require('luxon');
+const { DateTime, IANAZone } = require('luxon');
 
 const normalizeEnvValue = (value) => String(value || '')
     .trim()
@@ -31,24 +31,70 @@ function escapeHtml(value) {
 }
 
 /**
- * @param {Date|string|number} dateTime - ISO string, Date, or timestamp
- * @param {string} [eventTimezone] - IANA zone for display (e.g. interview eventTimezone)
+ * `interview.fromTimeUTC` is stored as UTC. With mysql2 `dateStrings: true`, values arrive as
+ * `yyyy-MM-dd HH:mm:ss` with NO offset — they must be parsed as UTC, not server-local (new Date()).
+ */
+function parseInterviewUtcInstant(dateTime) {
+    if (dateTime == null || dateTime === '') {
+        throw new Error('dateTime is required');
+    }
+
+    if (dateTime instanceof Date) {
+        if (Number.isNaN(dateTime.getTime())) {
+            throw new Error('Invalid Date object for interview email');
+        }
+        return DateTime.fromJSDate(dateTime, { zone: 'utc' });
+    }
+
+    if (typeof dateTime === 'number') {
+        const dt = DateTime.fromMillis(dateTime, { zone: 'utc' });
+        if (!dt.isValid) throw new Error('Invalid numeric timestamp for interview email');
+        return dt;
+    }
+
+    const raw = String(dateTime).trim();
+    // MySQL DATETIME / dateStrings (no timezone) — wall clock is UTC
+    const mysqlUtcPattern = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d{1,6})?$/;
+    if (mysqlUtcPattern.test(raw) && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(raw)) {
+        const normalized = raw.replace('T', ' ').replace(/\.\d{1,6}$/, '');
+        let dt = DateTime.fromSQL(normalized, { zone: 'utc' });
+        if (!dt.isValid) {
+            dt = DateTime.fromFormat(normalized, 'yyyy-MM-dd HH:mm:ss', { zone: 'utc' });
+        }
+        if (!dt.isValid) {
+            throw new Error(`Invalid MySQL UTC datetime for interview email: ${raw}`);
+        }
+        return dt;
+    }
+
+    const isoLike = raw.replace(' ', 'T');
+    const dt = DateTime.fromISO(isoLike, { setZone: true });
+    if (!dt.isValid) {
+        throw new Error(`Invalid ISO datetime for interview email: ${raw}`);
+    }
+    return dt.toUTC();
+}
+
+function resolveEventDisplayZone(eventTimezone) {
+    const z = eventTimezone && String(eventTimezone).trim();
+    if (z && IANAZone.isValidZone(z)) {
+        return z;
+    }
+    if (z) {
+        console.warn(`[INTERVIEW EMAIL] Invalid eventTimezone "${z}", using UTC for display`);
+    }
+    return 'UTC';
+}
+
+/**
+ * @param {Date|string|number} dateTime - UTC instant (DB fromTimeUTC or ISO)
+ * @param {string} [eventTimezone] - IANA zone for display (must match interview scheduling intent)
  * @returns {{ formattedDate: string, formattedTime: string }}
  */
 function formatInterviewDateTime(dateTime, eventTimezone = 'UTC') {
-    let dt;
-    if (dateTime instanceof Date) {
-        dt = DateTime.fromJSDate(dateTime, { zone: 'utc' });
-    } else {
-        dt = DateTime.fromISO(String(dateTime), { zone: 'utc' });
-        if (!dt.isValid) {
-            dt = DateTime.fromJSDate(new Date(dateTime), { zone: 'utc' });
-        }
-    }
-    if (!dt.isValid) {
-        throw new Error('Invalid dateTime for interview email');
-    }
-    const zoned = dt.setZone(eventTimezone || 'UTC');
+    const dtUtc = parseInterviewUtcInstant(dateTime);
+    const displayZone = resolveEventDisplayZone(eventTimezone);
+    const zoned = dtUtc.setZone(displayZone);
     return {
         formattedDate: zoned.toFormat('dd MMMM yyyy'),
         formattedTime: zoned.toFormat('h:mm a')
@@ -115,7 +161,7 @@ function validateInterviewEmailPayload(payload) {
         toEmail: primary,
         ccEmails: ccNormalized,
         recruiter: recruiterBlock,
-        eventTimezone: eventTimezone && String(eventTimezone).trim() ? String(eventTimezone).trim() : 'UTC'
+        eventTimezone: resolveEventDisplayZone(eventTimezone)
     };
 }
 
@@ -274,5 +320,7 @@ module.exports = {
     buildInterviewEmailDispatchPayload,
     validateInterviewEmailPayload,
     formatInterviewDateTime,
+    parseInterviewUtcInstant,
+    resolveEventDisplayZone,
     normalizeEmailInput
 };
