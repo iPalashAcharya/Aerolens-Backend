@@ -528,7 +528,14 @@ class InterviewRepository {
                     c.candidateName,
                     COALESCE(jp.jobRole, 'N/A') AS role,
                     COALESCE(loc.cityName, i.eventTimezone, 'N/A') AS location,
-                    interviewer.email AS toEmail,
+                    c.email AS candidateEmail,
+                    interviewer.email AS interviewerEmail,
+                    recruiter.memberName AS recruiterName,
+                    recruiter.email AS recruiterEmail,
+                    recruiter.memberContact AS recruiterPhone,
+                    COALESCE(recruiterDesig.value, '') AS recruiterDesignation,
+                    i.fromTimeUTC AS interviewStartsAt,
+                    i.eventTimezone,
                     RANK() OVER (
                         PARTITION BY i.candidateId
                         ORDER BY i.fromTimeUTC ASC, i.interviewId ASC
@@ -538,6 +545,11 @@ class InterviewRepository {
                     ON i.candidateId = c.candidateId
                 LEFT JOIN member interviewer
                     ON i.interviewerId = interviewer.memberId
+                LEFT JOIN member recruiter
+                    ON c.recruiterId = recruiter.memberId
+                LEFT JOIN lookup recruiterDesig
+                    ON recruiterDesig.lookupKey = recruiter.designation
+                    AND recruiterDesig.tag = 'designation'
                 LEFT JOIN jobProfileRequirement jpr
                     ON c.appliedForJobProfileId = jpr.jobProfileRequirementId
                 LEFT JOIN jobProfile jp

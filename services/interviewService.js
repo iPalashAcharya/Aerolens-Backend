@@ -75,17 +75,39 @@ class InterviewService {
                 return;
             }
 
-            if (!emailContext.toEmail) {
-                console.warn(`[INTERVIEW EMAIL] Skipped: interviewer email missing for interviewId=${interviewId}`);
+            if (!emailContext.candidateEmail) {
+                console.warn(`[INTERVIEW EMAIL] Skipped: candidate email missing for interviewId=${interviewId}`);
                 return;
             }
+
+            if (!emailContext.interviewStartsAt) {
+                console.warn(`[INTERVIEW EMAIL] Skipped: interview start time missing for interviewId=${interviewId}`);
+                return;
+            }
+
+            const ccEmails = [
+                emailContext.interviewerEmail,
+                emailContext.recruiterEmail
+            ].filter(Boolean);
 
             await sendInterviewEmail({
                 candidateName: emailContext.candidateName || 'Candidate',
                 role: emailContext.role || 'N/A',
-                round: `Round ${emailContext.roundNumber ?? 'N/A'}`,
+                round:
+                    emailContext.roundNumber != null
+                        ? `Round ${emailContext.roundNumber}`
+                        : 'Interview',
                 location: emailContext.location || 'N/A',
-                toEmail: emailContext.toEmail
+                dateTime: emailContext.interviewStartsAt,
+                eventTimezone: emailContext.eventTimezone || 'UTC',
+                toEmail: emailContext.candidateEmail,
+                ccEmails,
+                recruiter: {
+                    name: emailContext.recruiterName || 'Recruiting Team',
+                    designation: emailContext.recruiterDesignation || '',
+                    email: emailContext.recruiterEmail || '',
+                    phone: emailContext.recruiterPhone || ''
+                }
             });
         } catch (error) {
             console.error(`[INTERVIEW EMAIL] Failed for interviewId=${interviewId}:`, error.message);
