@@ -3,6 +3,9 @@ const multer = require('multer');
 const CandidateController = require('../controllers/candidateController');
 const CandidateService = require('../services/candidateService');
 const CandidateRepository = require('../repositories/candidateRepository');
+const ResumeShareRepository = require('../repositories/resumeShareRepository');
+const ResumeShareService = require('../services/resumeShareService');
+const ResumeShareController = require('../controllers/resumeShareController');
 const CandidateBulkService = require('../services/candidateBulkService');
 const CandidateBulkController = require('../controllers/candidateBulkController');
 const {
@@ -19,6 +22,10 @@ const { resumeBulkQueue } = require('../queues/resumeBulkQueue');
 const candidateRepository = new CandidateRepository(db);
 const candidateService = new CandidateService(candidateRepository, db);
 const candidateController = new CandidateController(candidateService);
+
+const resumeShareRepository = new ResumeShareRepository(db);
+const resumeShareService = new ResumeShareService(resumeShareRepository, candidateService, db);
+const resumeShareController = new ResumeShareController(resumeShareService);
 
 // === RESUME BULK UPLOAD (ZIP) ===
 const ResumeBulkUploadController = require('../controllers/resumeBulkUploadController');
@@ -132,6 +139,11 @@ router.get('/:id/resume/info',
     candidateController.getResumeInfo
 );
 
+router.post('/:id/share',
+    CandidateValidator.validateDelete,
+    resumeShareController.createShare
+);
+
 router.get('/:id',
     CandidateValidator.validateDelete,
     candidateController.getCandidate
@@ -208,4 +220,5 @@ router.get(
         resumeBulkUploadController.getBatchStatus(req, res, next)
 );
 
+router.resumeShareController = resumeShareController;
 module.exports = router;

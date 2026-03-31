@@ -20,6 +20,8 @@ router.get('/form-data', offerController.getOfferFormData);
 
 router.get('/', offerController.getOffers);
 
+router.get('/:offerId/details', offerController.getOfferDetails);
+
 router.delete('/:offerId', offerController.deleteOffer);
 
 router.post('/:offerId/terminate', OfferValidator.validateTerminate, offerController.terminateOffer);

@@ -75,6 +75,8 @@ async function startServer() {
         await fetchSecrets();
 
         const express = require('express');
+        const { authenticate } = require('./middleware/authMiddleware');
+        const auditContextMiddleware = require('./middleware/auditContext');
         const cookieParser = require('cookie-parser');
         const passport = require('./config/passport');
         const cors = require('cors');
@@ -299,6 +301,32 @@ async function startServer() {
         app.use('/contact', contactRoutes);
         app.use('/jobProfile', jobProfileRoutes);
         app.use('/jobProfileRequirement', jobProfileRequirementRoutes);
+
+        const shareViewLimiter = rateLimit({
+            windowMs: 15 * 60 * 1000,
+            max: 60,
+            standardHeaders: true,
+            legacyHeaders: false,
+            message: {
+                success: false,
+                error: 'TOO_MANY_REQUESTS',
+                message: 'Too many resume share requests. Try again later.'
+            }
+        });
+
+        const sharePublicRouter = express.Router();
+        sharePublicRouter.get('/:token', (req, res, next) =>
+            candidateRoutes.resumeShareController.getResumeByShareToken(req, res, next)
+        );
+        app.use('/share', shareViewLimiter, sharePublicRouter);
+
+        app.delete(
+            '/share/:token',
+            authenticate,
+            auditContextMiddleware,
+            (req, res, next) => candidateRoutes.resumeShareController.revokeShare(req, res, next)
+        );
+
         app.use('/candidate', candidateRoutes);
         app.use('/lookup', lookupRoutes);
         app.use('/member', memberRoutes);
