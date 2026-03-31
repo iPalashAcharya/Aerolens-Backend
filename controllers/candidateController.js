@@ -3,7 +3,6 @@ const ApiResponse = require('../utils/response');
 const AppError = require('../utils/appError');
 const path = require('path');
 const fs = require('fs');
-const { streamCandidateResumeToResponse } = require('../utils/streamCandidateResume');
 
 class CandidateController {
     constructor(candidateService) {
@@ -210,9 +209,42 @@ class CandidateController {
         const candidateId = parseInt(req.params.id);
 
         const resumeData = await this.candidateService.downloadResume(candidateId);
+        const { GetObjectCommand } = require('@aws-sdk/client-s3');
+        const { s3Client, bucketName } = this.candidateService;
+
+        const command = new GetObjectCommand({
+            Bucket: bucketName,
+            Key: resumeData.s3Key
+        });
+
+        const s3Response = await s3Client.send(command);
+
+        const mimeType = this.getMimeType(resumeData.originalName);
+        const sanitizedFilename = this.sanitizeFilename(resumeData.originalName);
+
+        // Set headers for download
+        res.setHeader('Content-Type', mimeType);
+        res.setHeader('Content-Disposition', `attachment; filename="${sanitizedFilename}"`);
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
-        await streamCandidateResumeToResponse(this.candidateService, resumeData, res, { inline: false });
+
+        if (s3Response.ContentLength) {
+            res.setHeader('Content-Length', s3Response.ContentLength);
+        }
+
+        // Stream the S3 response to client
+        // Handle both Node.js streams and Web streams
+        if (s3Response.Body.pipe) {
+            // Node.js stream
+            s3Response.Body.pipe(res);
+        } else {
+            // Web stream (AWS SDK v3)
+            const stream = s3Response.Body;
+            for await (const chunk of stream) {
+                res.write(chunk);
+            }
+            res.end();
+        }
     });
 
     previewResume = catchAsync(async (req, res) => {
@@ -230,9 +262,41 @@ class CandidateController {
                 }
             );
         }
+        const { GetObjectCommand } = require('@aws-sdk/client-s3');
+        const { s3Client, bucketName } = this.candidateService;
+
+        const command = new GetObjectCommand({
+            Bucket: bucketName,
+            Key: resumeData.s3Key
+        });
+
+        const s3Response = await s3Client.send(command);
+
+        const mimeType = this.getMimeType(resumeData.originalName);
+        const sanitizedFilename = this.sanitizeFilename(resumeData.originalName);
+
+        // Set headers for inline preview
+        res.setHeader('Content-Type', mimeType);
+        res.setHeader('Content-Disposition', `inline; filename="${sanitizedFilename}"`);
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
-        await streamCandidateResumeToResponse(this.candidateService, resumeData, res, { inline: true });
+
+        if (s3Response.ContentLength) {
+            res.setHeader('Content-Length', s3Response.ContentLength);
+        }
+
+        // Stream the S3 response to client
+        if (s3Response.Body.pipe) {
+            // Node.js stream
+            s3Response.Body.pipe(res);
+        } else {
+            // Web stream (AWS SDK v3)
+            const stream = s3Response.Body;
+            for await (const chunk of stream) {
+                res.write(chunk);
+            }
+            res.end();
+        }
     });
 
     deleteResume = catchAsync(async (req, res) => {
