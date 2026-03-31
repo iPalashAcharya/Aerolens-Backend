@@ -1,3 +1,171 @@
+# Recruitment Automation ATS - WhatsApp Module (Frontend Integration Source of Truth)
+
+This section defines the exact API contract FE must follow for WhatsApp resume sharing.
+
+## FE Integration Rules (Must Follow)
+
+- FE must send only `candidateId`, `groupId`, and optional `customMessage`.
+- FE must never send phone numbers.
+- Recipient resolution is backend-only via `groupId` (`whatsapp_group_member` + `member`).
+- API is async via queue; FE gets immediate queued response.
+
+## Endpoint Contract
+
+### POST `/api/whatsapp/send-resume`
+
+#### Request Headers
+
+```http
+Content-Type: application/json
+```
+
+#### Request Body
+
+```json
+{
+  "candidateId": 123,
+  "groupId": 2,
+  "customMessage": "Please review ASAP, strong backend candidate"
+}
+```
+
+#### Field Rules
+
+- `candidateId`: required, numeric.
+- `groupId`: required, numeric.
+- `customMessage`: optional.
+  - trimmed by backend before use
+  - max length `1024`
+  - plain text only (HTML tags are rejected)
+  - if missing or empty after trim, backend sends single space `" "` to WhatsApp template variable `{{2}}`
+
+#### Success Response (Always Immediate)
+
+Status: `200`
+
+```json
+{
+  "success": true,
+  "queued": true
+}
+```
+
+#### Validation Error Responses
+
+Status: `400`
+
+Missing required fields:
+
+```json
+{
+  "success": false,
+  "message": "candidateId and groupId are required"
+}
+```
+
+Invalid `customMessage` examples:
+
+```json
+{
+  "success": false,
+  "message": "customMessage max length is 1024 characters"
+}
+```
+
+```json
+{
+  "success": false,
+  "message": "customMessage must be plain text only"
+}
+```
+
+```json
+{
+  "success": false,
+  "message": "customMessage must be plain text"
+}
+```
+
+## What Happens After Queueing (Backend Lifecycle)
+
+Queue name: `whatsapp-resume-queue`  
+Worker concurrency: `1`  
+Retry policy: `attempts: 3`, exponential backoff, `5000ms`
+
+Processing sequence:
+1. `whatsapp_queue` row starts as `PENDING`.
+2. Worker updates status to `PROCESSING`.
+3. Candidate is fetched from `candidate`.
+4. Resume signed URL is generated (S3, 5-minute expiry, HTTPS).
+5. Dynamic text (`{{1}}`) is built by backend.
+6. Recipients are resolved by `groupId` from DB.
+7. WhatsApp template `candidate_resume_v2` is sent.
+8. Every recipient attempt is logged in `whatsapp_message_log` (`SENT`/`FAILED`).
+9. Queue row is updated to `DONE` or `FAILED` and `retry_count` is synced with attempts.
+
+## WhatsApp Template Mapping (Backend-Controlled)
+
+- Template name: `candidate_resume_v2`
+- Language: `en`
+- Body variables:
+  - `{{1}}`: dynamic candidate block from backend
+  - `{{2}}`: FE `customMessage` (trimmed), fallback `" "` (single space)
+- Header document:
+  - `filename`: `Resume.pdf`
+  - `link`: signed S3 URL
+
+## Webhook Endpoints (Meta -> Backend)
+
+### GET `/webhook/whatsapp`
+
+- Used by Meta webhook verification.
+- Returns `hub.challenge` when `hub.verify_token === WA_VERIFY_TOKEN`, else `403`.
+
+### POST `/webhook/whatsapp`
+
+- Consumes WhatsApp delivery statuses.
+- Updates `whatsapp_message_log` by `meta_message_id`.
+- Supported statuses: `sent`, `delivered`, `read`, `failed`.
+- Returns `200 OK` always.
+
+## Backend Files for This Module
+
+- `config/s3.js`
+- `config/whatsapp.js`
+- `controllers/whatsappController.js`
+- `controllers/webhookController.js`
+- `services/whatsappCandidateService.js`
+- `services/s3Service.js`
+- `services/messageService.js`
+- `services/groupService.js`
+- `services/whatsappService.js`
+- `services/whatsappLogService.js`
+- `queues/whatsappQueue.js`
+- `workers/whatsappWorker.js`
+- `routes/whatsappRoutes.js`
+- `routes/webhookRoutes.js`
+- `scripts/whatsapp_schema.sql`
+
+## Required Environment Variables
+
+`WA_ACCESS_TOKEN`  
+`WA_PHONE_NUMBER_ID`  
+`WA_WABA_ID`  
+`WA_VERIFY_TOKEN`  
+`AWS_ACCESS_KEY_ID`  
+`AWS_SECRET_ACCESS_KEY`  
+`AWS_REGION`  
+`S3_BUCKET_NAME`  
+`DB_HOST`  
+`DB_PORT`  
+`DB_NAME`  
+`DB_USER`  
+`DB_PASSWORD`  
+`REDIS_HOST`  
+`REDIS_PORT`  
+`PORT`  
+`NODE_ENV`
+
 # Authentication API Documentation
 
 This module provides JWT-based authentication with token family tracking, refresh with grace period, and active session management. All endpoints use JSON for request and response bodies.
