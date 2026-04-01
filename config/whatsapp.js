@@ -7,5 +7,7 @@ module.exports = {
     phoneNumberId: process.env.WA_PHONE_NUMBER_ID,
     wabaId:        process.env.WA_WABA_ID,
     verifyToken:   process.env.WA_VERIFY_TOKEN,
-    apiBaseUrl:    `https://graph.facebook.com/${graphVersion}`
+    apiBaseUrl:    `https://graph.facebook.com/${graphVersion}`,
+    templateName:  process.env.WA_TEMPLATE_NAME || 'candidate_resume_v2',
+    templateLanguageCode: process.env.WA_TEMPLATE_LANGUAGE_CODE || 'en'
 };

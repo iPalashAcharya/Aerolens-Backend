@@ -1,5 +1,4 @@
 const { enqueueWhatsAppResumeJob } = require('../queues/whatsappQueue');
-const { getCandidate } = require('../services/whatsappCandidateService');
 const { getRecipients } = require('../services/groupService');
 
 function validateCustomMessage(customMessage) {
@@ -27,40 +26,19 @@ function validateCustomMessage(customMessage) {
 async function sendResume(req, res) {
     const { candidateId, groupId, customMessage } = req.body;
 
-    if (!candidateId || !groupId) {
+    if (!groupId) {
         return res.status(400).json({
             success: false,
-            message: 'candidateId and groupId are required'
+            message: 'groupId is required'
         });
     }
 
-    const numCandidateId = Number(candidateId);
+    const numCandidateId = candidateId ? Number(candidateId) : null;
     const numGroupId = Number(groupId);
 
     try {
         // ------------------------------------------------------------------
-        // Pre-flight 1: candidate must exist and have a resume uploaded
-        // Fail fast here — no point burning a queue slot and 3 retries
-        // on a condition that won't fix itself
-        // ------------------------------------------------------------------
-        const candidate = await getCandidate(numCandidateId);
-
-        if (!candidate) {
-            return res.status(404).json({
-                success: false,
-                message: `Candidate not found: candidateId=${numCandidateId}`
-            });
-        }
-
-        if (!candidate.resumeKey) {
-            return res.status(400).json({
-                success: false,
-                message: `Candidate ${numCandidateId} does not have a resume uploaded. Please upload a resume before sharing.`
-            });
-        }
-
-        // ------------------------------------------------------------------
-        // Pre-flight 2: group must exist and be active, with at least 1 member
+        // Pre-flight: group must exist and be active, with at least 1 member
         // ------------------------------------------------------------------
         let recipients;
         try {

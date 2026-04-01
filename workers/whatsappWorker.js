@@ -4,9 +4,6 @@ const { Worker } = require('bullmq');
 const db = require('../db');
 const { redisConnection } = require('../config/redis');
 const { queueName } = require('../queues/whatsappQueue');
-const { getCandidate } = require('../services/whatsappCandidateService');
-const { generateSignedUrl } = require('../services/s3Service');
-const { buildDynamicText } = require('../services/messageService');
 const { getRecipients } = require('../services/groupService');
 const { sendToGroup } = require('../services/whatsappService');
 const { logMessages } = require('../services/whatsappLogService');
@@ -52,39 +49,12 @@ const whatsappWorker = new Worker(
         );
 
         // Tracked so the catch block can produce fallback log entries
-        let candidate  = null;
         let recipients = [];
 
         try {
-            // ----------------------------------------------------------------
-            // Step 1 — Candidate
-            // ----------------------------------------------------------------
-            candidate = await getCandidate(candidateId);
-
-            if (!candidate) {
-                throw new Error(`Candidate not found: candidateId=${candidateId}`);
-            }
-            if (!candidate.resumeKey) {
-                throw new Error(`Candidate resumeKey missing: candidateId=${candidateId}`);
-            }
-
-            console.log('[WA] Candidate fetched', {
-                candidateId,
-                name:      candidate.name,
-                resumeKey: candidate.resumeKey
-            });
-
-            // ----------------------------------------------------------------
-            // Step 2 — S3 signed URL
-            // ----------------------------------------------------------------
-            const signedUrl = await generateSignedUrl(candidate.resumeKey);
-            console.log('[WA] Signed URL generated', { resumeKey: candidate.resumeKey });
-
-            // ----------------------------------------------------------------
-            // Step 3 — Dynamic text
-            // ----------------------------------------------------------------
-            const dynamicText = buildDynamicText(candidate);
-            console.log('[WA] Dynamic text built');
+            const signedUrl = null;
+            const dynamicText = '';
+            console.log('[WA] hello_world mode active — skipping candidate/S3/message steps');
 
             // ----------------------------------------------------------------
             // Step 4 — Recipients

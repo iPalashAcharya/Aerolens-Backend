@@ -1,5 +1,7 @@
 const axios = require('axios');
 const waConfig = require('../config/whatsapp');
+const HELLO_WORLD_TEMPLATE_NAME = 'hello_world';
+const HELLO_WORLD_LANGUAGE_CODE = 'en_US';
 
 // ---------------------------------------------------------------------------
 // Phone number sanitization
@@ -23,17 +25,6 @@ function sanitizePhoneNumber(raw) {
     }
 
     return digits;
-}
-
-// ---------------------------------------------------------------------------
-// customMessage helpers
-// ---------------------------------------------------------------------------
-function normalizeCustomMessage(customMessage) {
-    if (typeof customMessage !== 'string') {
-        return ' ';
-    }
-    const trimmed = customMessage.trim();
-    return trimmed !== '' ? trimmed : ' ';
 }
 
 function validateCustomMessage(customMessage) {
@@ -60,42 +51,20 @@ async function sendWhatsApp(to, dynamicText, customMessage, fileUrl) {
 
     const sanitizedTo = sanitizePhoneNumber(to);
 
-    const parameters = [
-        { type: 'text', text: dynamicText },
-        { type: 'text', text: normalizeCustomMessage(customMessage) }
-    ];
-
     const payload = {
         messaging_product: 'whatsapp',
         to: sanitizedTo,
         type: 'template',
         template: {
-            name: 'candidate_resume_v2',
-            language: { code: 'en' },
-            components: [
-                {
-                    type: 'body',
-                    parameters
-                },
-                {
-                    type: 'header',
-                    parameters: [
-                        {
-                            type: 'document',
-                            document: {
-                                link: fileUrl,
-                                filename: 'Resume.pdf'
-                            }
-                        }
-                    ]
-                }
-            ]
+            name: HELLO_WORLD_TEMPLATE_NAME,
+            language: { code: HELLO_WORLD_LANGUAGE_CODE }
         }
     };
 
     console.log('[WA SEND] Outbound request', {
         to: sanitizedTo,
-        template: 'candidate_resume_v2',
+        template: HELLO_WORLD_TEMPLATE_NAME,
+        templateLanguageCode: HELLO_WORLD_LANGUAGE_CODE,
         phoneNumberId: waConfig.phoneNumberId,
         apiBaseUrl: waConfig.apiBaseUrl,
         hasToken: !!waConfig.accessToken,
