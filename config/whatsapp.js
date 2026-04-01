@@ -1,7 +1,11 @@
+// Read at require() time — dotenv.config() is always called before this
+// module is required (server.js line 1), so env vars are available.
+const graphVersion = process.env.WA_GRAPH_VERSION || 'v20.0';
+
 module.exports = {
-    accessToken: process.env.WA_ACCESS_TOKEN,
+    accessToken:   process.env.WA_ACCESS_TOKEN,
     phoneNumberId: process.env.WA_PHONE_NUMBER_ID,
-    wabaId: process.env.WA_WABA_ID,
-    verifyToken: process.env.WA_VERIFY_TOKEN,
-    apiBaseUrl: 'https://graph.facebook.com/v20.0'
+    wabaId:        process.env.WA_WABA_ID,
+    verifyToken:   process.env.WA_VERIFY_TOKEN,
+    apiBaseUrl:    `https://graph.facebook.com/${graphVersion}`
 };

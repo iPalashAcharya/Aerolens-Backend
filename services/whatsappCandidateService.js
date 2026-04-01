@@ -2,7 +2,13 @@ const db = require('../db');
 
 async function getCandidate(candidateId) {
     const [rows] = await db.execute(
-        `SELECT candidateId, name, yoe, currentCtc, expectedCtc, noticePeriod, resumeKey
+        `SELECT candidateId,
+                candidateName    AS name,
+                experienceYears  AS yoe,
+                currentCTC       AS currentCtc,
+                expectedCTC      AS expectedCtc,
+                noticePeriod,
+                resumeFilename   AS resumeKey
          FROM candidate
          WHERE candidateId = ?`,
         [candidateId]

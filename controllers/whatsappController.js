@@ -1,4 +1,6 @@
 const { enqueueWhatsAppResumeJob } = require('../queues/whatsappQueue');
+const { getCandidate } = require('../services/whatsappCandidateService');
+const { getRecipients } = require('../services/groupService');
 
 function validateCustomMessage(customMessage) {
     if (customMessage === undefined || customMessage === null) {
@@ -32,12 +34,62 @@ async function sendResume(req, res) {
         });
     }
 
+    const numCandidateId = Number(candidateId);
+    const numGroupId = Number(groupId);
+
     try {
+        // ------------------------------------------------------------------
+        // Pre-flight 1: candidate must exist and have a resume uploaded
+        // Fail fast here — no point burning a queue slot and 3 retries
+        // on a condition that won't fix itself
+        // ------------------------------------------------------------------
+        const candidate = await getCandidate(numCandidateId);
+
+        if (!candidate) {
+            return res.status(404).json({
+                success: false,
+                message: `Candidate not found: candidateId=${numCandidateId}`
+            });
+        }
+
+        if (!candidate.resumeKey) {
+            return res.status(400).json({
+                success: false,
+                message: `Candidate ${numCandidateId} does not have a resume uploaded. Please upload a resume before sharing.`
+            });
+        }
+
+        // ------------------------------------------------------------------
+        // Pre-flight 2: group must exist and be active, with at least 1 member
+        // ------------------------------------------------------------------
+        let recipients;
+        try {
+            recipients = await getRecipients(numGroupId);
+        } catch (groupErr) {
+            return res.status(400).json({
+                success: false,
+                message: groupErr.message
+            });
+        }
+
+        if (!recipients.length) {
+            return res.status(400).json({
+                success: false,
+                message: `Group ${numGroupId} has no active members to send to`
+            });
+        }
+
+        // ------------------------------------------------------------------
+        // Validate customMessage
+        // ------------------------------------------------------------------
         const normalizedCustomMessage = validateCustomMessage(customMessage);
 
+        // ------------------------------------------------------------------
+        // All checks passed — enqueue
+        // ------------------------------------------------------------------
         await enqueueWhatsAppResumeJob({
-            candidateId: Number(candidateId),
-            groupId: Number(groupId),
+            candidateId: numCandidateId,
+            groupId:     numGroupId,
             customMessage: normalizedCustomMessage
         });
 
@@ -45,6 +97,7 @@ async function sendResume(req, res) {
             success: true,
             queued: true
         });
+
     } catch (error) {
         return res.status(400).json({
             success: false,
