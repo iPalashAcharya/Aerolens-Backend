@@ -52,6 +52,18 @@ function validateCustomMessage(customMessage) {
     }
 }
 
+function normalizeTemplateText(value) {
+    if (value === undefined || value === null) {
+        return ' ';
+    }
+    // Meta template params reject newlines/tabs and long space runs.
+    const text = String(value)
+        .replace(/[\r\n\t]+/g, ' ')
+        .replace(/ {5,}/g, '    ')
+        .trim();
+    return text.length > 0 ? text : ' ';
+}
+
 // ---------------------------------------------------------------------------
 // Send single WhatsApp message
 // ---------------------------------------------------------------------------
@@ -59,10 +71,9 @@ async function sendWhatsApp(to, dynamicText, customMessage, fileUrl) {
     validateCustomMessage(customMessage);
 
     const sanitizedTo = sanitizePhoneNumber(to);
-
-    const parameters = [
-        { type: 'text', text: dynamicText },
-        { type: 'text', text: normalizeCustomMessage(customMessage) }
+    const bodyParameters = [
+        { type: 'text', text: normalizeTemplateText(dynamicText) },
+        { type: 'text', text: normalizeTemplateText(normalizeCustomMessage(customMessage)) }
     ];
 
     const payload = {
@@ -70,13 +81,10 @@ async function sendWhatsApp(to, dynamicText, customMessage, fileUrl) {
         to: sanitizedTo,
         type: 'template',
         template: {
-            name: 'candidate_resume_v2',
-            language: { code: 'en' },
+            name: waConfig.templateName,
+            language: { code: waConfig.templateLanguageCode },
             components: [
-                {
-                    type: 'body',
-                    parameters
-                },
+                // Keep component order deterministic (header first, then body)
                 {
                     type: 'header',
                     parameters: [
@@ -88,6 +96,10 @@ async function sendWhatsApp(to, dynamicText, customMessage, fileUrl) {
                             }
                         }
                     ]
+                },
+                {
+                    type: 'body',
+                    parameters: bodyParameters
                 }
             ]
         }
@@ -95,12 +107,15 @@ async function sendWhatsApp(to, dynamicText, customMessage, fileUrl) {
 
     console.log('[WA SEND] Outbound request', {
         to: sanitizedTo,
-        template: 'candidate_resume_v2',
+        template: waConfig.templateName,
+        language: waConfig.templateLanguageCode,
         phoneNumberId: waConfig.phoneNumberId,
         apiBaseUrl: waConfig.apiBaseUrl,
         hasToken: !!waConfig.accessToken,
-        fileUrl
+        fileUrl,
+        bodyParamLengths: bodyParameters.map((p) => (p?.text || '').length)
     });
+    console.log('[WA SEND] Outbound components', JSON.stringify(payload.template.components));
 
     const response = await axios.post(
         `${waConfig.apiBaseUrl}/${waConfig.phoneNumberId}/messages`,
@@ -151,15 +166,18 @@ async function sendToGroup(recipients, dynamicText, customMessage, fileUrl) {
                 metaMessageId: apiResponse?.messages?.[0]?.id || null
             });
         } catch (error) {
-            const metaError = error.response?.data
-                ? JSON.stringify(error.response.data)
+            const metaErrorPayload = error.response?.data || null;
+            const metaError = metaErrorPayload
+                ? JSON.stringify(metaErrorPayload)
                 : error.message;
+            const metaErrorDetails = metaErrorPayload?.error?.error_data?.details || null;
 
             console.error('[WA SEND GROUP] Failed for member', {
                 memberId:     recipient.member_id,
                 rawPhone,
                 metaStatus:   error.response?.status,
-                metaResponse: error.response?.data,
+                metaResponse: metaErrorPayload,
+                metaErrorDetails,
                 error:        error.message
             });
 

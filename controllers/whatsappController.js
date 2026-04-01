@@ -25,7 +25,7 @@ function validateCustomMessage(customMessage) {
 }
 
 async function sendResume(req, res) {
-    const { candidateId, groupId, customMessage } = req.body;
+    const { candidateId, groupId, customMessage, message } = req.body;
 
     if (!candidateId || !groupId) {
         return res.status(400).json({
@@ -82,7 +82,9 @@ async function sendResume(req, res) {
         // ------------------------------------------------------------------
         // Validate customMessage
         // ------------------------------------------------------------------
-        const normalizedCustomMessage = validateCustomMessage(customMessage);
+        const normalizedCustomMessage = validateCustomMessage(
+            customMessage !== undefined ? customMessage : message
+        );
 
         // ------------------------------------------------------------------
         // All checks passed — enqueue
