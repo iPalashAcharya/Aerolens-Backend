@@ -4,16 +4,19 @@ This section defines the exact API contract FE must follow for WhatsApp resume s
 
 ## How the frontend links to the backend
 
-- **Single FE-facing endpoint for “share resume on WhatsApp”:** `POST /whatsapp/send-resume` (see `server.js`: `app.use('/whatsapp', whatsappRoutes)` and `routes/whatsappRoutes.js`).
-- **Full URL:** prepend your backend base URL (same origin as other API calls, e.g. `https://<api-host>` in production or `http://localhost:<port>` locally):
+FE uses two routes under `/whatsapp` (see `server.js`: `app.use('/whatsapp', whatsappRoutes)` and `routes/whatsappRoutes.js`).
 
-  `POST {API_BASE_URL}/whatsapp/send-resume`
+1. **List groups (dropdown):** `GET {API_BASE_URL}/whatsapp/groups` — returns `groupId` + `groupName` for each active `whatsapp_group` row.
+2. **Share resume:** `POST {API_BASE_URL}/whatsapp/send-resume` — body must include **`groupId`** from step 1 (required), plus `candidateId` and optional note.
 
-  Example: `POST https://api.example.com/whatsapp/send-resume`
+Examples:
+
+- `GET https://api.example.com/whatsapp/groups`
+- `POST https://api.example.com/whatsapp/send-resume`
 
 - **Auth:** use the same headers your app already uses for authenticated API routes (e.g. `Authorization: Bearer <access_token>` if the route is protected). This README does not repeat global auth rules—match the rest of the ATS client.
 
-- **What this call returns:** only whether the job was **accepted and queued**. It does **not** return Meta message IDs, per-recipient success/failure, or delivery/read status. Those are handled asynchronously (worker + `whatsapp_message_log` + Meta webhooks). For “delivered” UI, the product would need a **separate** backend API or polling strategy—not implemented in this response.
+- **Send-resume response:** only whether the job was **accepted and queued**. It does **not** return Meta message IDs, per-recipient success/failure, or delivery/read status. Those are handled asynchronously (worker + `whatsapp_message_log` + Meta webhooks). For “delivered” UI, the product would need a **separate** backend API or polling strategy—not implemented in this response.
 
 ## FE Integration Rules (Must Follow)
 
@@ -23,6 +26,39 @@ This section defines the exact API contract FE must follow for WhatsApp resume s
 - API is async via queue; FE gets immediate `{ success: true, queued: true }` only—no send outcome in this response.
 
 ## Endpoint Contract
+
+### GET `/whatsapp/groups`
+
+Use this to populate a **group** dropdown before calling `POST /whatsapp/send-resume`. The user picks a row; send its **`groupId`** in the share payload (required).
+
+#### Success Response
+
+Status: `200`
+
+```json
+{
+  "success": true,
+  "groups": [
+    { "groupId": 1, "groupName": "Hiring managers" },
+    { "groupId": 2, "groupName": "Internal referrals" }
+  ]
+}
+```
+
+- Only rows with `whatsapp_group.is_active = TRUE` are returned.
+- **`groupName`** comes from `whatsapp_group.group_name` when non-empty; otherwise the backend uses `Group {id}` as a fallback label.
+- Sort order: by `groupName`, then `groupId`.
+
+#### Error Response
+
+Status: `500`
+
+```json
+{
+  "success": false,
+  "message": "Failed to load WhatsApp groups"
+}
+```
 
 ### POST `/whatsapp/send-resume`
 

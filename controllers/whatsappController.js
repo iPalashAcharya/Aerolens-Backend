@@ -1,6 +1,6 @@
 const { enqueueWhatsAppResumeJob } = require('../queues/whatsappQueue');
 const { getCandidate } = require('../services/whatsappCandidateService');
-const { getRecipients } = require('../services/groupService');
+const { getRecipients, listActiveWhatsappGroups } = require('../services/groupService');
 
 function validateCustomMessage(customMessage) {
     if (customMessage === undefined || customMessage === null) {
@@ -22,6 +22,22 @@ function validateCustomMessage(customMessage) {
     }
 
     return trimmed;
+}
+
+async function listGroups(_req, res) {
+    try {
+        const groups = await listActiveWhatsappGroups();
+        return res.status(200).json({
+            success: true,
+            groups
+        });
+    } catch (error) {
+        console.error('[WA] listGroups failed', { message: error.message });
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to load WhatsApp groups'
+        });
+    }
 }
 
 async function sendResume(req, res) {
@@ -109,5 +125,6 @@ async function sendResume(req, res) {
 }
 
 module.exports = {
+    listGroups,
     sendResume
 };

@@ -1,5 +1,21 @@
 const db = require('../db');
 
+/**
+ * Active WhatsApp groups for FE dropdowns (id + display name).
+ * Expects `whatsapp_group.group_name` (nullable); falls back to `Group {id}` when empty.
+ */
+async function listActiveWhatsappGroups() {
+    const [rows] = await db.execute(
+        `SELECT id AS groupId,
+                COALESCE(NULLIF(TRIM(group_name), ''), CONCAT('Group ', id)) AS groupName
+         FROM whatsapp_group
+         WHERE is_active = TRUE
+         ORDER BY groupName ASC, id ASC`
+    );
+
+    return rows;
+}
+
 async function getRecipients(groupId) {
     const [groups] = await db.execute(
         `SELECT id
@@ -24,5 +40,6 @@ async function getRecipients(groupId) {
 }
 
 module.exports = {
+    listActiveWhatsappGroups,
     getRecipients
 };

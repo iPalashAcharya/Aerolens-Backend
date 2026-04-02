@@ -1,8 +1,9 @@
 const express = require('express');
-const { sendResume } = require('../controllers/whatsappController');
+const { listGroups, sendResume } = require('../controllers/whatsappController');
 
 const router = express.Router();
 
+router.get('/groups', listGroups);
 router.post('/send-resume', sendResume);
 
 module.exports = router;
