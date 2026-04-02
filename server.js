@@ -309,7 +309,7 @@ async function startServer() {
         app.use('/interview', interviewRoutes);
         app.use('/vendor', vendorRoutes);
         app.use('/offers', offerRoutes);
-        app.use('/api/whatsapp', whatsappRoutes);
+        app.use('/whatsapp', whatsappRoutes);
         app.use('/webhook', webhookRoutes);
 
         app.use(globalErrorHandler);

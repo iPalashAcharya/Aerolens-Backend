@@ -4,12 +4,12 @@ This section defines the exact API contract FE must follow for WhatsApp resume s
 
 ## How the frontend links to the backend
 
-- **Single FE-facing endpoint for “share resume on WhatsApp”:** `POST /api/whatsapp/send-resume` (see `server.js`: `app.use('/api/whatsapp', whatsappRoutes)` and `routes/whatsappRoutes.js`).
+- **Single FE-facing endpoint for “share resume on WhatsApp”:** `POST /whatsapp/send-resume` (see `server.js`: `app.use('/whatsapp', whatsappRoutes)` and `routes/whatsappRoutes.js`).
 - **Full URL:** prepend your backend base URL (same origin as other API calls, e.g. `https://<api-host>` in production or `http://localhost:<port>` locally):
 
-  `POST {API_BASE_URL}/api/whatsapp/send-resume`
+  `POST {API_BASE_URL}/whatsapp/send-resume`
 
-  Example: `POST https://api.example.com/api/whatsapp/send-resume`
+  Example: `POST https://api.example.com/whatsapp/send-resume`
 
 - **Auth:** use the same headers your app already uses for authenticated API routes (e.g. `Authorization: Bearer <access_token>` if the route is protected). This README does not repeat global auth rules—match the rest of the ATS client.
 
@@ -24,7 +24,7 @@ This section defines the exact API contract FE must follow for WhatsApp resume s
 
 ## Endpoint Contract
 
-### POST `/api/whatsapp/send-resume`
+### POST `/whatsapp/send-resume`
 
 #### Request Headers
 
