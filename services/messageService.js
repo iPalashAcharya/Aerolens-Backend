@@ -66,7 +66,20 @@ function formatExperienceYears(yoe) {
     if (yoe === null || yoe === undefined || yoe === '') {
         return 'N/A';
     }
-    return `${yoe} years`;
+    const num = Number(yoe);
+    if (!Number.isFinite(num)) {
+        return 'N/A';
+    }
+    // WhatsApp display only: avoid "2.20 years" — trim trailing zeros after the decimal (10 stays 10).
+    const rounded = Math.round(num * 100) / 100;
+    const abs = Math.abs(rounded);
+    const sign = rounded < 0 ? '-' : '';
+    const [w, frac = ''] = abs.toFixed(2).split('.');
+    if (frac === '00') {
+        return `${sign}${w} years`;
+    }
+    const fracTrimmed = frac.replace(/0+$/, '');
+    return `${sign}${w}.${fracTrimmed} years`;
 }
 
 function normalizeCustomMessageForParam9(customMessage) {
