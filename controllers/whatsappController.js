@@ -1,4 +1,5 @@
-const ApiResponse = require('../config/apiResponse');
+const ApiResponse = require('../utils/response');
+const AppError = require('../utils/appError');
 const { enqueueWhatsAppResumeJob } = require('../queues/whatsappQueue');
 const { getCandidate } = require('../services/whatsappCandidateService');
 const { getRecipients, listActiveWhatsappGroups } = require('../services/groupService');
@@ -28,12 +29,19 @@ function validateCustomMessage(customMessage) {
 async function listGroups(_req, res) {
     try {
         const groups = await listActiveWhatsappGroups();
-        const r = ApiResponse.ok({ groups });
-        return res.status(r.statusCode).json(r.body);
+        return ApiResponse.success(
+            res,
+            { groups },
+            'WhatsApp groups retrieved successfully'
+        );
     } catch (error) {
         console.error('[WA] listGroups failed', { message: error.message });
-        const r = ApiResponse.serverError('Failed to load WhatsApp groups');
-        return res.status(r.statusCode).json(r.body);
+        const err = new AppError(
+            'Failed to load WhatsApp groups',
+            500,
+            'WHATSAPP_GROUPS_ERROR'
+        );
+        return ApiResponse.error(res, err, err.statusCode);
     }
 }
 
@@ -41,8 +49,12 @@ async function sendResume(req, res) {
     const { candidateId, groupId, customMessage, message } = req.body;
 
     if (!candidateId || !groupId) {
-        const r = ApiResponse.badRequest('candidateId and groupId are required');
-        return res.status(r.statusCode).json(r.body);
+        const err = new AppError(
+            'candidateId and groupId are required',
+            400,
+            'VALIDATION_ERROR'
+        );
+        return ApiResponse.error(res, err, err.statusCode);
     }
 
     const numCandidateId = Number(candidateId);
@@ -57,17 +69,21 @@ async function sendResume(req, res) {
         const candidate = await getCandidate(numCandidateId);
 
         if (!candidate) {
-            const r = ApiResponse.notFound(
-                `Candidate not found: candidateId=${numCandidateId}`
+            const err = new AppError(
+                `Candidate not found: candidateId=${numCandidateId}`,
+                404,
+                'CANDIDATE_NOT_FOUND'
             );
-            return res.status(r.statusCode).json(r.body);
+            return ApiResponse.error(res, err, err.statusCode);
         }
 
         if (!candidate.resumeKey) {
-            const r = ApiResponse.badRequest(
-                `Candidate ${numCandidateId} does not have a resume uploaded. Please upload a resume before sharing.`
+            const err = new AppError(
+                `Candidate ${numCandidateId} does not have a resume uploaded. Please upload a resume before sharing.`,
+                400,
+                'RESUME_REQUIRED'
             );
-            return res.status(r.statusCode).json(r.body);
+            return ApiResponse.error(res, err, err.statusCode);
         }
 
         // ------------------------------------------------------------------
@@ -77,15 +93,17 @@ async function sendResume(req, res) {
         try {
             recipients = await getRecipients(numGroupId);
         } catch (groupErr) {
-            const r = ApiResponse.badRequest(groupErr.message);
-            return res.status(r.statusCode).json(r.body);
+            const err = new AppError(groupErr.message, 400, 'INVALID_GROUP');
+            return ApiResponse.error(res, err, err.statusCode);
         }
 
         if (!recipients.length) {
-            const r = ApiResponse.badRequest(
-                `Group ${numGroupId} has no active members to send to`
+            const err = new AppError(
+                `Group ${numGroupId} has no active members to send to`,
+                400,
+                'EMPTY_GROUP'
             );
-            return res.status(r.statusCode).json(r.body);
+            return ApiResponse.error(res, err, err.statusCode);
         }
 
         // ------------------------------------------------------------------
@@ -104,12 +122,18 @@ async function sendResume(req, res) {
             customMessage: normalizedCustomMessage
         });
 
-        const r = ApiResponse.ok({ queued: true });
-        return res.status(r.statusCode).json(r.body);
+        return ApiResponse.success(
+            res,
+            { queued: true },
+            'WhatsApp resume share queued successfully'
+        );
 
     } catch (error) {
-        const r = ApiResponse.badRequest(error.message);
-        return res.status(r.statusCode).json(r.body);
+        const err =
+            error instanceof AppError
+                ? error
+                : new AppError(error.message, 400, 'VALIDATION_ERROR');
+        return ApiResponse.error(res, err, err.statusCode);
     }
 }
 

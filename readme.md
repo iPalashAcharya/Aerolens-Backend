@@ -23,7 +23,7 @@ Examples:
 - FE must send only `candidateId`, `groupId`, and optional note text (`customMessage` or `message`—same meaning).
 - FE must never send phone numbers.
 - Recipient resolution is backend-only via `groupId` (`whatsapp_group_member` + `member`).
-- API is async via queue; FE gets immediate `{ success: true, queued: true }` only—no send outcome in this response.
+- API is async via queue; FE gets immediate success with `data.queued === true` (see below)—no send outcome in this response. Responses use `utils/response.js` (`ApiResponse`): success payloads live under **`data`**, plus **`message`**.
 
 ## Endpoint Contract
 
@@ -38,10 +38,13 @@ Status: `200`
 ```json
 {
   "success": true,
-  "groups": [
-    { "groupId": 1, "groupName": "Hiring managers" },
-    { "groupId": 2, "groupName": "Internal referrals" }
-  ]
+  "message": "WhatsApp groups retrieved successfully",
+  "data": {
+    "groups": [
+      { "groupId": 1, "groupName": "Hiring managers" },
+      { "groupId": 2, "groupName": "Internal referrals" }
+    ]
+  }
 }
 ```
 
@@ -56,7 +59,9 @@ Status: `500`
 ```json
 {
   "success": false,
-  "message": "Failed to load WhatsApp groups"
+  "error": "WHATSAPP_GROUPS_ERROR",
+  "message": "Failed to load WhatsApp groups",
+  "stack": "…"
 }
 ```
 
@@ -105,11 +110,14 @@ Status: `200`
 ```json
 {
   "success": true,
-  "queued": true
+  "message": "WhatsApp resume share queued successfully",
+  "data": {
+    "queued": true
+  }
 }
 ```
 
-**Frontend UX:** treat `200` + `success` + `queued` as “request accepted; sending happens in the background.” Do not imply WhatsApp delivery is confirmed from this payload alone.
+**Frontend UX:** treat `200` + `success` + `data.queued === true` as “request accepted; sending happens in the background.” Do not imply WhatsApp delivery is confirmed from this payload alone.
 
 #### Validation Error Responses
 
@@ -120,34 +128,42 @@ Missing required fields:
 ```json
 {
   "success": false,
-  "message": "candidateId and groupId are required"
+  "error": "VALIDATION_ERROR",
+  "message": "candidateId and groupId are required",
+  "stack": "…"
 }
 ```
 
-Invalid `customMessage` examples:
+Invalid `customMessage` examples (same envelope as other errors: `error`, `message`, `stack` from `ApiResponse.error`):
 
 ```json
 {
   "success": false,
-  "message": "customMessage max length is 1024 characters"
+  "error": "VALIDATION_ERROR",
+  "message": "customMessage max length is 1024 characters",
+  "stack": "…"
 }
 ```
 
 ```json
 {
   "success": false,
-  "message": "customMessage must be plain text only"
+  "error": "VALIDATION_ERROR",
+  "message": "customMessage must be plain text only",
+  "stack": "…"
 }
 ```
 
 ```json
 {
   "success": false,
-  "message": "customMessage must be plain text"
+  "error": "VALIDATION_ERROR",
+  "message": "customMessage must be plain text",
+  "stack": "…"
 }
 ```
 
-Other common errors (same `400` / `404` + `{ success: false, message: "..." }` shape):
+Other common errors (same `400` / `404` + `ApiResponse.error` shape; `error` codes include `CANDIDATE_NOT_FOUND`, `RESUME_REQUIRED`, `INVALID_GROUP`, `EMPTY_GROUP`):
 
 - **404** — candidate does not exist: `Candidate not found: candidateId=<id>`
 - **400** — no resume on candidate: `Candidate <id> does not have a resume uploaded. Please upload a resume before sharing.`
