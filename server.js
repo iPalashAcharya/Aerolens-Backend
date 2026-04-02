@@ -97,6 +97,8 @@ async function startServer() {
         const vendorRoutes = require('./routes/vendorRoutes');
         const offerRoutes = require('./routes/offerRoutes');
         const db = require('./db');
+        const whatsappRoutes = require('./routes/whatsappRoutes');
+        const webhookRoutes = require('./routes/webhookRoutes');
         const JobProfileValidator = require('./validators/jobProfileValidator');
         const JobProfileRequirementValidator = require('./validators/jobProfileRequirementValidator');
         const AuthValidator = require('./validators/authValidator');
@@ -288,6 +290,7 @@ async function startServer() {
         MemberValidator.init(db);
         scheduledJobs.initializeAll();
         require('./workers/resumeBulkWorker');
+        require('./workers/whatsappWorker');
         app.use('/auth/login', loginLimiter);
         app.use('/auth/register', strictLimiter);
         app.use('/auth/forgot-password', strictLimiter);
@@ -306,6 +309,8 @@ async function startServer() {
         app.use('/interview', interviewRoutes);
         app.use('/vendor', vendorRoutes);
         app.use('/offers', offerRoutes);
+        app.use('/whatsapp', whatsappRoutes);
+        app.use('/webhook', webhookRoutes);
 
         app.use(globalErrorHandler);
         app.use((err, req, res, next) => {

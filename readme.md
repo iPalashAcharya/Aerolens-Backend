@@ -1,3 +1,298 @@
+# Recruitment Automation ATS - WhatsApp Module (Frontend Integration Source of Truth)
+
+This section defines the exact API contract FE must follow for WhatsApp resume sharing.
+
+## How the frontend links to the backend
+
+FE uses two routes under `/whatsapp` (see `server.js`: `app.use('/whatsapp', whatsappRoutes)` and `routes/whatsappRoutes.js`).
+
+1. **List groups (dropdown):** `GET {API_BASE_URL}/whatsapp/groups` — returns `groupId` + `groupName` for each active `whatsapp_group` row.
+2. **Share resume:** `POST {API_BASE_URL}/whatsapp/send-resume` — body must include **`groupId`** from step 1 (required), plus `candidateId` and optional note.
+
+Examples:
+
+- `GET https://api.example.com/whatsapp/groups`
+- `POST https://api.example.com/whatsapp/send-resume`
+
+- **Auth:** use the same headers your app already uses for authenticated API routes (e.g. `Authorization: Bearer <access_token>` if the route is protected). This README does not repeat global auth rules—match the rest of the ATS client.
+
+- **Send-resume response:** only whether the job was **accepted and queued**. It does **not** return Meta message IDs, per-recipient success/failure, or delivery/read status. Those are handled asynchronously (worker + `whatsapp_message_log` + Meta webhooks). For “delivered” UI, the product would need a **separate** backend API or polling strategy—not implemented in this response.
+
+## FE Integration Rules (Must Follow)
+
+- FE must send only `candidateId`, `groupId`, and optional note text (`customMessage` or `message`—same meaning).
+- FE must never send phone numbers.
+- Recipient resolution is backend-only via `groupId` (`whatsapp_group_member` + `member`).
+- API is async via queue; FE gets immediate success with `data.queued === true` (see below)—no send outcome in this response. Responses use `utils/response.js` (`ApiResponse`): success payloads live under **`data`**, plus **`message`**.
+
+## Endpoint Contract
+
+### GET `/whatsapp/groups`
+
+Use this to populate a **group** dropdown before calling `POST /whatsapp/send-resume`. The user picks a row; send its **`groupId`** in the share payload (required).
+
+#### Success Response
+
+Status: `200`
+
+```json
+{
+  "success": true,
+  "message": "WhatsApp groups retrieved successfully",
+  "data": {
+    "groups": [
+      { "groupId": 1, "groupName": "Hiring managers" },
+      { "groupId": 2, "groupName": "Internal referrals" }
+    ]
+  }
+}
+```
+
+- Only rows with `whatsapp_group.is_active = TRUE` are returned.
+- **`groupName`** comes from `whatsapp_group.group_name` when non-empty; otherwise the backend uses `Group {id}` as a fallback label.
+- Sort order: by `groupName`, then `groupId`.
+
+#### Error Response
+
+Status: `500`
+
+```json
+{
+  "success": false,
+  "error": "WHATSAPP_GROUPS_ERROR",
+  "message": "Failed to load WhatsApp groups",
+  "stack": "…"
+}
+```
+
+### POST `/whatsapp/send-resume`
+
+#### Request Headers
+
+```http
+Content-Type: application/json
+```
+
+#### Request Body
+
+```json
+{
+  "candidateId": 123,
+  "groupId": 2,
+  "customMessage": "Please review ASAP, strong backend candidate"
+}
+```
+
+Equivalent optional field name (backend accepts either; use one, not both required):
+
+```json
+{
+  "candidateId": 123,
+  "groupId": 2,
+  "message": "Please review ASAP, strong backend candidate"
+}
+```
+
+#### Field Rules
+
+- `candidateId`: required, numeric.
+- `groupId`: required, numeric.
+- `customMessage` **or** `message`: optional (same validation; if both are sent, `customMessage` wins).
+  - trimmed by backend before use
+  - max length `1024`
+  - plain text only (HTML tags are rejected)
+  - if missing or empty after trim, backend sends single space `" "` to WhatsApp template variable `{{9}}` (Additional message)
+
+#### Success Response (Always Immediate)
+
+Status: `200`
+
+```json
+{
+  "success": true,
+  "message": "WhatsApp resume share queued successfully",
+  "data": {
+    "queued": true
+  }
+}
+```
+
+**Frontend UX:** treat `200` + `success` + `data.queued === true` as “request accepted; sending happens in the background.” Do not imply WhatsApp delivery is confirmed from this payload alone.
+
+#### Validation Error Responses
+
+Status: `400`
+
+Missing required fields:
+
+```json
+{
+  "success": false,
+  "error": "VALIDATION_ERROR",
+  "message": "candidateId and groupId are required",
+  "stack": "…"
+}
+```
+
+Invalid `customMessage` examples (same envelope as other errors: `error`, `message`, `stack` from `ApiResponse.error`):
+
+```json
+{
+  "success": false,
+  "error": "VALIDATION_ERROR",
+  "message": "customMessage max length is 1024 characters",
+  "stack": "…"
+}
+```
+
+```json
+{
+  "success": false,
+  "error": "VALIDATION_ERROR",
+  "message": "customMessage must be plain text only",
+  "stack": "…"
+}
+```
+
+```json
+{
+  "success": false,
+  "error": "VALIDATION_ERROR",
+  "message": "customMessage must be plain text",
+  "stack": "…"
+}
+```
+
+Other common errors (same `400` / `404` + `ApiResponse.error` shape; `error` codes include `CANDIDATE_NOT_FOUND`, `RESUME_REQUIRED`, `INVALID_GROUP`, `EMPTY_GROUP`):
+
+- **404** — candidate does not exist: `Candidate not found: candidateId=<id>`
+- **400** — no resume on candidate: `Candidate <id> does not have a resume uploaded. Please upload a resume before sharing.`
+- **400** — invalid/empty group or members: message from group validation, e.g. group has no active members
+
+## What Happens After Queueing (Backend Lifecycle)
+
+Queue name: `whatsapp-resume-queue`  
+Worker concurrency: `1`  
+Retry policy: `attempts: 3`, exponential backoff, `5000ms`
+
+Processing sequence:
+1. `whatsapp_queue` row starts as `PENDING`.
+2. Worker updates status to `PROCESSING`.
+3. Candidate is fetched from `candidate`.
+4. Resume signed URL is generated (S3, 5-minute expiry, HTTPS).
+5. Nine template body parameters (`{{1}}`–`{{9}}`) are built from the candidate row (and optional FE note for `{{9}}`).
+6. Recipients are resolved by `groupId` from DB.
+7. WhatsApp template (name from `WA_TEMPLATE_NAME`, default `candidate_resume_v2`) is sent.
+8. Every recipient attempt is logged in `whatsapp_message_log` (`SENT`/`FAILED`).
+9. Queue row is updated to `DONE` or `FAILED` and `retry_count` is synced with attempts.
+
+## WhatsApp Template Mapping (Backend-Controlled)
+
+Approved body layout (static text is in Meta; backend only fills variables). Line breaks live in the **template**, not inside variable values (Meta rejects newlines/tabs inside parameters).
+
+```text
+*Candidate Details*
+
+Full Name: {{1}}
+Contact Number: {{2}}
+Email ID: {{3}}
+LinkedIn: {{4}}
+Years of Experience: {{5}}
+Current CTC: {{6}}
+Expected CTC: {{7}}
+Notice Period: {{8}}
+
+Additional message: {{9}}
+
+Thank you
+```
+
+- **Template name:** set `WA_TEMPLATE_NAME` to match the template name in Meta Business Manager (default in code: `candidate_resume_v2`).
+- **Language:** `WA_TEMPLATE_LANGUAGE_CODE` (default `en`) must match the approved template language code.
+- **Header:** document (PDF resume); `filename`: `Resume.pdf`; `link`: signed S3 URL.
+
+### Body variables (`{{1}}`–`{{9}}`)
+
+| Var | Source | Notes |
+|-----|--------|--------|
+| `{{1}}` | `candidate.candidateName` | Fallback `N/A` |
+| `{{2}}` | `candidate.contactNumber` | Fallback `N/A` |
+| `{{3}}` | `candidate.email` | Fallback `N/A` |
+| `{{4}}` | `candidate.linkedinProfileUrl` | Fallback `N/A` |
+| `{{5}}` | `candidate.experienceYears` | Format: `{n} years`, fallback `N/A` |
+| `{{6}}` | Current compensation | See **CTC formatting** below |
+| `{{7}}` | Expected compensation | See **CTC formatting** below |
+| `{{8}}` | `candidate.noticePeriod` | Numeric: `{n} days`; otherwise string trimmed or `N/A` |
+| `{{9}}` | FE `customMessage` or `message` | Trimmed; empty/missing → single space `" "` |
+
+### CTC formatting (`{{6}}` and `{{7}}`)
+
+When **all three** structured fields are present — amount (`currentCTCAmount` / `expectedCTCAmount`), currency lookup (`…CurrencyId` → `lookup` tag `currency`), and type lookup (`…TypeId` → `lookup` tag `compensationType`) — the backend sends a **single line**:
+
+`{currencySymbol} {amount} {type}`
+
+- **Symbol:** derived from the currency lookup `value` (e.g. INR/Rupee → `₹`, USD → `$`, EUR → `€`, GBP → `£`; otherwise the lookup label is used).
+- **Amount:** formatted with grouping (e.g. `en-IN` locale).
+- **Type:** the compensation type lookup `value` (e.g. Annual, Monthly, Hourly).
+
+If structured fields are incomplete but legacy **`currentCTC` / `expectedCTC`** integers exist, the backend sends: `₹ {amount} Annual` (legacy assumption).
+
+If nothing usable is present: `N/A`.
+
+## Webhook Endpoints (Meta -> Backend)
+
+### GET `/webhook/whatsapp`
+
+- Used by Meta webhook verification.
+- Returns `hub.challenge` when `hub.verify_token === WA_VERIFY_TOKEN`, else `403`.
+
+### POST `/webhook/whatsapp`
+
+- Consumes WhatsApp delivery statuses.
+- Updates `whatsapp_message_log` by `meta_message_id`.
+- Supported statuses: `sent`, `delivered`, `read`, `failed`.
+- Returns `200 OK` always.
+
+## Backend Files for This Module
+
+- `config/s3.js`
+- `config/whatsapp.js`
+- `controllers/whatsappController.js`
+- `controllers/webhookController.js`
+- `services/whatsappCandidateService.js`
+- `services/s3Service.js`
+- `services/messageService.js`
+- `services/groupService.js`
+- `services/whatsappService.js`
+- `services/whatsappLogService.js`
+- `queues/whatsappQueue.js`
+- `workers/whatsappWorker.js`
+- `routes/whatsappRoutes.js`
+- `routes/webhookRoutes.js`
+- `scripts/whatsapp_schema.sql`
+
+## Required Environment Variables
+
+`WA_ACCESS_TOKEN`  
+`WA_PHONE_NUMBER_ID`  
+`WA_WABA_ID`  
+`WA_VERIFY_TOKEN`  
+`WA_TEMPLATE_NAME` (must match Meta template name; default in code: `candidate_resume_v2`)  
+`WA_TEMPLATE_LANGUAGE_CODE` (must match Meta language code; default in code: `en`)  
+`AWS_ACCESS_KEY_ID`  
+`AWS_SECRET_ACCESS_KEY`  
+`AWS_REGION`  
+`S3_BUCKET_NAME`  
+`DB_HOST`  
+`DB_PORT`  
+`DB_NAME`  
+`DB_USER`  
+`DB_PASSWORD`  
+`REDIS_HOST`  
+`REDIS_PORT`  
+`PORT`  
+`NODE_ENV`
+
 # Authentication API Documentation
 
 This module provides JWT-based authentication with token family tracking, refresh with grace period, and active session management. All endpoints use JSON for request and response bodies.

@@ -545,6 +545,54 @@ class MemberRepository {
                 filteredData.vendorId = null;
             }
 
+            if (Object.prototype.hasOwnProperty.call(filteredData, 'email')) {
+                const emailToCheck = filteredData.email;
+                if (emailToCheck !== null && emailToCheck !== undefined && emailToCheck !== '') {
+                    const [emailConflicts] = await connection.execute(
+                        `SELECT memberId
+                         FROM member
+                         WHERE email = ?
+                           AND isActive = TRUE
+                           AND memberId != ?
+                         LIMIT 1`,
+                        [emailToCheck, memberId]
+                    );
+
+                    if (emailConflicts.length > 0) {
+                        throw new AppError(
+                            'Email already exists for another active member',
+                            409,
+                            'DUPLICATE_ACTIVE_EMAIL',
+                            { email: emailToCheck, conflictingMemberId: emailConflicts[0].memberId }
+                        );
+                    }
+                }
+            }
+
+            if (Object.prototype.hasOwnProperty.call(filteredData, 'memberContact')) {
+                const contactToCheck = filteredData.memberContact;
+                if (contactToCheck !== null && contactToCheck !== undefined && contactToCheck !== '') {
+                    const [contactConflicts] = await connection.execute(
+                        `SELECT memberId
+                         FROM member
+                         WHERE memberContact = ?
+                           AND isActive = TRUE
+                           AND memberId != ?
+                         LIMIT 1`,
+                        [contactToCheck, memberId]
+                    );
+
+                    if (contactConflicts.length > 0) {
+                        throw new AppError(
+                            'Contact number already exists for another active member',
+                            409,
+                            'DUPLICATE_ACTIVE_CONTACT',
+                            { memberContact: contactToCheck, conflictingMemberId: contactConflicts[0].memberId }
+                        );
+                    }
+                }
+            }
+
             const fields = Object.keys(filteredData);
             const values = Object.values(filteredData);
 
@@ -567,6 +615,14 @@ class MemberRepository {
             };
         } catch (error) {
             if (error instanceof AppError) { throw error; }
+            if (error.code === 'ER_DUP_ENTRY') {
+                console.error('[MemberRepository.updateMember] Duplicate key conflict', {
+                    memberId,
+                    updateEmail: updateData?.email,
+                    updateContact: updateData?.memberContact,
+                    dbMessage: error.message
+                });
+            }
             throw new AppError(
                 'Database error while Updating Member',
                 500,
@@ -604,12 +660,26 @@ class MemberRepository {
         }
     }
 
-    async deactivateAccount(memberId) {
+    async deactivateAccount(memberId, deletedByUserId) {
         const connection = await db.getConnection();
         try {
             await connection.execute(
-                `UPDATE member SET isActive = FALSE WHERE memberId = ?`,
-                [memberId]
+                `UPDATE member
+                 SET isActive = FALSE,
+                     deletedAt = NOW(),
+                     deletedBy = ?,
+                     memberContact = CASE
+                         WHEN memberContact IS NOT NULL
+                         THEN CONCAT(memberContact, '_old_', memberId)
+                         ELSE NULL
+                     END,
+                     email = CASE
+                         WHEN email IS NOT NULL
+                         THEN CONCAT(email, '_old_', memberId)
+                         ELSE NULL
+                     END
+                 WHERE memberId = ?`,
+                [deletedByUserId, memberId]
             );
         } catch (error) {
             throw new AppError('Database error while deactivating account', 500, 'DB_ERROR', error.message);

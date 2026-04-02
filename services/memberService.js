@@ -394,7 +394,7 @@ class MemberService {
 
             console.log(`Unlinked ${schedulerResult.affectedRows} interviews where member was scheduler`);
 
-            await this.memberRepository.deactivateAccount(memberId, client);
+            await this.memberRepository.deactivateAccount(memberId, auditContext?.userId || null);
 
             await auditLogService.logAction({
                 userId: auditContext.userId,
