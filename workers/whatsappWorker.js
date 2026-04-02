@@ -6,9 +6,9 @@ const { redisConnection } = require('../config/redis');
 const { queueName } = require('../queues/whatsappQueue');
 const { getCandidate } = require('../services/whatsappCandidateService');
 const { generateSignedUrl } = require('../services/s3Service');
-const { buildDynamicText } = require('../services/messageService');
+const { buildWhatsappTemplateBodyParams } = require('../services/messageService');
 const { getRecipients } = require('../services/groupService');
-const { sendToGroup } = require('../services/whatsappService');
+const { sendToGroup, validateCustomMessage } = require('../services/whatsappService');
 const { logMessages } = require('../services/whatsappLogService');
 
 // ---------------------------------------------------------------------------
@@ -81,10 +81,11 @@ const whatsappWorker = new Worker(
             console.log('[WA] Signed URL generated', { resumeKey: candidate.resumeKey });
 
             // ----------------------------------------------------------------
-            // Step 3 — Dynamic text
+            // Step 3 — Template body parameters {{1}}–{{9}}
             // ----------------------------------------------------------------
-            const dynamicText = buildDynamicText(candidate);
-            console.log('[WA] Dynamic text built');
+            validateCustomMessage(customMessage);
+            const bodyParams = buildWhatsappTemplateBodyParams(candidate, customMessage);
+            console.log('[WA] Template body params built', { count: bodyParams.length });
 
             // ----------------------------------------------------------------
             // Step 4 — Recipients
@@ -104,7 +105,7 @@ const whatsappWorker = new Worker(
             // Step 5 — Send
             // sendToGroup never throws; per-recipient errors are in results
             // ----------------------------------------------------------------
-            const results = await sendToGroup(recipients, dynamicText, customMessage, signedUrl);
+            const results = await sendToGroup(recipients, bodyParams, signedUrl);
             console.log('[WA] sendToGroup complete', {
                 total:   results.length,
                 success: results.filter(r => r.status === 'SUCCESS').length,

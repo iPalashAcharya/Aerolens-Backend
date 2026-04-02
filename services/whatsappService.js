@@ -26,16 +26,8 @@ function sanitizePhoneNumber(raw) {
 }
 
 // ---------------------------------------------------------------------------
-// customMessage helpers
+// customMessage helpers ({{9}} — validated before template body is built)
 // ---------------------------------------------------------------------------
-function normalizeCustomMessage(customMessage) {
-    if (typeof customMessage !== 'string') {
-        return ' ';
-    }
-    const trimmed = customMessage.trim();
-    return trimmed !== '' ? trimmed : ' ';
-}
-
 function validateCustomMessage(customMessage) {
     if (customMessage === undefined || customMessage === null) {
         return;
@@ -64,17 +56,23 @@ function normalizeTemplateText(value) {
     return text.length > 0 ? text : ' ';
 }
 
+const EXPECTED_BODY_PARAM_COUNT = 9;
+
 // ---------------------------------------------------------------------------
 // Send single WhatsApp message
 // ---------------------------------------------------------------------------
-async function sendWhatsApp(to, dynamicText, customMessage, fileUrl) {
-    validateCustomMessage(customMessage);
+async function sendWhatsApp(to, bodyParams, fileUrl) {
+    if (!Array.isArray(bodyParams) || bodyParams.length !== EXPECTED_BODY_PARAM_COUNT) {
+        throw new Error(
+            `WhatsApp template body must have ${EXPECTED_BODY_PARAM_COUNT} parameters, got ${bodyParams?.length}`
+        );
+    }
 
     const sanitizedTo = sanitizePhoneNumber(to);
-    const bodyParameters = [
-        { type: 'text', text: normalizeTemplateText(dynamicText) },
-        { type: 'text', text: normalizeTemplateText(normalizeCustomMessage(customMessage)) }
-    ];
+    const bodyParameters = bodyParams.map((p) => ({
+        type: 'text',
+        text: normalizeTemplateText(p)
+    }));
 
     const payload = {
         messaging_product: 'whatsapp',
@@ -141,7 +139,7 @@ async function sendWhatsApp(to, dynamicText, customMessage, fileUrl) {
 // ---------------------------------------------------------------------------
 // Send to all recipients; never throws — per-recipient errors are captured
 // ---------------------------------------------------------------------------
-async function sendToGroup(recipients, dynamicText, customMessage, fileUrl) {
+async function sendToGroup(recipients, bodyParams, fileUrl) {
     const results = [];
 
     for (const recipient of recipients) {
@@ -152,12 +150,7 @@ async function sendToGroup(recipients, dynamicText, customMessage, fileUrl) {
         });
 
         try {
-            const apiResponse = await sendWhatsApp(
-                rawPhone,
-                dynamicText,
-                customMessage,
-                fileUrl
-            );
+            const apiResponse = await sendWhatsApp(rawPhone, bodyParams, fileUrl);
 
             results.push({
                 memberId:      recipient.member_id,
@@ -196,5 +189,6 @@ async function sendToGroup(recipients, dynamicText, customMessage, fileUrl) {
 
 module.exports = {
     sendWhatsApp,
-    sendToGroup
+    sendToGroup,
+    validateCustomMessage
 };

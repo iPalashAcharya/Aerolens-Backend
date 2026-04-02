@@ -60,7 +60,7 @@ Equivalent optional field name (backend accepts either; use one, not both requir
   - trimmed by backend before use
   - max length `1024`
   - plain text only (HTML tags are rejected)
-  - if missing or empty after trim, backend sends single space `" "` to WhatsApp template variable `{{2}}`
+  - if missing or empty after trim, backend sends single space `" "` to WhatsApp template variable `{{9}}` (Additional message)
 
 #### Success Response (Always Immediate)
 
@@ -128,22 +128,64 @@ Processing sequence:
 2. Worker updates status to `PROCESSING`.
 3. Candidate is fetched from `candidate`.
 4. Resume signed URL is generated (S3, 5-minute expiry, HTTPS).
-5. Dynamic text (`{{1}}`) is built by backend.
+5. Nine template body parameters (`{{1}}`–`{{9}}`) are built from the candidate row (and optional FE note for `{{9}}`).
 6. Recipients are resolved by `groupId` from DB.
-7. WhatsApp template `candidate_resume_v2` is sent.
+7. WhatsApp template (name from `WA_TEMPLATE_NAME`, default `candidate_resume_v2`) is sent.
 8. Every recipient attempt is logged in `whatsapp_message_log` (`SENT`/`FAILED`).
 9. Queue row is updated to `DONE` or `FAILED` and `retry_count` is synced with attempts.
 
 ## WhatsApp Template Mapping (Backend-Controlled)
 
-- Template name: `candidate_resume_v2`
-- Language: `en`
-- Body variables:
-  - `{{1}}`: dynamic candidate block from backend
-  - `{{2}}`: FE `customMessage` (trimmed), fallback `" "` (single space)
-- Header document:
-  - `filename`: `Resume.pdf`
-  - `link`: signed S3 URL
+Approved body layout (static text is in Meta; backend only fills variables). Line breaks live in the **template**, not inside variable values (Meta rejects newlines/tabs inside parameters).
+
+```text
+*Candidate Details*
+
+Full Name: {{1}}
+Contact Number: {{2}}
+Email ID: {{3}}
+LinkedIn: {{4}}
+Years of Experience: {{5}}
+Current CTC: {{6}}
+Expected CTC: {{7}}
+Notice Period: {{8}}
+
+Additional message: {{9}}
+
+Thank you
+```
+
+- **Template name:** set `WA_TEMPLATE_NAME` to match the template name in Meta Business Manager (default in code: `candidate_resume_v2`).
+- **Language:** `WA_TEMPLATE_LANGUAGE_CODE` (default `en`) must match the approved template language code.
+- **Header:** document (PDF resume); `filename`: `Resume.pdf`; `link`: signed S3 URL.
+
+### Body variables (`{{1}}`–`{{9}}`)
+
+| Var | Source | Notes |
+|-----|--------|--------|
+| `{{1}}` | `candidate.candidateName` | Fallback `N/A` |
+| `{{2}}` | `candidate.contactNumber` | Fallback `N/A` |
+| `{{3}}` | `candidate.email` | Fallback `N/A` |
+| `{{4}}` | `candidate.linkedinProfileUrl` | Fallback `N/A` |
+| `{{5}}` | `candidate.experienceYears` | Format: `{n} years`, fallback `N/A` |
+| `{{6}}` | Current compensation | See **CTC formatting** below |
+| `{{7}}` | Expected compensation | See **CTC formatting** below |
+| `{{8}}` | `candidate.noticePeriod` | Numeric: `{n} days`; otherwise string trimmed or `N/A` |
+| `{{9}}` | FE `customMessage` or `message` | Trimmed; empty/missing → single space `" "` |
+
+### CTC formatting (`{{6}}` and `{{7}}`)
+
+When **all three** structured fields are present — amount (`currentCTCAmount` / `expectedCTCAmount`), currency lookup (`…CurrencyId` → `lookup` tag `currency`), and type lookup (`…TypeId` → `lookup` tag `compensationType`) — the backend sends a **single line**:
+
+`{currencySymbol} {amount} {type}`
+
+- **Symbol:** derived from the currency lookup `value` (e.g. INR/Rupee → `₹`, USD → `$`, EUR → `€`, GBP → `£`; otherwise the lookup label is used).
+- **Amount:** formatted with grouping (e.g. `en-IN` locale).
+- **Type:** the compensation type lookup `value` (e.g. Annual, Monthly, Hourly).
+
+If structured fields are incomplete but legacy **`currentCTC` / `expectedCTC`** integers exist, the backend sends: `₹ {amount} Annual` (legacy assumption).
+
+If nothing usable is present: `N/A`.
 
 ## Webhook Endpoints (Meta -> Backend)
 
@@ -183,6 +225,8 @@ Processing sequence:
 `WA_PHONE_NUMBER_ID`  
 `WA_WABA_ID`  
 `WA_VERIFY_TOKEN`  
+`WA_TEMPLATE_NAME` (must match Meta template name; default in code: `candidate_resume_v2`)  
+`WA_TEMPLATE_LANGUAGE_CODE` (must match Meta language code; default in code: `en`)  
 `AWS_ACCESS_KEY_ID`  
 `AWS_SECRET_ACCESS_KEY`  
 `AWS_REGION`  

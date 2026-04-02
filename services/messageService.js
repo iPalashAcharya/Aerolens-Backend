@@ -1,11 +1,121 @@
-function buildDynamicText(candidate) {
-    return `Name: ${candidate.name}
-Experience: ${candidate.yoe} years
-Current CTC: ₹${candidate.currentCtc}
-Expected CTC: ₹${candidate.expectedCtc}
-Notice Period: ${candidate.noticePeriod || 'N/A'}`;
+// ---------------------------------------------------------------------------
+// WhatsApp template body: {{1}}–{{9}} (single-line values; newlines forbidden by Meta)
+// ---------------------------------------------------------------------------
+
+function formatAmount(n) {
+    if (n === null || n === undefined || Number.isNaN(Number(n))) {
+        return null;
+    }
+    return Number(n).toLocaleString('en-IN');
+}
+
+function symbolFromCurrencyLookup(value) {
+    if (!value || typeof value !== 'string') {
+        return '';
+    }
+    const v = value.trim();
+    const upper = v.toUpperCase();
+    if (upper === 'INR' || /RUPEE|₹/.test(v)) {
+        return '₹';
+    }
+    if (upper === 'USD' || /DOLLAR|\$/.test(v)) {
+        return '$';
+    }
+    if (upper === 'EUR' || /EURO|€/.test(v)) {
+        return '€';
+    }
+    if (upper === 'GBP' || /POUND|£/.test(v)) {
+        return '£';
+    }
+    return v;
+}
+
+function formatCtcLine({ amount, currencyLookupValue, typeLookupValue, legacyAmount }) {
+    const hasFull =
+        amount != null &&
+        amount !== '' &&
+        currencyLookupValue &&
+        typeLookupValue;
+
+    if (hasFull) {
+        const sym = symbolFromCurrencyLookup(currencyLookupValue);
+        const amt = formatAmount(amount);
+        return `${sym} ${amt} ${typeLookupValue}`.trim();
+    }
+
+    if (legacyAmount != null && legacyAmount !== '') {
+        const amt = formatAmount(legacyAmount);
+        return `₹ ${amt} Annual`;
+    }
+
+    return 'N/A';
+}
+
+function formatNoticePeriod(np) {
+    if (np === null || np === undefined || np === '') {
+        return 'N/A';
+    }
+    if (typeof np === 'number') {
+        return `${np} days`;
+    }
+    const s = String(np).trim();
+    return s || 'N/A';
+}
+
+function formatExperienceYears(yoe) {
+    if (yoe === null || yoe === undefined || yoe === '') {
+        return 'N/A';
+    }
+    return `${yoe} years`;
+}
+
+function normalizeCustomMessageForParam9(customMessage) {
+    if (customMessage === undefined || customMessage === null) {
+        return ' ';
+    }
+    const trimmed = String(customMessage).trim();
+    return trimmed !== '' ? trimmed : ' ';
+}
+
+/**
+ * Builds the nine body parameters for the approved WhatsApp template (order matters).
+ * @param {object} candidate — row from whatsappCandidateService.getCandidate
+ * @param {string|undefined|null} customMessage — FE optional note (maps to {{9}})
+ */
+function buildWhatsappTemplateBodyParams(candidate, customMessage) {
+    const fullName = candidate.name || 'N/A';
+    const contact = candidate.contactNumber || 'N/A';
+    const email = candidate.email || 'N/A';
+    const linkedin = candidate.linkedinUrl || 'N/A';
+    const yoe = formatExperienceYears(candidate.yoe);
+    const currentCtc = formatCtcLine({
+        amount: candidate.currentCTCAmount,
+        currencyLookupValue: candidate.currentCurrencyValue,
+        typeLookupValue: candidate.currentCompensationTypeValue,
+        legacyAmount: candidate.currentCTC
+    });
+    const expectedCtc = formatCtcLine({
+        amount: candidate.expectedCTCAmount,
+        currencyLookupValue: candidate.expectedCurrencyValue,
+        typeLookupValue: candidate.expectedCompensationTypeValue,
+        legacyAmount: candidate.expectedCTC
+    });
+    const notice = formatNoticePeriod(candidate.noticePeriod);
+    const additional = normalizeCustomMessageForParam9(customMessage);
+
+    return [
+        fullName,
+        contact,
+        email,
+        linkedin,
+        yoe,
+        currentCtc,
+        expectedCtc,
+        notice,
+        additional
+    ];
 }
 
 module.exports = {
-    buildDynamicText
+    buildWhatsappTemplateBodyParams
 };
