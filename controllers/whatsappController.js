@@ -1,3 +1,4 @@
+const ApiResponse = require('../config/apiResponse');
 const { enqueueWhatsAppResumeJob } = require('../queues/whatsappQueue');
 const { getCandidate } = require('../services/whatsappCandidateService');
 const { getRecipients, listActiveWhatsappGroups } = require('../services/groupService');
@@ -27,16 +28,12 @@ function validateCustomMessage(customMessage) {
 async function listGroups(_req, res) {
     try {
         const groups = await listActiveWhatsappGroups();
-        return res.status(200).json({
-            success: true,
-            groups
-        });
+        const r = ApiResponse.ok({ groups });
+        return res.status(r.statusCode).json(r.body);
     } catch (error) {
         console.error('[WA] listGroups failed', { message: error.message });
-        return res.status(500).json({
-            success: false,
-            message: 'Failed to load WhatsApp groups'
-        });
+        const r = ApiResponse.serverError('Failed to load WhatsApp groups');
+        return res.status(r.statusCode).json(r.body);
     }
 }
 
@@ -44,10 +41,8 @@ async function sendResume(req, res) {
     const { candidateId, groupId, customMessage, message } = req.body;
 
     if (!candidateId || !groupId) {
-        return res.status(400).json({
-            success: false,
-            message: 'candidateId and groupId are required'
-        });
+        const r = ApiResponse.badRequest('candidateId and groupId are required');
+        return res.status(r.statusCode).json(r.body);
     }
 
     const numCandidateId = Number(candidateId);
@@ -62,17 +57,17 @@ async function sendResume(req, res) {
         const candidate = await getCandidate(numCandidateId);
 
         if (!candidate) {
-            return res.status(404).json({
-                success: false,
-                message: `Candidate not found: candidateId=${numCandidateId}`
-            });
+            const r = ApiResponse.notFound(
+                `Candidate not found: candidateId=${numCandidateId}`
+            );
+            return res.status(r.statusCode).json(r.body);
         }
 
         if (!candidate.resumeKey) {
-            return res.status(400).json({
-                success: false,
-                message: `Candidate ${numCandidateId} does not have a resume uploaded. Please upload a resume before sharing.`
-            });
+            const r = ApiResponse.badRequest(
+                `Candidate ${numCandidateId} does not have a resume uploaded. Please upload a resume before sharing.`
+            );
+            return res.status(r.statusCode).json(r.body);
         }
 
         // ------------------------------------------------------------------
@@ -82,17 +77,15 @@ async function sendResume(req, res) {
         try {
             recipients = await getRecipients(numGroupId);
         } catch (groupErr) {
-            return res.status(400).json({
-                success: false,
-                message: groupErr.message
-            });
+            const r = ApiResponse.badRequest(groupErr.message);
+            return res.status(r.statusCode).json(r.body);
         }
 
         if (!recipients.length) {
-            return res.status(400).json({
-                success: false,
-                message: `Group ${numGroupId} has no active members to send to`
-            });
+            const r = ApiResponse.badRequest(
+                `Group ${numGroupId} has no active members to send to`
+            );
+            return res.status(r.statusCode).json(r.body);
         }
 
         // ------------------------------------------------------------------
@@ -111,16 +104,12 @@ async function sendResume(req, res) {
             customMessage: normalizedCustomMessage
         });
 
-        return res.status(200).json({
-            success: true,
-            queued: true
-        });
+        const r = ApiResponse.ok({ queued: true });
+        return res.status(r.statusCode).json(r.body);
 
     } catch (error) {
-        return res.status(400).json({
-            success: false,
-            message: error.message
-        });
+        const r = ApiResponse.badRequest(error.message);
+        return res.status(r.statusCode).json(r.body);
     }
 }
 

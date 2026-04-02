@@ -1,27 +1,23 @@
-const db = require('../db');
+const WhatsappMessageLogRepository = require('../repositories/whatsappMessageLogRepository');
+
+const whatsappMessageLogRepository = new WhatsappMessageLogRepository();
 
 async function logMessages(candidateId, groupId, results) {
     if (!results.length) {
         return;
     }
 
-    const insertSql = `
-        INSERT INTO whatsapp_message_log
-            (candidate_id, group_id, member_id, phone_number, message_status, meta_message_id, error_message, sent_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
-    `;
+    const rows = results.map((result) => ({
+        candidateId,
+        groupId,
+        memberId: result.memberId || null,
+        phone: result.phone,
+        messageStatus: result.status === 'SUCCESS' ? 'SENT' : 'FAILED',
+        metaMessageId: result.metaMessageId || null,
+        errorMessage: result.errorMessage || null
+    }));
 
-    for (const result of results) {
-        await db.execute(insertSql, [
-            candidateId,
-            groupId,
-            result.memberId || null,
-            result.phone,
-            result.status === 'SUCCESS' ? 'SENT' : 'FAILED',
-            result.metaMessageId || null,
-            result.errorMessage || null
-        ]);
-    }
+    await whatsappMessageLogRepository.insertLogRows(rows);
 }
 
 module.exports = {

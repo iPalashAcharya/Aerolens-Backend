@@ -1,5 +1,7 @@
-const db = require('../db');
 const { verifyToken } = require('../config/whatsapp');
+const WhatsappMessageLogRepository = require('../repositories/whatsappMessageLogRepository');
+
+const whatsappMessageLogRepository = new WhatsappMessageLogRepository();
 
 async function verifyWebhook(req, res) {
     const mode = req.query['hub.mode'];
@@ -35,21 +37,11 @@ async function handleWebhook(req, res) {
                 const shouldSetDeliveredAt =
                     statusItem.status === 'delivered' || statusItem.status === 'read';
 
-                if (shouldSetDeliveredAt) {
-                    await db.execute(
-                        `UPDATE whatsapp_message_log
-                         SET message_status = ?, delivered_at = NOW()
-                         WHERE meta_message_id = ?`,
-                        [mappedStatus, statusItem.id]
-                    );
-                } else {
-                    await db.execute(
-                        `UPDATE whatsapp_message_log
-                         SET message_status = ?
-                         WHERE meta_message_id = ?`,
-                        [mappedStatus, statusItem.id]
-                    );
-                }
+                await whatsappMessageLogRepository.updateStatusByMetaMessageId(
+                    mappedStatus,
+                    statusItem.id,
+                    shouldSetDeliveredAt
+                );
             }
         }
     } catch (error) {

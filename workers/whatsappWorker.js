@@ -1,9 +1,9 @@
 require('dotenv').config();
 
 const { Worker } = require('bullmq');
-const db = require('../db');
 const { redisConnection } = require('../config/redis');
 const { queueName } = require('../queues/whatsappQueue');
+const WhatsappQueueRepository = require('../repositories/whatsappQueueRepository');
 const { getCandidate } = require('../services/whatsappCandidateService');
 const { generateSignedUrl } = require('../services/s3Service');
 const { buildWhatsappTemplateBodyParams } = require('../services/messageService');
@@ -11,17 +11,17 @@ const { getRecipients } = require('../services/groupService');
 const { sendToGroup, validateCustomMessage } = require('../services/whatsappService');
 const { logMessages } = require('../services/whatsappLogService');
 
+const whatsappQueueRepository = new WhatsappQueueRepository();
+
 // ---------------------------------------------------------------------------
 // Safe DB helper — logs but never throws, so it never masks the real error
 // ---------------------------------------------------------------------------
-async function safeDbExec(label, sql, params) {
+async function safeDbExec(label, fn) {
     try {
-        await db.execute(sql, params);
+        await fn();
     } catch (err) {
         console.error(`[WA WORKER] DB update failed (${label})`, {
-            error: err.message,
-            sql,
-            params
+            error: err.message
         });
     }
 }
@@ -43,12 +43,8 @@ const whatsappWorker = new Worker(
         });
 
         // Mark as PROCESSING — wrapped so a transient DB hiccup doesn't abort the job
-        await safeDbExec(
-            'PROCESSING',
-            `UPDATE whatsapp_queue
-             SET status = 'PROCESSING', retry_count = ?
-             WHERE id = ?`,
-            [job.attemptsMade, queueId]
+        await safeDbExec('PROCESSING', () =>
+            whatsappQueueRepository.updateToProcessing(queueId, job.attemptsMade)
         );
 
         // Tracked so the catch block can produce fallback log entries
@@ -121,12 +117,8 @@ const whatsappWorker = new Worker(
             // ----------------------------------------------------------------
             // Step 7 — Mark DONE
             // ----------------------------------------------------------------
-            await safeDbExec(
-                'DONE',
-                `UPDATE whatsapp_queue
-                 SET status = 'DONE', retry_count = ?, processed_at = NOW()
-                 WHERE id = ?`,
-                [job.attemptsMade, queueId]
+            await safeDbExec('DONE', () =>
+                whatsappQueueRepository.updateToDone(queueId, job.attemptsMade)
             );
 
             console.log('[WA JOB DONE]', { jobId: job.id, queueId });
@@ -180,12 +172,8 @@ const whatsappWorker = new Worker(
             // ----------------------------------------------------------------
             // Mark FAILED with processed_at so row is never stuck as PROCESSING
             // ----------------------------------------------------------------
-            await safeDbExec(
-                'FAILED',
-                `UPDATE whatsapp_queue
-                 SET status = 'FAILED', retry_count = ?, processed_at = NOW()
-                 WHERE id = ?`,
-                [job.attemptsMade + 1, queueId]
+            await safeDbExec('FAILED', () =>
+                whatsappQueueRepository.updateToFailed(queueId, job.attemptsMade + 1)
             );
 
             // Re-throw so BullMQ applies configured retry / backoff

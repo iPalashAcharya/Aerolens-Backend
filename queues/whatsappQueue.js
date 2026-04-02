@@ -1,6 +1,6 @@
 const { Queue } = require('bullmq');
 const { redisConnection } = require('../config/redis');
-const db = require('../db');
+const WhatsappQueueRepository = require('../repositories/whatsappQueueRepository');
 
 const queueName = 'whatsapp-resume-queue';
 
@@ -17,14 +17,13 @@ const whatsappResumeQueue = new Queue(queueName, {
     }
 });
 
-async function enqueueWhatsAppResumeJob(payload) {
-    const [insertResult] = await db.execute(
-        `INSERT INTO whatsapp_queue (candidate_id, group_id, status)
-         VALUES (?, ?, 'PENDING')`,
-        [payload.candidateId, payload.groupId]
-    );
+const whatsappQueueRepository = new WhatsappQueueRepository();
 
-    const queueId = insertResult.insertId;
+async function enqueueWhatsAppResumeJob(payload) {
+    const queueId = await whatsappQueueRepository.insertPendingEnqueue(
+        payload.candidateId,
+        payload.groupId
+    );
 
     await whatsappResumeQueue.add('send-resume', {
         ...payload,
