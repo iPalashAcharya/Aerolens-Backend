@@ -2,7 +2,7 @@ const db = require('../db');
 
 /**
  * Active WhatsApp groups for FE dropdowns (id + display name).
- * Expects `whatsapp_group.group_name` (nullable); falls back to `Group {id}` when empty.
+ * Matches `whatsapp_group.group_name` (NOT NULL in schema); COALESCE still safe if trim yields empty.
  */
 async function listActiveWhatsappGroups() {
     const [rows] = await db.execute(
