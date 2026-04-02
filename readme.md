@@ -2,12 +2,25 @@
 
 This section defines the exact API contract FE must follow for WhatsApp resume sharing.
 
+## How the frontend links to the backend
+
+- **Single FE-facing endpoint for “share resume on WhatsApp”:** `POST /api/whatsapp/send-resume` (see `server.js`: `app.use('/api/whatsapp', whatsappRoutes)` and `routes/whatsappRoutes.js`).
+- **Full URL:** prepend your backend base URL (same origin as other API calls, e.g. `https://<api-host>` in production or `http://localhost:<port>` locally):
+
+  `POST {API_BASE_URL}/api/whatsapp/send-resume`
+
+  Example: `POST https://api.example.com/api/whatsapp/send-resume`
+
+- **Auth:** use the same headers your app already uses for authenticated API routes (e.g. `Authorization: Bearer <access_token>` if the route is protected). This README does not repeat global auth rules—match the rest of the ATS client.
+
+- **What this call returns:** only whether the job was **accepted and queued**. It does **not** return Meta message IDs, per-recipient success/failure, or delivery/read status. Those are handled asynchronously (worker + `whatsapp_message_log` + Meta webhooks). For “delivered” UI, the product would need a **separate** backend API or polling strategy—not implemented in this response.
+
 ## FE Integration Rules (Must Follow)
 
-- FE must send only `candidateId`, `groupId`, and optional `customMessage`.
+- FE must send only `candidateId`, `groupId`, and optional note text (`customMessage` or `message`—same meaning).
 - FE must never send phone numbers.
 - Recipient resolution is backend-only via `groupId` (`whatsapp_group_member` + `member`).
-- API is async via queue; FE gets immediate queued response.
+- API is async via queue; FE gets immediate `{ success: true, queued: true }` only—no send outcome in this response.
 
 ## Endpoint Contract
 
@@ -29,11 +42,21 @@ Content-Type: application/json
 }
 ```
 
+Equivalent optional field name (backend accepts either; use one, not both required):
+
+```json
+{
+  "candidateId": 123,
+  "groupId": 2,
+  "message": "Please review ASAP, strong backend candidate"
+}
+```
+
 #### Field Rules
 
 - `candidateId`: required, numeric.
 - `groupId`: required, numeric.
-- `customMessage`: optional.
+- `customMessage` **or** `message`: optional (same validation; if both are sent, `customMessage` wins).
   - trimmed by backend before use
   - max length `1024`
   - plain text only (HTML tags are rejected)
@@ -49,6 +72,8 @@ Status: `200`
   "queued": true
 }
 ```
+
+**Frontend UX:** treat `200` + `success` + `queued` as “request accepted; sending happens in the background.” Do not imply WhatsApp delivery is confirmed from this payload alone.
 
 #### Validation Error Responses
 
@@ -85,6 +110,12 @@ Invalid `customMessage` examples:
   "message": "customMessage must be plain text"
 }
 ```
+
+Other common errors (same `400` / `404` + `{ success: false, message: "..." }` shape):
+
+- **404** — candidate does not exist: `Candidate not found: candidateId=<id>`
+- **400** — no resume on candidate: `Candidate <id> does not have a resume uploaded. Please upload a resume before sharing.`
+- **400** — invalid/empty group or members: message from group validation, e.g. group has no active members
 
 ## What Happens After Queueing (Backend Lifecycle)
 
