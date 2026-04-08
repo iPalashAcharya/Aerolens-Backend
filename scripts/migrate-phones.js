@@ -15,6 +15,9 @@
  *   migration_errors.json
  *   migration_duplicates.json
  */
+require('dotenv').config({
+    path: require('path').resolve(__dirname, '../.env')
+});
 
 const fs = require('fs');
 const path = require('path');
@@ -251,7 +254,7 @@ async function applyUpdates(db, proposed, skipMemberIds, dryRun) {
     if (dryRun) {
         console.log(
             `[dry-run] Would UPDATE ${toWrite.length} row(s); ` +
-                `skipped ${skipMemberIds.size} (duplicate E.164 collision)`
+            `skipped ${skipMemberIds.size} (duplicate E.164 collision)`
         );
         return 0;
     }
@@ -286,6 +289,8 @@ async function applyUpdates(db, proposed, skipMemberIds, dryRun) {
 
 async function migratePhones() {
     await fetchSecrets();
+    console.log("DB_CA_BASE64 exists:", !!process.env.DB_CA_BASE64);
+    console.log("NODE_ENV:", process.env.NODE_ENV);
 
     const db = await require('../db').getConnection();
     console.log('Connected to database');
