@@ -5,7 +5,8 @@
   "type": "commonjs",
   "scripts": {
     "test": "jest",
-    "start": "node server.js"
+    "start": "node server.js",
+    "migrate-phones": "node scripts/migrate-phones.js"
   },
   "keywords": [],
   "author": "",
@@ -33,6 +34,7 @@
     "ioredis": "^5.9.3",
     "joi": "^18.0.1",
     "jsonwebtoken": "^9.0.2",
+    "libphonenumber-js": "^1.12.10",
     "luxon": "^3.7.2",
     "multer": "^2.0.2",
     "multer-s3": "^3.0.1",
