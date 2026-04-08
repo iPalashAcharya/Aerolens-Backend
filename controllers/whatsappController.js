@@ -3,6 +3,11 @@ const AppError = require('../utils/appError');
 const { enqueueWhatsAppResumeJob } = require('../queues/whatsappQueue');
 const { getCandidate } = require('../services/whatsappCandidateService');
 const { getRecipients, listActiveWhatsappGroups } = require('../services/groupService');
+const WhatsappQueueRepository = require('../repositories/whatsappQueueRepository');
+const WhatsappMessageLogRepository = require('../repositories/whatsappMessageLogRepository');
+
+const whatsappQueueRepository = new WhatsappQueueRepository();
+const whatsappMessageLogRepository = new WhatsappMessageLogRepository();
 
 function validateCustomMessage(customMessage) {
     if (customMessage === undefined || customMessage === null) {
@@ -116,7 +121,7 @@ async function sendResume(req, res) {
         // ------------------------------------------------------------------
         // All checks passed — enqueue
         // ------------------------------------------------------------------
-        await enqueueWhatsAppResumeJob({
+        const { queueId } = await enqueueWhatsAppResumeJob({
             candidateId: numCandidateId,
             groupId:     numGroupId,
             customMessage: normalizedCustomMessage
@@ -124,7 +129,7 @@ async function sendResume(req, res) {
 
         return ApiResponse.success(
             res,
-            { queued: true },
+            { queued: true, queueId },
             'WhatsApp resume share queued successfully'
         );
 
@@ -137,7 +142,45 @@ async function sendResume(req, res) {
     }
 }
 
+async function getShareLog(req, res) {
+    const queueId = parseInt(req.params.queueId, 10);
+    if (!Number.isFinite(queueId) || queueId < 1) {
+        const err = new AppError('Invalid queueId', 400, 'VALIDATION_ERROR');
+        return ApiResponse.error(res, err, err.statusCode);
+    }
+
+    try {
+        const queue = await whatsappQueueRepository.getById(queueId);
+        if (!queue) {
+            const err = new AppError('Share job not found', 404, 'WHATSAPP_SHARE_NOT_FOUND');
+            return ApiResponse.error(res, err, err.statusCode);
+        }
+
+        const messages = await whatsappMessageLogRepository.findForQueueJob({
+            candidateId: queue.candidateId,
+            groupId: queue.groupId,
+            createdAt: queue.createdAt,
+            processedAt: queue.processedAt
+        });
+
+        return ApiResponse.success(
+            res,
+            { queue, messages },
+            'WhatsApp share log retrieved successfully'
+        );
+    } catch (error) {
+        console.error('[WA] getShareLog failed', { message: error.message });
+        const err = new AppError(
+            'Failed to load WhatsApp share log',
+            500,
+            'WHATSAPP_SHARE_LOG_ERROR'
+        );
+        return ApiResponse.error(res, err, err.statusCode);
+    }
+}
+
 module.exports = {
     listGroups,
-    sendResume
+    sendResume,
+    getShareLog
 };

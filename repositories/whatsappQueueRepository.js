@@ -49,6 +49,21 @@ class WhatsappQueueRepository {
             [retryCount, queueId]
         );
     }
+
+    async getById(queueId) {
+        const connection = await db.getConnection();
+        try {
+            const [rows] = await connection.execute(
+                `SELECT id, candidate_id AS candidateId, group_id AS groupId, status, retry_count AS retryCount,
+                        created_at AS createdAt, processed_at AS processedAt
+                 FROM whatsapp_queue WHERE id = ?`,
+                [queueId]
+            );
+            return rows[0] || null;
+        } finally {
+            connection.release();
+        }
+    }
 }
 
 module.exports = WhatsappQueueRepository;

@@ -4,26 +4,28 @@ This section defines the exact API contract FE must follow for WhatsApp resume s
 
 ## How the frontend links to the backend
 
-FE uses two routes under `/whatsapp` (see `server.js`: `app.use('/whatsapp', whatsappRoutes)` and `routes/whatsappRoutes.js`).
+FE uses three routes under `/whatsapp` (see `server.js`: `app.use('/whatsapp', whatsappRoutes)` and `routes/whatsappRoutes.js`). **All of them require** `Authorization: Bearer <access_token>` (`authenticate` middleware).
 
 1. **List groups (dropdown):** `GET {API_BASE_URL}/whatsapp/groups` — returns `groupId` + `groupName` for each active `whatsapp_group` row.
 2. **Share resume:** `POST {API_BASE_URL}/whatsapp/send-resume` — body must include **`groupId`** from step 1 (required), plus `candidateId` and optional note.
+3. **Share log (polling):** `GET {API_BASE_URL}/whatsapp/shares/:queueId` — returns the `whatsapp_queue` row for that job and matching `whatsapp_message_log` rows (same `candidate_id` + `group_id`, and `sent_at` between that queue row’s **`created_at`** and **`processed_at`**; while the job is still running, `processed_at` is null so only the lower bound applies). Use **`queueId`** from step 2 to poll until `queue.status` is `DONE` or `FAILED` and `messages` is populated.
 
 Examples:
 
 - `GET https://api.example.com/whatsapp/groups`
 - `POST https://api.example.com/whatsapp/send-resume`
+- `GET https://api.example.com/whatsapp/shares/42`
 
-- **Auth:** use the same headers your app already uses for authenticated API routes (e.g. `Authorization: Bearer <access_token>` if the route is protected). This README does not repeat global auth rules—match the rest of the ATS client.
+- **Auth:** Bearer token is **required** on every `/whatsapp/*` route (same as other protected ATS routes).
 
-- **Send-resume response:** only whether the job was **accepted and queued**. It does **not** return Meta message IDs, per-recipient success/failure, or delivery/read status. Those are handled asynchronously (worker + `whatsapp_message_log` + Meta webhooks). For “delivered” UI, the product would need a **separate** backend API or polling strategy—not implemented in this response.
+- **Send-resume response:** returns **`queueId`** plus `queued: true`. The worker writes Meta send outcomes into **`whatsapp_message_log`** (existing columns only — no extra FK column). **`GET /whatsapp/shares/:queueId`** selects logs by **`candidate_id`**, **`group_id`**, and **`sent_at`** in the window for that queue job (`created_at` … `processed_at`). Optional later: Meta webhooks can still update the same rows (e.g. `delivered_at` / status) if configured; the read API reflects current DB columns.
 
 ## FE Integration Rules (Must Follow)
 
 - FE must send only `candidateId`, `groupId`, and optional note text (`customMessage` or `message`—same meaning).
 - FE must never send phone numbers.
 - Recipient resolution is backend-only via `groupId` (`whatsapp_group_member` + `member`).
-- API is async via queue; FE gets immediate success with `data.queued === true` (see below)—no send outcome in this response. Responses use `utils/response.js` (`ApiResponse`): success payloads live under **`data`**, plus **`message`**.
+- API is async via queue; FE gets immediate success with `data.queued === true` and **`data.queueId`** (see below). Poll **`GET /whatsapp/shares/:queueId`** for per-recipient rows from `whatsapp_message_log`. Responses use `utils/response.js` (`ApiResponse`): success payloads live under **`data`**, plus **`message`**.
 
 ## Endpoint Contract
 
@@ -112,12 +114,13 @@ Status: `200`
   "success": true,
   "message": "WhatsApp resume share queued successfully",
   "data": {
-    "queued": true
+    "queued": true,
+    "queueId": 42
   }
 }
 ```
 
-**Frontend UX:** treat `200` + `success` + `data.queued === true` as “request accepted; sending happens in the background.” Do not imply WhatsApp delivery is confirmed from this payload alone.
+**Frontend UX:** treat `200` + `success` + `data.queued === true` as “request accepted; sending happens in the background.” Use **`data.queueId`** with **`GET /whatsapp/shares/:queueId`** to show per-recipient send result (`SENT` / `FAILED`) and `metaMessageId` from the DB once the worker has finished writing rows.
 
 #### Validation Error Responses
 
@@ -169,6 +172,56 @@ Other common errors (same `400` / `404` + `ApiResponse.error` shape; `error` cod
 - **400** — no resume on candidate: `Candidate <id> does not have a resume uploaded. Please upload a resume before sharing.`
 - **400** — invalid/empty group or members: message from group validation, e.g. group has no active members
 
+### GET `/whatsapp/shares/:queueId`
+
+- **Path param:** `queueId` (integer) — same value as `data.queueId` from `POST /whatsapp/send-resume`.
+
+#### Success Response
+
+Status: `200`
+
+```json
+{
+  "success": true,
+  "message": "WhatsApp share log retrieved successfully",
+  "data": {
+    "queue": {
+      "id": 42,
+      "candidateId": 123,
+      "groupId": 2,
+      "status": "DONE",
+      "retryCount": 0,
+      "createdAt": "2026-04-08T10:14:55.000Z",
+      "processedAt": "2026-04-08T10:15:00.000Z"
+    },
+    "messages": [
+      {
+        "messageLogId": 1001,
+        "candidateId": 123,
+        "groupId": 2,
+        "memberId": 5,
+        "phoneNumber": "919876543210",
+        "messageStatus": "SENT",
+        "metaMessageId": "wamid.HBgL...",
+        "errorMessage": null,
+        "sentAt": "2026-04-08T10:14:58.000Z",
+        "deliveredAt": null
+      }
+    ]
+  }
+}
+```
+
+- While the job is still running, `queue.status` may be `PENDING` or `PROCESSING`, `processedAt` may be null, and `messages` may be empty until the worker inserts log rows (then all rows with `sent_at >= queue.createdAt` are returned).
+- After completion, **`processed_at`** caps the window so only log rows from that job’s timeframe are returned (same candidate + group, concurrent sequential jobs with worker concurrency `1`).
+- **`deliveredAt` / non-`SENT` delivery states** appear only if something updates those columns (e.g. a webhook or future job); otherwise the UI reflects what the Meta send API path stored (`SENT` / `FAILED`).
+
+#### Error Responses
+
+- **400** — invalid `queueId`: `VALIDATION_ERROR`
+- **404** — no `whatsapp_queue` row: `WHATSAPP_SHARE_NOT_FOUND`
+- **500** — `WHATSAPP_SHARE_LOG_ERROR`
+
 ## What Happens After Queueing (Backend Lifecycle)
 
 Queue name: `whatsapp-resume-queue`  
@@ -183,7 +236,7 @@ Processing sequence:
 5. Nine template body parameters (`{{1}}`–`{{9}}`) are built from the candidate row (and optional FE note for `{{9}}`).
 6. Recipients are resolved by `groupId` from DB.
 7. WhatsApp template (name from `WA_TEMPLATE_NAME`, default `candidate_resume_v2`) is sent.
-8. Every recipient attempt is logged in `whatsapp_message_log` (`SENT`/`FAILED`).
+8. Every recipient attempt is logged in `whatsapp_message_log` (`SENT`/`FAILED`) using existing columns (`candidate_id`, `group_id`, `sent_at`, etc.); correlation to the job for reads is by **`whatsapp_queue.created_at` / `processed_at`** and matching candidate + group.
 9. Queue row is updated to `DONE` or `FAILED` and `retry_count` is synced with attempts.
 
 ## WhatsApp Template Mapping (Backend-Controlled)
@@ -259,6 +312,8 @@ If nothing usable is present: `N/A`.
 - `config/whatsapp.js`
 - `controllers/whatsappController.js`
 - `controllers/webhookController.js`
+- `repositories/whatsappQueueRepository.js`
+- `repositories/whatsappMessageLogRepository.js`
 - `services/whatsappCandidateService.js`
 - `services/s3Service.js`
 - `services/messageService.js`
@@ -269,7 +324,6 @@ If nothing usable is present: `N/A`.
 - `workers/whatsappWorker.js`
 - `routes/whatsappRoutes.js`
 - `routes/webhookRoutes.js`
-- `scripts/whatsapp_schema.sql`
 
 ## Required Environment Variables
 
