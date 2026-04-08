@@ -15,6 +15,7 @@ const contactRoutes = require('./routes/contact');
 const candidateRoutes = require('./routes/candidateRoutes');
 const CandidateValidator = require('./validators/candidateValidator');
 const lookupRoutes = require('./routes/lookupRoutes');
+const roleRoutes = require('./routes/roleRoutes');
 const db = require('./db');
 const JobProfileValidator = require('./validators/jobProfileValidator');
 const AuthValidator = require('./validators/authValidator');
@@ -82,6 +83,7 @@ app.use('/jobProfile', jobProfileRoutes);
 CandidateValidator.init(db);
 app.use('/candidate', candidateRoutes);
 app.use('/lookup', lookupRoutes);
+app.use('/api/master/roles', roleRoutes);
 
 app.use(globalErrorHandler);
 app.use((err, req, res, next) => {

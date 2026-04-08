@@ -96,6 +96,7 @@ async function startServer() {
         const interviewRoutes = require('./routes/interviewRoutes');
         const vendorRoutes = require('./routes/vendorRoutes');
         const offerRoutes = require('./routes/offerRoutes');
+        const roleRoutes = require('./routes/roleRoutes');
         const db = require('./db');
         const whatsappRoutes = require('./routes/whatsappRoutes');
         const webhookRoutes = require('./routes/webhookRoutes');
@@ -309,6 +310,7 @@ async function startServer() {
         app.use('/interview', interviewRoutes);
         app.use('/vendor', vendorRoutes);
         app.use('/offers', offerRoutes);
+        app.use('/api/master/roles', roleRoutes);
         app.use('/whatsapp', whatsappRoutes);
         app.use('/webhook', webhookRoutes);
 
