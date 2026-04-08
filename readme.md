@@ -1,3 +1,11 @@
+## Member phone numbers (E.164 / WhatsApp)
+
+`member.memberContact` is validated and normalized to **strict E.164** on **register** and **member PATCH** via `utils/phone-validator.js` (`libphonenumber-js`). Staged column migration: **`docs/MEMBER_PHONE_E164.md`**, **`scripts/sql-migration.sql`**, **`scripts/migrate-phones.js`**, **`npm run migrate-phones`**.
+
+**Frontend:** use `AerolensApp/src/shared/components/PhoneInput.tsx`, `shared/utils/phoneE164.ts`, integrated in **Create User** (`SignupForm`) and **Edit Member** (`MembersEdit`). Dependency: **`react-phone-input-2`**.
+
+---
+
 # Recruitment Automation ATS - WhatsApp Module (Frontend Integration Source of Truth)
 
 This section defines the exact API contract FE must follow for WhatsApp resume sharing.

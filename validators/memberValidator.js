@@ -1,5 +1,6 @@
 const Joi = require('joi');
 const AppError = require('../utils/appError');
+const { validatePhoneE164 } = require('../utils/phone-validator');
 
 class MemberValidatorHelper {
     constructor(db) {
@@ -347,11 +348,11 @@ const memberSchema = {
             }),
 
         memberContact: Joi.string()
-            .pattern(/^[0-9+\-\s()]+$/)
             .allow(null, '')
+            .trim()
             .max(25)
             .messages({
-                'string.pattern.base': 'Invalid contact number format'
+                'string.max': 'Contact number is too long'
             }),
 
         email: Joi.string()
@@ -523,6 +524,16 @@ class MemberValidator {
                 );
             }
             MemberValidator.helper.normalizeEmptyStringsDeep(value);
+
+            if (value.memberContact != null && String(value.memberContact).trim() !== '') {
+                const phone = validatePhoneE164(String(value.memberContact).trim());
+                if (!phone.valid) {
+                    throw new AppError(phone.error, 400, 'VALIDATION_ERROR', {
+                        validationErrors: [{ field: 'memberContact', message: phone.error }]
+                    });
+                }
+                value.memberContact = phone.e164;
+            }
 
             // FK validation
             if (value.designationId != null) {

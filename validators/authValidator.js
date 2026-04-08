@@ -1,5 +1,6 @@
 const Joi = require('joi');
 const AppError = require('../utils/appError');
+const { validatePhoneE164 } = require('../utils/phone-validator');
 
 class AuthValidatorHelper {
     constructor(db) {
@@ -99,11 +100,10 @@ const registerSchema = Joi.object({
         }),
     memberContact: Joi.string()
         .required()
-        .pattern(/^[0-9+\-\s()]+$/)
+        .trim()
         .max(25)
         .messages({
-            'any.required': 'Contact number is required',
-            'string.pattern.base': 'Invalid contact number format'
+            'any.required': 'Contact number is required'
         }),
     email: Joi.string()
         .email()
@@ -222,6 +222,14 @@ class AuthValidator {
             }));
             return next(new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details }));
         }
+
+        const phone = validatePhoneE164(value.memberContact);
+        if (!phone.valid) {
+            return next(new AppError(phone.error, 400, 'VALIDATION_ERROR', {
+                validationErrors: [{ field: 'memberContact', message: phone.error }]
+            }));
+        }
+        value.memberContact = phone.e164;
 
         if (value.designationId) {
             value.designation = await AuthValidator.helper.validateDesignationExists(value.designationId);

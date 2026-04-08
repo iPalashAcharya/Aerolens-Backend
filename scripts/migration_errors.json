@@ -1,0 +1,186 @@
+[
+  {
+    "memberId": 421,
+    "rawContact": "5098438942",
+    "reason": "UNRESOLVABLE",
+    "step": "STEP_3",
+    "detail": "invalid 10-digit local for location hint",
+    "locationCountry": "India"
+  },
+  {
+    "memberId": 422,
+    "rawContact": "3404342423423",
+    "reason": "UNRESOLVABLE",
+    "step": "STEP_3",
+    "detail": "digit count 13 (need 10 for local, or 91+10 / 1+10 patterns)",
+    "locationCountry": "India"
+  },
+  {
+    "memberId": 423,
+    "rawContact": "42342342",
+    "reason": "UNRESOLVABLE",
+    "step": "STEP_3",
+    "detail": "digit count 8 (need 10 for local, or 91+10 / 1+10 patterns)",
+    "locationCountry": "India"
+  },
+  {
+    "memberId": 424,
+    "rawContact": "456321567",
+    "reason": "UNRESOLVABLE",
+    "step": "STEP_3",
+    "detail": "digit count 9 (need 10 for local, or 91+10 / 1+10 patterns)",
+    "locationCountry": "India"
+  },
+  {
+    "memberId": 425,
+    "rawContact": "13121312",
+    "reason": "UNRESOLVABLE",
+    "step": "STEP_3",
+    "detail": "digit count 8 (need 10 for local, or 91+10 / 1+10 patterns)",
+    "locationCountry": "India"
+  },
+  {
+    "memberId": 426,
+    "rawContact": "34224",
+    "reason": "UNRESOLVABLE",
+    "step": "STEP_3",
+    "detail": "digit count 5 (need 10 for local, or 91+10 / 1+10 patterns)",
+    "locationCountry": "India"
+  },
+  {
+    "memberId": 428,
+    "rawContact": "3403215678",
+    "reason": "UNRESOLVABLE",
+    "step": "STEP_3",
+    "detail": "invalid 10-digit local for location hint",
+    "locationCountry": "India"
+  },
+  {
+    "memberId": 429,
+    "rawContact": "5083404281",
+    "reason": "UNRESOLVABLE",
+    "step": "STEP_3",
+    "detail": "invalid 10-digit local for location hint",
+    "locationCountry": "India"
+  },
+  {
+    "memberId": 430,
+    "rawContact": "5084528134",
+    "reason": "UNRESOLVABLE",
+    "step": "STEP_3",
+    "detail": "invalid 10-digit local for location hint",
+    "locationCountry": "India"
+  },
+  {
+    "memberId": 431,
+    "rawContact": "5083146617",
+    "reason": "UNRESOLVABLE",
+    "step": "STEP_3",
+    "detail": "invalid 10-digit local for location hint",
+    "locationCountry": "India"
+  },
+  {
+    "memberId": 432,
+    "rawContact": "4321508952314",
+    "reason": "UNRESOLVABLE",
+    "step": "STEP_3",
+    "detail": "digit count 13 (need 10 for local, or 91+10 / 1+10 patterns)",
+    "locationCountry": "India"
+  },
+  {
+    "memberId": 435,
+    "rawContact": "50834402134",
+    "reason": "UNRESOLVABLE",
+    "step": "STEP_3",
+    "detail": "digit count 11 (need 10 for local, or 91+10 / 1+10 patterns)",
+    "locationCountry": "India"
+  },
+  {
+    "memberId": 436,
+    "rawContact": "34052311456",
+    "reason": "UNRESOLVABLE",
+    "step": "STEP_3",
+    "detail": "digit count 11 (need 10 for local, or 91+10 / 1+10 patterns)",
+    "locationCountry": "India"
+  },
+  {
+    "memberId": 437,
+    "rawContact": "5083421404",
+    "reason": "UNRESOLVABLE",
+    "step": "STEP_3",
+    "detail": "invalid 10-digit local for location hint",
+    "locationCountry": "India"
+  },
+  {
+    "memberId": 438,
+    "rawContact": "508314616",
+    "reason": "UNRESOLVABLE",
+    "step": "STEP_3",
+    "detail": "digit count 9 (need 10 for local, or 91+10 / 1+10 patterns)",
+    "locationCountry": "India"
+  },
+  {
+    "memberId": 440,
+    "rawContact": "5083146616",
+    "reason": "UNRESOLVABLE",
+    "step": "STEP_3",
+    "detail": "invalid 10-digit local for location hint",
+    "locationCountry": "India"
+  },
+  {
+    "memberId": 442,
+    "rawContact": "774813921",
+    "reason": "UNRESOLVABLE",
+    "step": "STEP_3",
+    "detail": "digit count 9 (need 10 for local, or 91+10 / 1+10 patterns)",
+    "locationCountry": "India"
+  },
+  {
+    "memberId": 443,
+    "rawContact": "50831455233",
+    "reason": "UNRESOLVABLE",
+    "step": "STEP_3",
+    "detail": "digit count 11 (need 10 for local, or 91+10 / 1+10 patterns)",
+    "locationCountry": "India"
+  },
+  {
+    "memberId": 446,
+    "rawContact": "7777777646464",
+    "reason": "UNRESOLVABLE",
+    "step": "STEP_3",
+    "detail": "digit count 13 (need 10 for local, or 91+10 / 1+10 patterns)",
+    "locationCountry": "India"
+  },
+  {
+    "memberId": 447,
+    "rawContact": "987657578",
+    "reason": "UNRESOLVABLE",
+    "step": "STEP_3",
+    "detail": "digit count 9 (need 10 for local, or 91+10 / 1+10 patterns)",
+    "locationCountry": "India"
+  },
+  {
+    "memberId": 457,
+    "rawContact": "7748139122_old_457",
+    "reason": "UNRESOLVABLE",
+    "step": "STEP_3",
+    "detail": "digit count 13 (need 10 for local, or 91+10 / 1+10 patterns)",
+    "locationCountry": null
+  },
+  {
+    "memberId": 459,
+    "rawContact": "123333445",
+    "reason": "UNRESOLVABLE",
+    "step": "STEP_3",
+    "detail": "digit count 9 (need 10 for local, or 91+10 / 1+10 patterns)",
+    "locationCountry": null
+  },
+  {
+    "memberId": 462,
+    "rawContact": "77335535777",
+    "reason": "UNRESOLVABLE",
+    "step": "STEP_3",
+    "detail": "digit count 11 (need 10 for local, or 91+10 / 1+10 patterns)",
+    "locationCountry": null
+  }
+]
