@@ -277,7 +277,7 @@ class CandidateBulkService {
 
             const coerced = this._coerceRowTypes(mapped);
 
-            // Step 2: Validate mapped data
+            // Step 2: Validate mapped data (strings for work mode / structured CTC lookups)
             const validated = await this._validateRow(coerced, rowNumber);
 
             if (!validated) {
@@ -318,7 +318,10 @@ class CandidateBulkService {
             'candidateName', 'contactNumber', 'email', 'recruiterName',
             'clientName', 'departmentName', 'jobRole', 'currentCity',
             'expectedCity', 'linkedinProfileUrl', 'notes',
-            'vendorName', 'referredBy'
+            'vendorName', 'referredBy',
+            'workMode',
+            'currentCurrency', 'currentCompensationType',
+            'expectedCurrency', 'expectedCompensationType'
         ];
 
         for (const field of stringFields) {
@@ -330,8 +333,11 @@ class CandidateBulkService {
             }
         }
 
-        // Fields that must be numbers
-        const numberFields = ['currentCTC', 'expectedCTC', 'noticePeriod', 'experienceYears'];
+        // Fields that must be numbers (legacy currentCTC/expectedCTC are not accepted via bulk upload)
+        const numberFields = [
+            'noticePeriod', 'experienceYears',
+            'currentCTCAmount', 'expectedCTCAmount'
+        ];
 
         for (const field of numberFields) {
             const val = coerced[field];
@@ -371,14 +377,38 @@ class CandidateBulkService {
             jobRole: findValue(['job_role', 'role', 'position', 'jobrole']),
             currentCity: findValue(['current_city', 'current_location', 'city', 'currentcity']),
             expectedCity: findValue(['expected_city', 'preferred_city', 'expected_location', 'expectedcity']),
-            currentCTC: findValue(['current_ctc', 'currentctc', 'current_salary']),
-            expectedCTC: findValue(['expected_ctc', 'expectedctc', 'expected_salary']),
             noticePeriod: findValue(['notice_period', 'notice', 'noticeperiod']),
             experienceYears: findValue(['experience_years', 'experience', 'exp', 'experienceyears']),
             linkedinProfileUrl: findValue(['linkedin_url', 'linkedin', 'linkedinprofileurl']),
             notes: findValue(['notes', 'comments', 'remarks']),
             vendorName: findValue(['vendor_name', 'vendor', 'vendorname']),
-            referredBy: findValue(['referred_by', 'referrer', 'referredby'])
+            referredBy: findValue(['referred_by', 'referrer', 'referredby']),
+
+            workMode: findValue(['work_mode', 'work_mode_name', 'workmodename']),
+
+            currentCTCAmount: findValue(['current_ctc_amount', 'currentctcamount']),
+            currentCurrency: findValue([
+                'current_currency',
+                'current_ctc_currency',
+                'currentcurrency'
+            ]),
+            currentCompensationType: findValue([
+                'current_compensation_type',
+                'current_ctc_compensation_type',
+                'currentcompensationtype'
+            ]),
+
+            expectedCTCAmount: findValue(['expected_ctc_amount', 'expectedctcamount']),
+            expectedCurrency: findValue([
+                'expected_currency',
+                'expected_ctc_currency',
+                'expectedcurrency'
+            ]),
+            expectedCompensationType: findValue([
+                'expected_compensation_type',
+                'expected_ctc_compensation_type',
+                'expectedcompensationtype'
+            ])
         };
     }
 
@@ -388,7 +418,7 @@ class CandidateBulkService {
     async _validateRow(data, rowNumber) {
         const Joi = require('joi');
 
-        // Bulk upload schema - must match single create validation exactly
+        // Bulk schema: lookup fields (work mode, structured CTC) use display strings; IDs are resolved in _transformRow.
         const bulkSchema = Joi.object({
             candidateName: Joi.string()
                 .trim()
@@ -464,19 +494,57 @@ class CandidateBulkService {
                 .max(100)
                 .required(),
 
-            currentCTC: Joi.number()
+            currentCTCAmount: Joi.number()
+                .precision(2)
+                .min(0)
+                .max(100000000)
+                .optional()
+                .allow(null),
+
+            currentCurrency: Joi.string()
+                .trim()
+                .min(1)
+                .max(100)
+                .optional()
+                .allow(null, ''),
+
+            currentCompensationType: Joi.string()
+                .trim()
+                .min(1)
+                .max(100)
+                .optional()
+                .allow(null, ''),
+
+            expectedCTCAmount: Joi.number()
                 .precision(2)
                 .min(0)
                 .max(10000000)
                 .optional()
                 .allow(null),
 
-            expectedCTC: Joi.number()
-                .precision(2)
-                .min(0)
-                .max(10000000)
+            expectedCurrency: Joi.string()
+                .trim()
+                .min(1)
+                .max(100)
                 .optional()
-                .allow(null),
+                .allow(null, ''),
+
+            expectedCompensationType: Joi.string()
+                .trim()
+                .min(1)
+                .max(100)
+                .optional()
+                .allow(null, ''),
+
+            workMode: Joi.string()
+                .trim()
+                .min(1)
+                .max(100)
+                .required()
+                .messages({
+                    'any.required': 'Work mode is required (work_mode column — use the same label as in the app)',
+                    'string.empty': 'Work mode is required'
+                }),
 
             noticePeriod: Joi.number()
                 .integer()
@@ -508,11 +576,54 @@ class CandidateBulkService {
                 .max(100),
             referredBy: Joi.string()
                 .trim()
+                .min(2)
+                .max(150)
+                .pattern(/^[a-zA-Z\s.'-]+$/)
                 .optional()
                 .allow(null, '')
-                .min(2)
-                .max(100)
-        });
+                .messages({
+                    'string.min': 'Referred by must be at least 2 characters long',
+                    'string.max': 'Referred by cannot exceed 150 characters',
+                    'string.pattern.base': 'Referred by can only contain letters, spaces, periods, hyphens and apostrophes'
+                })
+        })
+            .custom((value, helpers) => {
+                const hasAmount = value.currentCTCAmount !== undefined && value.currentCTCAmount !== null;
+                const hasCur =
+                    value.currentCurrency !== undefined &&
+                    value.currentCurrency !== null &&
+                    String(value.currentCurrency).trim() !== '';
+                const hasType =
+                    value.currentCompensationType !== undefined &&
+                    value.currentCompensationType !== null &&
+                    String(value.currentCompensationType).trim() !== '';
+                const curCount = [hasAmount, hasCur, hasType].filter(Boolean).length;
+                if (curCount > 0 && curCount < 3) {
+                    return helpers.error('custom.currentCTCIncomplete');
+                }
+
+                const hasExpAmount = value.expectedCTCAmount !== undefined && value.expectedCTCAmount !== null;
+                const hasExpCur =
+                    value.expectedCurrency !== undefined &&
+                    value.expectedCurrency !== null &&
+                    String(value.expectedCurrency).trim() !== '';
+                const hasExpType =
+                    value.expectedCompensationType !== undefined &&
+                    value.expectedCompensationType !== null &&
+                    String(value.expectedCompensationType).trim() !== '';
+                const expCount = [hasExpAmount, hasExpCur, hasExpType].filter(Boolean).length;
+                if (expCount > 0 && expCount < 3) {
+                    return helpers.error('custom.expectedCTCIncomplete');
+                }
+
+                return value;
+            })
+            .messages({
+                'custom.currentCTCIncomplete':
+                    'Current structured CTC requires all three together: current_ctc_amount, current_currency, and current_compensation_type (same labels as in the app)',
+                'custom.expectedCTCIncomplete':
+                    'Expected structured CTC requires all three together: expected_ctc_amount, expected_currency, and expected_compensation_type (same labels as in the app)'
+            });
 
         const { error, value } = bulkSchema.validate(data, {
             abortEarly: false,
@@ -592,6 +703,56 @@ class CandidateBulkService {
         } else {
             throw new Error('Client name, department name, and job role are all required');
         }
+
+        // Work mode display value -> lookup ID (same pattern as recruiter / vendor)
+        if (data.workMode) {
+            transformed.workModeId = await this.validatorHelper.getLookupKeyByTagAndValue(
+                'workMode',
+                data.workMode,
+                client,
+                'Work mode'
+            );
+            delete transformed.workMode;
+        } else {
+            throw new Error('Work mode is required');
+        }
+
+        if (data.currentCTCAmount !== undefined && data.currentCTCAmount !== null) {
+            transformed.currentCTCCurrencyId = await this.validatorHelper.getLookupKeyByTagAndValue(
+                'currency',
+                data.currentCurrency,
+                client,
+                'Current CTC currency'
+            );
+            transformed.currentCTCTypeId = await this.validatorHelper.getLookupKeyByTagAndValue(
+                'compensationType',
+                data.currentCompensationType,
+                client,
+                'Current CTC compensation type'
+            );
+        }
+        delete transformed.currentCurrency;
+        delete transformed.currentCompensationType;
+
+        if (data.expectedCTCAmount !== undefined && data.expectedCTCAmount !== null) {
+            transformed.expectedCTCCurrencyId = await this.validatorHelper.getLookupKeyByTagAndValue(
+                'currency',
+                data.expectedCurrency,
+                client,
+                'Expected CTC currency'
+            );
+            transformed.expectedCTCTypeId = await this.validatorHelper.getLookupKeyByTagAndValue(
+                'compensationType',
+                data.expectedCompensationType,
+                client,
+                'Expected CTC compensation type'
+            );
+        }
+        delete transformed.expectedCurrency;
+        delete transformed.expectedCompensationType;
+
+        delete transformed.currentCTC;
+        delete transformed.expectedCTC;
 
         return transformed;
     }
@@ -733,10 +894,15 @@ class CandidateBulkService {
             'client_name',
             'department_name',
             'job_role',
+            'work_mode',
             'current_city',
             'expected_city',
-            'current_ctc',
-            'expected_ctc',
+            'current_ctc_amount',
+            'current_currency',
+            'current_compensation_type',
+            'expected_ctc_amount',
+            'expected_currency',
+            'expected_compensation_type',
             'notice_period',
             'experience_years',
             'linkedin_url',
@@ -754,10 +920,15 @@ class CandidateBulkService {
                 client_name: 'TCS',
                 department_name: 'Engineering',
                 job_role: 'Senior Software Engineer',
+                work_mode: 'Remote',
                 current_city: 'Ahmedabad',
                 expected_city: 'Bangalore',
-                current_ctc: 1200000,
-                expected_ctc: 1500000,
+                current_ctc_amount: '',
+                current_currency: '',
+                current_compensation_type: '',
+                expected_ctc_amount: '',
+                expected_currency: '',
+                expected_compensation_type: '',
                 notice_period: 30,
                 experience_years: 5.5,
                 linkedin_url: 'https://linkedin.com/in/johndoe',

@@ -1044,7 +1044,7 @@ class CandidateRepository {
             }
 
             const placeholders = candidates.map(() =>
-                '(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+                '(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
             ).join(', ');
 
             const query = `
@@ -1058,12 +1058,19 @@ class CandidateRepository {
                 currentLocation,
                 currentCTC,
                 expectedCTC,
+                currentCTCAmount,
+                currentCTCCurrencyId,
+                currentCTCTypeId,
+                expectedCTCAmount,
+                expectedCTCCurrencyId,
+                expectedCTCTypeId,
                 noticePeriod,
                 experienceYears,
                 linkedinProfileUrl,
                 resumeFilename,
                 resumeOriginalName,
                 resumeUploadDate,
+                workModeId,
                 notes,
                 statusId,
                 vendorId,
@@ -1082,12 +1089,19 @@ class CandidateRepository {
                 c.currentLocation ?? null,
                 c.currentCTC ?? null,
                 c.expectedCTC ?? null,
+                c.currentCTCAmount ?? null,
+                c.currentCTCCurrencyId ?? null,
+                c.currentCTCTypeId ?? null,
+                c.expectedCTCAmount ?? null,
+                c.expectedCTCCurrencyId ?? null,
+                c.expectedCTCTypeId ?? null,
                 c.noticePeriod,
                 c.experienceYears,
                 c.linkedinProfileUrl ?? null,
                 null,   // resumeFilename
                 null,   // resumeOriginalName
                 null,   // resumeUploadDate
+                c.workModeId,
                 c.notes ?? null,
                 c.statusId,
                 c.vendorId ?? null,

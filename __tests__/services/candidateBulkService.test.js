@@ -16,10 +16,9 @@ function validHeaderRow() {
         'client_name',
         'department_name',
         'job_role',
+        'work_mode',
         'current_city',
         'expected_city',
-        'current_ctc',
-        'expected_ctc',
         'notice_period',
         'experience_years'
     ];
@@ -34,10 +33,9 @@ function validDataRow(overrides = {}) {
         client_name: 'TCS',
         department_name: 'Engineering',
         job_role: 'Engineer',
+        work_mode: 'Remote',
         current_city: 'Mumbai',
         expected_city: 'Bangalore',
-        current_ctc: 1000000,
-        expected_ctc: 1200000,
         notice_period: 30,
         experience_years: 5,
         ...overrides
@@ -56,11 +54,12 @@ describe('CandidateBulkService', () => {
             bulkInsert: jest.fn().mockResolvedValue(undefined)
         };
         validatorHelper = {
-            transformLocation: jest.fn().mockResolvedValue({ locationId: 1 }),
+            transformLocation: jest.fn().mockResolvedValue(1),
             getStatusIdByName: jest.fn().mockResolvedValue(1),
             getVendorIdByName: jest.fn().mockResolvedValue(5),
             getRecruiterId: jest.fn().mockResolvedValue(3),
             getJobProfileRequirementId: jest.fn().mockResolvedValue(4),
+            getLookupKeyByTagAndValue: jest.fn().mockResolvedValue(99),
             checkEmailExists: jest.fn().mockResolvedValue(false),
             checkContactExists: jest.fn().mockResolvedValue(false)
         };
@@ -87,7 +86,10 @@ describe('CandidateBulkService', () => {
         it('returns headers and sample row', async () => {
             const { headers, sampleData } = await service.generateTemplate();
             expect(headers).toContain('candidate_name');
+            expect(headers).toContain('work_mode');
             expect(headers).toContain('email');
+            expect(headers).not.toContain('current_ctc');
+            expect(headers).not.toContain('expected_ctc');
             expect(sampleData).toHaveLength(1);
             expect(sampleData[0].candidate_name).toBe('John Doe');
         });
@@ -140,8 +142,8 @@ describe('CandidateBulkService', () => {
         it('processes a valid CSV row and inserts batch', async () => {
             const tmp = path.join(os.tmpdir(), `bulk-${Date.now()}.csv`);
             const csvContent = [
-                'candidate_name,email,contact_number,recruiter_name,client_name,department_name,job_role,current_city,expected_city,current_ctc,expected_ctc,notice_period,experience_years',
-                'John Doe,john.doe@example.com,+919876543210,Jayraj,TCS,Engineering,Engineer,Mumbai,Bangalore,1000000,1200000,30,5'
+                'candidate_name,email,contact_number,recruiter_name,client_name,department_name,job_role,work_mode,current_city,expected_city,notice_period,experience_years',
+                'John Doe,john.doe@example.com,+919876543210,Jayraj,TCS,Engineering,Engineer,Remote,Mumbai,Bangalore,30,5'
             ].join('\n');
             fs.writeFileSync(tmp, csvContent, 'utf8');
 
