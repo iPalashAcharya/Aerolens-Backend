@@ -1,7 +1,17 @@
 const DepartmentService = require('../../services/departmentService');
 const AppError = require('../../utils/appError');
 
+jest.mock('../../services/auditLogService', () => ({
+    logAction: jest.fn().mockResolvedValue(undefined),
+}));
+
 describe('DepartmentService', () => {
+    const auditContext = {
+        userId: 1,
+        ipAddress: '127.0.0.1',
+        userAgent: 'jest',
+        timestamp: new Date(),
+    };
     let departmentService;
     let mockDepartmentRepository;
     let mockDb;
@@ -50,7 +60,7 @@ describe('DepartmentService', () => {
                 mockDepartmentRepository.existsByName.mockResolvedValue(false);
                 mockDepartmentRepository.create.mockResolvedValue(expectedResult);
 
-                const result = await departmentService.createDepartment(validDepartmentData);
+                const result = await departmentService.createDepartment(validDepartmentData, auditContext);
 
                 expect(mockDb.getConnection).toHaveBeenCalledTimes(1);
                 expect(mockClient.beginTransaction).toHaveBeenCalledTimes(1);
@@ -72,11 +82,11 @@ describe('DepartmentService', () => {
             it('should throw AppError when department name already exists', async () => {
                 mockDepartmentRepository.existsByName.mockResolvedValue(true);
 
-                await expect(departmentService.createDepartment(validDepartmentData))
+                await expect(departmentService.createDepartment(validDepartmentData, auditContext))
                     .rejects
                     .toThrow(AppError);
 
-                await expect(departmentService.createDepartment(validDepartmentData))
+                await expect(departmentService.createDepartment(validDepartmentData, auditContext))
                     .rejects
                     .toMatchObject({
                         message: 'A department with this name already exists for this client',
@@ -94,7 +104,7 @@ describe('DepartmentService', () => {
                 mockDepartmentRepository.existsByName.mockResolvedValue(true);
 
                 try {
-                    await departmentService.createDepartment(validDepartmentData);
+                    await departmentService.createDepartment(validDepartmentData, auditContext);
                 } catch (error) {
                     expect(mockClient.beginTransaction).toHaveBeenCalled();
                     expect(mockClient.rollback).toHaveBeenCalled();
@@ -107,7 +117,7 @@ describe('DepartmentService', () => {
             it('should handle database connection failure', async () => {
                 mockDb.getConnection.mockRejectedValue(new Error('Connection failed'));
 
-                await expect(departmentService.createDepartment(validDepartmentData))
+                await expect(departmentService.createDepartment(validDepartmentData, auditContext))
                     .rejects
                     .toThrow('Connection failed');
             });
@@ -116,7 +126,7 @@ describe('DepartmentService', () => {
                 mockDepartmentRepository.existsByName.mockResolvedValue(false);
                 mockDepartmentRepository.create.mockRejectedValue(new Error('DB Insert Error'));
 
-                await expect(departmentService.createDepartment(validDepartmentData))
+                await expect(departmentService.createDepartment(validDepartmentData, auditContext))
                     .rejects
                     .toMatchObject({
                         message: 'Failed to create Department',
@@ -133,7 +143,7 @@ describe('DepartmentService', () => {
             it('should handle transaction begin failure', async () => {
                 mockClient.beginTransaction.mockRejectedValue(new Error('Transaction error'));
 
-                await expect(departmentService.createDepartment(validDepartmentData))
+                await expect(departmentService.createDepartment(validDepartmentData, auditContext))
                     .rejects
                     .toThrow();
 
@@ -145,7 +155,7 @@ describe('DepartmentService', () => {
                 mockDepartmentRepository.create.mockResolvedValue({ id: 1 });
                 mockClient.commit.mockRejectedValue(new Error('Commit failed'));
 
-                await expect(departmentService.createDepartment(validDepartmentData))
+                await expect(departmentService.createDepartment(validDepartmentData, auditContext))
                     .rejects
                     .toThrow();
 
@@ -159,7 +169,7 @@ describe('DepartmentService', () => {
                 mockDepartmentRepository.create.mockRejectedValue(new Error('Create failed'));
                 mockClient.rollback.mockRejectedValue(new Error('Rollback failed'));
 
-                await expect(departmentService.createDepartment(validDepartmentData))
+                await expect(departmentService.createDepartment(validDepartmentData, auditContext))
                     .rejects
                     .toThrow();
 
@@ -181,7 +191,7 @@ describe('DepartmentService', () => {
 
             const result = await departmentService.getDepartmentById(departmentId);
 
-            expect(mockDepartmentRepository.findById).toHaveBeenCalledWith(departmentId);
+            expect(mockDepartmentRepository.findById).toHaveBeenCalledWith(departmentId, mockClient);
             expect(result).toEqual(existingDepartment);
         });
 
@@ -212,13 +222,14 @@ describe('DepartmentService', () => {
 
                 mockDb.getConnection.mockResolvedValue(mockClient);
                 mockClient.beginTransaction.mockResolvedValue(undefined);
-                mockDepartmentRepository.findById.mockResolvedValue(existingDepartment);
+                mockDepartmentRepository.findById
+                    .mockResolvedValueOnce(existingDepartment)
+                    .mockResolvedValueOnce({ ...existingDepartment, ...updateData });
                 mockDepartmentRepository.existsByName.mockResolvedValue(false);
-                mockDepartmentRepository.update.mockResolvedValue(undefined);
+                mockDepartmentRepository.update.mockResolvedValue({ ...existingDepartment, ...updateData });
                 mockClient.commit.mockResolvedValue(undefined);
-                mockDepartmentRepository.findById.mockResolvedValue({ ...existingDepartment, ...updateData });
 
-                const result = await departmentService.updateDepartment(departmentId, updateData);
+                const result = await departmentService.updateDepartment(departmentId, updateData, auditContext);
 
                 expect(mockDb.getConnection).toHaveBeenCalledTimes(1);
                 expect(mockClient.beginTransaction).toHaveBeenCalledTimes(1);
@@ -243,7 +254,7 @@ describe('DepartmentService', () => {
                 mockClient.beginTransaction.mockResolvedValue(undefined);
                 mockDepartmentRepository.findById.mockResolvedValue(null);
 
-                await expect(departmentService.updateDepartment(departmentId, { departmentName: 'HR' }))
+                await expect(departmentService.updateDepartment(departmentId, { departmentName: 'HR' }, auditContext))
                     .rejects
                     .toMatchObject({
                         message: `Department with ID ${departmentId} not found`,
@@ -262,7 +273,7 @@ describe('DepartmentService', () => {
                 mockDepartmentRepository.findById.mockResolvedValue(existingDepartment);
                 mockDepartmentRepository.existsByName.mockResolvedValue(true);
 
-                await expect(departmentService.updateDepartment(departmentId, { departmentName: 'HR' }))
+                await expect(departmentService.updateDepartment(departmentId, { departmentName: 'HR' }, auditContext))
                     .rejects
                     .toMatchObject({
                         message: 'A department with this name already exists for this client',
@@ -284,9 +295,13 @@ describe('DepartmentService', () => {
                 mockDepartmentRepository.existsByName.mockResolvedValue(false);
                 mockDepartmentRepository.update.mockRejectedValue(new Error('Update failed'));
 
-                await expect(departmentService.updateDepartment(departmentId, { departmentName: 'HR' }))
+                await expect(departmentService.updateDepartment(departmentId, { departmentName: 'HR' }, auditContext))
                     .rejects
-                    .toThrow();
+                    .toMatchObject({
+                        message: 'Failed to update Department',
+                        statusCode: 500,
+                        errorCode: 'DEPARTMENT_UPDATION_ERROR',
+                    });
 
                 expect(mockClient.rollback).toHaveBeenCalledTimes(1);
                 expect(mockClient.commit).not.toHaveBeenCalled();
@@ -311,7 +326,7 @@ describe('DepartmentService', () => {
                 mockDepartmentRepository.delete.mockResolvedValue(undefined);
                 mockClient.commit.mockResolvedValue(undefined);
 
-                const result = await departmentService.deleteDepartment(departmentId);
+                const result = await departmentService.deleteDepartment(departmentId, auditContext);
 
                 expect(mockDb.getConnection).toHaveBeenCalledTimes(1);
                 expect(mockClient.beginTransaction).toHaveBeenCalledTimes(1);
@@ -330,7 +345,7 @@ describe('DepartmentService', () => {
                 mockClient.beginTransaction.mockResolvedValue(undefined);
                 mockDepartmentRepository.findById.mockResolvedValue(null);
 
-                await expect(departmentService.deleteDepartment(departmentId))
+                await expect(departmentService.deleteDepartment(departmentId, auditContext))
                     .rejects
                     .toMatchObject({
                         message: `Department with ID ${departmentId} not found`,
@@ -351,9 +366,13 @@ describe('DepartmentService', () => {
                 mockDepartmentRepository.findById.mockResolvedValue(existingDepartment);
                 mockDepartmentRepository.delete.mockRejectedValue(new Error('Delete failed'));
 
-                await expect(departmentService.deleteDepartment(departmentId))
+                await expect(departmentService.deleteDepartment(departmentId, auditContext))
                     .rejects
-                    .toThrow();
+                    .toMatchObject({
+                        message: 'Failed to delete Department',
+                        statusCode: 500,
+                        errorCode: 'DEPARTMENT_DELETION_ERROR',
+                    });
 
                 expect(mockClient.rollback).toHaveBeenCalledTimes(1);
                 expect(mockClient.commit).not.toHaveBeenCalled();
@@ -373,7 +392,7 @@ describe('DepartmentService', () => {
 
             const result = await departmentService.getDepartmentsByClientId(clientId);
 
-            expect(mockDepartmentRepository.findByClientId).toHaveBeenCalledWith(clientId);
+            expect(mockDepartmentRepository.findByClientId).toHaveBeenCalledWith(clientId, mockClient);
             expect(result).toEqual(departments);
         });
     });
@@ -400,7 +419,7 @@ describe('DepartmentService', () => {
             mockDepartmentRepository.create.mockRejectedValue(new Error('Test error'));
 
             try {
-                await departmentService.createDepartment({ departmentName: 'Test', clientId: 1 });
+                await departmentService.createDepartment({ departmentName: 'Test', clientId: 1 }, auditContext);
             } catch (error) {
                 expect(console.error).toHaveBeenCalled();
                 expect(error).toBeInstanceOf(AppError);
@@ -412,7 +431,7 @@ describe('DepartmentService', () => {
             mockDepartmentRepository.existsByName.mockRejectedValue(originalError);
 
             try {
-                await departmentService.createDepartment({ departmentName: 'Test', clientId: 1 });
+                await departmentService.createDepartment({ departmentName: 'Test', clientId: 1 }, auditContext);
             } catch (error) {
                 expect(error).toBe(originalError);
             }
@@ -421,7 +440,7 @@ describe('DepartmentService', () => {
         it('should include operation context in all error metadata', async () => {
             const operations = [
                 {
-                    method: () => departmentService.createDepartment({ departmentName: 'Test', clientId: 1 }),
+                    method: () => departmentService.createDepartment({ departmentName: 'Test', clientId: 1 }, auditContext),
                     setup: () => {
                         mockDepartmentRepository.existsByName.mockResolvedValue(false);
                         mockDepartmentRepository.create.mockRejectedValue(new Error('Error'));
@@ -429,14 +448,14 @@ describe('DepartmentService', () => {
                     operation: 'createDepartment'
                 },
                 {
-                    method: () => departmentService.updateDepartment(1, { departmentName: 'Test' }),
+                    method: () => departmentService.updateDepartment(1, { departmentName: 'Test' }, auditContext),
                     setup: () => {
                         mockDepartmentRepository.findById.mockRejectedValue(new Error('Error'));
                     },
                     operation: 'updateDepartment'
                 },
                 {
-                    method: () => departmentService.deleteDepartment(1),
+                    method: () => departmentService.deleteDepartment(1, auditContext),
                     setup: () => {
                         mockDepartmentRepository.findById.mockRejectedValue(new Error('Error'));
                     },

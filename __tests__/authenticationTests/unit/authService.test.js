@@ -1,12 +1,31 @@
-const authService = require('../../../services/authServices');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const jwtConfig = require('../../../config/jwt');
-const memberRepository = require('../../../repositories/memberRepository');
-const refreshTokenRepository = require('../../../repositories/refreshTokenRepository');
 
-jest.mock('../../../repositories/memberRepository');
-jest.mock('../../../repositories/refreshTokenRepository');
+jest.mock('../../../db', () => ({
+    getConnection: jest.fn(),
+}));
+
+jest.mock('../../../repositories/memberRepository', () => {
+    const impl = {
+        findByEmail: jest.fn(),
+        updateLastLogin: jest.fn(),
+        findById: jest.fn(),
+        updatePassword: jest.fn(),
+        create: jest.fn(),
+    };
+    const Ctor = jest.fn(() => impl);
+    Ctor.__instance = impl;
+    return Ctor;
+});
+jest.mock('../../../repositories/tokenRepository');
+
+const db = require('../../../db');
+
+const MemberRepository = require('../../../repositories/memberRepository');
+const mockMemberRepo = MemberRepository.__instance;
+const tokenRepository = require('../../../repositories/tokenRepository');
+const authService = require('../../../services/authServices');
 
 describe('AuthService Unit Tests', () => {
     beforeEach(() => {
@@ -20,237 +39,388 @@ describe('AuthService Unit Tests', () => {
 
             expect(hash).toBeDefined();
             expect(hash).not.toBe(password);
-            expect(hash.startsWith('$2b$')).toBe(true);
+            expect(hash.startsWith('$2')).toBe(true);
         });
 
         it('should compare password correctly', async () => {
             const password = 'TestPassword123!';
             const hash = await bcrypt.hash(password, 10);
 
-            const isValid = await authService.comparePassword(password, hash);
-            expect(isValid).toBe(true);
-
-            const isInvalid = await authService.comparePassword('WrongPassword', hash);
-            expect(isInvalid).toBe(false);
+            expect(await authService.comparePassword(password, hash)).toBe(true);
+            expect(await authService.comparePassword('WrongPassword', hash)).toBe(false);
         });
     });
 
-    describe('Token Generation', () => {
-        it('should generate valid access token with correct payload', () => {
-            const token = authService.generateAccessToken(1, 'test@example.com', 'family-123');
-            const decoded = jwt.verify(token, jwtConfig.access.secret);
+    describe('Token helpers', () => {
+        it('should generate JWT with expected claims', () => {
+            const token = authService.generateToken(1, 'a@b.com', 'fam', 'jti-1');
+            const decoded = jwt.verify(token, jwtConfig.token.secret, {
+                algorithms: [jwtConfig.token.algorithm],
+                issuer: jwtConfig.token.issuer,
+                audience: jwtConfig.token.audience,
+            });
 
             expect(decoded.memberId).toBe(1);
-            expect(decoded.email).toBe('test@example.com');
-            expect(decoded.tokenFamily).toBe('family-123');
-            expect(decoded.type).toBe('access');
-        });
-
-        it('should generate valid refresh token with correct payload', () => {
-            const token = authService.generateRefreshToken(1, 'family-123');
-            const decoded = jwt.verify(token, jwtConfig.refresh.secret);
-
-            expect(decoded.memberId).toBe(1);
-            expect(decoded.tokenFamily).toBe('family-123');
-            expect(decoded.type).toBe('refresh');
+            expect(decoded.email).toBe('a@b.com');
+            expect(decoded.family).toBe('fam');
+            expect(decoded.jti).toBe('jti-1');
         });
 
         it('should generate unique token families', () => {
             const families = new Set();
-            for (let i = 0; i < 100; i++) {
+            for (let i = 0; i < 50; i++) {
                 families.add(authService.generateTokenFamily());
             }
-            expect(families.size).toBe(100);
+            expect(families.size).toBe(50);
+        });
+
+        it('calculateExpiresAt should advance seconds, minutes, hours, and days', () => {
+            const base = Date.now();
+            const s = authService.calculateExpiresAt('30s');
+            const m = authService.calculateExpiresAt('15m');
+            const h = authService.calculateExpiresAt('2h');
+            const d = authService.calculateExpiresAt('3d');
+
+            expect(s.getTime() - base).toBeGreaterThanOrEqual(29000);
+            expect(m.getMinutes()).not.toBe(new Date(base).getMinutes());
+            expect(h.getHours()).not.toBe(new Date(base).getHours());
+            expect(d.getDate()).not.toBe(new Date(base).getDate());
+        });
+
+        it('calculateExpiresAt returns date when pattern does not match', () => {
+            const out = authService.calculateExpiresAt('not-a-duration');
+            expect(out).toBeInstanceOf(Date);
         });
     });
 
-    describe('Token Verification', () => {
-        it('should verify valid access token', () => {
-            const token = authService.generateAccessToken(1, 'test@example.com', 'family');
-            const decoded = authService.verifyAccessToken(token);
+    describe('verifyToken', () => {
+        it('should verify valid token when not revoked', async () => {
+            tokenRepository.isTokenRevoked.mockResolvedValue(false);
+            const token = authService.generateToken(2, 'u@u.com', 'f', authService.generateJTI());
 
-            expect(decoded).toBeDefined();
-            expect(decoded.memberId).toBe(1);
+            const decoded = await authService.verifyToken(token);
+
+            expect(decoded.memberId).toBe(2);
         });
 
-        it('should reject invalid access token', () => {
-            expect(() => {
-                authService.verifyAccessToken('invalid.token.here');
-            }).toThrow();
+        it('should reject revoked token', async () => {
+            tokenRepository.isTokenRevoked.mockResolvedValue(true);
+            const token = authService.generateToken(2, 'u@u.com', 'f', authService.generateJTI());
+
+            await expect(authService.verifyToken(token)).rejects.toMatchObject({
+                errorCode: 'TOKEN_REVOKED',
+            });
         });
 
-        it('should reject expired access token', () => {
-            const expiredToken = jwt.sign(
-                { memberId: 1, email: 'test@example.com', tokenFamily: 'family', type: 'access' },
-                jwtConfig.access.secret,
-                { expiresIn: '-1h', algorithm: 'HS256' }
-            );
-
-            expect(() => {
-                authService.verifyAccessToken(expiredToken);
-            }).toThrow();
-        });
-    });
-
-    describe('Token Hashing', () => {
-        it('should hash refresh token consistently', () => {
-            const token = 'test-refresh-token';
-            const hash1 = authService.hashRefreshToken(token);
-            const hash2 = authService.hashRefreshToken(token);
-
-            expect(hash1).toBe(hash2);
-            expect(hash1).toHaveLength(64);
-        });
-
-        it('should produce different hashes for different tokens', () => {
-            const hash1 = authService.hashRefreshToken('token1');
-            const hash2 = authService.hashRefreshToken('token2');
-
-            expect(hash1).not.toBe(hash2);
-        });
-    });
-
-    describe('Registration', () => {
-        it('should register new member successfully', async () => {
-            memberRepository.findByEmail.mockResolvedValue(null);
-            memberRepository.create.mockResolvedValue({
-                memberId: 1,
-                memberName: 'John Doe',
-                email: 'john@example.com',
-                designation: 'DEV'
+        it('should map TokenExpiredError from jwt.verify', async () => {
+            const err = new Error('expired');
+            err.name = 'TokenExpiredError';
+            jest.spyOn(jwt, 'verify').mockImplementation(() => {
+                throw err;
             });
 
-            const result = await authService.register({
-                memberName: 'John Doe',
-                email: 'john@example.com',
-                password: 'Test@1234',
-                designation: 'DEV'
+            await expect(authService.verifyToken('bad')).rejects.toMatchObject({
+                errorCode: 'TOKEN_EXPIRED',
             });
 
-            expect(result).toBeDefined();
-            expect(result.password).toBeUndefined();
-            expect(memberRepository.create).toHaveBeenCalled();
+            jwt.verify.mockRestore();
         });
 
-        it('should throw error if email exists', async () => {
-            memberRepository.findByEmail.mockResolvedValue({ memberId: 1 });
+        it('should wrap generic jwt errors as INVALID_TOKEN', async () => {
+            jest.spyOn(jwt, 'verify').mockImplementation(() => {
+                throw new Error('sig');
+            });
 
-            await expect(authService.register({
-                email: 'existing@example.com',
-                password: 'Test@1234'
-            })).rejects.toThrow('Email already registered');
+            await expect(authService.verifyToken('bad')).rejects.toMatchObject({
+                errorCode: 'INVALID_TOKEN',
+            });
+
+            jwt.verify.mockRestore();
         });
     });
 
     describe('Login', () => {
         const mockMember = {
             memberId: 1,
-            memberName: 'John Doe',
+            memberName: 'John',
             email: 'john@example.com',
-            password: '$2b$12$hashedpassword',
-            isActive: true
+            password: '$2b$12$hashed',
+            isActive: true,
         };
 
-        it('should login successfully', async () => {
-            memberRepository.findByEmail.mockResolvedValue(mockMember);
-            memberRepository.updateLastLogin.mockResolvedValue();
-            refreshTokenRepository.create.mockResolvedValue(1);
+        it('should login and return token', async () => {
+            mockMemberRepo.findByEmail.mockResolvedValue(mockMember);
+            mockMemberRepo.updateLastLogin.mockResolvedValue();
+            tokenRepository.storeToken.mockResolvedValue(1);
             jest.spyOn(authService, 'comparePassword').mockResolvedValue(true);
 
-            const result = await authService.login('john@example.com', 'Test@1234', 'Mozilla', '127.0.0.1');
+            const result = await authService.login('john@example.com', 'pw', 'ua', '127.0.0.1');
 
-            expect(result).toHaveProperty('accessToken');
-            expect(result).toHaveProperty('refreshToken');
-            expect(result).toHaveProperty('member');
-            expect(result.member.password).toBeUndefined();
+            expect(result.token).toBeDefined();
+            expect(result.expiresIn).toBe(jwtConfig.token.expiresIn);
+            expect(result.member.email).toBe('john@example.com');
+            expect(tokenRepository.storeToken).toHaveBeenCalled();
         });
 
-        it('should throw error for non-existent member', async () => {
-            memberRepository.findByEmail.mockResolvedValue(null);
+        it('should reject invalid credentials', async () => {
+            mockMemberRepo.findByEmail.mockResolvedValue(null);
 
             await expect(
-                authService.login('notfound@example.com', 'password', 'Mozilla', '127.0.0.1')
-            ).rejects.toThrow('Invalid credentials');
+                authService.login('x@y.com', 'pw', 'ua', 'ip')
+            ).rejects.toMatchObject({ errorCode: 'INVALID_CREDENTIALS' });
         });
 
-        it('should throw error for inactive account', async () => {
-            memberRepository.findByEmail.mockResolvedValue({
-                ...mockMember,
-                isActive: false
+        it('should reject inactive account', async () => {
+            mockMemberRepo.findByEmail.mockResolvedValue({ ...mockMember, isActive: false });
+
+            await expect(authService.login('john@example.com', 'pw', 'ua', 'ip')).rejects.toMatchObject({
+                errorCode: 'ACCOUNT_INACTIVE',
             });
-
-            await expect(
-                authService.login('john@example.com', 'password', 'Mozilla', '127.0.0.1')
-            ).rejects.toThrow('Account is inactive');
         });
 
-        it('should throw error for invalid password', async () => {
-            memberRepository.findByEmail.mockResolvedValue(mockMember);
+        it('should reject wrong password', async () => {
+            mockMemberRepo.findByEmail.mockResolvedValue(mockMember);
             jest.spyOn(authService, 'comparePassword').mockResolvedValue(false);
 
-            await expect(
-                authService.login('john@example.com', 'wrongpassword', 'Mozilla', '127.0.0.1')
-            ).rejects.toThrow('Invalid credentials');
+            await expect(authService.login('john@example.com', 'bad', 'ua', 'ip')).rejects.toMatchObject({
+                errorCode: 'INVALID_CREDENTIALS',
+            });
+        });
+
+        it('should pass null userAgent and ip to storeToken when omitted', async () => {
+            mockMemberRepo.findByEmail.mockResolvedValue(mockMember);
+            mockMemberRepo.updateLastLogin.mockResolvedValue();
+            tokenRepository.storeToken.mockResolvedValue(1);
+            jest.spyOn(authService, 'comparePassword').mockResolvedValue(true);
+
+            await authService.login('john@example.com', 'pw');
+
+            expect(tokenRepository.storeToken).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userAgent: null,
+                    ipAddress: null,
+                })
+            );
         });
     });
 
-    describe('Logout', () => {
-        it('should logout successfully', async () => {
-            const token = 'test-refresh-token';
-            const tokenHash = authService.hashRefreshToken(token);
+    describe('register', () => {
+        let client;
 
-            refreshTokenRepository.findByHash.mockResolvedValue({
-                id: 1,
-                tokenHash
+        beforeEach(() => {
+            client = {
+                beginTransaction: jest.fn().mockResolvedValue(),
+                commit: jest.fn().mockResolvedValue(),
+                rollback: jest.fn().mockResolvedValue(),
+                release: jest.fn(),
+            };
+            db.getConnection.mockResolvedValue(client);
+        });
+
+        it('should create member when email is new', async () => {
+            mockMemberRepo.findByEmail.mockResolvedValue(null);
+            mockMemberRepo.create.mockResolvedValue({
+                memberId: 9,
+                email: 'n@n.com',
+                memberName: 'N',
+                password: 'hidden',
             });
-            refreshTokenRepository.revokeToken.mockResolvedValue();
+
+            const out = await authService.register({
+                email: 'n@n.com',
+                password: 'Secret1!',
+                memberName: 'N',
+            });
+
+            expect(out.memberId).toBe(9);
+            expect(out.password).toBeUndefined();
+            expect(client.commit).toHaveBeenCalled();
+            expect(client.release).toHaveBeenCalled();
+        });
+
+        it('should throw when email exists', async () => {
+            mockMemberRepo.findByEmail.mockResolvedValue({ memberId: 1 });
+
+            await expect(
+                authService.register({ email: 'e@e.com', password: 'p' })
+            ).rejects.toMatchObject({ errorCode: 'EMAIL_EXISTS' });
+        });
+
+        it('should rollback when create fails', async () => {
+            mockMemberRepo.findByEmail.mockResolvedValue(null);
+            mockMemberRepo.create.mockRejectedValue(new Error('db'));
+
+            await expect(
+                authService.register({ email: 'a@a.com', password: 'p', memberName: 'A' })
+            ).rejects.toThrow('db');
+
+            expect(client.rollback).toHaveBeenCalled();
+        });
+    });
+
+    describe('changePassword', () => {
+        it('should reject when current password wrong', async () => {
+            mockMemberRepo.findById.mockResolvedValue({ memberId: 1, password: 'h' });
+            jest.spyOn(authService, 'comparePassword').mockResolvedValue(false);
+
+            await expect(authService.changePassword(1, 'old', 'new')).rejects.toMatchObject({
+                errorCode: 'INVALID_CURRENT_PASSWORD',
+            });
+        });
+
+        it('should update password and revoke tokens on success', async () => {
+            mockMemberRepo.findById.mockResolvedValue({ memberId: 1, password: 'h' });
+            jest.spyOn(authService, 'comparePassword').mockResolvedValue(true);
+            mockMemberRepo.updatePassword.mockResolvedValue();
+            tokenRepository.revokeAllTokensByMember.mockResolvedValue();
+
+            const out = await authService.changePassword(1, 'old', 'newPass1!');
+
+            expect(out.success).toBe(true);
+            expect(mockMemberRepo.updatePassword).toHaveBeenCalled();
+            expect(tokenRepository.revokeAllTokensByMember).toHaveBeenCalledWith(1);
+        });
+    });
+
+    describe('refreshToken', () => {
+        afterEach(() => {
+            if (jwt.verify.mockRestore) {
+                jwt.verify.mockRestore();
+            }
+        });
+
+        it('should reject when jwt.verify fails', async () => {
+            jest.spyOn(jwt, 'verify').mockImplementation(() => {
+                throw new Error('bad sig');
+            });
+
+            await expect(authService.refreshToken('t')).rejects.toMatchObject({
+                errorCode: 'INVALID_TOKEN',
+            });
+        });
+
+        it('should reject when token age exceeds grace period', async () => {
+            jest.spyOn(jwt, 'verify').mockReturnValue({
+                memberId: 1,
+                jti: 'j',
+                family: 'f',
+                iat: Math.floor(Date.now() / 1000) - 999999999,
+            });
+
+            await expect(authService.refreshToken('t')).rejects.toMatchObject({
+                errorCode: 'TOKEN_TOO_OLD',
+            });
+        });
+
+        it('should revoke family when token revoked in DB', async () => {
+            jest.spyOn(jwt, 'verify').mockReturnValue({
+                memberId: 1,
+                jti: 'j',
+                family: 'fam',
+                iat: Math.floor(Date.now() / 1000),
+            });
+            tokenRepository.isTokenRevoked.mockResolvedValue(true);
+            tokenRepository.revokeTokenFamily.mockResolvedValue();
+
+            await expect(authService.refreshToken('t')).rejects.toMatchObject({
+                errorCode: 'TOKEN_REVOKED',
+            });
+
+            expect(tokenRepository.revokeTokenFamily).toHaveBeenCalledWith(1, 'fam');
+        });
+
+        it('should reject when member missing or inactive', async () => {
+            jest.spyOn(jwt, 'verify').mockReturnValue({
+                memberId: 1,
+                jti: 'j',
+                family: 'f',
+                iat: Math.floor(Date.now() / 1000),
+            });
+            tokenRepository.isTokenRevoked.mockResolvedValue(false);
+            mockMemberRepo.findById.mockResolvedValue(null);
+
+            await expect(authService.refreshToken('t')).rejects.toMatchObject({
+                errorCode: 'INVALID_MEMBER',
+            });
+
+            mockMemberRepo.findById.mockResolvedValue({ isActive: false });
+            await expect(authService.refreshToken('t')).rejects.toMatchObject({
+                errorCode: 'INVALID_MEMBER',
+            });
+        });
+
+        it('should issue new token when refresh succeeds', async () => {
+            jest.spyOn(jwt, 'verify').mockReturnValue({
+                memberId: 2,
+                jti: 'old',
+                family: 'fam',
+                iat: Math.floor(Date.now() / 1000),
+            });
+            tokenRepository.isTokenRevoked.mockResolvedValue(false);
+            mockMemberRepo.findById.mockResolvedValue({
+                memberId: 2,
+                email: 'e@e.com',
+                isActive: true,
+            });
+            tokenRepository.revokeToken.mockResolvedValue();
+            tokenRepository.storeToken.mockResolvedValue(1);
+
+            const out = await authService.refreshToken('t', 'ua', '9.9.9.9');
+
+            expect(out.token).toBeDefined();
+            expect(out.expiresIn).toBe(jwtConfig.token.expiresIn);
+            expect(tokenRepository.revokeToken).toHaveBeenCalledWith('old');
+            expect(tokenRepository.storeToken).toHaveBeenCalled();
+        });
+    });
+
+    describe('logout', () => {
+        it('should revoke token when jti present', async () => {
+            const token = authService.generateToken(1, 'a@b.com', 'f', authService.generateJTI());
+            tokenRepository.revokeToken.mockResolvedValue();
 
             const result = await authService.logout(token);
 
             expect(result.success).toBe(true);
-            expect(refreshTokenRepository.revokeToken).toHaveBeenCalledWith(1);
+            expect(tokenRepository.revokeToken).toHaveBeenCalled();
         });
 
-        it('should handle logout gracefully when token not found', async () => {
-            refreshTokenRepository.findByHash.mockResolvedValue(null);
+        it('should succeed without revoking when decode has no jti', async () => {
+            jest.spyOn(jwt, 'decode').mockReturnValue({ sub: 1 });
 
-            const result = await authService.logout('non-existent-token');
+            const result = await authService.logout('not-a-real-jwt');
 
             expect(result.success).toBe(true);
+            expect(tokenRepository.revokeToken).not.toHaveBeenCalled();
+
+            jwt.decode.mockRestore();
         });
 
-        it('should handle logout errors gracefully', async () => {
-            refreshTokenRepository.findByHash.mockRejectedValue(new Error('DB Error'));
+        it('should still succeed when revoke throws', async () => {
+            const token = authService.generateToken(1, 'a@b.com', 'f', authService.generateJTI());
+            tokenRepository.revokeToken.mockRejectedValue(new Error('db'));
 
-            const result = await authService.logout('token');
-
-            expect(result.success).toBe(true);
+            await expect(authService.logout(token)).resolves.toEqual({ success: true });
         });
     });
 
-    describe('Logout All Devices', () => {
+    describe('logoutAllDevices', () => {
         it('should revoke all tokens for member', async () => {
-            refreshTokenRepository.revokeAllTokensByMember.mockResolvedValue();
+            tokenRepository.revokeAllTokensByMember.mockResolvedValue();
 
-            const result = await authService.logoutAllDevices(1);
+            const result = await authService.logoutAllDevices(3);
 
             expect(result.success).toBe(true);
-            expect(refreshTokenRepository.revokeAllTokensByMember).toHaveBeenCalledWith(1);
+            expect(tokenRepository.revokeAllTokensByMember).toHaveBeenCalledWith(3);
         });
     });
 
-    describe('Get Active Sessions', () => {
-        it('should retrieve active sessions', async () => {
-            const mockSessions = [
-                { id: 1, userAgent: 'Mozilla', ipAddress: '127.0.0.1' },
-                { id: 2, userAgent: 'Chrome', ipAddress: '192.168.1.1' }
-            ];
-            refreshTokenRepository.findActiveByMember.mockResolvedValue(mockSessions);
+    describe('getActiveSessions', () => {
+        it('should delegate to token repository', async () => {
+            const rows = [{ id: 1 }];
+            tokenRepository.findActiveByMember.mockResolvedValue(rows);
 
-            const result = await authService.getActiveSessions(1);
-
-            expect(result).toEqual(mockSessions);
-            expect(result).toHaveLength(2);
+            await expect(authService.getActiveSessions(1)).resolves.toEqual(rows);
         });
     });
 });

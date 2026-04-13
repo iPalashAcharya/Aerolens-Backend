@@ -21,27 +21,37 @@ describe('AuthValidator Unit Tests', () => {
         AuthValidator.init(db);
     });
 
-    describe('Designation Transformation', () => {
-        it('should transform valid designation', async () => {
-            mockConnection.execute.mockResolvedValue([[{ lookupKey: 'DEV' }]]);
+    describe('validateDesignationExists', () => {
+        it('should return designation id when lookup exists', async () => {
+            mockConnection.execute.mockResolvedValue([[{ lookupKey: 5 }], []]);
 
-            const result = await AuthValidator.helper.transformDesignation('developer');
+            const result = await AuthValidator.helper.validateDesignationExists(5);
 
-            expect(result).toBe('DEV');
+            expect(result).toBe(5);
         });
 
-        it('should throw error for invalid designation', async () => {
-            mockConnection.execute.mockResolvedValue([[]]);
+        it('should throw when designation id missing from lookup', async () => {
+            mockConnection.execute.mockResolvedValue([[], []]);
 
-            await expect(
-                AuthValidator.helper.transformDesignation('invalid')
-            ).rejects.toThrow('Invalid designation specified');
+            await expect(AuthValidator.helper.validateDesignationExists(999))
+                .rejects
+                .toMatchObject({ errorCode: 'INVALID_DESIGNATION_ID' });
+        });
+    });
+
+    describe('validateVendorExists', () => {
+        it('should return true when vendor row exists', async () => {
+            mockConnection.execute.mockResolvedValue([[{ vendorId: 1 }], []]);
+
+            await expect(AuthValidator.helper.validateVendorExists(1)).resolves.toBe(true);
         });
 
-        it('should return null for empty designation', async () => {
-            const result = await AuthValidator.helper.transformDesignation('');
+        it('should throw when vendor missing', async () => {
+            mockConnection.execute.mockResolvedValue([[], []]);
 
-            expect(result).toBeNull();
+            await expect(AuthValidator.helper.validateVendorExists(99)).rejects.toMatchObject({
+                errorCode: 'INVALID_VENDOR_ID',
+            });
         });
     });
 
@@ -93,26 +103,43 @@ describe('AuthValidator Unit Tests', () => {
     });
 
     describe('Register Validation', () => {
-        const validRegistration = {
+        const validRegistration = () => ({
             memberName: 'John Doe',
-            memberContact: '+1234567890',
+            memberContact: '+919876543210',
             email: 'john@example.com',
             password: 'Test@1234',
-            designation: 'developer'
-        };
+            designationId: 1,
+            isRecruiter: false,
+        });
 
         it('should pass valid registration data', async () => {
-            req.body = validRegistration;
-            mockConnection.execute.mockResolvedValue([[{ lookupKey: 'DEV' }]]);
+            req.body = validRegistration();
+            mockConnection.execute.mockResolvedValue([[{ lookupKey: 1 }], []]);
 
             await AuthValidator.validateRegister(req, res, next);
 
             expect(next).toHaveBeenCalledWith();
-            expect(req.body.designation).toBe('DEV');
+            expect(req.body.designation).toBe(1);
+        });
+
+        it('should validate vendor when recruiter with vendorId', async () => {
+            req.body = {
+                ...validRegistration(),
+                isRecruiter: true,
+                vendorId: 7,
+            };
+            mockConnection.execute
+                .mockResolvedValueOnce([[{ lookupKey: 1 }], []])
+                .mockResolvedValueOnce([[{ vendorId: 7 }], []]);
+
+            await AuthValidator.validateRegister(req, res, next);
+
+            expect(next).toHaveBeenCalledWith();
+            expect(req.body.vendorId).toBe(7);
         });
 
         it('should reject short name', async () => {
-            req.body = { ...validRegistration, memberName: 'A' };
+            req.body = { ...validRegistration(), memberName: 'A' };
 
             await AuthValidator.validateRegister(req, res, next);
 
@@ -123,7 +150,8 @@ describe('AuthValidator Unit Tests', () => {
 
         it('should reject invalid contact format', async () => {
             req.body = {
-                ...validRegistration, memberContact: 'invalid@#'
+                ...validRegistration(),
+                memberContact: 'invalid@#'
             };
 
             await AuthValidator.validateRegister(req, res, next);
@@ -134,7 +162,7 @@ describe('AuthValidator Unit Tests', () => {
         });
 
         it('should reject weak password', async () => {
-            req.body = { ...validRegistration, password: 'weak' };
+            req.body = { ...validRegistration(), password: 'weak' };
 
             await AuthValidator.validateRegister(req, res, next);
 
@@ -144,23 +172,41 @@ describe('AuthValidator Unit Tests', () => {
         });
     });
 
-    describe('Refresh Token Validation', () => {
-        it('should pass valid refresh token', async () => {
-            req.body = { refreshToken: 'valid-token' };
+    describe('validateResetPassword', () => {
+        it('should pass valid payload', async () => {
+            req.body = {
+                currentPassword: 'Old@1234',
+                newPassword: 'New@5678',
+            };
 
-            await AuthValidator.validateRefreshToken(req, res, next);
+            await AuthValidator.validateResetPassword(req, res, next);
 
             expect(next).toHaveBeenCalledWith();
+            expect(req.body.newPassword).toBe('New@5678');
         });
 
-        it('should reject missing refresh token', async () => {
-            req.body = {};
+        it('should reject when new password matches current', async () => {
+            req.body = {
+                currentPassword: 'Same@1234',
+                newPassword: 'Same@1234',
+            };
 
-            await AuthValidator.validateRefreshToken(req, res, next);
+            await AuthValidator.validateResetPassword(req, res, next);
 
-            expect(next).toHaveBeenCalledWith(expect.objectContaining({
-                errorCode: 'VALIDATION_ERROR'
-            }));
+            expect(next).toHaveBeenCalledWith(
+                expect.objectContaining({ errorCode: 'VALIDATION_ERROR' })
+            );
+        });
+
+        it('should reject invalid new password pattern', async () => {
+            req.body = {
+                currentPassword: 'Old@1234',
+                newPassword: 'alllowercase1@',
+            };
+
+            await AuthValidator.validateResetPassword(req, res, next);
+
+            expect(next).toHaveBeenCalledWith(expect.objectContaining({ errorCode: 'VALIDATION_ERROR' }));
         });
     });
 });

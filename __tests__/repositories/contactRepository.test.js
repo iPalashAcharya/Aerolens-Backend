@@ -418,7 +418,7 @@ describe('ContactRepository', () => {
         });
 
         it('should throw AppError for ER_DUP_ENTRY', () => {
-            const error = new Error('Duplicate entry for clientName');
+            const error = new Error('Duplicate entry for contactName');
             error.code = 'ER_DUP_ENTRY';
 
             try {

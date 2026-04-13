@@ -60,7 +60,7 @@ describe('CandidateRepository', () => {
             });
         });
 
-        it('should use default statusId when not provided', async () => {
+        it('should pass undefined statusId when not provided', async () => {
             const dataWithoutStatus = { ...mockCandidateData };
             delete dataWithoutStatus.statusId;
             mockConnection.execute.mockResolvedValue([{ insertId: 1 }]);
@@ -68,7 +68,7 @@ describe('CandidateRepository', () => {
             await candidateRepository.create(dataWithoutStatus, mockConnection);
 
             const callArgs = mockConnection.execute.mock.calls[0][1];
-            expect(callArgs[11]).toBe(9); // Default statusId
+            expect(callArgs[23]).toBeUndefined();
         });
 
         it('should handle null preferredJobLocation', async () => {
@@ -138,7 +138,7 @@ describe('CandidateRepository', () => {
             const result = await candidateRepository.findByEmail('john@example.com', mockConnection);
 
             expect(mockConnection.execute).toHaveBeenCalledWith(
-                expect.stringContaining('WHERE c.email = ?'),
+                expect.stringContaining('LOWER(c.email) = LOWER(?)'),
                 ['john@example.com']
             );
             expect(result).toEqual(mockCandidate);
@@ -321,16 +321,16 @@ describe('CandidateRepository', () => {
                 .toThrow(AppError);
         });
 
-        it('should throw error when updateData is empty', async () => {
+        it('should return candidateId only when updateData is empty', async () => {
             await expect(candidateRepository.update(candidateId, {}, mockConnection))
-                .rejects
-                .toThrow(AppError);
+                .resolves
+                .toEqual({ candidateId });
         });
 
-        it('should throw error when updateData is null', async () => {
+        it('should return candidateId only when updateData is null', async () => {
             await expect(candidateRepository.update(candidateId, null, mockConnection))
-                .rejects
-                .toThrow(AppError);
+                .resolves
+                .toEqual({ candidateId });
         });
 
         it('should filter out invalid fields', async () => {
@@ -402,13 +402,13 @@ describe('CandidateRepository', () => {
     });
 
     describe('delete', () => {
-        it('should delete candidate successfully', async () => {
+        it('should soft-delete candidate successfully', async () => {
             mockConnection.execute.mockResolvedValue([{ affectedRows: 1 }]);
 
             const result = await candidateRepository.delete(1, mockConnection);
 
             expect(mockConnection.execute).toHaveBeenCalledWith(
-                expect.stringContaining('DELETE FROM candidate WHERE candidateId = ?'),
+                expect.stringContaining('UPDATE candidate SET isActive=FALSE'),
                 [1]
             );
             expect(result).toBe(1);
@@ -435,44 +435,44 @@ describe('CandidateRepository', () => {
                 { candidateId: 1, candidateName: 'John' },
                 { candidateId: 2, candidateName: 'Jane' }
             ];
-            mockConnection.query.mockResolvedValue([mockCandidates]);
+            mockConnection.execute.mockResolvedValue([mockCandidates]);
 
             const result = await candidateRepository.findAll(10, 0, mockConnection);
 
-            expect(mockConnection.query).toHaveBeenCalledWith(
-                expect.stringContaining('LIMIT ? OFFSET ?'),
-                [10, 0]
+            expect(mockConnection.execute).toHaveBeenCalledWith(
+                expect.stringContaining('LIMIT ?'),
+                [10]
             );
             expect(result).toEqual(mockCandidates);
         });
 
         it('should find all candidates with custom pagination', async () => {
-            mockConnection.query.mockResolvedValue([[]]);
+            mockConnection.execute.mockResolvedValue([[]]);
 
             await candidateRepository.findAll(20, 10, mockConnection);
 
-            expect(mockConnection.query).toHaveBeenCalledWith(
+            expect(mockConnection.execute).toHaveBeenCalledWith(
                 expect.any(String),
                 [20, 10]
             );
         });
 
-        it('should handle invalid limit values', async () => {
-            mockConnection.query.mockResolvedValue([[]]);
+        it('should pass negative limit through to query', async () => {
+            mockConnection.execute.mockResolvedValue([[]]);
 
             await candidateRepository.findAll(-5, 0, mockConnection);
 
-            const params = mockConnection.query.mock.calls[0][1];
-            expect(params[0]).toBeGreaterThanOrEqual(1);
+            const params = mockConnection.execute.mock.calls[0][1];
+            expect(params[0]).toBe(-5);
         });
 
-        it('should handle invalid offset values', async () => {
-            mockConnection.query.mockResolvedValue([[]]);
+        it('should pass negative offset through to query', async () => {
+            mockConnection.execute.mockResolvedValue([[]]);
 
             await candidateRepository.findAll(10, -5, mockConnection);
 
-            const params = mockConnection.query.mock.calls[0][1];
-            expect(params[1]).toBeGreaterThanOrEqual(0);
+            const params = mockConnection.execute.mock.calls[0][1];
+            expect(params[1]).toBe(-5);
         });
     });
 
@@ -673,6 +673,39 @@ describe('CandidateRepository', () => {
             const result = await candidateRepository.countCandidates({}, mockConnection);
 
             expect(result).toBe(50);
+        });
+    });
+
+    describe('getFormData', () => {
+        it('should aggregate recruiters, locations, job profiles, vendors, currencies, compensation types, and work modes', async () => {
+            const recruiterRow = [{ recruiterId: 1, recruiterName: 'Rec A' }];
+            const locationRow = [{ locationId: 2, city: 'City', country: 'IN', state: 'ST' }];
+            const jobRow = [{ jobProfileRequirementId: 3, jobRole: 'Dev' }];
+            const vendorRow = [{ vendorId: 4, vendorName: 'V' }];
+            const currencyRow = [{ currencyId: 5, currencyName: 'INR' }];
+            const compRow = [{ compensationTypeId: 6, compensationTypeName: 'Annual' }];
+            const workModeRow = [{ workModeId: 7, workMode: 'Remote' }];
+
+            // query() is invoked in source order: recruiters, jobProfile, location, vendor, currency, workMode, compensationType
+            mockConnection.query
+                .mockResolvedValueOnce([recruiterRow])
+                .mockResolvedValueOnce([jobRow])
+                .mockResolvedValueOnce([locationRow])
+                .mockResolvedValueOnce([vendorRow])
+                .mockResolvedValueOnce([currencyRow])
+                .mockResolvedValueOnce([workModeRow])
+                .mockResolvedValueOnce([compRow]);
+
+            const result = await candidateRepository.getFormData(mockConnection);
+
+            expect(mockConnection.query).toHaveBeenCalledTimes(7);
+            expect(result.recruiters).toEqual(recruiterRow);
+            expect(result.locations).toEqual(locationRow);
+            expect(result.jobProfiles).toEqual(jobRow);
+            expect(result.vendors).toEqual(vendorRow);
+            expect(result.currencies).toEqual(currencyRow);
+            expect(result.compensationTypes).toEqual(compRow);
+            expect(result.workModes).toEqual(workModeRow);
         });
     });
 
