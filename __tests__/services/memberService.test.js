@@ -24,6 +24,7 @@ describe('MemberService', () => {
             commit: jest.fn().mockResolvedValue(undefined),
             rollback: jest.fn().mockResolvedValue(undefined),
             release: jest.fn().mockResolvedValue(undefined),
+            execute: jest.fn(),
         };
         mockDb = { getConnection: jest.fn().mockResolvedValue(mockClient) };
         mockRepo = {
@@ -38,6 +39,8 @@ describe('MemberService', () => {
             getLocationById: jest.fn(),
             updateTimezone: jest.fn(),
             deleteMember: jest.fn(),
+            deactivateAccount: jest.fn(),
+            permanentlyDeleteBatch: jest.fn(),
         };
         service = new MemberService(mockRepo, mockDb);
         jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -123,5 +126,63 @@ describe('MemberService', () => {
 
         expect(mockRepo.updateTimezone).toHaveBeenCalled();
         expect(zone === null || typeof zone === 'string').toBe(true);
+    });
+
+    it('deleteMember throws when member not found', async () => {
+        mockRepo.findById.mockResolvedValue(null);
+
+        await expect(service.deleteMember(1, audit)).rejects.toMatchObject({
+            errorCode: 'MEMBER_NOT_FOUND',
+        });
+    });
+
+    it('deleteMember throws when recruiter has active candidates', async () => {
+        mockRepo.findById.mockResolvedValue({ memberId: 3 });
+        mockClient.execute.mockResolvedValueOnce([[{ count: 2 }]]);
+
+        await expect(service.deleteMember(3, audit)).rejects.toMatchObject({
+            errorCode: 'MEMBER_HAS_CANDIDATES',
+        });
+    });
+
+    it('deleteMember throws when interviewer has active interviews', async () => {
+        mockRepo.findById.mockResolvedValue({ memberId: 4 });
+        mockClient.execute
+            .mockResolvedValueOnce([[{ count: 0 }]])
+            .mockResolvedValueOnce([[{ count: 3 }]]);
+
+        await expect(service.deleteMember(4, audit)).rejects.toMatchObject({
+            errorCode: 'MEMBER_HAS_INTERVIEWS',
+        });
+    });
+
+    it('deleteMember deactivates when checks pass', async () => {
+        mockRepo.findById.mockResolvedValue({ memberId: 5, email: 'e@e.com' });
+        mockClient.execute
+            .mockResolvedValueOnce([[{ count: 0 }]])
+            .mockResolvedValueOnce([[{ count: 0 }]])
+            .mockResolvedValueOnce([{ affectedRows: 1 }]);
+        mockRepo.deactivateAccount.mockResolvedValue(undefined);
+
+        const out = await service.deleteMember(5, audit);
+
+        expect(mockRepo.deactivateAccount).toHaveBeenCalled();
+        expect(mockClient.commit).toHaveBeenCalled();
+        expect(out.deletedMember.memberId).toBe(5);
+    });
+
+    it('permanentlyDeleteOldMembers returns 0 when none eligible', async () => {
+        mockClient.execute.mockResolvedValueOnce([[]]);
+
+        await expect(service.permanentlyDeleteOldMembers()).resolves.toBe(0);
+    });
+
+    it('permanentlyDeleteOldMembers runs batch delete', async () => {
+        mockClient.execute.mockResolvedValueOnce([[{ memberId: 10 }, { memberId: 11 }]]);
+        mockRepo.permanentlyDeleteBatch.mockResolvedValue(2);
+
+        await expect(service.permanentlyDeleteOldMembers()).resolves.toBe(2);
+
+        expect(mockRepo.permanentlyDeleteBatch).toHaveBeenCalledWith([10, 11], mockClient);
     });
 });

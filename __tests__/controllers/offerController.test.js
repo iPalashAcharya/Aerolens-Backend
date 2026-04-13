@@ -56,4 +56,65 @@ describe('OfferController', () => {
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json.mock.calls[0][0].data).toHaveProperty('vendors');
     });
+
+    it('getOffers delegates to service', async () => {
+        mockService.getOffers.mockResolvedValue([{ offerId: 1 }]);
+        await controller.getOffers(req, res);
+        expect(mockService.getOffers).toHaveBeenCalled();
+        expect(res.status).toHaveBeenCalledWith(200);
+    });
+
+    it('getOfferDetails passes offerId', async () => {
+        req.params.offerId = '12';
+        mockService.getOfferDetails.mockResolvedValue({ offerId: 12 });
+        await controller.getOfferDetails(req, res);
+        expect(mockService.getOfferDetails).toHaveBeenCalledWith(12);
+    });
+
+    it('deleteOffer passes offerId and auditContext', async () => {
+        req.params.offerId = '5';
+        mockService.deleteOffer.mockResolvedValue(undefined);
+        await controller.deleteOffer(req, res);
+        expect(mockService.deleteOffer).toHaveBeenCalledWith(5, req.auditContext);
+    });
+
+    it('terminateOffer builds termination payload', async () => {
+        req.params.offerId = '7';
+        req.body = { terminationDate: '2026-01-01', terminationReason: 'left' };
+        mockService.terminateOffer.mockResolvedValue(undefined);
+        await controller.terminateOffer(req, res);
+        expect(mockService.terminateOffer).toHaveBeenCalledWith(
+            7,
+            expect.objectContaining({ terminatedBy: 9, terminationReason: 'left' }),
+            req.auditContext
+        );
+    });
+
+    it('reviseOffer builds revision payload', async () => {
+        req.params.offerId = '8';
+        req.body = { newCTC: 100, newJoiningDate: '2026-02-01', reason: 'revised' };
+        mockService.reviseOffer.mockResolvedValue(undefined);
+        await controller.reviseOffer(req, res);
+        expect(mockService.reviseOffer).toHaveBeenCalledWith(
+            8,
+            expect.objectContaining({ revisedBy: 9, reason: 'revised' }),
+            req.auditContext
+        );
+    });
+
+    it('updateOfferStatus maps body and null-coalesces rejectionReason', async () => {
+        req.params.offerId = '9';
+        req.body = {
+            status: 'REJECTED',
+            decisionDate: '2026-03-01',
+            signedNDAReceived: false,
+        };
+        mockService.updateOfferStatus.mockResolvedValue(undefined);
+        await controller.updateOfferStatus(req, res);
+        expect(mockService.updateOfferStatus).toHaveBeenCalledWith(
+            9,
+            expect.objectContaining({ rejectionReason: null }),
+            req.auditContext
+        );
+    });
 });
