@@ -317,6 +317,29 @@ describe('LookupValidator', () => {
         });
     });
 
+    describe('validateUpdate', () => {
+        it('should pass when value is provided', () => {
+            req.body = { value: 'updated-value' };
+
+            LookupValidator.validateUpdate(req, res, next);
+
+            expect(next).toHaveBeenCalledWith();
+            expect(req.body.value).toBe('updated-value');
+        });
+
+        it('should reject when body is empty', () => {
+            req.body = {};
+
+            expect(() => LookupValidator.validateUpdate(req, res, next)).toThrow(AppError);
+        });
+
+        it('should reject when tag is present', () => {
+            req.body = { tag: 'no', value: 'yes' };
+
+            expect(() => LookupValidator.validateUpdate(req, res, next)).toThrow(AppError);
+        });
+    });
+
     describe('validateDelete', () => {
         describe('successful validation', () => {
             it('should pass validation with valid lookupKey', () => {

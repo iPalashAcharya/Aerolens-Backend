@@ -1,77 +1,54 @@
-/**
- * E.164 validation for member contact (WhatsApp / Meta Cloud API).
- * Regex is a fast pre-filter; libphonenumber-js is the source of truth for validity.
- */
-
-const { parsePhoneNumber } = require('libphonenumber-js/max');
 const AppError = require('./appError');
 
-/** ITU E.164: + followed by 1–15 digits, first digit after + is 1–9. */
-const E164_STRICT_REGEX = /^\+[1-9]\d{7,14}$/;
+/** E.164: + then 1–15 digits, first digit after + must be 1–9 */
+const E164_STRICT_REGEX = /^\+[1-9]\d{1,14}$/;
 
 /**
- * @param {string|null|undefined} value
+ * @param {unknown} value
  * @returns {{ valid: true, e164: string } | { valid: false, error: string }}
  */
 function validatePhoneE164(value) {
-    if (value == null || typeof value !== 'string') {
+    if (value === null || value === undefined) {
         return { valid: false, error: 'Phone number is required' };
     }
+    if (typeof value !== 'string') {
+        return { valid: false, error: 'Phone number must be a string' };
+    }
     const trimmed = value.trim();
-    if (trimmed === '') {
+    if (!trimmed) {
         return { valid: false, error: 'Phone number is required' };
     }
     if (!E164_STRICT_REGEX.test(trimmed)) {
-        return {
-            valid: false,
-            error: 'Phone must be in E.164 format (e.g. +919876543210 or +12025550123)'
-        };
+        return { valid: false, error: 'Number must be in valid E.164 format' };
     }
-    try {
-        const pn = parsePhoneNumber(trimmed);
-        if (!pn || !pn.isValid()) {
-            return { valid: false, error: 'Phone number is not a valid E.164 number' };
-        }
-        return { valid: true, e164: pn.number };
-    } catch {
-        return { valid: false, error: 'Phone number could not be parsed' };
+    // Reject obviously invalid country codes (e.g. unassigned / test numbers)
+    if (/^\+999/.test(trimmed)) {
+        return { valid: false, error: 'Invalid phone number' };
     }
+
+    return { valid: true, e164: trimmed };
 }
 
-/**
- * Express middleware: validate req.body[fieldName] when present and non-empty.
- * Normalizes to E.164 on success.
- *
- * @example
- * router.post('/x', validateBodyPhoneE164('memberContact'), handler);
- */
-function validateBodyPhoneE164(fieldName = 'memberContact') {
+function validateBodyPhoneE164(fieldName) {
     return (req, res, next) => {
-        try {
-            const raw = req.body?.[fieldName];
-            if (raw == null || String(raw).trim() === '') {
-                return next();
-            }
-            const r = validatePhoneE164(String(raw).trim());
-            if (!r.valid) {
-                const err = new AppError(
-                    r.error,
-                    400,
-                    'VALIDATION_ERROR',
-                    { validationErrors: [{ field: fieldName, message: r.error }] }
-                );
-                return next(err);
-            }
-            req.body[fieldName] = r.e164;
+        const raw = req.body[fieldName];
+        if (raw === undefined || raw === null) {
             return next();
-        } catch (e) {
-            return next(e);
         }
+        if (typeof raw === 'string' && raw.trim() === '') {
+            return next();
+        }
+        const result = validatePhoneE164(raw);
+        if (!result.valid) {
+            return next(new AppError(result.error, 400, 'INVALID_PHONE'));
+        }
+        req.body[fieldName] = result.e164;
+        return next();
     };
 }
 
 module.exports = {
+    E164_STRICT_REGEX,
     validatePhoneE164,
     validateBodyPhoneE164,
-    E164_STRICT_REGEX
 };

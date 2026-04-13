@@ -28,105 +28,25 @@ describe('LookupRepository', () => {
     });
 
     describe('getAll', () => {
-        it('should return paginated lookup data with default parameters', async () => {
-            const mockCountResult = [[{ total: 25 }]];
-            const mockDataResult = [[
+        it('should return lookup data in a single query (limit/page unused in repository)', async () => {
+            const rows = [
                 { tag: 'TAG1', lookupKey: 1, value: 'value1' },
-                { tag: 'TAG2', lookupKey: 2, value: 'value2' }
-            ]];
-
-            mockConnection.query
-                .mockResolvedValueOnce(mockCountResult)
-                .mockResolvedValueOnce(mockDataResult);
+                { tag: 'TAG2', lookupKey: 2, value: 'value2' },
+            ];
+            mockConnection.query.mockResolvedValue([rows]);
 
             const result = await lookupRepository.getAll(10, 1, mockConnection);
 
-            expect(mockConnection.query).toHaveBeenCalledTimes(2);
-            expect(mockConnection.query).toHaveBeenNthCalledWith(1,
-                'SELECT COUNT(lookupKey) as total FROM lookup'
+            expect(mockConnection.query).toHaveBeenCalledTimes(1);
+            expect(mockConnection.query).toHaveBeenCalledWith(
+                expect.stringContaining('SELECT tag, lookupKey, value FROM lookup')
             );
-            expect(mockConnection.query).toHaveBeenNthCalledWith(2,
-                expect.stringContaining('SELECT tag, lookupKey, value FROM lookup'),
-                [10, 0]
-            );
-            expect(result).toEqual({
-                data: mockDataResult[0],
-                totalRecords: 25
-            });
+            expect(result).toEqual({ data: rows });
             expect(mockConnection.release).not.toHaveBeenCalled();
         });
 
-        it('should calculate offset correctly for different pages', async () => {
-            const mockCountResult = [[{ total: 50 }]];
-            const mockDataResult = [[{ tag: 'TAG1', lookupKey: 11, value: 'value11' }]];
-
-            mockConnection.query
-                .mockResolvedValueOnce(mockCountResult)
-                .mockResolvedValueOnce(mockDataResult);
-
-            await lookupRepository.getAll(10, 3, mockConnection);
-
-            expect(mockConnection.query).toHaveBeenNthCalledWith(2,
-                expect.any(String),
-                [10, 20] // page 3 with limit 10 = offset 20
-            );
-        });
-
-        it('should handle custom limit and page parameters', async () => {
-            const mockCountResult = [[{ total: 100 }]];
-            const mockDataResult = [[{ tag: 'TAG1', lookupKey: 1, value: 'value1' }]];
-
-            mockConnection.query
-                .mockResolvedValueOnce(mockCountResult)
-                .mockResolvedValueOnce(mockDataResult);
-
-            await lookupRepository.getAll(20, 2, mockConnection);
-
-            expect(mockConnection.query).toHaveBeenNthCalledWith(2,
-                expect.any(String),
-                [20, 20]
-            );
-        });
-
-        it('should handle invalid limit by using minimum of 1', async () => {
-            const mockCountResult = [[{ total: 10 }]];
-            const mockDataResult = [[{ tag: 'TAG1', lookupKey: 1, value: 'value1' }]];
-
-            mockConnection.query
-                .mockResolvedValueOnce(mockCountResult)
-                .mockResolvedValueOnce(mockDataResult);
-
-            await lookupRepository.getAll(0, 1, mockConnection);
-
-            expect(mockConnection.query).toHaveBeenNthCalledWith(2,
-                expect.any(String),
-                [1, 0] // limit should be at least 1
-            );
-        });
-
-        it('should handle invalid offset by using minimum of 0', async () => {
-            const mockCountResult = [[{ total: 10 }]];
-            const mockDataResult = [[{ tag: 'TAG1', lookupKey: 1, value: 'value1' }]];
-
-            mockConnection.query
-                .mockResolvedValueOnce(mockCountResult)
-                .mockResolvedValueOnce(mockDataResult);
-
-            await lookupRepository.getAll(10, 0, mockConnection);
-
-            expect(mockConnection.query).toHaveBeenNthCalledWith(2,
-                expect.any(String),
-                [10, 0] // offset should be at least 0
-            );
-        });
-
         it('should use provided client connection and not release it', async () => {
-            const mockCountResult = [[{ total: 5 }]];
-            const mockDataResult = [[{ tag: 'TAG1', lookupKey: 1, value: 'value1' }]];
-
-            mockConnection.query
-                .mockResolvedValueOnce(mockCountResult)
-                .mockResolvedValueOnce(mockDataResult);
+            mockConnection.query.mockResolvedValue([[]]);
 
             await lookupRepository.getAll(10, 1, mockConnection);
 
@@ -135,19 +55,11 @@ describe('LookupRepository', () => {
         });
 
         it('should handle empty results', async () => {
-            const mockCountResult = [[{ total: 0 }]];
-            const mockDataResult = [[]];
-
-            mockConnection.query
-                .mockResolvedValueOnce(mockCountResult)
-                .mockResolvedValueOnce(mockDataResult);
+            mockConnection.query.mockResolvedValue([[]]);
 
             const result = await lookupRepository.getAll(10, 1, mockConnection);
 
-            expect(result).toEqual({
-                data: [],
-                totalRecords: 0
-            });
+            expect(result).toEqual({ data: [] });
         });
 
         it('should throw AppError on database error', async () => {
@@ -157,13 +69,9 @@ describe('LookupRepository', () => {
 
             await expect(lookupRepository.getAll(10, 1, mockConnection))
                 .rejects
-                .toThrow(AppError);
-
-            await expect(lookupRepository.getAll(10, 1, mockConnection))
-                .rejects
                 .toMatchObject({
                     statusCode: 503,
-                    errorCode: 'DATABASE_CONNECTION_ERROR'
+                    errorCode: 'DATABASE_CONNECTION_ERROR',
                 });
         });
     });
@@ -419,6 +327,62 @@ describe('LookupRepository', () => {
         });
     });
 
+    describe('update', () => {
+        it('should throw when lookupKey missing', async () => {
+            await expect(lookupRepository.update(null, { value: 'x' }, mockConnection)).rejects.toMatchObject({
+                errorCode: 'MISSING_LOOKUP_KEY',
+            });
+        });
+
+        it('should throw when updateData empty', async () => {
+            await expect(lookupRepository.update(1, {}, mockConnection)).rejects.toMatchObject({
+                errorCode: 'MISSING_LOOKUP_DATA',
+            });
+        });
+
+        it('should throw when no allowed fields', async () => {
+            await expect(lookupRepository.update(1, { extra: 1 }, mockConnection)).rejects.toMatchObject({
+                errorCode: 'NO_VALID_FIELDS',
+            });
+        });
+
+        it('should update allowed fields and return merged payload', async () => {
+            mockConnection.execute.mockResolvedValue([{ affectedRows: 1 }]);
+
+            const out = await lookupRepository.update(5, { tag: 'T', value: 'V' }, mockConnection);
+
+            expect(out.lookupKey).toBe(5);
+            expect(out.tag).toBe('T');
+            expect(mockConnection.execute).toHaveBeenCalledWith(
+                expect.stringContaining('UPDATE lookup SET'),
+                expect.arrayContaining(['T', 'V', 5])
+            );
+        });
+
+        it('should throw when no row updated', async () => {
+            mockConnection.execute.mockResolvedValue([{ affectedRows: 0 }]);
+
+            await expect(lookupRepository.update(99, { value: 'x' }, mockConnection)).rejects.toMatchObject({
+                errorCode: 'LOOKUP_NOT_FOUND',
+            });
+        });
+
+        it('should rethrow AppError from validation', async () => {
+            const err = new AppError('x', 400, 'X');
+            mockConnection.execute.mockRejectedValue(err);
+
+            await expect(lookupRepository.update(1, { value: 'y' }, mockConnection)).rejects.toBe(err);
+        });
+
+        it('should wrap generic DB errors', async () => {
+            mockConnection.execute.mockRejectedValue(new Error('db'));
+
+            await expect(lookupRepository.update(1, { value: 'y' }, mockConnection)).rejects.toMatchObject({
+                errorCode: 'DATABASE_ERROR',
+            });
+        });
+    });
+
     describe('delete', () => {
         it('should delete lookup entry successfully', async () => {
             const mockDeleteResult = [{ affectedRows: 1 }];
@@ -491,6 +455,17 @@ describe('LookupRepository', () => {
                 .toThrow();
 
             expect(mockConnection.release).not.toHaveBeenCalled();
+        });
+
+        it('should map foreign key constraint to AppError', async () => {
+            const dbError = new Error('FK');
+            dbError.code = 'ER_ROW_IS_REFERENCED_2';
+            mockConnection.execute.mockRejectedValue(dbError);
+
+            await expect(lookupRepository.delete(1, mockConnection)).rejects.toMatchObject({
+                statusCode: 409,
+                errorCode: 'FOREIGN_KEY_CONSTRAINT',
+            });
         });
     });
 

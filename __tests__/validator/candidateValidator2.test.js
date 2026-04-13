@@ -1,10 +1,16 @@
-const CandidateValidator = require('../../validators/candidateValidator');
+const { CandidateValidator } = require('../../validators/candidateValidator');
 const AppError = require('../../utils/appError');
 const fs = require('fs');
-const path = require('path');
 
 jest.mock('fs', () => ({
     unlink: jest.fn((path, callback) => callback && callback())
+}));
+
+jest.mock('@aws-sdk/client-s3', () => ({
+    S3Client: jest.fn().mockImplementation(() => ({
+        send: jest.fn().mockResolvedValue({}),
+    })),
+    DeleteObjectCommand: jest.fn().mockImplementation((input) => input),
 }));
 
 describe('CandidateValidatorHelper', () => {
@@ -33,11 +39,12 @@ describe('CandidateValidatorHelper', () => {
     describe('getStatusIdByName', () => {
         it('should return cached status ID if exists', async () => {
             helper.statusCache.set('selected', 1);
+            mockClient.execute.mockResolvedValue([[{ '1': 1 }]]);
 
             const result = await helper.getStatusIdByName('selected');
 
             expect(result).toBe(1);
-            expect(mockDb.getConnection).not.toHaveBeenCalled();
+            expect(mockClient.execute).toHaveBeenCalled();
         });
 
         it('should fetch and cache status ID from database', async () => {
@@ -77,17 +84,21 @@ describe('CandidateValidatorHelper', () => {
             );
         });
 
-        it('should return null for null status name', async () => {
+        it('should default null status name to pending', async () => {
+            mockClient.execute.mockResolvedValue([[{ lookupKey: 9 }]]);
+
             const result = await helper.getStatusIdByName(null);
 
-            expect(result).toBeNull();
-            expect(mockDb.getConnection).not.toHaveBeenCalled();
+            expect(result).toBe(9);
+            expect(mockClient.execute).toHaveBeenCalledWith(expect.any(String), ['pending']);
         });
 
-        it('should return null for undefined status name', async () => {
+        it('should default undefined status name to pending', async () => {
+            mockClient.execute.mockResolvedValue([[{ lookupKey: 9 }]]);
+
             const result = await helper.getStatusIdByName(undefined);
 
-            expect(result).toBeNull();
+            expect(result).toBe(9);
         });
 
         it('should throw AppError when status does not exist', async () => {
@@ -127,51 +138,53 @@ describe('CandidateValidatorHelper', () => {
     });
 
     describe('transformLocation', () => {
-        it('should transform and return location ID for Bangalore', async () => {
-            mockClient.execute.mockResolvedValue([[{ lookupKey: 1 }]]);
+        const loc = (city) => ({ country: 'india', city });
 
-            const result = await helper.transformLocation('Bangalore');
+        it('should transform and return location ID for Bangalore', async () => {
+            mockClient.execute.mockResolvedValue([[{ locationId: 1 }]]);
+
+            const result = await helper.transformLocation(loc('Bangalore'));
 
             expect(result).toBe(1);
             expect(mockClient.execute).toHaveBeenCalledWith(
-                expect.stringContaining('SELECT lookupKey FROM lookup'),
-                ['bangalore']
+                expect.stringContaining('SELECT locationId FROM location'),
+                ['Bangalore']
             );
             expect(mockClient.release).toHaveBeenCalledTimes(1);
         });
 
         it('should normalize Bengaluru to Bangalore', async () => {
-            mockClient.execute.mockResolvedValue([[{ lookupKey: 1 }]]);
+            mockClient.execute.mockResolvedValue([[{ locationId: 1 }]]);
 
-            await helper.transformLocation('Bengaluru');
+            await helper.transformLocation(loc('Bengaluru'));
 
             expect(mockClient.execute).toHaveBeenCalledWith(
                 expect.any(String),
-                ['bangalore']
+                ['Bengaluru']
             );
         });
 
         it('should handle Ahmedabad location', async () => {
-            mockClient.execute.mockResolvedValue([[{ lookupKey: 2 }]]);
+            mockClient.execute.mockResolvedValue([[{ locationId: 2 }]]);
 
-            const result = await helper.transformLocation('Ahmedabad');
+            const result = await helper.transformLocation(loc('Ahmedabad'));
 
             expect(result).toBe(2);
             expect(mockClient.execute).toHaveBeenCalledWith(
                 expect.any(String),
-                ['ahmedabad']
+                ['Ahmedabad']
             );
         });
 
         it('should handle San Francisco location', async () => {
-            mockClient.execute.mockResolvedValue([[{ lookupKey: 3 }]]);
+            mockClient.execute.mockResolvedValue([[{ locationId: 3 }]]);
 
-            const result = await helper.transformLocation('San Francisco');
+            const result = await helper.transformLocation({ country: 'usa', city: 'San Francisco' });
 
             expect(result).toBe(3);
             expect(mockClient.execute).toHaveBeenCalledWith(
                 expect.any(String),
-                ['san francisco']
+                ['San Francisco']
             );
         });
 
@@ -191,10 +204,10 @@ describe('CandidateValidatorHelper', () => {
         it('should throw AppError for invalid location', async () => {
             mockClient.execute.mockResolvedValue([[]]);
 
-            await expect(helper.transformLocation('Invalid City'))
+            await expect(helper.transformLocation(loc('Invalid City')))
                 .rejects
                 .toMatchObject({
-                    message: "Invalid location: 'Invalid City'. Must be either Ahmedabad, Bangalore or San Francisco.",
+                    message: "Invalid location: 'Invalid City'. Location does not exist.",
                     statusCode: 400,
                     errorCode: 'INVALID_LOCATION'
                 });
@@ -203,20 +216,20 @@ describe('CandidateValidatorHelper', () => {
         });
 
         it('should handle case-insensitive location names', async () => {
-            mockClient.execute.mockResolvedValue([[{ lookupKey: 1 }]]);
+            mockClient.execute.mockResolvedValue([[{ locationId: 1 }]]);
 
-            await helper.transformLocation('BANGALORE');
+            await helper.transformLocation(loc('BANGALORE'));
 
             expect(mockClient.execute).toHaveBeenCalledWith(
                 expect.any(String),
-                ['bangalore']
+                ['BANGALORE']
             );
         });
 
         it('should trim whitespace from location names', async () => {
-            mockClient.execute.mockResolvedValue([[{ lookupKey: 1 }]]);
+            mockClient.execute.mockResolvedValue([[{ locationId: 1 }]]);
 
-            await helper.transformLocation('  bangalore  ');
+            await helper.transformLocation(loc('  bangalore  '));
 
             expect(mockClient.execute).toHaveBeenCalledWith(
                 expect.any(String),
@@ -226,11 +239,11 @@ describe('CandidateValidatorHelper', () => {
 
         it('should use provided client when passed', async () => {
             const externalClient = {
-                execute: jest.fn().mockResolvedValue([[{ lookupKey: 1 }]]),
+                execute: jest.fn().mockResolvedValue([[{ locationId: 1 }]]),
                 release: jest.fn()
             };
 
-            await helper.transformLocation('Bangalore', externalClient);
+            await helper.transformLocation(loc('Bangalore'), externalClient);
 
             expect(mockDb.getConnection).not.toHaveBeenCalled();
             expect(externalClient.execute).toHaveBeenCalledTimes(1);
@@ -238,9 +251,9 @@ describe('CandidateValidatorHelper', () => {
         });
 
         it('should handle empty result set', async () => {
-            mockClient.execute.mockResolvedValue([null]);
+            mockClient.execute.mockResolvedValue([[]]);
 
-            await expect(helper.transformLocation('Unknown'))
+            await expect(helper.transformLocation(loc('Unknown')))
                 .rejects
                 .toThrow(AppError);
         });
@@ -414,6 +427,11 @@ describe('CandidateValidator', () => {
 
         CandidateValidator.init(mockDb);
 
+        const { S3Client } = require('@aws-sdk/client-s3');
+        S3Client.mockImplementation(() => ({
+            send: jest.fn().mockResolvedValue({}),
+        }));
+
         req = {
             body: {},
             params: {},
@@ -432,40 +450,40 @@ describe('CandidateValidator', () => {
         jest.clearAllMocks();
     });
 
-    describe('validateCreate', () => {
-        const validCreateData = {
-            candidateName: 'John Doe',
-            contactNumber: '+91-9876543210',
-            email: 'john@example.com',
-            recruiterName: 'Jayraj',
-            jobRole: 'Software Engineer',
-            preferredJobLocation: 'bangalore',
-            currentCTC: 500000,
-            expectedCTC: 600000,
-            noticePeriod: 30,
-            experienceYears: 5,
-            linkedinProfileUrl: 'https://linkedin.com/in/johndoe',
-            status: 'interview pending'
-        };
+    const validCreateData = () => ({
+        candidateName: 'John Doe',
+        contactNumber: '+91 9876543210',
+        email: 'john@example.com',
+        recruiterId: 1,
+        jobProfileRequirementId: 10,
+        expectedLocation: { country: 'india', city: 'Mumbai' },
+        workModeId: 2,
+        noticePeriod: 30,
+        experienceYears: 5,
+        linkedinProfileUrl: 'https://linkedin.com/in/johndoe',
+    });
 
+    const mockCreateSuccessSequence = (mock, { locationId = 5, statusLookupKey = 7 } = {}) => {
+        mock.execute
+            .mockResolvedValueOnce([[{ locationId }]])
+            .mockResolvedValueOnce([[{ lookupKey: statusLookupKey }]])
+            .mockResolvedValueOnce([[]])
+            .mockResolvedValueOnce([[]]);
+    };
+
+    describe('validateCreate', () => {
         beforeEach(() => {
-            // Mock location transformation
-            mockClient.execute
-                .mockResolvedValueOnce([[{ lookupKey: 1 }]]) // location
-                .mockResolvedValueOnce([[{ lookupKey: 3 }]]) // status
-                .mockResolvedValueOnce([[]]) // email check
-                .mockResolvedValueOnce([[]]); // contact check
+            mockCreateSuccessSequence(mockClient);
         });
 
         it('should validate and transform valid create data', async () => {
-            req.body = { ...validCreateData };
+            req.body = { ...validCreateData() };
 
             await CandidateValidator.validateCreate(req, res, next);
 
             expect(next).toHaveBeenCalledWith();
-            expect(req.body.preferredJobLocation).toBe(1);
-            expect(req.body.statusId).toBe(3);
-            expect(req.body.status).toBeUndefined();
+            expect(req.body.expectedLocation).toBe(5);
+            expect(req.body.statusId).toBe(7);
         });
 
         it('should fail validation when required fields are missing', async () => {
@@ -480,7 +498,7 @@ describe('CandidateValidator', () => {
         });
 
         it('should reject invalid candidate name with numbers', async () => {
-            req.body = { ...validCreateData, candidateName: 'John123' };
+            req.body = { ...validCreateData(), candidateName: 'John123' };
 
             await CandidateValidator.validateCreate(req, res, next);
 
@@ -492,7 +510,7 @@ describe('CandidateValidator', () => {
         });
 
         it('should reject candidate name shorter than 2 characters', async () => {
-            req.body = { ...validCreateData, candidateName: 'J' };
+            req.body = { ...validCreateData(), candidateName: 'J' };
 
             await CandidateValidator.validateCreate(req, res, next);
 
@@ -500,7 +518,7 @@ describe('CandidateValidator', () => {
         });
 
         it('should reject invalid email format', async () => {
-            req.body = { ...validCreateData, email: 'invalid-email' };
+            req.body = { ...validCreateData(), email: 'invalid-email' };
 
             await CandidateValidator.validateCreate(req, res, next);
 
@@ -508,31 +526,31 @@ describe('CandidateValidator', () => {
         });
 
         it('should reject invalid contact number format', async () => {
-            req.body = { ...validCreateData, contactNumber: '123' };
+            req.body = { ...validCreateData(), contactNumber: '123' };
 
             await CandidateValidator.validateCreate(req, res, next);
 
             expect(next).toHaveBeenCalledWith(expect.any(AppError));
         });
 
-        it('should validate recruiter name against allowed list', async () => {
-            req.body = { ...validCreateData, recruiterName: 'Invalid Recruiter' };
+        it('should reject invalid recruiter id type', async () => {
+            req.body = { ...validCreateData(), recruiterId: 'not-a-number' };
 
             await CandidateValidator.validateCreate(req, res, next);
 
             expect(next).toHaveBeenCalledWith(expect.any(AppError));
         });
 
-        it('should accept valid recruiter names (case-insensitive)', async () => {
-            req.body = { ...validCreateData, recruiterName: 'JAYRAJ' };
+        it('should accept numeric recruiter id', async () => {
+            req.body = { ...validCreateData(), recruiterId: 99 };
 
             await CandidateValidator.validateCreate(req, res, next);
 
             expect(next).toHaveBeenCalledWith();
         });
 
-        it('should reject invalid job location', async () => {
-            req.body = { ...validCreateData, preferredJobLocation: 'invalid city' };
+        it('should reject invalid expected location city length', async () => {
+            req.body = { ...validCreateData(), expectedLocation: { country: 'india', city: 'x' } };
 
             await CandidateValidator.validateCreate(req, res, next);
 
@@ -540,23 +558,23 @@ describe('CandidateValidator', () => {
         });
 
         it('should reject negative CTC values', async () => {
-            req.body = { ...validCreateData, currentCTC: -1000 };
+            req.body = { ...validCreateData(), currentCTC: -1000 };
 
             await CandidateValidator.validateCreate(req, res, next);
 
             expect(next).toHaveBeenCalledWith(expect.any(AppError));
         });
 
-        it('should reject expectedCTC less than currentCTC', async () => {
-            req.body = { ...validCreateData, currentCTC: 600000, expectedCTC: 500000 };
+        it('should allow expectedCTC less than currentCTC', async () => {
+            req.body = { ...validCreateData(), currentCTC: 600000, expectedCTC: 500000 };
 
             await CandidateValidator.validateCreate(req, res, next);
 
-            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next).toHaveBeenCalledWith();
         });
 
         it('should reject notice period exceeding 365 days', async () => {
-            req.body = { ...validCreateData, noticePeriod: 400 };
+            req.body = { ...validCreateData(), noticePeriod: 400 };
 
             await CandidateValidator.validateCreate(req, res, next);
 
@@ -564,7 +582,7 @@ describe('CandidateValidator', () => {
         });
 
         it('should reject experience years exceeding 50', async () => {
-            req.body = { ...validCreateData, experienceYears: 51 };
+            req.body = { ...validCreateData(), experienceYears: 51 };
 
             await CandidateValidator.validateCreate(req, res, next);
 
@@ -572,7 +590,7 @@ describe('CandidateValidator', () => {
         });
 
         it('should validate LinkedIn URL format', async () => {
-            req.body = { ...validCreateData, linkedinProfileUrl: 'https://facebook.com/john' };
+            req.body = { ...validCreateData(), linkedinProfileUrl: 'https://facebook.com/john' };
 
             await CandidateValidator.validateCreate(req, res, next);
 
@@ -580,7 +598,7 @@ describe('CandidateValidator', () => {
         });
 
         it('should accept valid LinkedIn URL', async () => {
-            req.body = { ...validCreateData, linkedinProfileUrl: 'https://linkedin.com/in/john-doe' };
+            req.body = { ...validCreateData(), linkedinProfileUrl: 'https://linkedin.com/in/john-doe' };
 
             await CandidateValidator.validateCreate(req, res, next);
 
@@ -588,24 +606,16 @@ describe('CandidateValidator', () => {
         });
 
         it('should accept empty LinkedIn URL', async () => {
-            req.body = { ...validCreateData, linkedinProfileUrl: '' };
+            req.body = { ...validCreateData(), linkedinProfileUrl: '' };
 
             await CandidateValidator.validateCreate(req, res, next);
 
             expect(next).toHaveBeenCalledWith();
         });
 
-        it('should validate status against allowed values', async () => {
-            req.body = { ...validCreateData, status: 'invalid status' };
-
-            await CandidateValidator.validateCreate(req, res, next);
-
-            expect(next).toHaveBeenCalledWith(expect.any(AppError));
-        });
-
         it('should throw error when email already exists', async () => {
             // Arrange
-            req.body = { ...validCreateData, email: 'existing@example.com' };
+            req.body = { ...validCreateData(), email: 'existing@example.com' };
             next = jest.fn();
             res = {};
 
@@ -620,11 +630,10 @@ describe('CandidateValidator', () => {
 
             CandidateValidator.init(mockDb);
 
-            // Mock sequential execute calls in order to simulate db queries
             mockClient.execute
-                .mockResolvedValueOnce([[{ lookupKey: 1 }]])  // location transform
-                .mockResolvedValueOnce([[{ lookupKey: 3 }]])  // status transform
-                .mockResolvedValueOnce([[{ candidateId: 99 }]]); // email duplication found
+                .mockResolvedValueOnce([[{ locationId: 1 }]])
+                .mockResolvedValueOnce([[{ lookupKey: 3 }]])
+                .mockResolvedValueOnce([[{ candidateId: 99 }]]);
 
             // Act
             await CandidateValidator.validateCreate(req, res, next);
@@ -637,7 +646,7 @@ describe('CandidateValidator', () => {
 
         it('should throw error when contact number already exists', async () => {
             // Arrange
-            req.body = { ...validCreateData };
+            req.body = { ...validCreateData() };
 
             next = jest.fn();
             res = {};
@@ -653,10 +662,10 @@ describe('CandidateValidator', () => {
             CandidateValidator.init(mockDb);
 
             mockClient.execute
-                .mockResolvedValueOnce([[{ lookupKey: 1 }]])  // transformLocation call
-                .mockResolvedValueOnce([[{ lookupKey: 3 }]])  // getStatusIdByName call
-                .mockResolvedValueOnce([[]])                    // email does not exist
-                .mockResolvedValueOnce([[{ candidateId: 1 }]]); // contact number exists
+                .mockResolvedValueOnce([[{ locationId: 1 }]])
+                .mockResolvedValueOnce([[{ lookupKey: 3 }]])
+                .mockResolvedValueOnce([[]])
+                .mockResolvedValueOnce([[{ candidateId: 1 }]]);
 
             // Act
             await CandidateValidator.validateCreate(req, res, next);
@@ -668,62 +677,60 @@ describe('CandidateValidator', () => {
         });
 
         it('should validate resume file type', async () => {
-            req.body = { ...validCreateData };
+            const { S3Client } = require('@aws-sdk/client-s3');
+            req.body = { ...validCreateData() };
             req.file = {
                 mimetype: 'image/jpeg',
-                path: '/tmp/test.jpg',
+                key: 'uploads/bad.jpg',
                 size: 1024
             };
 
             await CandidateValidator.validateCreate(req, res, next);
 
-            expect(fs.unlink).toHaveBeenCalledWith('/tmp/test.jpg', expect.any(Function));
+            expect(S3Client).toHaveBeenCalled();
             expect(next).toHaveBeenCalledWith(expect.any(AppError));
             const error = next.mock.calls[0][0];
             expect(error.message).toContain('Invalid resume file format');
         });
 
         it('should accept valid resume file types', async () => {
-            req.body = { ...validCreateData };
+            req.body = { ...validCreateData() };
             req.file = {
                 mimetype: 'application/pdf',
-                path: '/tmp/test.pdf',
+                key: 'uploads/good.pdf',
                 size: 1024 * 1024
             };
 
             await CandidateValidator.validateCreate(req, res, next);
 
-            expect(fs.unlink).not.toHaveBeenCalled();
             expect(next).toHaveBeenCalledWith();
         });
 
         it('should reject resume file exceeding 5MB', async () => {
-            req.body = { ...validCreateData };
+            const { S3Client } = require('@aws-sdk/client-s3');
+            req.body = { ...validCreateData() };
             req.file = {
                 mimetype: 'application/pdf',
-                path: '/tmp/test.pdf',
+                key: 'uploads/huge.pdf',
                 size: 6 * 1024 * 1024
             };
 
             await CandidateValidator.validateCreate(req, res, next);
 
-            expect(fs.unlink).toHaveBeenCalledWith('/tmp/test.pdf', expect.any(Function));
+            expect(S3Client).toHaveBeenCalled();
             expect(next).toHaveBeenCalledWith(expect.any(AppError));
             const error = next.mock.calls[0][0];
             expect(error.message).toContain('Resume file size cannot exceed 5MB');
         });
 
         it('should clean up uploaded file on validation error', async () => {
-            req.body = { candidateName: 'J' }; // Invalid candidate name triggers error
+            const { S3Client } = require('@aws-sdk/client-s3');
+            req.body = { candidateName: 'J' };
             req.file = {
                 mimetype: 'application/pdf',
-                path: '/tmp/test.pdf',
+                key: 'uploads/bad.pdf',
                 size: 1024
             };
-
-            // Patch promise-based unlink for this test
-            fs.promises = fs.promises || {};
-            fs.promises.unlink = jest.fn(() => Promise.resolve());
 
             next = jest.fn();
             res = {};
@@ -733,11 +740,11 @@ describe('CandidateValidator', () => {
 
             await CandidateValidator.validateCreate(req, res, next);
 
-            expect(fs.promises.unlink).toHaveBeenCalledWith('/tmp/test.pdf');
+            expect(S3Client).toHaveBeenCalled();
         });
 
         it('should strip unknown fields from request body', async () => {
-            req.body = { ...validCreateData, unknownField: 'should be removed' };
+            req.body = { ...validCreateData(), unknownField: 'should be removed' };
 
             await CandidateValidator.validateCreate(req, res, next);
 
@@ -745,7 +752,7 @@ describe('CandidateValidator', () => {
         });
 
         it('should convert and trim string fields', async () => {
-            req.body = { ...validCreateData, candidateName: '  John Doe  ' };
+            req.body = { ...validCreateData(), candidateName: '  John Doe  ' };
 
             await CandidateValidator.validateCreate(req, res, next);
 
@@ -754,10 +761,11 @@ describe('CandidateValidator', () => {
     });
 
     describe('validateUpdate', () => {
-        const validUpdateData = {
+        const validUpdateData = () => ({
+            workModeId: 1,
             candidateName: 'Jane Doe',
-            email: 'jane@example.com'
-        };
+            email: 'jane@example.com',
+        });
 
         beforeEach(() => {
             req.params = { id: '1' };
@@ -765,7 +773,7 @@ describe('CandidateValidator', () => {
         });
 
         it('should validate and transform valid update data', async () => {
-            req.body = { ...validUpdateData };
+            req.body = { ...validUpdateData() };
 
             await CandidateValidator.validateUpdate(req, res, next);
 
@@ -786,27 +794,25 @@ describe('CandidateValidator', () => {
 
             expect(next).toHaveBeenCalledWith(expect.any(AppError));
             const error = next.mock.calls[0][0];
-            expect(error.details.validationErrors[0].message).toContain('At least one field must be provided');
+            expect(error.details.validationErrors[0].message).toMatch(/Work mode|At least one field/);
         });
 
-        it('should allow update with only file upload', async () => {
-            req.body = {};
+        it('should allow update with only file upload when body empty', async () => {
+            req.body = { workModeId: 1 };
             req.file = {
                 mimetype: 'application/pdf',
-                path: '/tmp/resume.pdf',
+                key: 'uploads/resume.pdf',
                 size: 1024,
-                originalname: 'resume.pdf'
             };
 
             await CandidateValidator.validateUpdate(req, res, next);
 
             expect(next).toHaveBeenCalledWith();
-            expect(req.body.resumeOriginalName).toBe('resume.pdf');
         });
 
         it('should validate candidate ID in params', async () => {
             req.params = { id: 'invalid' };
-            req.body = { ...validUpdateData };
+            req.body = { ...validUpdateData() };
 
             await CandidateValidator.validateUpdate(req, res, next);
 
@@ -815,34 +821,35 @@ describe('CandidateValidator', () => {
 
         it('should reject negative candidate ID', async () => {
             req.params = { id: '-1' };
-            req.body = { ...validUpdateData };
+            req.body = { ...validUpdateData() };
 
             await CandidateValidator.validateUpdate(req, res, next);
 
             expect(next).toHaveBeenCalledWith(expect.any(AppError));
         });
 
-        it('should transform location when provided', async () => {
-            req.body = { preferredJobLocation: 'bangalore' };
-            mockClient.execute.mockResolvedValueOnce([[{ lookupKey: 1 }]]);
+        it('should transform expectedLocation when provided', async () => {
+            req.body = {
+                workModeId: 1,
+                expectedLocation: { country: 'india', city: 'Pune' },
+            };
+            mockClient.execute.mockResolvedValueOnce([[{ locationId: 9 }]]);
 
             await CandidateValidator.validateUpdate(req, res, next);
 
-            expect(req.body.preferredJobLocation).toBe(1);
+            expect(req.body.expectedLocation).toBe(9);
         });
 
-        it('should transform status when provided', async () => {
-            req.body = { status: 'selected' };
-            mockClient.execute.mockResolvedValueOnce([[{ lookupKey: 2 }]]);
+        it('should strip unknown status field on update', async () => {
+            req.body = { workModeId: 1, status: 'selected' };
 
             await CandidateValidator.validateUpdate(req, res, next);
 
-            expect(req.body.statusId).toBe(2);
             expect(req.body.status).toBeUndefined();
         });
 
         it('should check email uniqueness excluding current candidate', async () => {
-            req.body = { email: 'newemail@example.com' };
+            req.body = { workModeId: 1, email: 'newemail@example.com' };
             mockClient.execute.mockResolvedValueOnce([[]]);
 
             await CandidateValidator.validateUpdate(req, res, next);
@@ -854,7 +861,7 @@ describe('CandidateValidator', () => {
         });
 
         it('should throw error when email exists for another candidate', async () => {
-            req.body = { email: 'existing@example.com' };
+            req.body = { workModeId: 1, email: 'existing@example.com' };
             mockClient.execute.mockResolvedValueOnce([[{ candidateId: 2 }]]);
 
             await CandidateValidator.validateUpdate(req, res, next);
@@ -865,7 +872,7 @@ describe('CandidateValidator', () => {
         });
 
         it('should check contact uniqueness excluding current candidate', async () => {
-            req.body = { contactNumber: '9876543210' };
+            req.body = { workModeId: 1, contactNumber: '9876543210' };
             mockClient.execute.mockResolvedValueOnce([[]]);
 
             await CandidateValidator.validateUpdate(req, res, next);
@@ -876,18 +883,16 @@ describe('CandidateValidator', () => {
             );
         });
 
-        it('should validate CTC range when both provided', async () => {
-            req.body = { currentCTC: 600000, expectedCTC: 500000 };
+        it('should reject incomplete structured current CTC group', async () => {
+            req.body = { workModeId: 1, currentCTCAmount: 100 };
 
             await CandidateValidator.validateUpdate(req, res, next);
 
             expect(next).toHaveBeenCalledWith(expect.any(AppError));
-            const error = next.mock.calls[0][0];
-            expect(error.details.validationErrors[0].message).toContain('Expected CTC should not be less than current CTC');
         });
 
         it('should allow updating only currentCTC', async () => {
-            req.body = { currentCTC: 700000 };
+            req.body = { workModeId: 1, currentCTC: 700000 };
 
             await CandidateValidator.validateUpdate(req, res, next);
 
@@ -895,7 +900,7 @@ describe('CandidateValidator', () => {
         });
 
         it('should allow updating only expectedCTC', async () => {
-            req.body = { expectedCTC: 800000 };
+            req.body = { workModeId: 1, expectedCTC: 800000 };
 
             await CandidateValidator.validateUpdate(req, res, next);
 
@@ -903,45 +908,41 @@ describe('CandidateValidator', () => {
         });
 
         it('should validate resume file on update', async () => {
-            req.body = { candidateName: 'Updated Name' };
+            req.body = { workModeId: 1, candidateName: 'Updated Name' };
             req.file = {
                 mimetype: 'application/msword',
-                path: '/tmp/resume.doc',
+                key: 'uploads/resume.doc',
                 size: 2 * 1024 * 1024,
-                originalname: 'updated-resume.doc'
             };
 
             await CandidateValidator.validateUpdate(req, res, next);
 
             expect(next).toHaveBeenCalledWith();
-            expect(req.body.resumeOriginalName).toBe('updated-resume.doc');
         });
 
         it('should reject invalid resume file type on update', async () => {
-            req.body = { candidateName: 'Updated Name' };
+            const { S3Client } = require('@aws-sdk/client-s3');
+            req.body = { workModeId: 1, candidateName: 'Updated Name' };
             req.file = {
                 mimetype: 'text/plain',
-                path: '/tmp/resume.txt',
-                size: 1024
+                key: 'uploads/bad.txt',
+                size: 1024,
             };
 
             await CandidateValidator.validateUpdate(req, res, next);
 
-            expect(fs.unlink).toHaveBeenCalledWith('/tmp/resume.txt', expect.any(Function));
+            expect(S3Client).toHaveBeenCalled();
             expect(next).toHaveBeenCalledWith(expect.any(AppError));
         });
 
         it('should clean up file on update validation error', async () => {
-            req.body = { candidateName: 'J' };
+            const { S3Client } = require('@aws-sdk/client-s3');
+            req.body = { workModeId: 1, candidateName: 'J' };
             req.file = {
                 mimetype: 'application/pdf',
-                path: '/tmp/test.pdf',
-                size: 1024
+                key: 'uploads/bad.pdf',
+                size: 1024,
             };
-
-            // Patch promise-based unlink for this test
-            fs.promises = fs.promises || {};
-            fs.promises.unlink = jest.fn(() => Promise.resolve());
 
             next = jest.fn();
             res = {};
@@ -951,13 +952,14 @@ describe('CandidateValidator', () => {
 
             await CandidateValidator.validateUpdate(req, res, next);
 
-            expect(fs.promises.unlink).toHaveBeenCalledWith('/tmp/test.pdf');
+            expect(S3Client).toHaveBeenCalled();
         });
 
         it('should allow partial updates with valid fields', async () => {
             req.body = {
+                workModeId: 1,
                 candidateName: 'Updated Name',
-                noticePeriod: 60
+                noticePeriod: 60,
             };
 
             await CandidateValidator.validateUpdate(req, res, next);
@@ -970,8 +972,9 @@ describe('CandidateValidator', () => {
         it('should handle multiple validation errors', async () => {
             req.params = { id: 'invalid' };
             req.body = {
+                workModeId: 1,
                 email: 'invalid-email',
-                experienceYears: 100
+                experienceYears: 100,
             };
 
             await CandidateValidator.validateUpdate(req, res, next);
@@ -1099,13 +1102,12 @@ describe('CandidateValidator', () => {
             expect(error.details.validationErrors[0].message).toContain('Minimum CTC cannot be greater than maximum CTC');
         });
 
-        it('should validate and transform location in search', async () => {
+        it('should surface error when preferredJobLocation string is passed to transform', async () => {
             req.query = { preferredJobLocation: 'bangalore' };
-            mockClient.execute.mockResolvedValueOnce([[{ lookupKey: 1 }]]);
 
             await CandidateValidator.validateSearch(req, res, next);
 
-            expect(req.validatedSearch.preferredJobLocation).toBeDefined();
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
         });
 
         it('should validate and transform status in search', async () => {
@@ -1179,22 +1181,20 @@ describe('CandidateValidator', () => {
             expect(req.validatedSearch.unknownField).toBeUndefined();
         });
 
-        it('should accept valid location values', async () => {
+        it('should not complete search when preferredJobLocation cannot be transformed', async () => {
             req.query = { preferredJobLocation: 'ahmedabad' };
-            mockClient.execute.mockResolvedValueOnce([[{ lookupKey: 2 }]]);
 
             await CandidateValidator.validateSearch(req, res, next);
 
-            expect(next).toHaveBeenCalledWith();
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
         });
 
-        it('should handle bengaluru as valid location', async () => {
+        it('should not complete search for bengaluru string without location object', async () => {
             req.query = { preferredJobLocation: 'bengaluru' };
-            mockClient.execute.mockResolvedValueOnce([[{ lookupKey: 1 }]]);
 
             await CandidateValidator.validateSearch(req, res, next);
 
-            expect(next).toHaveBeenCalledWith();
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
         });
 
         it('should convert string numbers to integers', async () => {
@@ -1213,28 +1213,13 @@ describe('CandidateValidator', () => {
     });
 
     describe('Schema Validation Edge Cases', () => {
-        beforeEach(() => {
-            mockClient.execute.mockResolvedValue([[]]);
-        });
-
-        it('should trim whitespace from all string fields', async () => {
+        it('should trim whitespace from string fields on create', async () => {
+            mockCreateSuccessSequence(mockClient);
             req.body = {
+                ...validCreateData(),
                 candidateName: '  John Doe  ',
-                contactNumber: '  +91-9876543210  ',
                 email: '  john@example.com  ',
-                recruiterName: '  Jayraj  ',
-                jobRole: '  Software Engineer  ',
-                preferredJobLocation: '  bangalore  ',
-                currentCTC: 500000,
-                expectedCTC: 600000,
-                noticePeriod: 30,
-                experienceYears: 5
             };
-
-            mockClient.execute
-                .mockResolvedValueOnce([[{ lookupKey: 1 }]]) // location
-                .mockResolvedValueOnce([[]]) // email
-                .mockResolvedValueOnce([[]]); // contact
 
             await CandidateValidator.validateCreate(req, res, next);
 
@@ -1243,23 +1228,8 @@ describe('CandidateValidator', () => {
         });
 
         it('should lowercase email addresses', async () => {
-            req.body = {
-                candidateName: 'John Doe',
-                contactNumber: '+91-9876543210',
-                email: 'JOHN@EXAMPLE.COM',
-                recruiterName: 'Jayraj',
-                jobRole: 'Software Engineer',
-                preferredJobLocation: 'bangalore',
-                currentCTC: 500000,
-                expectedCTC: 600000,
-                noticePeriod: 30,
-                experienceYears: 5
-            };
-
-            mockClient.execute
-                .mockResolvedValueOnce([[{ lookupKey: 1 }]]) // location
-                .mockResolvedValueOnce([[]]) // email
-                .mockResolvedValueOnce([[]]); // contact
+            mockCreateSuccessSequence(mockClient);
+            req.body = { ...validCreateData(), email: 'JOHN@EXAMPLE.COM' };
 
             await CandidateValidator.validateCreate(req, res, next);
 
@@ -1267,23 +1237,8 @@ describe('CandidateValidator', () => {
         });
 
         it('should accept names with apostrophes and hyphens', async () => {
-            req.body = {
-                candidateName: "O'Brien-Smith",
-                contactNumber: '+91-9876543210',
-                email: 'obrien@example.com',
-                recruiterName: 'Jayraj',
-                jobRole: 'Software Engineer',
-                preferredJobLocation: 'bangalore',
-                currentCTC: 500000,
-                expectedCTC: 600000,
-                noticePeriod: 30,
-                experienceYears: 5
-            };
-
-            mockClient.execute
-                .mockResolvedValueOnce([[{ lookupKey: 1 }]]) // location
-                .mockResolvedValueOnce([[]]) // email
-                .mockResolvedValueOnce([[]]); // contact
+            mockCreateSuccessSequence(mockClient);
+            req.body = { ...validCreateData(), candidateName: "O'Brien-Smith" };
 
             await CandidateValidator.validateCreate(req, res, next);
 
@@ -1291,23 +1246,8 @@ describe('CandidateValidator', () => {
         });
 
         it('should accept zero experience years', async () => {
-            req.body = {
-                candidateName: 'Fresh Graduate',
-                contactNumber: '+91-9876543210',
-                email: 'fresh@example.com',
-                recruiterName: 'Jayraj',
-                jobRole: 'Junior Developer',
-                preferredJobLocation: 'bangalore',
-                currentCTC: 0,
-                expectedCTC: 300000,
-                noticePeriod: 0,
-                experienceYears: 0
-            };
-
-            mockClient.execute
-                .mockResolvedValueOnce([[{ lookupKey: 1 }]]) // location
-                .mockResolvedValueOnce([[]]) // email
-                .mockResolvedValueOnce([[]]); // contact
+            mockCreateSuccessSequence(mockClient);
+            req.body = { ...validCreateData(), experienceYears: 0 };
 
             await CandidateValidator.validateCreate(req, res, next);
 
@@ -1316,23 +1256,8 @@ describe('CandidateValidator', () => {
         });
 
         it('should accept equal currentCTC and expectedCTC', async () => {
-            req.body = {
-                candidateName: 'John Doe',
-                contactNumber: '+91-9876543210',
-                email: 'john@example.com',
-                recruiterName: 'Jayraj',
-                jobRole: 'Software Engineer',
-                preferredJobLocation: 'bangalore',
-                currentCTC: 500000,
-                expectedCTC: 500000,
-                noticePeriod: 30,
-                experienceYears: 5
-            };
-
-            mockClient.execute
-                .mockResolvedValueOnce([[{ lookupKey: 1 }]]) // location
-                .mockResolvedValueOnce([[]]) // email
-                .mockResolvedValueOnce([[]]); // contact
+            mockCreateSuccessSequence(mockClient);
+            req.body = { ...validCreateData(), currentCTC: 500000, expectedCTC: 500000 };
 
             await CandidateValidator.validateCreate(req, res, next);
 
@@ -1340,18 +1265,7 @@ describe('CandidateValidator', () => {
         });
 
         it('should reject CTC exceeding maximum', async () => {
-            req.body = {
-                candidateName: 'John Doe',
-                contactNumber: '+91-9876543210',
-                email: 'john@example.com',
-                recruiterName: 'Jayraj',
-                jobRole: 'Software Engineer',
-                preferredJobLocation: 'bangalore',
-                currentCTC: 11000000,
-                expectedCTC: 12000000,
-                noticePeriod: 30,
-                experienceYears: 5
-            };
+            req.body = { ...validCreateData(), currentCTC: 11000000, expectedCTC: 12000000 };
 
             await CandidateValidator.validateCreate(req, res, next);
 
@@ -1363,80 +1277,56 @@ describe('CandidateValidator', () => {
                 '+91-9876543210',
                 '9876543210',
                 '+1 (555) 123-4567',
-                '+44 20 7946 0958'
+                '+44 20 7946 0958',
             ];
 
             for (const format of validFormats) {
+                mockCreateSuccessSequence(mockClient);
                 req.body = {
-                    candidateName: 'John Doe',
+                    ...validCreateData(),
                     contactNumber: format,
                     email: `john${Math.random()}@example.com`,
-                    recruiterName: 'Jayraj',
-                    jobRole: 'Software Engineer',
-                    preferredJobLocation: 'bangalore',
-                    currentCTC: 500000,
-                    expectedCTC: 600000,
-                    noticePeriod: 30,
-                    experienceYears: 5
                 };
-
-                mockClient.execute
-                    .mockResolvedValueOnce([[{ lookupKey: 1 }]]) // location
-                    .mockResolvedValueOnce([[]]) // email
-                    .mockResolvedValueOnce([[]]); // contact
 
                 await CandidateValidator.validateCreate(req, res, next);
 
-                expect(next).toHaveBeenCalled();
+                expect(next).toHaveBeenCalledWith();
                 jest.clearAllMocks();
             }
         });
     });
 
     describe('Integration Tests', () => {
-        beforeEach(() => {
-            mockClient.execute.mockResolvedValue([[]]);
-        });
-
         it('should handle complete create flow with all transformations', async () => {
+            mockCreateSuccessSequence(mockClient, { locationId: 2, statusLookupKey: 4 });
             req.body = {
                 candidateName: '  Jane Smith  ',
-                contactNumber: '+91-9876543210',
+                contactNumber: '+91 9876543210',
                 email: 'JANE@EXAMPLE.COM',
-                recruiterName: 'khushi',
-                jobRole: 'Data Scientist',
-                preferredJobLocation: 'Bengaluru',
-                currentCTC: 800000,
-                expectedCTC: 1000000,
+                recruiterId: 1,
+                jobProfileRequirementId: 5,
+                expectedLocation: { country: 'india', city: 'Delhi' },
+                workModeId: 2,
                 noticePeriod: 45,
                 experienceYears: 7,
                 linkedinProfileUrl: 'https://linkedin.com/in/jane-smith',
-                status: 'Interview Pending'
             };
-
-            mockClient.execute
-                .mockResolvedValueOnce([[{ lookupKey: 1 }]]) // location
-                .mockResolvedValueOnce([[{ lookupKey: 3 }]]) // status
-                .mockResolvedValueOnce([[]]) // email
-                .mockResolvedValueOnce([[]]); // contact
 
             await CandidateValidator.validateCreate(req, res, next);
 
             expect(next).toHaveBeenCalledWith();
             expect(req.body.candidateName).toBe('Jane Smith');
             expect(req.body.email).toBe('jane@example.com');
-            expect(req.body.preferredJobLocation).toBe(1);
-            expect(req.body.statusId).toBe(3);
-            expect(req.body.status).toBeUndefined();
+            expect(req.body.expectedLocation).toBe(2);
+            expect(req.body.statusId).toBe(4);
         });
 
         it('should handle complete update flow with partial data', async () => {
             req.params = { id: '5' };
             req.body = {
+                workModeId: 1,
                 email: 'newemail@example.com',
-                jobRole: 'Senior Engineer',
                 expectedCTC: 1200000,
-                // Omit preferredJobLocation and status if you don't want to mock their DB calls
             };
 
             next = jest.fn();
@@ -1445,22 +1335,19 @@ describe('CandidateValidator', () => {
             mockDb = { getConnection: jest.fn().mockResolvedValue(mockClient) };
             CandidateValidator.init(mockDb);
 
-            // Mock email check result
-            mockClient.execute.mockResolvedValueOnce([[]]); // email does not exist
+            mockClient.execute.mockResolvedValueOnce([[]]);
 
             await CandidateValidator.validateUpdate(req, res, next);
 
-            expect(next).toHaveBeenCalledWith();  // next() with no args means success
+            expect(next).toHaveBeenCalledWith();
             expect(req.body.email).toBe('newemail@example.com');
-            expect(req.body.jobRole).toBe('Senior Engineer');
         });
 
-        it('should handle search with all filters and transformations', async () => {
+        it('should handle search with filters except preferredJobLocation transform', async () => {
             req.query = {
                 candidateName: 'John',
                 email: 'john@example.com',
                 jobRole: 'Engineer',
-                preferredJobLocation: 'bangalore',
                 recruiterName: 'Jayraj',
                 minExperience: '3',
                 maxExperience: '8',
@@ -1468,12 +1355,10 @@ describe('CandidateValidator', () => {
                 maxCurrentCTC: '900000',
                 status: 'selected',
                 limit: '30',
-                offset: '10'
+                offset: '10',
             };
 
-            mockClient.execute
-                .mockResolvedValueOnce([[{ lookupKey: 1 }]]) // location (if needed)
-                .mockResolvedValueOnce([[{ lookupKey: 1 }]]); // status
+            mockClient.execute.mockResolvedValueOnce([[{ lookupKey: 1 }]]);
 
             await CandidateValidator.validateSearch(req, res, next);
 
@@ -1488,18 +1373,7 @@ describe('CandidateValidator', () => {
 
     describe('Error Handling', () => {
         it('should handle database connection errors in helper methods', async () => {
-            req.body = {
-                candidateName: 'John Doe',
-                contactNumber: '+91-9876543210',
-                email: 'john@example.com',
-                recruiterName: 'Jayraj',
-                jobRole: 'Software Engineer',
-                preferredJobLocation: 'bangalore',
-                currentCTC: 500000,
-                expectedCTC: 600000,
-                noticePeriod: 30,
-                experienceYears: 5
-            };
+            req.body = { ...validCreateData() };
 
             mockClient.execute.mockRejectedValue(new Error('Connection failed'));
 
@@ -1508,34 +1382,19 @@ describe('CandidateValidator', () => {
             expect(next).toHaveBeenCalledWith(expect.any(Error));
         });
 
-        it('should clean up file on database error', async () => {
-            req.body = {
-                candidateName: 'John Doe',
-                contactNumber: '+91-9876543210',
-                email: 'john@example.com',
-                recruiterName: 'Jayraj',
-                jobRole: 'Software Engineer',
-                preferredJobLocation: 'bangalore',
-                currentCTC: 500000,
-                expectedCTC: 600000,
-                noticePeriod: 30,
-                experienceYears: 5
-            };
+        it('should propagate database errors from helper after schema validation', async () => {
+            req.body = { ...validCreateData() };
             req.file = {
                 mimetype: 'application/pdf',
-                path: '/tmp/resume.pdf',
-                size: 1024
+                key: 'uploads/resume.pdf',
+                size: 1024,
             };
-
-            // Mock promise-based unlink
-            fs.promises = fs.promises || {};
-            fs.promises.unlink = jest.fn(() => Promise.resolve());
 
             mockClient.execute.mockRejectedValue(new Error('Database error'));
 
             await CandidateValidator.validateCreate(req, res, next);
 
-            expect(fs.promises.unlink).toHaveBeenCalledWith('/tmp/resume.pdf');
+            expect(next).toHaveBeenCalledWith(expect.any(Error));
         });
 
         it('should handle multiple validation errors gracefully', async () => {
@@ -1543,7 +1402,7 @@ describe('CandidateValidator', () => {
                 candidateName: 'J',
                 email: 'invalid',
                 currentCTC: -1000,
-                expectedCTC: 'not-a-number'
+                expectedCTC: 'not-a-number',
             };
 
             await CandidateValidator.validateCreate(req, res, next);

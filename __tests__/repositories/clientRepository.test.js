@@ -36,53 +36,25 @@ describe('ClientRepository', () => {
             { clientId: 2, clientName: 'Client B', address: '456 Oak Ave', location: null }
         ];
 
-        it('should retrieve all clients with default pagination', async () => {
-            mockConnection.query
-                .mockResolvedValueOnce([[{ total: 10 }]])
-                .mockResolvedValueOnce([mockClients]);
+        it('should retrieve all clients in a single query (pagination args ignored)', async () => {
+            mockConnection.query.mockResolvedValueOnce([mockClients]);
 
             const result = await clientRepository.getAll(10, 1, mockConnection);
 
-            expect(mockConnection.query).toHaveBeenCalledTimes(2);
-            expect(mockConnection.query).toHaveBeenNthCalledWith(1, expect.stringContaining('COUNT'));
-            expect(mockConnection.query).toHaveBeenNthCalledWith(
-                2,
-                expect.stringContaining('SELECT clientId'),
-                [10, 0]
+            expect(mockConnection.query).toHaveBeenCalledTimes(1);
+            expect(mockConnection.query).toHaveBeenCalledWith(
+                expect.stringContaining('SELECT clientId, clientName, address, location FROM client')
             );
-            expect(result).toEqual({
-                data: mockClients,
-                totalRecords: 10
-            });
+            expect(result).toEqual(mockClients);
         });
 
-        it('should handle custom pagination parameters', async () => {
-            mockConnection.query
-                .mockResolvedValueOnce([[{ total: 50 }]])
-                .mockResolvedValueOnce([mockClients]);
+        it('should return same shape for custom pagination parameters', async () => {
+            mockConnection.query.mockResolvedValueOnce([mockClients]);
 
             const result = await clientRepository.getAll(20, 3, mockConnection);
 
-            expect(mockConnection.query).toHaveBeenNthCalledWith(
-                2,
-                expect.stringContaining('SELECT clientId'),
-                [20, 40]
-            );
-            expect(result.totalRecords).toBe(50);
-        });
-
-        it('should handle invalid limit by using minimum value of 1', async () => {
-            mockConnection.query
-                .mockResolvedValueOnce([[{ total: 10 }]])
-                .mockResolvedValueOnce([mockClients]);
-
-            await clientRepository.getAll(-5, 1, mockConnection);
-
-            expect(mockConnection.query).toHaveBeenNthCalledWith(
-                2,
-                expect.anything(),
-                [1, 0]
-            );
+            expect(mockConnection.query).toHaveBeenCalledTimes(1);
+            expect(result).toEqual(mockClients);
         });
 
         it('should handle database errors appropriately', async () => {
@@ -95,16 +67,11 @@ describe('ClientRepository', () => {
         });
 
         it('should return empty array when no clients exist', async () => {
-            mockConnection.query
-                .mockResolvedValueOnce([[{ total: 0 }]])
-                .mockResolvedValueOnce([[]]);
+            mockConnection.query.mockResolvedValueOnce([[]]);
 
             const result = await clientRepository.getAll(10, 1, mockConnection);
 
-            expect(result).toEqual({
-                data: [],
-                totalRecords: 0
-            });
+            expect(result).toEqual([]);
         });
     });
 
@@ -167,24 +134,38 @@ describe('ClientRepository', () => {
     });
 
     describe('getAllWithDepartments', () => {
-        const mockData = [
+        const mockClientData = [
             { clientId: 1, clientName: 'Client A', departments: [] },
             { clientId: 2, clientName: 'Client B', departments: [{ departmentId: 1, departmentName: 'IT' }] }
         ];
+        const mockLocationData = [{ city: 'NYC', state: 'NY', country: 'US' }];
 
-        it('should retrieve all clients with departments', async () => {
-            mockConnection.query.mockResolvedValueOnce([mockData]);
+        it('should retrieve clients and locations with two queries', async () => {
+            mockConnection.query
+                .mockResolvedValueOnce([mockClientData])
+                .mockResolvedValueOnce([mockLocationData]);
 
             const result = await clientRepository.getAllWithDepartments(mockConnection);
 
-            expect(mockConnection.query).toHaveBeenCalledWith(
+            expect(mockConnection.query).toHaveBeenCalledTimes(2);
+            expect(mockConnection.query).toHaveBeenNthCalledWith(
+                1,
                 expect.stringContaining('JSON_ARRAYAGG')
             );
-            expect(result).toEqual(mockData);
+            expect(mockConnection.query).toHaveBeenNthCalledWith(
+                2,
+                expect.stringContaining('location')
+            );
+            expect(result).toEqual({
+                clientData: mockClientData,
+                locationData: mockLocationData
+            });
         });
 
         it('should return null when no clients exist', async () => {
-            mockConnection.query.mockResolvedValueOnce([[]]);
+            mockConnection.query
+                .mockResolvedValueOnce([[]])
+                .mockResolvedValueOnce([mockLocationData]);
 
             const result = await clientRepository.getAllWithDepartments(mockConnection);
 

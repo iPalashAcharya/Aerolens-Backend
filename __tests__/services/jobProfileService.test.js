@@ -1,5 +1,29 @@
+// jobProfileService reads S3 bucket at module load; set before require
+process.env.AWS_S3_BUCKET = process.env.AWS_S3_BUCKET || 'test-bucket';
+process.env.AWS_REGION = process.env.AWS_REGION || 'us-east-1';
+
+jest.mock('@aws-sdk/client-s3', () => ({
+    S3Client: jest.fn().mockImplementation(() => ({
+        send: jest.fn(),
+    })),
+    DeleteObjectCommand: jest.fn((input) => input),
+    HeadObjectCommand: jest.fn((input) => input),
+    GetObjectCommand: jest.fn((input) => input),
+    CopyObjectCommand: jest.fn((input) => input),
+}));
+
+jest.mock('@aws-sdk/s3-request-presigner', () => ({
+    getSignedUrl: jest.fn().mockResolvedValue('https://signed.example/download'),
+}));
+
 const JobProfileService = require('../../services/jobProfileService');
-const AppError = require('../../utils/appError');
+
+jest.mock('../../services/auditLogService', () => ({
+    logAction: jest.fn().mockResolvedValue(undefined),
+}));
+
+const auditLogService = require('../../services/auditLogService');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 describe('JobProfileService', () => {
     let jobProfileService;
@@ -25,18 +49,24 @@ describe('JobProfileService', () => {
             findById: jest.fn(),
             update: jest.fn(),
             delete: jest.fn(),
-            findByClientId: jest.fn(),
-            findByStatus: jest.fn(),
-            findByDepartment: jest.fn(),
             findAll: jest.fn(),
-            countByClient: jest.fn(),
+            count: jest.fn(),
+            addTechSpecifications: jest.fn(),
+            getJDInfo: jest.fn(),
+            updateJDInfo: jest.fn(),
+            deleteJDInfo: jest.fn(),
         };
 
         jobProfileService = new JobProfileService(mockRepository, mockDb);
+        if (jobProfileService.s3Client && jobProfileService.s3Client.send) {
+            jobProfileService.s3Client.send.mockReset();
+        }
+        getSignedUrl.mockResolvedValue('https://signed.example/download');
     });
 
     afterEach(() => {
         jest.clearAllMocks();
+        getSignedUrl.mockResolvedValue('https://signed.example/download');
     });
 
     describe('createJobProfile', () => {
@@ -47,7 +77,7 @@ describe('JobProfileService', () => {
         };
 
         it('should create a job profile successfully', async () => {
-            const expectedProfile = { id: 'profile-1', ...jobProfileData };
+            const expectedProfile = { jobProfileId: 'profile-1', ...jobProfileData };
             mockRepository.existsByRole.mockResolvedValue(false);
             mockRepository.create.mockResolvedValue(expectedProfile);
 
@@ -57,7 +87,6 @@ describe('JobProfileService', () => {
             expect(mockClient.beginTransaction).toHaveBeenCalledTimes(1);
             expect(mockRepository.existsByRole).toHaveBeenCalledWith(
                 jobProfileData.jobRole,
-                jobProfileData.clientId,
                 null,
                 mockClient
             );
@@ -72,44 +101,63 @@ describe('JobProfileService', () => {
 
             await expect(jobProfileService.createJobProfile(jobProfileData))
                 .rejects
-                .toThrow(AppError);
-
-            await expect(jobProfileService.createJobProfile(jobProfileData))
-                .rejects
                 .toMatchObject({
-                    message: 'A job profile with this role already exists for this client',
+                    message: 'A job profile with this role already exists',
                     statusCode: 409,
                     errorCode: 'DUPLICATE_JOB_ROLE',
                 });
 
-            expect(mockClient.rollback).toHaveBeenCalledTimes(2);
-            expect(mockClient.release).toHaveBeenCalledTimes(2);
+            expect(mockClient.rollback).toHaveBeenCalledTimes(1);
+            expect(mockClient.release).toHaveBeenCalledTimes(1);
             expect(mockRepository.create).not.toHaveBeenCalled();
         });
 
-        it('should rollback transaction and release client on repository error', async () => {
+        it('should wrap repository error in AppError and rollback', async () => {
             const dbError = new Error('Database connection failed');
             mockRepository.existsByRole.mockResolvedValue(false);
             mockRepository.create.mockRejectedValue(dbError);
 
             await expect(jobProfileService.createJobProfile(jobProfileData))
                 .rejects
-                .toThrow(dbError);
+                .toMatchObject({
+                    message: 'Failed to create job profile',
+                    statusCode: 500,
+                    errorCode: 'JOB_PROFILE_CREATION_ERROR',
+                });
 
             expect(mockClient.rollback).toHaveBeenCalledTimes(1);
             expect(mockClient.release).toHaveBeenCalledTimes(1);
             expect(mockClient.commit).not.toHaveBeenCalled();
         });
+
+        it('should add technical specifications when techSpecLookupIds provided', async () => {
+            const dataWithSpecs = {
+                ...jobProfileData,
+                techSpecLookupIds: ['spec-1', 'spec-2'],
+            };
+            const created = { jobProfileId: 'jp-1', ...jobProfileData };
+            mockRepository.existsByRole.mockResolvedValue(false);
+            mockRepository.create.mockResolvedValue(created);
+            mockRepository.addTechSpecifications.mockResolvedValue(undefined);
+
+            await jobProfileService.createJobProfile(dataWithSpecs);
+
+            expect(mockRepository.addTechSpecifications).toHaveBeenCalledWith(
+                'jp-1',
+                ['spec-1', 'spec-2'],
+                mockClient
+            );
+        });
     });
 
     describe('getJobProfileById', () => {
         it('should return job profile when found', async () => {
-            const expectedProfile = { id: 'profile-1', jobRole: 'Developer' };
+            const expectedProfile = { jobProfileId: 'profile-1', jobRole: 'Developer' };
             mockRepository.findById.mockResolvedValue(expectedProfile);
 
             const result = await jobProfileService.getJobProfileById('profile-1');
 
-            expect(mockRepository.findById).toHaveBeenCalledWith('profile-1');
+            expect(mockRepository.findById).toHaveBeenCalledWith('profile-1', mockClient);
             expect(result).toEqual(expectedProfile);
         });
 
@@ -129,7 +177,7 @@ describe('JobProfileService', () => {
     describe('updateJobProfile', () => {
         const jobProfileId = 'profile-1';
         const existingProfile = {
-            id: jobProfileId,
+            jobProfileId,
             jobRole: 'Old Role',
             clientId: 'client-123',
         };
@@ -149,7 +197,6 @@ describe('JobProfileService', () => {
             expect(mockRepository.findById).toHaveBeenCalledWith(jobProfileId, mockClient);
             expect(mockRepository.existsByRole).toHaveBeenCalledWith(
                 updateData.jobRole,
-                existingProfile.clientId,
                 jobProfileId,
                 mockClient
             );
@@ -181,7 +228,7 @@ describe('JobProfileService', () => {
             await expect(jobProfileService.updateJobProfile(jobProfileId, updateData))
                 .rejects
                 .toMatchObject({
-                    message: 'A job profile with this role already exists in the database for this client',
+                    message: 'A job profile with this role already exists',
                     statusCode: 409,
                     errorCode: 'DUPLICATE_JOB_ROLE',
                 });
@@ -206,7 +253,7 @@ describe('JobProfileService', () => {
             expect(result).toEqual(updatedProfile);
         });
 
-        it('should rollback transaction on update error', async () => {
+        it('should wrap update error in AppError and rollback', async () => {
             const updateError = new Error('Update failed');
             mockRepository.findById.mockResolvedValue(existingProfile);
             mockRepository.existsByRole.mockResolvedValue(false);
@@ -214,7 +261,11 @@ describe('JobProfileService', () => {
 
             await expect(jobProfileService.updateJobProfile(jobProfileId, updateData))
                 .rejects
-                .toThrow(updateError);
+                .toMatchObject({
+                    message: 'Failed to Update job profile',
+                    statusCode: 500,
+                    errorCode: 'JOB_PROFILE_UPDATE_ERROR',
+                });
 
             expect(mockClient.rollback).toHaveBeenCalledTimes(1);
             expect(mockClient.release).toHaveBeenCalledTimes(1);
@@ -223,7 +274,7 @@ describe('JobProfileService', () => {
 
     describe('deleteJobProfile', () => {
         const jobProfileId = 'profile-1';
-        const existingProfile = { id: jobProfileId, jobRole: 'Developer' };
+        const existingProfile = { jobProfileId, jobRole: 'Developer' };
 
         it('should delete job profile successfully', async () => {
             mockRepository.findById.mockResolvedValue(existingProfile);
@@ -254,282 +305,500 @@ describe('JobProfileService', () => {
             expect(mockRepository.delete).not.toHaveBeenCalled();
         });
 
-        it('should rollback transaction on delete error', async () => {
+        it('should wrap delete error in AppError and rollback', async () => {
             const deleteError = new Error('Delete failed');
             mockRepository.findById.mockResolvedValue(existingProfile);
             mockRepository.delete.mockRejectedValue(deleteError);
 
             await expect(jobProfileService.deleteJobProfile(jobProfileId))
                 .rejects
-                .toThrow(deleteError);
+                .toMatchObject({
+                    message: 'Failed to Delete job profile',
+                    statusCode: 500,
+                    errorCode: 'JOB_PROFILE_DELETE_ERROR',
+                });
 
             expect(mockClient.rollback).toHaveBeenCalledTimes(1);
             expect(mockClient.release).toHaveBeenCalledTimes(1);
-        });
-    });
-
-    describe('getJobProfilesByClientId', () => {
-        it('should return job profiles for client', async () => {
-            const expectedProfiles = [
-                { id: 'profile-1', jobRole: 'Developer' },
-                { id: 'profile-2', jobRole: 'Designer' },
-            ];
-            mockRepository.findByClientId.mockResolvedValue(expectedProfiles);
-
-            const result = await jobProfileService.getJobProfilesByClientId('client-123');
-
-            expect(mockRepository.findByClientId).toHaveBeenCalledWith('client-123', undefined, undefined);
-            expect(result).toEqual(expectedProfiles);
-        });
-
-        it('should return job profiles with limit and offset', async () => {
-            const expectedProfiles = [{ id: 'profile-1', jobRole: 'Developer' }];
-            mockRepository.findByClientId.mockResolvedValue(expectedProfiles);
-
-            const result = await jobProfileService.getJobProfilesByClientId('client-123', { limit: 10, offset: 5 });
-
-            expect(mockRepository.findByClientId).toHaveBeenCalledWith('client-123', 10, 5);
-            expect(result).toEqual(expectedProfiles);
-        });
-    });
-
-    describe('getJobProfilesByStatus', () => {
-        it('should return job profiles by status', async () => {
-            const expectedProfiles = [{ id: 'profile-1', statusId: 'active' }];
-            mockRepository.findByStatus.mockResolvedValue(expectedProfiles);
-
-            const result = await jobProfileService.getJobProfilesByStatus('active');
-
-            expect(mockRepository.findByStatus).toHaveBeenCalledWith('active');
-            expect(result).toEqual(expectedProfiles);
-        });
-    });
-
-    describe('getJobProfilesByDepartment', () => {
-        it('should return job profiles by department', async () => {
-            const expectedProfiles = [{ id: 'profile-1', departmentId: 'dept-1' }];
-            mockRepository.findByDepartment.mockResolvedValue(expectedProfiles);
-
-            const result = await jobProfileService.getJobProfilesByDepartment('dept-1');
-
-            expect(mockRepository.findByDepartment).toHaveBeenCalledWith('dept-1');
-            expect(result).toEqual(expectedProfiles);
         });
     });
 
     describe('getAllJobProfiles', () => {
         it('should return all job profiles', async () => {
             const expectedProfiles = [
-                { id: 'profile-1', jobRole: 'Developer' },
-                { id: 'profile-2', jobRole: 'Designer' },
+                { jobProfileId: 'profile-1', jobRole: 'Developer' },
+                { jobProfileId: 'profile-2', jobRole: 'Designer' },
             ];
             mockRepository.findAll.mockResolvedValue(expectedProfiles);
 
             const result = await jobProfileService.getAllJobProfiles();
 
-            expect(mockRepository.findAll).toHaveBeenCalledWith(undefined, undefined);
+            expect(mockRepository.findAll).toHaveBeenCalledWith(undefined, undefined, mockClient);
             expect(result).toEqual(expectedProfiles);
         });
 
         it('should return all job profiles with pagination options', async () => {
-            const expectedProfiles = [{ id: 'profile-1', jobRole: 'Developer' }];
+            const expectedProfiles = [{ jobProfileId: 'profile-1', jobRole: 'Developer' }];
             mockRepository.findAll.mockResolvedValue(expectedProfiles);
 
             const result = await jobProfileService.getAllJobProfiles({ limit: 20, offset: 10 });
 
-            expect(mockRepository.findAll).toHaveBeenCalledWith(20, 10);
+            expect(mockRepository.findAll).toHaveBeenCalledWith(20, 10, mockClient);
             expect(result).toEqual(expectedProfiles);
         });
     });
 
     describe('getJobProfileCount', () => {
-        it('should return job profile count for client', async () => {
-            mockRepository.countByClient.mockResolvedValue(15);
+        it('should return total job profile count', async () => {
+            mockRepository.count.mockResolvedValue(15);
 
-            const result = await jobProfileService.getJobProfileCount('client-123');
+            const result = await jobProfileService.getJobProfileCount();
 
-            expect(mockRepository.countByClient).toHaveBeenCalledWith('client-123');
+            expect(mockRepository.count).toHaveBeenCalledWith(mockClient);
             expect(result).toBe(15);
-        });
-    });
-
-    describe('getJobProfilesByClientWithPagination', () => {
-        it('should return paginated job profiles with default page and size', async () => {
-            const mockProfiles = [{ id: 'profile-1', jobRole: 'Developer' }];
-            mockRepository.findByClientId.mockResolvedValue(mockProfiles);
-            mockRepository.countByClient.mockResolvedValue(25);
-
-            const result = await jobProfileService.getJobProfilesByClientWithPagination('client-123');
-
-            expect(mockRepository.findByClientId).toHaveBeenCalledWith('client-123', 10, 0);
-            expect(mockRepository.countByClient).toHaveBeenCalledWith('client-123');
-            expect(result).toEqual({
-                jobProfiles: mockProfiles,
-                pagination: {
-                    currentPage: 1,
-                    pageSize: 10,
-                    totalCount: 25,
-                    totalPages: 3,
-                    hasNextPage: true,
-                    hasPreviousPage: false,
-                },
-            });
-        });
-
-        it('should return paginated job profiles for page 2', async () => {
-            const mockProfiles = [{ id: 'profile-2', jobRole: 'Designer' }];
-            mockRepository.findByClientId.mockResolvedValue(mockProfiles);
-            mockRepository.countByClient.mockResolvedValue(25);
-
-            const result = await jobProfileService.getJobProfilesByClientWithPagination('client-123', 2, 10);
-
-            expect(mockRepository.findByClientId).toHaveBeenCalledWith('client-123', 10, 10);
-            expect(result.pagination).toMatchObject({
-                currentPage: 2,
-                hasNextPage: true,
-                hasPreviousPage: true,
-            });
-        });
-
-        it('should return last page correctly', async () => {
-            const mockProfiles = [{ id: 'profile-3', jobRole: 'Manager' }];
-            mockRepository.findByClientId.mockResolvedValue(mockProfiles);
-            mockRepository.countByClient.mockResolvedValue(25);
-
-            const result = await jobProfileService.getJobProfilesByClientWithPagination('client-123', 3, 10);
-
-            expect(result.pagination).toMatchObject({
-                currentPage: 3,
-                totalPages: 3,
-                hasNextPage: false,
-                hasPreviousPage: true,
-            });
-        });
-
-        it('should handle custom page size', async () => {
-            const mockProfiles = [{ id: 'profile-1' }];
-            mockRepository.findByClientId.mockResolvedValue(mockProfiles);
-            mockRepository.countByClient.mockResolvedValue(100);
-
-            const result = await jobProfileService.getJobProfilesByClientWithPagination('client-123', 1, 25);
-
-            expect(mockRepository.findByClientId).toHaveBeenCalledWith('client-123', 25, 0);
-            expect(result.pagination).toMatchObject({
-                pageSize: 25,
-                totalPages: 4,
-            });
         });
     });
 
     describe('getAllJobProfilesWithPagination', () => {
         it('should return paginated all job profiles', async () => {
-            const mockProfiles = Array(10).fill({ id: 'profile-1', jobRole: 'Developer' });
+            const mockProfiles = Array(10).fill({ jobProfileId: 'profile-1', jobRole: 'Developer' });
             mockRepository.findAll.mockResolvedValue(mockProfiles);
+            mockRepository.count.mockResolvedValue(42);
 
             const result = await jobProfileService.getAllJobProfilesWithPagination(1, 10);
 
-            expect(mockRepository.findAll).toHaveBeenCalledWith(10, 0);
+            expect(mockRepository.findAll).toHaveBeenCalledWith(10, 0, mockClient);
+            expect(mockRepository.count).toHaveBeenCalledWith(mockClient);
             expect(result).toEqual({
                 jobProfiles: mockProfiles,
                 pagination: {
                     currentPage: 1,
                     pageSize: 10,
+                    totalCount: 42,
+                    totalPages: 5,
                     hasNextPage: true,
                     hasPreviousPage: false,
                 },
             });
         });
 
-        it('should indicate no next page when fewer results than page size', async () => {
-            const mockProfiles = Array(5).fill({ id: 'profile-1', jobRole: 'Developer' });
+        it('should indicate no next page on last page', async () => {
+            const mockProfiles = Array(5).fill({ jobProfileId: 'profile-1', jobRole: 'Developer' });
             mockRepository.findAll.mockResolvedValue(mockProfiles);
+            mockRepository.count.mockResolvedValue(15);
 
             const result = await jobProfileService.getAllJobProfilesWithPagination(2, 10);
 
-            expect(result.pagination.hasNextPage).toBe(false);
+            expect(result.pagination).toMatchObject({
+                currentPage: 2,
+                hasNextPage: false,
+                hasPreviousPage: true,
+            });
+        });
+
+        it('should wrap unexpected errors', async () => {
+            mockRepository.findAll.mockRejectedValue(new Error('db'));
+
+            await expect(jobProfileService.getAllJobProfilesWithPagination(1, 10)).rejects.toMatchObject({
+                errorCode: 'JOB_PROFILE_FETCH_ERROR',
+            });
         });
     });
 
-    describe('bulkUpdateJobProfiles', () => {
-        const jobProfileIds = ['profile-1', 'profile-2', 'profile-3'];
-        const updateData = { status: 'active' };
+    describe('S3 helpers', () => {
+        it('deleteFromS3 should send DeleteObjectCommand', async () => {
+            jobProfileService.s3Client.send.mockResolvedValue({});
 
-        it('should successfully update all job profiles', async () => {
-            mockRepository.update.mockResolvedValue(undefined);
+            await jobProfileService.deleteFromS3('folder/key.pdf');
 
-            const result = await jobProfileService.bulkUpdateJobProfiles(jobProfileIds, updateData);
+            expect(jobProfileService.s3Client.send).toHaveBeenCalled();
+        });
 
-            expect(mockClient.beginTransaction).toHaveBeenCalledTimes(1);
-            expect(mockRepository.update).toHaveBeenCalledTimes(3);
-            jobProfileIds.forEach(id => {
-                expect(mockRepository.update).toHaveBeenCalledWith(id, updateData, mockClient);
-            });
-            expect(mockClient.commit).toHaveBeenCalledTimes(1);
-            expect(mockClient.rollback).not.toHaveBeenCalled();
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
-            expect(result).toEqual({
-                results: [
-                    { jobProfileId: 'profile-1', status: 'success' },
-                    { jobProfileId: 'profile-2', status: 'success' },
-                    { jobProfileId: 'profile-3', status: 'success' },
-                ],
-                totalProcessed: 3,
-                successful: 3,
+        it('deleteFromS3 should wrap failures', async () => {
+            jobProfileService.s3Client.send.mockRejectedValue(new Error('aws'));
+
+            await expect(jobProfileService.deleteFromS3('k')).rejects.toMatchObject({
+                errorCode: 'S3_DELETE_ERROR',
             });
         });
 
-        it('should rollback and throw error when one update fails', async () => {
-            const updateError = new Error('Update failed');
-            mockRepository.update
-                .mockResolvedValueOnce(undefined)
-                .mockRejectedValueOnce(updateError)
-                .mockResolvedValueOnce(undefined);
+        it('fileExistsInS3 returns true on HeadObject success', async () => {
+            jobProfileService.s3Client.send.mockResolvedValue({});
 
-            await expect(jobProfileService.bulkUpdateJobProfiles(jobProfileIds, updateData))
-                .rejects
-                .toMatchObject({
-                    message: 'Bulk update failed for some records',
-                    statusCode: 400,
-                    errorCode: 'BULK_UPDATE_ERROR',
-                });
-
-            expect(mockClient.rollback).toHaveBeenCalledTimes(1);
-            expect(mockClient.commit).not.toHaveBeenCalled();
-            expect(mockClient.release).toHaveBeenCalledTimes(1);
+            await expect(jobProfileService.fileExistsInS3('k')).resolves.toBe(true);
         });
 
-        it('should collect all errors and provide detailed results', async () => {
-            const error1 = new Error('Error 1');
-            const error2 = new Error('Error 2');
+        it('fileExistsInS3 returns false when NotFound', async () => {
+            const err = new Error('nf');
+            err.name = 'NotFound';
+            jobProfileService.s3Client.send.mockRejectedValue(err);
 
-            mockRepository.update
-                .mockResolvedValueOnce(undefined)
-                .mockRejectedValueOnce(error1)
-                .mockRejectedValueOnce(error2);
-
-            try {
-                await jobProfileService.bulkUpdateJobProfiles(jobProfileIds, updateData);
-            } catch (error) {
-                expect(error.details.results).toHaveLength(3);
-                expect(error.details.errors).toHaveLength(2);
-                expect(error.details.errors).toEqual([
-                    { jobProfileId: 'profile-2', error: 'Error 1' },
-                    { jobProfileId: 'profile-3', error: 'Error 2' },
-                ]);
-            }
-
-            expect(mockClient.rollback).toHaveBeenCalledTimes(1);
+            await expect(jobProfileService.fileExistsInS3('k')).resolves.toBe(false);
         });
 
-        it('should handle empty job profile ids array', async () => {
-            const result = await jobProfileService.bulkUpdateJobProfiles([], updateData);
+        it('fileExistsInS3 returns false on HTTP 404 metadata', async () => {
+            jobProfileService.s3Client.send.mockRejectedValue({ $metadata: { httpStatusCode: 404 } });
 
-            expect(mockClient.commit).toHaveBeenCalledTimes(1);
-            expect(result).toEqual({
-                results: [],
-                totalProcessed: 0,
-                successful: 0,
+            await expect(jobProfileService.fileExistsInS3('k')).resolves.toBe(false);
+        });
+
+        it('fileExistsInS3 rethrows unexpected errors', async () => {
+            jobProfileService.s3Client.send.mockRejectedValue(new Error('other'));
+
+            await expect(jobProfileService.fileExistsInS3('k')).rejects.toThrow('other');
+        });
+
+        it('generatePresignedUrl returns signed URL', async () => {
+            jobProfileService.s3Client.send.mockResolvedValue({});
+
+            const url = await jobProfileService.generatePresignedUrl('key', 60);
+
+            expect(url).toBe('https://signed.example/download');
+            expect(getSignedUrl).toHaveBeenCalled();
+        });
+
+        it('generatePresignedUrl wraps errors', async () => {
+            getSignedUrl.mockRejectedValueOnce(new Error('sign fail'));
+
+            await expect(jobProfileService.generatePresignedUrl('k')).rejects.toMatchObject({
+                errorCode: 'S3_URL_ERROR',
             });
+        });
+
+        it('getS3FileMetadata returns mapped fields', async () => {
+            jobProfileService.s3Client.send.mockResolvedValue({
+                ContentType: 'application/pdf',
+                ContentLength: 12,
+                LastModified: new Date('2020-01-01'),
+                Metadata: { a: '1' },
+            });
+
+            const meta = await jobProfileService.getS3FileMetadata('k');
+
+            expect(meta.contentType).toBe('application/pdf');
+            expect(meta.contentLength).toBe(12);
+        });
+
+        it('getS3FileMetadata wraps errors', async () => {
+            jobProfileService.s3Client.send.mockRejectedValue(new Error('head'));
+
+            await expect(jobProfileService.getS3FileMetadata('k')).rejects.toMatchObject({
+                errorCode: 'S3_METADATA_ERROR',
+            });
+        });
+
+        it('renameS3File copies and deletes', async () => {
+            jobProfileService.s3Client.send.mockResolvedValue({});
+
+            const out = await jobProfileService.renameS3File('old-key', 5, 'My Doc!.pdf');
+
+            expect(out.newKey).toContain('jobProfile_5_');
+            expect(jobProfileService.s3Client.send).toHaveBeenCalledTimes(2);
+        });
+
+        it('renameS3File cleans up old key when copy fails', async () => {
+            jobProfileService.s3Client.send
+                .mockRejectedValueOnce(new Error('copy failed'))
+                .mockResolvedValueOnce({});
+
+            await expect(
+                jobProfileService.renameS3File('temp-old', 1, 'a.pdf')
+            ).rejects.toMatchObject({ errorCode: 'S3_RENAME_ERROR' });
+
+            expect(jobProfileService.s3Client.send).toHaveBeenCalled();
+        });
+    });
+
+    describe('uploadJD', () => {
+        const file = {
+            key: 'jd/new.pdf',
+            originalname: 'orig.pdf',
+            size: 100,
+            location: 's3',
+        };
+
+        it('should persist JD metadata on success', async () => {
+            mockRepository.findById.mockResolvedValue({ jobProfileId: 'jp1' });
+            mockRepository.getJDInfo.mockResolvedValue(null);
+            mockRepository.updateJDInfo.mockResolvedValue(undefined);
+
+            const out = await jobProfileService.uploadJD('jp1', file);
+
+            expect(out.filename).toBe(file.key);
+            expect(mockRepository.updateJDInfo).toHaveBeenCalledWith('jp1', file.key, file.originalname, mockClient);
+            expect(mockClient.commit).toHaveBeenCalled();
+        });
+
+        it('should delete uploaded key when profile missing', async () => {
+            mockRepository.findById.mockResolvedValue(null);
+            jobProfileService.s3Client.send.mockResolvedValue({});
+
+            await expect(jobProfileService.uploadJD('missing', file)).rejects.toMatchObject({
+                errorCode: 'JOB_PROFILE_NOT_FOUND',
+            });
+
+            expect(jobProfileService.s3Client.send).toHaveBeenCalled();
+        });
+
+        it('should continue when deleting old JD from S3 fails', async () => {
+            mockRepository.findById.mockResolvedValue({ jobProfileId: '1' });
+            mockRepository.getJDInfo.mockResolvedValue({ jdFileName: 'old.pdf' });
+            mockRepository.updateJDInfo.mockResolvedValue(undefined);
+            jobProfileService.s3Client.send.mockRejectedValue(new Error('del old'));
+
+            const out = await jobProfileService.uploadJD('1', file);
+
+            expect(out.jobProfileId).toBe('1');
+            expect(mockClient.commit).toHaveBeenCalled();
+        });
+
+        it('should rollback and delete new key on generic error', async () => {
+            mockRepository.findById.mockResolvedValue({ jobProfileId: '1' });
+            mockRepository.getJDInfo.mockResolvedValue(null);
+            mockRepository.updateJDInfo.mockRejectedValue(new Error('db'));
+            jobProfileService.s3Client.send.mockResolvedValue({});
+
+            await expect(jobProfileService.uploadJD('1', file)).rejects.toMatchObject({
+                errorCode: 'JD_UPLOAD_ERROR',
+            });
+
+            expect(mockClient.rollback).toHaveBeenCalled();
+        });
+    });
+
+    describe('downloadJD', () => {
+        it('should return metadata when file exists', async () => {
+            mockRepository.findById.mockResolvedValue({ jobProfileId: '1' });
+            mockRepository.getJDInfo.mockResolvedValue({
+                jdFileName: 'k.pdf',
+                jdOriginalName: 'orig.pdf',
+                jdUploadDate: new Date(),
+            });
+            jobProfileService.s3Client.send.mockResolvedValue({
+                ContentType: 'application/pdf',
+                ContentLength: 9,
+            });
+
+            const out = await jobProfileService.downloadJD('1');
+
+            expect(out.s3Key).toBe('k.pdf');
+            expect(out.contentType).toBe('application/pdf');
+        });
+
+        it('should 404 when profile missing', async () => {
+            mockRepository.findById.mockResolvedValue(null);
+
+            await expect(jobProfileService.downloadJD('x')).rejects.toMatchObject({
+                errorCode: 'JOB_PROFILE_NOT_FOUND',
+            });
+        });
+
+        it('should 404 when no JD row', async () => {
+            mockRepository.findById.mockResolvedValue({});
+            mockRepository.getJDInfo.mockResolvedValue(null);
+
+            await expect(jobProfileService.downloadJD('1')).rejects.toMatchObject({ errorCode: 'JD_NOT_FOUND' });
+        });
+
+        it('should 404 when object missing in S3', async () => {
+            mockRepository.findById.mockResolvedValue({});
+            mockRepository.getJDInfo.mockResolvedValue({ jdFileName: 'k' });
+            jobProfileService.s3Client.send.mockRejectedValue({ name: 'NotFound' });
+
+            await expect(jobProfileService.downloadJD('1')).rejects.toMatchObject({
+                errorCode: 'JD_FILE_NOT_FOUND',
+            });
+        });
+
+        it('should wrap unexpected errors', async () => {
+            mockRepository.findById.mockRejectedValue(new Error('db'));
+
+            await expect(jobProfileService.downloadJD('1')).rejects.toMatchObject({
+                errorCode: 'JD_DOWNLOAD_ERROR',
+            });
+        });
+    });
+
+    describe('getJDPresignedUrl', () => {
+        it('should return URL payload', async () => {
+            mockRepository.findById.mockResolvedValue({});
+            mockRepository.getJDInfo.mockResolvedValue({
+                jdFileName: 'k',
+                jdOriginalName: 'o.pdf',
+            });
+            jobProfileService.s3Client.send.mockResolvedValue({});
+
+            const out = await jobProfileService.getJDPresignedUrl('1', 120);
+
+            expect(out.downloadUrl).toBe('https://signed.example/download');
+            expect(out.expiresIn).toBe(120);
+        });
+
+        it('should wrap unexpected errors', async () => {
+            mockRepository.findById.mockRejectedValue(new Error('x'));
+
+            await expect(jobProfileService.getJDPresignedUrl('1')).rejects.toMatchObject({
+                errorCode: 'PRESIGNED_URL_ERROR',
+            });
+        });
+    });
+
+    describe('deleteJD', () => {
+        it('should delete from S3 and clear DB row', async () => {
+            mockRepository.findById.mockResolvedValue({});
+            mockRepository.getJDInfo.mockResolvedValue({ jdFileName: 'k' });
+            mockRepository.deleteJDInfo.mockResolvedValue(undefined);
+            jobProfileService.s3Client.send.mockResolvedValue({});
+
+            const out = await jobProfileService.deleteJD('1');
+
+            expect(out.deletedFile).toBe('k');
+            expect(mockRepository.deleteJDInfo).toHaveBeenCalledWith('1', mockClient);
+        });
+
+        it('should continue when S3 delete fails', async () => {
+            mockRepository.findById.mockResolvedValue({});
+            mockRepository.getJDInfo.mockResolvedValue({ jdFileName: 'k' });
+            mockRepository.deleteJDInfo.mockResolvedValue(undefined);
+            jobProfileService.s3Client.send.mockRejectedValue(new Error('s3'));
+
+            const out = await jobProfileService.deleteJD('1');
+
+            expect(out.message).toMatch(/deleted/i);
+        });
+
+        it('should wrap DB errors', async () => {
+            mockRepository.findById.mockResolvedValue({});
+            mockRepository.getJDInfo.mockResolvedValue({ jdFileName: 'k' });
+            mockRepository.deleteJDInfo.mockRejectedValue(new Error('db'));
+
+            await expect(jobProfileService.deleteJD('1')).rejects.toMatchObject({ errorCode: 'JD_DELETE_ERROR' });
+        });
+    });
+
+    describe('getJDInfo (service)', () => {
+        it('should describe whether JD exists', async () => {
+            mockRepository.findById.mockResolvedValue({});
+            mockRepository.getJDInfo.mockResolvedValue({ jdFileName: 'x', jdOriginalName: 'a', jdUploadDate: null });
+
+            const out = await jobProfileService.getJDInfo('1');
+
+            expect(out.hasJD).toBe(true);
+            expect(out.s3Key).toBe('x');
+        });
+
+        it('should wrap errors', async () => {
+            mockRepository.findById.mockRejectedValue(new Error('e'));
+
+            await expect(jobProfileService.getJDInfo('1')).rejects.toMatchObject({ errorCode: 'JD_FETCH_ERROR' });
+        });
+    });
+
+    describe('updateJobProfileJDInfo', () => {
+        it('should run transactional update', async () => {
+            mockRepository.updateJDInfo.mockResolvedValue(undefined);
+
+            await jobProfileService.updateJobProfileJDInfo('1', {
+                jdFileName: 'k',
+                jdOriginalName: 'o.pdf',
+            });
+
+            expect(mockClient.commit).toHaveBeenCalled();
+        });
+
+        it('should wrap errors', async () => {
+            mockRepository.updateJDInfo.mockRejectedValue(new Error('db'));
+
+            await expect(
+                jobProfileService.updateJobProfileJDInfo('1', { jdFileName: 'k', jdOriginalName: 'o' })
+            ).rejects.toMatchObject({ errorCode: 'JD_UPDATE_ERROR' });
+        });
+    });
+
+    describe('createJobProfile with auditContext', () => {
+        const data = { jobRole: 'R', clientId: 'c', departmentId: 'd' };
+
+        it('should log audit when context provided', async () => {
+            mockRepository.existsByRole.mockResolvedValue(false);
+            mockRepository.create.mockResolvedValue({ jobProfileId: 'jp-1', jobRole: 'R' });
+            const ctx = { userId: 9, ipAddress: '1.1.1.1', userAgent: 'ua', timestamp: new Date() };
+
+            await jobProfileService.createJobProfile(data, ctx);
+
+            expect(auditLogService.logAction).toHaveBeenCalledWith(
+                expect.objectContaining({ userId: 9, action: 'CREATE' }),
+                mockClient
+            );
+        });
+    });
+
+    describe('updateJobProfile with auditContext', () => {
+        it('should log audit on update', async () => {
+            const existing = { jobProfileId: '1', jobRole: 'Old' };
+            const updated = { jobProfileId: '1', jobRole: 'New' };
+            mockRepository.findById.mockResolvedValueOnce(existing).mockResolvedValueOnce(updated);
+            mockRepository.update.mockResolvedValue(updated);
+            const ctx = { userId: 2, ipAddress: '::1', userAgent: 'jest', timestamp: new Date() };
+
+            await jobProfileService.updateJobProfile('1', { jobRole: 'New' }, ctx);
+
+            expect(auditLogService.logAction).toHaveBeenCalledWith(
+                expect.objectContaining({ action: 'UPDATE', oldValues: existing }),
+                mockClient
+            );
+        });
+    });
+
+    describe('deleteJobProfile with auditContext', () => {
+        it('should log audit on delete', async () => {
+            const prof = { jobProfileId: '1', jobRole: 'X' };
+            mockRepository.findById.mockResolvedValue(prof);
+            mockRepository.delete.mockResolvedValue(undefined);
+            const ctx = { userId: 3, ipAddress: '0.0.0.0', userAgent: 'ua', timestamp: new Date() };
+
+            await jobProfileService.deleteJobProfile('1', ctx);
+
+            expect(auditLogService.logAction).toHaveBeenCalledWith(
+                expect.objectContaining({ action: 'DELETE', oldValues: prof }),
+                mockClient
+            );
+        });
+    });
+
+    describe('getAllJobProfiles error path', () => {
+        it('should wrap repository errors', async () => {
+            mockRepository.findAll.mockRejectedValue(new Error('db'));
+
+            await expect(jobProfileService.getAllJobProfiles()).rejects.toMatchObject({
+                errorCode: 'JOB_PROFILE_FETCH_ERROR',
+            });
+        });
+    });
+
+    describe('getJobProfileCount error path', () => {
+        it('should wrap repository errors', async () => {
+            mockRepository.count.mockRejectedValue(new Error('db'));
+
+            await expect(jobProfileService.getJobProfileCount()).rejects.toMatchObject({
+                errorCode: 'JOB_PROFILE_COUNT_ERROR',
+            });
+        });
+    });
+
+    describe('getJobProfileById error path', () => {
+        it('should wrap non-AppError failures', async () => {
+            mockRepository.findById.mockRejectedValue(new Error('db'));
+
+            await expect(jobProfileService.getJobProfileById('1')).rejects.toMatchObject({
+                errorCode: 'JOB_PROFILE_FETCH_ERROR',
+            });
+        });
+    });
+
+    describe('multer upload wiring', () => {
+        it('should expose upload middleware', () => {
+            expect(jobProfileService.upload).toBeDefined();
+            expect(typeof jobProfileService.upload.single).toBe('function');
         });
     });
 });
