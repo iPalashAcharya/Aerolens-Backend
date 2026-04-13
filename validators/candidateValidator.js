@@ -303,6 +303,41 @@ class CandidateValidatorHelper {
             if (!client) connection.release();
         }
     }
+
+    /**
+     * Resolve a lookup row by tag + display value (case-insensitive).
+     * Used by bulk upload for work mode, currency, compensation type, etc.
+     */
+    async getLookupKeyByTagAndValue(tag, displayValue, client = null, friendlyLabel = null) {
+        const trimmed = String(displayValue).trim();
+        if (!trimmed) {
+            throw new AppError(
+                `${friendlyLabel || tag} value cannot be empty`,
+                400,
+                'INVALID_LOOKUP_VALUE'
+            );
+        }
+
+        const connection = client || await this.db.getConnection();
+        try {
+            const [rows] = await connection.execute(
+                `SELECT lookupKey FROM lookup WHERE tag = ? AND LOWER(TRIM(value)) = LOWER(?) LIMIT 1`,
+                [tag, trimmed]
+            );
+
+            if (rows.length === 0) {
+                throw new AppError(
+                    `Invalid ${friendlyLabel || tag}: '${trimmed}'. Value does not exist in the system.`,
+                    400,
+                    'INVALID_LOOKUP_VALUE'
+                );
+            }
+
+            return rows[0].lookupKey;
+        } finally {
+            if (!client) connection.release();
+        }
+    }
 }
 
 // Schema definitions

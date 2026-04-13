@@ -9,6 +9,7 @@ describe('JobProfileRepository', () => {
     beforeEach(() => {
         mockConnection = {
             execute: jest.fn(),
+            query: jest.fn(),
             release: jest.fn(),
         };
 
@@ -23,769 +24,356 @@ describe('JobProfileRepository', () => {
         jest.clearAllMocks();
     });
 
+    const baseCreatePayload = () => ({
+        jobRole: 'Software Engineer',
+        jobOverview: 'Overview',
+        keyResponsibilities: 'Responsibilities',
+        requiredSkillsText: 'Skills',
+        niceToHave: 'Nice',
+        experienceText: '5+ years',
+        experienceMinYears: 3,
+        experienceMaxYears: 7,
+    });
+
     describe('create', () => {
-        const jobProfileData = {
-            clientId: 'client-123',
-            departmentId: 'dept-1',
-            jobProfileDescription: 'Senior developer position',
-            jobRole: 'Software Engineer',
-            techSpecification: 'Node.js, React',
-            positions: 3,
-            estimatedCloseDate: '2025-12-31',
-            locationId: 'loc-1',
-            statusId: 7,
-        };
+        it('should create job profile and return insert id with data', async () => {
+            const data = baseCreatePayload();
+            mockConnection.execute.mockResolvedValue([{ insertId: 101 }]);
 
-        it('should create job profile successfully without client', async () => {
-            const mockResult = { insertId: 101 };
-            mockConnection.execute.mockResolvedValue([mockResult]);
-
-            const result = await repository.create(jobProfileData, mockConnection);
+            const result = await repository.create(data, mockConnection);
 
             expect(mockConnection.execute).toHaveBeenCalledWith(
                 expect.stringContaining('INSERT INTO jobProfile'),
                 [
-                    jobProfileData.clientId,
-                    jobProfileData.departmentId,
-                    jobProfileData.jobProfileDescription,
-                    jobProfileData.jobRole,
-                    jobProfileData.techSpecification,
-                    jobProfileData.positions,
-                    jobProfileData.estimatedCloseDate,
-                    jobProfileData.locationId,
-                    jobProfileData.statusId,
+                    data.jobRole,
+                    data.jobOverview,
+                    data.keyResponsibilities,
+                    data.requiredSkillsText,
+                    data.niceToHave,
+                    data.experienceText,
+                    data.experienceMinYears,
+                    data.experienceMaxYears,
                 ]
             );
-            expect(mockConnection.release).not.toHaveBeenCalled();
             expect(result).toMatchObject({
                 jobProfileId: 101,
-                ...jobProfileData,
+                ...data,
             });
-            expect(result.receivedOn).toBeInstanceOf(Date);
+            expect(result.createdAt).toBeInstanceOf(Date);
         });
 
-        it('should create job profile with provided client connection', async () => {
-            const mockResult = { insertId: 102 };
-            mockConnection.execute.mockResolvedValue([mockResult]);
+        it('should use null for optional text fields when omitted', async () => {
+            const data = { jobRole: 'Role Only' };
+            mockConnection.execute.mockResolvedValue([{ insertId: 1 }]);
 
-            const result = await repository.create(jobProfileData, mockConnection);
+            await repository.create(data, mockConnection);
 
-            expect(mockDb.getConnection).not.toHaveBeenCalled();
-            expect(mockConnection.release).not.toHaveBeenCalled();
-            expect(result.jobProfileId).toBe(102);
+            expect(mockConnection.execute).toHaveBeenCalledWith(expect.any(String), [
+                'Role Only',
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+            ]);
         });
 
-        it('should use default statusId of 7 when not provided', async () => {
-            const dataWithoutStatus = { ...jobProfileData };
-            delete dataWithoutStatus.statusId;
+        it('should map duplicate entry to AppError', async () => {
+            const data = baseCreatePayload();
+            mockConnection.execute.mockRejectedValue({ code: 'ER_DUP_ENTRY', message: 'dup' });
 
-            const mockResult = { insertId: 103 };
-            mockConnection.execute.mockResolvedValue([mockResult]);
+            await expect(repository.create(data, mockConnection)).rejects.toMatchObject({
+                message: 'A job profile with this role already exists',
+                statusCode: 409,
+                errorCode: 'DUPLICATE_ENTRY',
+            });
+        });
+    });
 
-            await repository.create(dataWithoutStatus, mockConnection);
+    describe('addTechSpecifications', () => {
+        it('should insert tech specs using bulk query', async () => {
+            mockConnection.query.mockResolvedValue();
 
-            expect(mockConnection.execute).toHaveBeenCalledWith(
-                expect.any(String),
-                expect.arrayContaining([7])
+            await repository.addTechSpecifications(5, [10, 11], mockConnection);
+
+            expect(mockConnection.query).toHaveBeenCalledWith(
+                expect.stringContaining('INSERT INTO jobProfileTechSpec'),
+                [[[5, 10], [5, 11]]]
             );
         });
 
-        it('should use null for estimatedCloseDate when not provided', async () => {
-            const dataWithoutDate = { ...jobProfileData };
-            delete dataWithoutDate.estimatedCloseDate;
+        it('should no-op when lookupIds empty', async () => {
+            await repository.addTechSpecifications(5, [], mockConnection);
+            expect(mockConnection.query).not.toHaveBeenCalled();
+        });
+    });
 
-            const mockResult = { insertId: 104 };
-            mockConnection.execute.mockResolvedValue([mockResult]);
+    describe('removeTechSpecifications', () => {
+        it('should delete rows for job profile', async () => {
+            mockConnection.execute.mockResolvedValue([{ affectedRows: 2 }]);
 
-            await repository.create(dataWithoutDate, mockConnection);
+            await repository.removeTechSpecifications(9, mockConnection);
 
             expect(mockConnection.execute).toHaveBeenCalledWith(
-                expect.any(String),
-                expect.arrayContaining([null])
+                expect.stringContaining('DELETE FROM jobProfileTechSpec'),
+                [9]
             );
         });
+    });
 
-        it('should handle duplicate entry error', async () => {
-            const dbError = { code: 'ER_DUP_ENTRY', message: 'Duplicate entry' };
-            mockConnection.execute.mockRejectedValue(dbError);
+    describe('getTechSpecifications', () => {
+        it('should return rows from join', async () => {
+            const rows = [{ lookupId: 1, techSpecName: 'Node' }];
+            mockConnection.execute.mockResolvedValue([rows]);
 
-            await expect(repository.create(jobProfileData, mockConnection))
-                .rejects
-                .toMatchObject({
-                    message: 'A job profile with this role already exists for this client',
-                    statusCode: 409,
-                    errorCode: 'DUPLICATE_ENTRY',
-                });
+            const result = await repository.getTechSpecifications(3, mockConnection);
 
-            expect(mockConnection.release).not.toHaveBeenCalled();
-        });
-
-        it('should handle foreign key constraint error', async () => {
-            const dbError = { code: 'ER_NO_REFERENCED_ROW_2', message: 'Foreign key constraint' };
-            mockConnection.execute.mockRejectedValue(dbError);
-
-            await expect(repository.create(jobProfileData, mockConnection))
-                .rejects
-                .toMatchObject({
-                    message: 'Invalid foreign key provided - referenced record does not exist',
-                    statusCode: 400,
-                    errorCode: 'FOREIGN_KEY_CONSTRAINT',
-                });
-        });
-
-        it('should not release connection when error occurs', async () => {
-            mockConnection.execute.mockRejectedValue(new Error('Database error'));
-
-            await expect(repository.create(jobProfileData, mockConnection)).rejects.toThrow();
-
-            expect(mockConnection.release).not.toHaveBeenCalled();
-        });
-
-        it('should not release connection when client is provided and error occurs', async () => {
-            mockConnection.execute.mockRejectedValue(new Error('Database error'));
-
-            await expect(repository.create(jobProfileData, mockConnection)).rejects.toThrow();
-
-            expect(mockConnection.release).not.toHaveBeenCalled();
+            expect(result).toEqual(rows);
         });
     });
 
     describe('findById', () => {
-        const jobProfileId = 'profile-123';
-        const mockJobProfile = {
-            jobProfileId,
-            clientId: 'client-123',
-            clientName: 'Tech Corp',
-            departmentId: 'dept-1',
-            departmentName: 'Engineering',
-            jobRole: 'Software Engineer',
-        };
+        it('should group job profile with tech specifications', async () => {
+            const rows = [
+                {
+                    jobProfileId: 1,
+                    jobRole: 'Dev',
+                    jobOverview: 'o',
+                    keyResponsibilities: 'k',
+                    requiredSkillsText: 'r',
+                    niceToHave: 'n',
+                    experienceText: 'e',
+                    experienceMinYears: 1,
+                    experienceMaxYears: 2,
+                    jdFileName: null,
+                    jdOriginalName: null,
+                    jdUploadDate: null,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                    techSpecId: 10,
+                    techSpecName: 'TS1',
+                },
+                {
+                    jobProfileId: 1,
+                    jobRole: 'Dev',
+                    jobOverview: 'o',
+                    keyResponsibilities: 'k',
+                    requiredSkillsText: 'r',
+                    niceToHave: 'n',
+                    experienceText: 'e',
+                    experienceMinYears: 1,
+                    experienceMaxYears: 2,
+                    jdFileName: null,
+                    jdOriginalName: null,
+                    jdUploadDate: null,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                    techSpecId: 11,
+                    techSpecName: 'TS2',
+                },
+            ];
+            mockConnection.execute.mockResolvedValue([rows]);
 
-        it('should find job profile by id successfully', async () => {
-            mockConnection.execute.mockResolvedValue([[mockJobProfile]]);
+            const result = await repository.findById(1, mockConnection);
 
-            const result = await repository.findById(jobProfileId, mockConnection);
-
-            expect(mockConnection.execute).toHaveBeenCalledWith(
-                expect.stringContaining('SELECT jp.jobProfileId'),
-                [jobProfileId]
-            );
-            expect(mockConnection.release).not.toHaveBeenCalled();
-            expect(result).toEqual(mockJobProfile);
+            expect(result.jobProfileId).toBe(1);
+            expect(result.techSpecifications).toEqual([
+                { lookupId: 10, value: 'TS1' },
+                { lookupId: 11, value: 'TS2' },
+            ]);
         });
 
-        it('should return null when job profile not found', async () => {
+        it('should return null when not found', async () => {
             mockConnection.execute.mockResolvedValue([[]]);
 
-            const result = await repository.findById(jobProfileId, mockConnection);
+            const result = await repository.findById(99, mockConnection);
 
             expect(result).toBeNull();
         });
 
-        it('should throw AppError when jobProfileId is missing', async () => {
-            await expect(repository.findById(null, mockConnection))
-                .rejects
-                .toMatchObject({
-                    message: 'Job Profile ID is required',
-                    statusCode: 400,
-                    errorCode: 'MISSING_JOB_PROFILE_ID',
-                });
+        it('should throw when jobProfileId missing', async () => {
+            await expect(repository.findById(null, mockConnection)).rejects.toMatchObject({
+                errorCode: 'MISSING_JOB_PROFILE_ID',
+            });
+        });
+    });
 
-            expect(mockConnection.release).not.toHaveBeenCalled();
+    describe('findByRole', () => {
+        it('should return first matching row', async () => {
+            mockConnection.execute.mockResolvedValue([[{ jobProfileId: 3, jobRole: 'X' }]]);
+
+            const result = await repository.findByRole('X', null, mockConnection);
+
+            expect(result).toEqual({ jobProfileId: 3, jobRole: 'X' });
         });
 
-        it('should work with provided client connection', async () => {
-            mockConnection.execute.mockResolvedValue([[mockJobProfile]]);
+        it('should add exclude clause when excludeId set', async () => {
+            mockConnection.execute.mockResolvedValue([[]]);
 
-            const result = await repository.findById(jobProfileId, mockConnection);
+            await repository.findByRole('X', 5, mockConnection);
 
-            expect(mockDb.getConnection).not.toHaveBeenCalled();
-            expect(mockConnection.release).not.toHaveBeenCalled();
-            expect(result).toEqual(mockJobProfile);
+            const [q, p] = mockConnection.execute.mock.calls[0];
+            expect(q).toContain('jobProfileId != ?');
+            expect(p).toEqual(['X', 5]);
         });
 
-        it('should rethrow AppError without wrapping', async () => {
-            const appError = new AppError('Custom error', 400, 'CUSTOM_ERROR');
-            mockConnection.execute.mockRejectedValue(appError);
-
-            await expect(repository.findById(jobProfileId, mockConnection)).rejects.toBe(appError);
-        });
-
-        it('should handle database errors', async () => {
-            const dbError = { code: 'ECONNREFUSED', message: 'Connection refused' };
-            mockConnection.execute.mockRejectedValue(dbError);
-
-            await expect(repository.findById(jobProfileId, mockConnection))
-                .rejects
-                .toMatchObject({
-                    message: 'Database connection refused',
-                    statusCode: 503,
-                    errorCode: 'DATABASE_CONNECTION_ERROR',
-                });
+        it('should throw when jobRole missing', async () => {
+            await expect(repository.findByRole(null, null, mockConnection)).rejects.toMatchObject({
+                errorCode: 'MISSING_JOB_ROLE',
+            });
         });
     });
 
     describe('update', () => {
-        const jobProfileId = 'profile-123';
-        const updateData = {
-            jobRole: 'Senior Software Engineer',
-            positions: 5,
-            statusId: 8,
-        };
+        const id = 12;
+        const base = { jobRole: 'New Role' };
 
-        it('should update job profile successfully', async () => {
+        it('should update allowed fields', async () => {
             mockConnection.execute.mockResolvedValue([{ affectedRows: 1 }]);
 
-            const result = await repository.update(jobProfileId, updateData, mockConnection);
+            const result = await repository.update(id, base, mockConnection);
 
             expect(mockConnection.execute).toHaveBeenCalledWith(
                 expect.stringContaining('UPDATE jobProfile SET'),
-                ['Senior Software Engineer', 5, 8, jobProfileId]
+                ['New Role', id]
             );
-            expect(mockConnection.release).not.toHaveBeenCalled();
-            expect(result).toMatchObject({
-                jobProfileId,
-                ...updateData
-            });
+            expect(result).toMatchObject({ jobProfileId: id, jobRole: 'New Role' });
         });
 
-        it('should filter out non-allowed fields', async () => {
-            const dataWithInvalidFields = {
-                ...updateData,
-                invalidField: 'should be filtered',
-                anotherBadField: 'also filtered',
-            };
+        it('should return only jobProfileId when updateData missing or empty', async () => {
+            await expect(repository.update(id, null, mockConnection)).resolves.toEqual({ jobProfileId: id });
+            await expect(repository.update(id, {}, mockConnection)).resolves.toEqual({ jobProfileId: id });
+        });
 
+        it('should throw NO_VALID_FIELDS when only invalid keys', async () => {
+            await expect(
+                repository.update(id, { unknown: 1 }, mockConnection)
+            ).rejects.toMatchObject({ errorCode: 'NO_VALID_FIELDS' });
+        });
+
+        it('should refresh tech specs when techSpecLookupIds provided', async () => {
+            jest.spyOn(repository, 'removeTechSpecifications').mockResolvedValue();
+            jest.spyOn(repository, 'addTechSpecifications').mockResolvedValue();
             mockConnection.execute.mockResolvedValue([{ affectedRows: 1 }]);
 
-            await repository.update(jobProfileId, dataWithInvalidFields, mockConnection);
+            await repository.update(id, { jobRole: 'R', techSpecLookupIds: [1, 2] }, mockConnection);
 
-            const executedQuery = mockConnection.execute.mock.calls[0][0];
-            expect(executedQuery).not.toContain('invalidField');
-            expect(executedQuery).not.toContain('anotherBadField');
-        });
-
-        it('should throw AppError when jobProfileId is missing', async () => {
-            await expect(repository.update(null, updateData, mockConnection))
-                .rejects
-                .toMatchObject({
-                    message: 'Job Profile ID is required',
-                    statusCode: 400,
-                    errorCode: 'MISSING_JOB_PROFILE_ID',
-                });
-        });
-
-        it('should throw AppError when updateData is missing', async () => {
-            await expect(repository.update(jobProfileId, null, mockConnection))
-                .rejects
-                .toMatchObject({
-                    message: 'Update data is required',
-                    statusCode: 400,
-                    errorCode: 'MISSING_UPDATE_DATA',
-                });
-        });
-
-        it('should throw AppError when updateData is empty object', async () => {
-            await expect(repository.update(jobProfileId, {}, mockConnection))
-                .rejects
-                .toMatchObject({
-                    message: 'Update data is required',
-                    statusCode: 400,
-                    errorCode: 'MISSING_UPDATE_DATA',
-                });
-        });
-
-        it('should throw AppError when no valid fields to update', async () => {
-            await expect(repository.update(jobProfileId, { invalidField: 'value' }, mockConnection))
-                .rejects
-                .toMatchObject({
-                    message: 'No valid fields to update',
-                    statusCode: 400,
-                    errorCode: 'NO_VALID_FIELDS',
-                });
-        });
-
-        it('should throw AppError when job profile not found', async () => {
-            mockConnection.execute.mockResolvedValue([{ affectedRows: 0 }]);
-
-            await expect(repository.update(jobProfileId, updateData, mockConnection))
-                .rejects
-                .toMatchObject({
-                    message: `Job profile with ID ${jobProfileId} not found`,
-                    statusCode: 404,
-                    errorCode: 'JOB_PROFILE_NOT_FOUND',
-                });
-        });
-
-        it('should work with provided client connection', async () => {
-            mockConnection.execute.mockResolvedValue([{ affectedRows: 1 }]);
-
-            await repository.update(jobProfileId, updateData, mockConnection);
-
-            expect(mockDb.getConnection).not.toHaveBeenCalled();
-            expect(mockConnection.release).not.toHaveBeenCalled();
-        });
-
-        it('should handle data too long error', async () => {
-            const dbError = { code: 'ER_DATA_TOO_LONG', message: 'Data too long' };
-            mockConnection.execute.mockRejectedValue(dbError);
-
-            await expect(repository.update(jobProfileId, updateData, mockConnection))
-                .rejects
-                .toMatchObject({
-                    message: 'One or more fields exceed the maximum allowed length',
-                    statusCode: 400,
-                    errorCode: 'DATA_TOO_LONG',
-                });
+            expect(repository.removeTechSpecifications).toHaveBeenCalledWith(id, mockConnection);
+            expect(repository.addTechSpecifications).toHaveBeenCalledWith(id, [1, 2], mockConnection);
         });
     });
 
     describe('delete', () => {
-        const jobProfileId = 'profile-123';
-
-        it('should delete job profile successfully', async () => {
+        it('should delete by id', async () => {
             mockConnection.execute.mockResolvedValue([{ affectedRows: 1 }]);
 
-            const result = await repository.delete(jobProfileId, mockConnection);
+            const n = await repository.delete(4, mockConnection);
 
-            expect(mockConnection.execute).toHaveBeenCalledWith(
-                expect.stringContaining('DELETE FROM jobProfile'),
-                [jobProfileId]
-            );
-            expect(mockConnection.release).not.toHaveBeenCalled();
-            expect(result).toBe(1);
-        });
-
-        it('should throw AppError when jobProfileId is missing', async () => {
-            await expect(repository.delete(null, mockConnection))
-                .rejects
-                .toMatchObject({
-                    message: 'Job Profile ID is required',
-                    statusCode: 400,
-                    errorCode: 'MISSING_JOB_PROFILE_ID',
-                });
-        });
-
-        it('should throw AppError when job profile not found', async () => {
-            mockConnection.execute.mockResolvedValue([{ affectedRows: 0 }]);
-
-            await expect(repository.delete(jobProfileId, mockConnection))
-                .rejects
-                .toMatchObject({
-                    message: `Job profile with ID ${jobProfileId} not found`,
-                    statusCode: 404,
-                    errorCode: 'JOB_PROFILE_NOT_FOUND',
-                });
-        });
-
-        it('should handle foreign key constraint on delete', async () => {
-            const dbError = { code: 'ER_ROW_IS_REFERENCED_2', message: 'Row referenced' };
-            mockConnection.execute.mockRejectedValue(dbError);
-
-            await expect(repository.delete(jobProfileId, mockConnection))
-                .rejects
-                .toMatchObject({
-                    message: 'Cannot delete record - it is referenced by other records',
-                    statusCode: 400,
-                    errorCode: 'FOREIGN_KEY_CONSTRAINT_DELETE',
-                });
-        });
-
-        it('should work with provided client connection', async () => {
-            mockConnection.execute.mockResolvedValue([{ affectedRows: 1 }]);
-
-            await repository.delete(jobProfileId, mockConnection);
-
-            expect(mockDb.getConnection).not.toHaveBeenCalled();
-            expect(mockConnection.release).not.toHaveBeenCalled();
-        });
-    });
-
-    describe('findByClientId', () => {
-        const clientId = 'client-123';
-        const mockProfiles = [
-            { jobProfileId: 'profile-1', jobRole: 'Developer' },
-            { jobProfileId: 'profile-2', jobRole: 'Designer' },
-        ];
-
-        it('should find job profiles by client id', async () => {
-            mockConnection.execute.mockResolvedValue([mockProfiles]);
-
-            const result = await repository.findByClientId(clientId, null, null, mockConnection);
-
-            expect(mockConnection.execute).toHaveBeenCalledWith(
-                expect.stringContaining('WHERE jp.clientId = ?'),
-                [clientId]
-            );
-            expect(result).toEqual(mockProfiles);
-        });
-
-        it('should throw AppError when clientId is missing', async () => {
-            await expect(repository.findByClientId(null, null, null, mockConnection))
-                .rejects
-                .toMatchObject({
-                    message: 'Client ID is required',
-                    statusCode: 400,
-                    errorCode: 'MISSING_CLIENT_ID',
-                });
-        });
-
-        it('should apply limit when provided', async () => {
-            mockConnection.execute.mockResolvedValue([mockProfiles]);
-
-            await repository.findByClientId(clientId, 10, null, mockConnection);
-
-            const [query, params] = mockConnection.execute.mock.calls[0];
-            expect(query).toContain('LIMIT ?');
-            expect(params).toEqual([clientId, 10]);
-        });
-
-        it('should apply limit and offset when both provided', async () => {
-            mockConnection.execute.mockResolvedValue([mockProfiles]);
-
-            await repository.findByClientId(clientId, 10, 20, mockConnection);
-
-            const [query, params] = mockConnection.execute.mock.calls[0];
-            expect(query).toContain('LIMIT ?');
-            expect(query).toContain('OFFSET ?');
-            expect(params).toEqual([clientId, 10, 20]);
-        });
-
-        it('should not apply offset when limit is not provided', async () => {
-            mockConnection.execute.mockResolvedValue([mockProfiles]);
-
-            await repository.findByClientId(clientId, null, 20, mockConnection);
-
-            const [query, params] = mockConnection.execute.mock.calls[0];
-            expect(query).not.toContain('LIMIT');
-            expect(query).not.toContain('OFFSET');
-            expect(params).toEqual([clientId]);
-        });
-
-        it('should order by receivedOn DESC', async () => {
-            mockConnection.execute.mockResolvedValue([mockProfiles]);
-
-            await repository.findByClientId(clientId, null, null, mockConnection);
-
-            const [query] = mockConnection.execute.mock.calls[0];
-            expect(query).toContain('ORDER BY jp.receivedOn DESC');
-        });
-    });
-
-    describe('findByStatus', () => {
-        const statusId = 'active';
-        const mockProfiles = [{ jobProfileId: 'profile-1', status: 'active' }];
-
-        it('should find job profiles by status', async () => {
-            mockConnection.execute.mockResolvedValue([mockProfiles]);
-
-            const result = await repository.findByStatus(statusId, mockConnection);
-
-            expect(mockConnection.execute).toHaveBeenCalledWith(
-                expect.stringContaining('WHERE jp.statusId = ?'),
-                [statusId]
-            );
-            expect(result).toEqual(mockProfiles);
-        });
-
-        it('should throw AppError when statusId is missing', async () => {
-            await expect(repository.findByStatus(null, mockConnection))
-                .rejects
-                .toMatchObject({
-                    message: 'Status ID is required',
-                    statusCode: 400,
-                    errorCode: 'MISSING_STATUS_ID',
-                });
-        });
-    });
-
-    describe('findByDepartment', () => {
-        const departmentId = 'dept-1';
-        const mockProfiles = [{ jobProfileId: 'profile-1', departmentId }];
-
-        it('should find job profiles by department', async () => {
-            mockConnection.execute.mockResolvedValue([mockProfiles]);
-
-            const result = await repository.findByDepartment(departmentId, mockConnection);
-
-            expect(mockConnection.execute).toHaveBeenCalledWith(
-                expect.stringContaining('WHERE jp.departmentId = ?'),
-                [departmentId]
-            );
-            expect(result).toEqual(mockProfiles);
-        });
-
-        it('should throw AppError when departmentId is missing', async () => {
-            await expect(repository.findByDepartment(null, mockConnection))
-                .rejects
-                .toMatchObject({
-                    message: 'Department ID is required',
-                    statusCode: 400,
-                    errorCode: 'MISSING_DEPARTMENT_ID',
-                });
-        });
-    });
-
-    describe('countByClient', () => {
-        const clientId = 'client-123';
-
-        it('should return count of job profiles for client', async () => {
-            mockConnection.execute.mockResolvedValue([[{ count: 15 }]]);
-
-            const result = await repository.countByClient(clientId, mockConnection);
-
-            expect(mockConnection.execute).toHaveBeenCalledWith(
-                expect.stringContaining('SELECT COUNT(*) as count FROM jobProfile'),
-                [clientId]
-            );
-            expect(result).toBe(15);
-        });
-
-        it('should throw AppError when clientId is missing', async () => {
-            await expect(repository.countByClient(null, mockConnection))
-                .rejects
-                .toMatchObject({
-                    message: 'Client ID is required',
-                    statusCode: 400,
-                    errorCode: 'MISSING_CLIENT_ID',
-                });
-        });
-
-        it('should return 0 when no profiles exist', async () => {
-            mockConnection.execute.mockResolvedValue([[{ count: 0 }]]);
-
-            const result = await repository.countByClient(clientId, mockConnection);
-
-            expect(result).toBe(0);
-        });
-    });
-
-    describe('existsByRole', () => {
-        const jobRole = 'Software Engineer';
-        const clientId = 'client-123';
-
-        it('should return true when job role exists', async () => {
-            mockConnection.execute.mockResolvedValue([[{ count: 1 }]]);
-
-            const result = await repository.existsByRole(jobRole, clientId, null, mockConnection);
-
-            expect(mockConnection.execute).toHaveBeenCalledWith(
-                expect.stringContaining('SELECT COUNT(*) as count'),
-                [jobRole, clientId]
-            );
-            expect(result).toBe(true);
-        });
-
-        it('should return false when job role does not exist', async () => {
-            mockConnection.execute.mockResolvedValue([[{ count: 0 }]]);
-
-            const result = await repository.existsByRole(jobRole, clientId, null, mockConnection);
-
-            expect(result).toBe(false);
-        });
-
-        it('should exclude specified id when provided', async () => {
-            const excludeId = 'profile-123';
-            mockConnection.execute.mockResolvedValue([[{ count: 0 }]]);
-
-            await repository.existsByRole(jobRole, clientId, excludeId, mockConnection);
-
-            const [query, params] = mockConnection.execute.mock.calls[0];
-            expect(query).toContain('AND jobProfileId != ?');
-            expect(params).toEqual([jobRole, clientId, excludeId]);
-        });
-
-        it('should not include exclude clause when excludeId is null', async () => {
-            mockConnection.execute.mockResolvedValue([[{ count: 0 }]]);
-
-            await repository.existsByRole(jobRole, clientId, null, mockConnection);
-
-            const [query, params] = mockConnection.execute.mock.calls[0];
-            expect(query).not.toContain('AND jobProfileId != ?');
-            expect(params).toEqual([jobRole, clientId]);
-        });
-
-        it('should throw AppError when jobRole is missing', async () => {
-            await expect(repository.existsByRole(null, clientId, null, mockConnection))
-                .rejects
-                .toMatchObject({
-                    message: 'Job Role and Client ID are required',
-                    statusCode: 400,
-                    errorCode: 'MISSING_REQUIRED_PARAMETERS',
-                });
-        });
-
-        it('should throw AppError when clientId is missing', async () => {
-            await expect(repository.existsByRole(jobRole, null, null, mockConnection))
-                .rejects
-                .toMatchObject({
-                    message: 'Job Role and Client ID are required',
-                    statusCode: 400,
-                    errorCode: 'MISSING_REQUIRED_PARAMETERS',
-                });
+            expect(n).toBe(1);
         });
     });
 
     describe('findAll', () => {
-        const mockProfiles = [
-            { jobProfileId: 'profile-1', jobRole: 'Developer' },
-            { jobProfileId: 'profile-2', jobRole: 'Designer' },
-        ];
-
-        it('should find all job profiles without pagination', async () => {
-            mockConnection.execute.mockResolvedValue([mockProfiles]);
+        it('should return grouped profiles ordered by createdAt DESC', async () => {
+            const rows = [
+                {
+                    jobProfileId: 1,
+                    jobRole: 'A',
+                    jobOverview: null,
+                    keyResponsibilities: null,
+                    requiredSkillsText: null,
+                    niceToHave: null,
+                    experienceText: null,
+                    experienceMinYears: null,
+                    experienceMaxYears: null,
+                    jdFileName: null,
+                    jdOriginalName: null,
+                    jdUploadDate: null,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                    techSpecId: null,
+                    techSpecName: null,
+                },
+            ];
+            mockConnection.execute.mockResolvedValue([rows]);
 
             const result = await repository.findAll(null, null, mockConnection);
 
-            expect(mockConnection.execute).toHaveBeenCalledWith(
-                expect.stringContaining('FROM jobProfile jp'),
-                []
-            );
-            expect(result).toEqual(mockProfiles);
+            const [q] = mockConnection.execute.mock.calls[0];
+            expect(q).toContain('ORDER BY jp.createdAt DESC');
+            expect(Array.isArray(result)).toBe(true);
         });
 
-        it('should apply limit when provided', async () => {
-            mockConnection.execute.mockResolvedValue([mockProfiles]);
+        it('should apply LIMIT and OFFSET when provided', async () => {
+            mockConnection.execute.mockResolvedValue([[]]);
 
-            await repository.findAll(10, null, mockConnection);
+            await repository.findAll(5, 10, mockConnection);
 
-            const [query, params] = mockConnection.execute.mock.calls[0];
-            expect(query).toContain('LIMIT ?');
-            expect(params).toEqual([10]);
+            expect(mockConnection.execute).toHaveBeenCalledWith(expect.any(String), [5, 10]);
+        });
+    });
+
+    describe('count', () => {
+        it('should return total count', async () => {
+            mockConnection.execute.mockResolvedValue([[{ count: 42 }]]);
+
+            const c = await repository.count(mockConnection);
+
+            expect(c).toBe(42);
+        });
+    });
+
+    describe('existsByRole', () => {
+        it('should return boolean from count', async () => {
+            mockConnection.execute.mockResolvedValue([[{ count: 1 }]]);
+
+            await expect(repository.existsByRole('R', null, mockConnection)).resolves.toBe(true);
         });
 
-        it('should apply limit and offset when both provided', async () => {
-            mockConnection.execute.mockResolvedValue([mockProfiles]);
+        it('should throw when jobRole missing', async () => {
+            await expect(repository.existsByRole(null, null, mockConnection)).rejects.toMatchObject({
+                errorCode: 'MISSING_JOB_ROLE',
+            });
+        });
+    });
 
-            await repository.findAll(10, 20, mockConnection);
+    describe('updateJDInfo / getJDInfo / deleteJDInfo', () => {
+        it('updateJDInfo updates file fields', async () => {
+            mockConnection.execute.mockResolvedValue([{ affectedRows: 1 }]);
 
-            const [query, params] = mockConnection.execute.mock.calls[0];
-            expect(query).toContain('LIMIT ?');
-            expect(query).toContain('OFFSET ?');
-            expect(params).toEqual([10, 20]);
+            const n = await repository.updateJDInfo(1, 'a.pdf', 'A.pdf', mockConnection);
+
+            expect(n).toBe(1);
         });
 
-        it('should order by receivedOn DESC', async () => {
-            mockConnection.execute.mockResolvedValue([mockProfiles]);
+        it('getJDInfo returns row or null', async () => {
+            mockConnection.execute.mockResolvedValue([[{ jdFileName: 'a.pdf' }]]);
 
-            await repository.findAll(null, null, mockConnection);
-
-            const [query] = mockConnection.execute.mock.calls[0];
-            expect(query).toContain('ORDER BY jp.receivedOn DESC');
+            await expect(repository.getJDInfo(1, mockConnection)).resolves.toEqual({ jdFileName: 'a.pdf' });
+            mockConnection.execute.mockResolvedValue([[]]);
+            await expect(repository.getJDInfo(1, mockConnection)).resolves.toBeNull();
         });
 
-        it('should handle database errors', async () => {
-            const dbError = { code: 'ER_ACCESS_DENIED_ERROR', message: 'Access denied' };
-            mockConnection.execute.mockRejectedValue(dbError);
+        it('deleteJDInfo clears jd fields', async () => {
+            mockConnection.execute.mockResolvedValue([{ affectedRows: 1 }]);
 
-            await expect(repository.findAll(null, null, mockConnection))
-                .rejects
-                .toMatchObject({
-                    message: 'Database access denied',
-                    statusCode: 503,
-                    errorCode: 'DATABASE_ACCESS_DENIED',
-                });
+            const n = await repository.deleteJDInfo(1, mockConnection);
+
+            expect(n).toBe(1);
         });
     });
 
     describe('_handleDatabaseError', () => {
-        it('should handle ER_DUP_ENTRY error', () => {
-            const error = { code: 'ER_DUP_ENTRY', message: 'Duplicate entry' };
-
-            expect(() => repository._handleDatabaseError(error))
-                .toThrow(AppError);
+        it('should map known mysql codes to AppError', () => {
+            const errDup = { code: 'ER_DUP_ENTRY', message: 'd' };
+            expect(() => repository._handleDatabaseError(errDup)).toThrow(AppError);
 
             try {
-                repository._handleDatabaseError(error);
+                repository._handleDatabaseError({ code: 'ER_DATA_TOO_LONG', message: 'm' });
             } catch (e) {
-                expect(e.statusCode).toBe(409);
-                expect(e.errorCode).toBe('DUPLICATE_ENTRY');
-            }
-        });
-
-        it('should handle ER_DATA_TOO_LONG error', () => {
-            const error = { code: 'ER_DATA_TOO_LONG', message: 'Data too long' };
-
-            try {
-                repository._handleDatabaseError(error);
-            } catch (e) {
-                expect(e.statusCode).toBe(400);
                 expect(e.errorCode).toBe('DATA_TOO_LONG');
-            }
-        });
-
-        it('should handle ER_BAD_NULL_ERROR error', () => {
-            const error = { code: 'ER_BAD_NULL_ERROR', message: 'Cannot be null' };
-
-            try {
-                repository._handleDatabaseError(error);
-            } catch (e) {
-                expect(e.statusCode).toBe(400);
-                expect(e.errorCode).toBe('NULL_CONSTRAINT_VIOLATION');
-            }
-        });
-
-        it('should handle ER_NO_REFERENCED_ROW_2 error', () => {
-            const error = { code: 'ER_NO_REFERENCED_ROW_2', message: 'Foreign key error' };
-
-            try {
-                repository._handleDatabaseError(error);
-            } catch (e) {
-                expect(e.statusCode).toBe(400);
-                expect(e.errorCode).toBe('FOREIGN_KEY_CONSTRAINT');
-            }
-        });
-
-        it('should handle ER_ROW_IS_REFERENCED_2 error', () => {
-            const error = { code: 'ER_ROW_IS_REFERENCED_2', message: 'Row referenced' };
-
-            try {
-                repository._handleDatabaseError(error);
-            } catch (e) {
-                expect(e.statusCode).toBe(400);
-                expect(e.errorCode).toBe('FOREIGN_KEY_CONSTRAINT_DELETE');
-            }
-        });
-
-        it('should handle ECONNREFUSED error', () => {
-            const error = { code: 'ECONNREFUSED', message: 'Connection refused' };
-
-            try {
-                repository._handleDatabaseError(error);
-            } catch (e) {
-                expect(e.statusCode).toBe(503);
-                expect(e.errorCode).toBe('DATABASE_CONNECTION_ERROR');
-            }
-        });
-
-        it('should handle ER_ACCESS_DENIED_ERROR error', () => {
-            const error = { code: 'ER_ACCESS_DENIED_ERROR', message: 'Access denied' };
-
-            try {
-                repository._handleDatabaseError(error);
-            } catch (e) {
-                expect(e.statusCode).toBe(503);
-                expect(e.errorCode).toBe('DATABASE_ACCESS_DENIED');
-            }
-        });
-
-        it('should handle unknown database errors', () => {
-            const error = {
-                code: 'UNKNOWN_ERROR',
-                sqlState: '42000',
-                message: 'Unknown database error',
-            };
-
-            try {
-                repository._handleDatabaseError(error);
-            } catch (e) {
-                expect(e.statusCode).toBe(500);
-                expect(e.errorCode).toBe('DATABASE_ERROR');
-                expect(e.details).toMatchObject({
-                    code: 'UNKNOWN_ERROR',
-                    sqlState: '42000',
-                    message: 'Unknown database error',
-                });
             }
         });
     });

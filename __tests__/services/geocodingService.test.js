@@ -110,18 +110,28 @@ describe('GeocodingService', () => {
             });
         });
 
-        it('should skip invalid plus codes and try regular geocoding', async () => {
-            const address = 'INVALID+CODE';
+        it('should skip invalid plus codes and delegate to provider geocoding', async () => {
+            // Must match OLC regex so _handlePlusCode runs; isValid=false then falls through to providers
+            const address = '2222+22';
             mockOlc.isValid.mockReturnValue(false);
+            jest.spyOn(service, '_geocodeWithProviders').mockResolvedValue({
+                lat: 19.0,
+                lon: 72.0,
+                source: 'openrouteservice'
+            });
 
             const result = await service.geocodeAddress(address);
 
-            // Should fall through to regular geocoding which will likely fail and throw
-            // OR succeed if the address somehow resolves, but expect some result structure
-            expect(result).toHaveProperty('lat');
-            expect(result).toHaveProperty('lon');
-            expect(result).toHaveProperty('source');
-        }, 10000); // Increased timeout for real API calls
+            expect(mockOlc.isValid).toHaveBeenCalled();
+            expect(service._geocodeWithProviders).toHaveBeenCalledWith(address);
+            expect(result).toEqual({
+                lat: 19.0,
+                lon: 72.0,
+                source: 'openrouteservice'
+            });
+
+            service._geocodeWithProviders.mockRestore();
+        });
     });
 
     describe('geocodeAddress - Provider-based Geocoding', () => {
@@ -411,6 +421,103 @@ describe('GeocodingService', () => {
             expect(result).toEqual({
                 lat: 19.0760,
                 lon: 72.8777
+            });
+        });
+    });
+
+    describe('Mocked branches (axios / providers)', () => {
+        const origOpenRoute = process.env.OPENROUTESERVICE_KEY;
+        const origGeo = process.env.GEOAPIFY_KEY;
+
+        beforeEach(() => {
+            // Must match geocodingService2: `${provider.name.toUpperCase()}_KEY`
+            process.env.OPENROUTESERVICE_KEY = 'test-key';
+            process.env.GEOAPIFY_KEY = 'test-key';
+        });
+
+        afterEach(() => {
+            process.env.OPENROUTESERVICE_KEY = origOpenRoute;
+            process.env.GEOAPIFY_KEY = origGeo;
+            jest.restoreAllMocks();
+        });
+
+        it('falls back to providers when full plus-code decode throws', async () => {
+            const address = '7JMX2R2C+2C';
+            mockOlc.isValid.mockReturnValue(true);
+            mockOlc.isFull.mockReturnValue(true);
+            mockOlc.decode.mockImplementation(() => {
+                throw new Error('decode fail');
+            });
+            const spy = jest.spyOn(service, '_geocodeWithProviders').mockResolvedValue({
+                lat: 1,
+                lon: 2,
+                source: 'mock'
+            });
+
+            const result = await service.geocodeAddress(address);
+
+            expect(spy).toHaveBeenCalledWith(address);
+            expect(result).toEqual({ lat: 1, lon: 2, source: 'mock' });
+        });
+
+        it('short plus code uses full address geocode when locality geocode fails', async () => {
+            const address = '2R2C+2C, Ahmedabad';
+            mockOlc.isValid.mockReturnValue(true);
+            mockOlc.isFull.mockReturnValue(false);
+            mockOlc.isShort.mockReturnValue(true);
+            jest.spyOn(service, '_geocodeWithProviders')
+                .mockRejectedValueOnce(new Error('locality fail'))
+                .mockResolvedValueOnce({ lat: 9, lon: 8, source: 'openrouteservice' });
+
+            const result = await service.geocodeAddress(address);
+
+            expect(result).toMatchObject({ lat: 9, lon: 8 });
+        });
+
+        it('_geocodeWithProviders rethrows when skipVariations is true and providers fail', async () => {
+            jest.spyOn(axios, 'get').mockRejectedValue(new Error('network'));
+
+            await expect(service._geocodeWithProviders('Somewhere', true)).rejects.toThrow('All promises were rejected');
+        });
+
+        it('_geocodeWithProviders uses variations when Promise.any fails', async () => {
+            jest.spyOn(axios, 'get').mockRejectedValue(new Error('no results'));
+
+            const result = await service._geocodeWithProviders('Ahmedabad, Gujarat, India');
+
+            expect(result).toMatchObject({ source: 'approximate' });
+            expect(result.lat).toBeCloseTo(23.0225, 1);
+        });
+
+        it('_tryVariations continues when a variation throws', async () => {
+            jest.spyOn(axios, 'get').mockRejectedValue(new Error('fail'));
+            const spy = jest.spyOn(service, '_geocodeWithProviders');
+
+            const result = await service._geocodeWithProviders(
+                'Near Market, opp. to Mall, Street 5, Ahmedabad, Gujarat, India'
+            );
+
+            expect(result.source).toBe('approximate');
+            expect(spy.mock.calls.some((c) => c[1] === true)).toBe(true);
+        });
+
+        it('provider task throws when API returns empty features', async () => {
+            jest.spyOn(axios, 'get').mockResolvedValue({ data: { features: [] } });
+
+            await expect(service._geocodeWithProviders('Xyzabc UnknownPlace', true)).rejects.toThrow();
+        });
+
+        it('geocodeAddressWithFallback preserves AppError statusCode when no city fallback', async () => {
+            jest.spyOn(service, 'geocodeAddress').mockRejectedValue(
+                Object.assign(new Error('not found'), {
+                    statusCode: 404,
+                    errorCode: 'GEOCODING_NOT_FOUND'
+                })
+            );
+
+            await expect(service.geocodeAddressWithFallback('zzzz-no-city-match-12345')).rejects.toMatchObject({
+                statusCode: 404,
+                errorCode: 'GEOCODING_NOT_FOUND'
             });
         });
     });
