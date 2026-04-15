@@ -103,4 +103,78 @@ describe('auditLogService', () => {
             conn
         );
     });
+
+    it('infers resource from newValues row shape (e.g. interview create)', async () => {
+        const conn = {};
+        await auditLogService.logAction(
+            {
+                userId: 1,
+                action: 'CREATE',
+                newValues: { interviewId: 42, candidateId: 7, roundNumber: 1 },
+                ipAddress: '0.0.0.0',
+                userAgent: 'ua',
+                timestamp: new Date('2024-06-01T00:00:00.000Z')
+            },
+            conn
+        );
+
+        expect(auditLogsRepository.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                resourceType: 'interview',
+                resourceId: '42',
+                verb: 'interview.created'
+            }),
+            conn
+        );
+    });
+
+    it('infers resource from oldValues when newValues is a partial patch', async () => {
+        const conn = {};
+        await auditLogService.logAction(
+            {
+                userId: 1,
+                action: 'UPDATE',
+                oldValues: { vendorId: 5, vendorName: 'Acme' },
+                newValues: { vendorName: 'Acme Ltd' },
+                ipAddress: '0.0.0.0',
+                userAgent: 'ua',
+                timestamp: new Date('2024-06-01T00:00:00.000Z')
+            },
+            conn
+        );
+
+        expect(auditLogsRepository.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                resourceType: 'vendor',
+                resourceId: '5',
+                verb: 'vendor.updated'
+            }),
+            conn
+        );
+    });
+
+    it('normalizes camelCase entityType to snake_case resource_type', async () => {
+        const conn = {};
+        await auditLogService.logAction(
+            {
+                userId: 1,
+                action: 'CREATE',
+                entityType: 'jobProfileRequirement',
+                entityId: 100,
+                newValues: {},
+                ipAddress: '0.0.0.0',
+                userAgent: 'ua',
+                timestamp: new Date('2024-06-01T00:00:00.000Z')
+            },
+            conn
+        );
+
+        expect(auditLogsRepository.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                resourceType: 'job_profile_requirement',
+                resourceId: '100'
+            }),
+            conn
+        );
+    });
 });

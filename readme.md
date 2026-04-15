@@ -10,6 +10,8 @@ Run the migration script on MySQL 8+ (once per environment):
 
 It extends `auditLogs.action` with `BULK_CANDIDATE_UPLOAD` and `BULK_UPDATE`, and adds: `resource_type`, `resource_id`, `verb`, `summary`, `http_method`, `http_path`, `occurred_at_utc`, plus indexes. Existing rows stay valid; new columns are nullable.
 
+When writers omit `resource_type` / `resource_id`, `auditLogService.logAction` **infers** them from `new_values` / `old_values` JSON using known primary-key fields (e.g. `interviewId` → `interview`, `candidateId` → `candidate`, `memberId` → `member`, `jobProfileId` → `job_profile`, `jobProfileRequirementId` → `job_profile_requirement`, etc.). Bulk operations may legitimately leave `resource_id` null.
+
 ### 2) Suggested commit phases (for your PRs)
 
 | Phase | Scope |

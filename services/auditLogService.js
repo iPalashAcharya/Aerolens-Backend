@@ -15,16 +15,98 @@ function toMysqlUtcDatetime3(date) {
     return iso.replace('T', ' ').replace('Z', '').slice(0, 23);
 }
 
+/** Lowercase snake_case for resource_type (handles camelCase e.g. jobProfileRequirement). */
+function toSnakeResourceType(s) {
+    return String(s)
+        .trim()
+        .replace(/\s+/g, '_')
+        .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+        .replace(/_+/g, '_')
+        .toLowerCase();
+}
+
 function normalizeResourceType(auditData) {
     const rt = auditData.resource_type ?? auditData.resourceType ?? auditData.entityType;
     if (rt == null || rt === '') return null;
-    return String(rt).toLowerCase().replace(/\s+/g, '_');
+    return toSnakeResourceType(rt);
 }
 
 function normalizeResourceId(auditData) {
     const rid = auditData.resource_id ?? auditData.resourceId ?? auditData.entityId;
     if (rid == null || rid === '') return null;
     return String(rid);
+}
+
+/**
+ * Map common domain row shapes to audit resource identity.
+ * Order matters: more specific composite IDs before generic foreign keys.
+ */
+const RESOURCE_ID_FIELD_ORDER = [
+    ['job_profile_requirement', 'jobProfileRequirementId'],
+    ['interview', 'interviewId'],
+    ['offer', 'offerId'],
+    ['job_profile', 'jobProfileId'],
+    ['member', 'memberId'],
+    ['candidate', 'candidateId'],
+    ['vendor', 'vendorId'],
+    ['department', 'departmentId'],
+    ['location', 'locationId'],
+    ['client', 'clientId'],
+    ['contact', 'contactId'],
+    ['lookup', 'lookupKey']
+];
+
+function inferResourceFromSnapshot(obj) {
+    if (obj == null || typeof obj !== 'object' || Array.isArray(obj)) return null;
+    for (const [resourceType, key] of RESOURCE_ID_FIELD_ORDER) {
+        const v = obj[key];
+        if (v != null && v !== '') {
+            return { resourceType, resourceId: String(v) };
+        }
+    }
+    return null;
+}
+
+/**
+ * Resolves resource_type / resource_id from explicit audit fields, entityType/entityId
+ * inside newValues (legacy offer payloads), or id columns on new/old snapshots.
+ */
+function resolveResourceIdentity(auditData, newRaw, oldRaw) {
+    let resourceType = normalizeResourceType(auditData);
+    let resourceId = normalizeResourceId(auditData);
+
+    if (
+        !resourceType &&
+        newRaw &&
+        typeof newRaw === 'object' &&
+        !Array.isArray(newRaw) &&
+        newRaw.entityType != null &&
+        newRaw.entityType !== ''
+    ) {
+        resourceType = toSnakeResourceType(String(newRaw.entityType));
+    }
+    if (
+        !resourceId &&
+        newRaw &&
+        typeof newRaw === 'object' &&
+        !Array.isArray(newRaw) &&
+        newRaw.entityId != null &&
+        newRaw.entityId !== ''
+    ) {
+        resourceId = String(newRaw.entityId);
+    }
+
+    const fromNew = inferResourceFromSnapshot(newRaw);
+    const fromOld = inferResourceFromSnapshot(oldRaw);
+
+    if (!resourceType) {
+        resourceType = fromNew?.resourceType || fromOld?.resourceType || null;
+    }
+    if (!resourceId) {
+        resourceId = fromNew?.resourceId || fromOld?.resourceId || null;
+    }
+
+    return { resourceType, resourceId };
 }
 
 function inferVerb(action, resourceType) {
@@ -70,26 +152,11 @@ class AuditLogService {
         const oldRaw = auditData.oldValues ?? auditData.previousValues ?? null;
         const newRaw = auditData.newValues ?? null;
 
-        let resourceType = normalizeResourceType(auditData);
-        let resourceId = normalizeResourceId(auditData);
-        if (
-            !resourceType &&
-            newRaw &&
-            typeof newRaw === 'object' &&
-            newRaw.entityType != null &&
-            newRaw.entityType !== ''
-        ) {
-            resourceType = String(newRaw.entityType).toLowerCase().replace(/\s+/g, '_');
-        }
-        if (
-            !resourceId &&
-            newRaw &&
-            typeof newRaw === 'object' &&
-            newRaw.entityId != null &&
-            newRaw.entityId !== ''
-        ) {
-            resourceId = String(newRaw.entityId);
-        }
+        const { resourceType, resourceId } = resolveResourceIdentity(
+            auditData,
+            newRaw,
+            oldRaw
+        );
 
         const oldValues = oldRaw != null ? JSON.stringify(oldRaw) : null;
         const newValues = newRaw != null ? JSON.stringify(newRaw) : null;
