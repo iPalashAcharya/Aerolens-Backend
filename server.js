@@ -98,6 +98,7 @@ async function startServer() {
         const offerRoutes = require('./routes/offerRoutes');
         const db = require('./db');
         const whatsappRoutes = require('./routes/whatsappRoutes');
+        const auditLogRoutes = require('./routes/auditLogRoutes');
         const webhookRoutes = require('./routes/webhookRoutes');
         const JobProfileValidator = require('./validators/jobProfileValidator');
         const JobProfileRequirementValidator = require('./validators/jobProfileRequirementValidator');
@@ -311,6 +312,7 @@ async function startServer() {
         app.use('/offers', offerRoutes);
         app.use('/whatsapp', whatsappRoutes);
         app.use('/webhook', webhookRoutes);
+        app.use('/audit-logs', auditLogRoutes);
 
         app.use(globalErrorHandler);
         app.use((err, req, res, next) => {

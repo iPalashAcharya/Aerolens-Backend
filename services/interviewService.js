@@ -832,7 +832,9 @@ class InterviewService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'UPDATE',
-                previousValues: existingInterview,
+                entityType: 'interview',
+                entityId: interviewId,
+                oldValues: existingInterview,
                 newValues: updatedInterview,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,

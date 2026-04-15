@@ -143,7 +143,9 @@ class LookupService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'UPDATE',
-                previousValues: existingLookup,
+                entityType: 'lookup',
+                entityId: lookupKey,
+                oldValues: existingLookup,
                 newValues: updatedLookup,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,

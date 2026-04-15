@@ -76,20 +76,25 @@ class CandidateBulkController {
 
         try {
             const result = await this.candidateBulkService.processBulkUpload(req.file, {
-                userId: req.user?.userId,
+                userId: req.user?.memberId,
                 ipAddress: req.ip,
                 userAgent: req.get('user-agent')
             });
+
+            const { inserted, failed } = result.summary;
+
             try {
                 await this.auditLogService.logAction({
                     ...req.auditContext,
                     action: 'BULK_CANDIDATE_UPLOAD',
+                    entityType: 'candidate',
                     oldValues: null,
                     newValues: {
                         summary: result.summary,
                         failedRows: result.failedRows,
                         hasMoreErrors: result.hasMoreErrors
                     },
+                    summary: `Bulk candidate upload: ${inserted} inserted, ${failed} failed`,
                     reason: {
                         fileName: req.file.originalname,
                         fileSize: req.file.size,
@@ -99,8 +104,6 @@ class CandidateBulkController {
             } catch (auditErr) {
                 console.error('Audit log failed for bulk upload:', auditErr);
             }
-
-            const { inserted, failed } = result.summary;
 
             let statusCode;
             let message;
