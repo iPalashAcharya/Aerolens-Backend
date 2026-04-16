@@ -1,5 +1,7 @@
 jest.mock('../../repositories/auditLogsRepository', () => ({
     create: jest.fn().mockResolvedValue(true),
+    findMany: jest.fn().mockResolvedValue({ rows: [], total: 0, page: 1, pageSize: 25 }),
+    findById: jest.fn().mockResolvedValue(null)
 }));
 
 const auditLogsRepository = require('../../repositories/auditLogsRepository');
@@ -17,7 +19,7 @@ describe('auditLogService', () => {
         logSpy.mockRestore();
     });
 
-    it('logAction formats timestamp and delegates to repository.create', async () => {
+    it('logAction formats timestamp and delegates to repository.create with extended payload', async () => {
         const ts = new Date('2024-01-15T12:30:45.000Z');
         const conn = {};
 
@@ -30,6 +32,10 @@ describe('auditLogService', () => {
                 ipAddress: '1.1.1.1',
                 userAgent: 'jest',
                 timestamp: ts,
+                entityType: 'candidate',
+                entityId: 99,
+                method: 'POST',
+                path: '/candidate'
             },
             conn
         );
@@ -38,10 +44,40 @@ describe('auditLogService', () => {
             expect.objectContaining({
                 userId: 1,
                 action: 'CREATE',
+                resourceType: 'candidate',
+                resourceId: '99',
+                verb: 'candidate.created',
                 newValues: JSON.stringify({ a: 1 }),
                 ipAddress: '1.1.1.1',
                 userAgent: 'jest',
+                httpMethod: 'POST',
+                httpPath: '/candidate',
                 timestamp: '2024-01-15 12:30:45',
+                occurredAtUtc: '2024-01-15 12:30:45.000'
+            }),
+            conn
+        );
+    });
+
+    it('maps previousValues to old_values payload', async () => {
+        const conn = {};
+        await auditLogService.logAction(
+            {
+                userId: 2,
+                action: 'UPDATE',
+                previousValues: { id: 1 },
+                newValues: { id: 1, x: 2 },
+                ipAddress: '0.0.0.0',
+                userAgent: 'ua',
+                timestamp: new Date('2024-06-01T00:00:00.000Z')
+            },
+            conn
+        );
+
+        expect(auditLogsRepository.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                oldValues: JSON.stringify({ id: 1 }),
+                newValues: JSON.stringify({ id: 1, x: 2 })
             }),
             conn
         );
@@ -54,7 +90,7 @@ describe('auditLogService', () => {
                 userId: 2,
                 action: 'DELETE',
                 ipAddress: '0.0.0.0',
-                userAgent: 'ua',
+                userAgent: 'ua'
             },
             conn
         );
@@ -62,6 +98,81 @@ describe('auditLogService', () => {
         expect(auditLogsRepository.create).toHaveBeenCalledWith(
             expect.objectContaining({
                 timestamp: null,
+                occurredAtUtc: null
+            }),
+            conn
+        );
+    });
+
+    it('infers resource from newValues row shape (e.g. interview create)', async () => {
+        const conn = {};
+        await auditLogService.logAction(
+            {
+                userId: 1,
+                action: 'CREATE',
+                newValues: { interviewId: 42, candidateId: 7, roundNumber: 1 },
+                ipAddress: '0.0.0.0',
+                userAgent: 'ua',
+                timestamp: new Date('2024-06-01T00:00:00.000Z')
+            },
+            conn
+        );
+
+        expect(auditLogsRepository.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                resourceType: 'interview',
+                resourceId: '42',
+                verb: 'interview.created'
+            }),
+            conn
+        );
+    });
+
+    it('infers resource from oldValues when newValues is a partial patch', async () => {
+        const conn = {};
+        await auditLogService.logAction(
+            {
+                userId: 1,
+                action: 'UPDATE',
+                oldValues: { vendorId: 5, vendorName: 'Acme' },
+                newValues: { vendorName: 'Acme Ltd' },
+                ipAddress: '0.0.0.0',
+                userAgent: 'ua',
+                timestamp: new Date('2024-06-01T00:00:00.000Z')
+            },
+            conn
+        );
+
+        expect(auditLogsRepository.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                resourceType: 'vendor',
+                resourceId: '5',
+                verb: 'vendor.updated'
+            }),
+            conn
+        );
+    });
+
+    it('normalizes camelCase entityType to snake_case resource_type', async () => {
+        const conn = {};
+        await auditLogService.logAction(
+            {
+                userId: 1,
+                action: 'CREATE',
+                entityType: 'jobProfileRequirement',
+                entityId: 100,
+                newValues: {},
+                ipAddress: '0.0.0.0',
+                userAgent: 'ua',
+                timestamp: new Date('2024-06-01T00:00:00.000Z')
+            },
+            conn
+        );
+
+        expect(auditLogsRepository.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                resourceType: 'job_profile_requirement',
+                resourceId: '100'
             }),
             conn
         );
