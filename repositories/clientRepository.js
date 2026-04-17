@@ -208,6 +208,85 @@ class ClientRepository {
             this._handleDatabaseError(error);
         }
     }
+
+    async getClientChangeLogs(page = 1, limit = 20, client) {
+        const connection = client;
+        const safePage = Math.max(1, parseInt(page, 10) || 1);
+        const safeLimit = Math.max(1, parseInt(limit, 10) || 20);
+        const offset = (safePage - 1) * safeLimit;
+        try {
+            const [rows] = await connection.execute(
+                `SELECT * FROM auditLogs
+                 WHERE resource_type = 'CLIENT'
+                   AND action IN ('CREATE', 'UPDATE')
+                 ORDER BY timestamp DESC
+                 LIMIT ? OFFSET ?`,
+                [safeLimit, offset]
+            );
+            const [countRows] = await connection.execute(
+                `SELECT COUNT(*) AS total FROM auditLogs
+                 WHERE resource_type = 'CLIENT'
+                   AND action IN ('CREATE', 'UPDATE')`
+            );
+
+            return { rows, total: Number(countRows[0]?.total || 0), page: safePage, limit: safeLimit };
+        } catch (error) {
+            this._handleDatabaseError(error, 'getClientChangeLogs');
+        }
+    }
+
+    async getClientDeleteLogs(page = 1, limit = 20, client) {
+        const connection = client;
+        const safePage = Math.max(1, parseInt(page, 10) || 1);
+        const safeLimit = Math.max(1, parseInt(limit, 10) || 20);
+        const offset = (safePage - 1) * safeLimit;
+        try {
+            const [rows] = await connection.execute(
+                `SELECT * FROM auditLogs
+                 WHERE resource_type = 'CLIENT'
+                   AND action = 'DELETE'
+                 ORDER BY timestamp DESC
+                 LIMIT ? OFFSET ?`,
+                [safeLimit, offset]
+            );
+            const [countRows] = await connection.execute(
+                `SELECT COUNT(*) AS total FROM auditLogs
+                 WHERE resource_type = 'CLIENT'
+                   AND action = 'DELETE'`
+            );
+
+            return { rows, total: Number(countRows[0]?.total || 0), page: safePage, limit: safeLimit };
+        } catch (error) {
+            this._handleDatabaseError(error, 'getClientDeleteLogs');
+        }
+    }
+
+    async getClientAuditLogsById(clientId, page = 1, limit = 20, client) {
+        const connection = client;
+        const safePage = Math.max(1, parseInt(page, 10) || 1);
+        const safeLimit = Math.max(1, parseInt(limit, 10) || 20);
+        const offset = (safePage - 1) * safeLimit;
+        try {
+            const [rows] = await connection.execute(
+                `SELECT * FROM auditLogs
+                 WHERE resource_type = 'CLIENT'
+                   AND resource_id = ?
+                 ORDER BY timestamp DESC
+                 LIMIT ? OFFSET ?`,
+                [String(clientId), safeLimit, offset]
+            );
+            const [countRows] = await connection.execute(
+                `SELECT COUNT(*) AS total FROM auditLogs
+                 WHERE resource_type = 'CLIENT'
+                   AND resource_id = ?`,
+                [String(clientId)]
+            );
+
+            return { rows, total: Number(countRows[0]?.total || 0), page: safePage, limit: safeLimit };
+        } catch (error) {
+            this._handleDatabaseError(error, 'getClientAuditLogsById');
+        }
+    }
     _handleDatabaseError(error, operation) {
         const errorMappings = {
             'ER_BAD_FIELD_ERROR': {

@@ -90,6 +90,45 @@ Routes are **authenticated** only today. Restrict to admin/compliance in the UI 
 
 ---
 
+## Audit Logs — Client Module
+
+### Overview
+Audit logging tracks every CREATE, UPDATE, and DELETE operation
+performed on Client records. Logs are stored in the existing
+`auditLogs` table using `resource_type = 'CLIENT'`.
+
+### What is Logged
+| Operation     | action   | verb     | old_values        | new_values        |
+|---------------|----------|----------|-------------------|-------------------|
+| Create Client | CREATE   | CREATE   | null              | new client object |
+| Update Client | UPDATE   | UPDATE   | client before     | client after      |
+| Delete Client | DELETE   | DELETE   | client before     | null              |
+
+### New API Endpoints
+| Method | Endpoint                          | Description                        |
+|--------|-----------------------------------|------------------------------------|
+| GET    | /clients/audit-logs/changes       | All CREATE + UPDATE logs (paginated)|
+| GET    | /clients/audit-logs/deletions     | All DELETE logs (paginated)         |
+| GET    | /clients/:clientId/audit-logs     | Logs for a specific client row      |
+
+### Query Parameters (all endpoints)
+| Param  | Type   | Default | Description          |
+|--------|--------|---------|----------------------|
+| page   | number | 1       | Page number          |
+| limit  | number | 20      | Records per page     |
+
+### Frontend Usage
+- Cog icon on each client row → opens row-specific audit log dialog
+- "Change Logs" button in page header → shows all CREATE + UPDATE logs
+- "Delete Logs" button in page header → shows all DELETE logs
+- Dialog has two tabs when opened globally: Change Logs / Delete Logs
+- Paginated table with colored action badges and collapsible JSON values
+
+### Notes
+- Both `action` and `verb` columns are intentionally kept in sync.
+- The auditLogs table schema is NOT modified by this feature.
+- No new tables are created.
+
 ## Member phone numbers (E.164 / WhatsApp)
 
 `member.memberContact` is validated and normalized to **strict E.164** on **register** and **member PATCH** via `utils/phone-validator.js` (`libphonenumber-js`). Staged column migration: **`docs/MEMBER_PHONE_E164.md`**, **`scripts/sql-migration.sql`**, **`scripts/migrate-phones.js`**, **`npm run migrate-phones`**.

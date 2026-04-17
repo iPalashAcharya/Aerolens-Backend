@@ -81,6 +81,39 @@ class ClientController {
             'Client deleted successfully'
         );
     });
+
+    getClientChangeLogs = catchAsync(async (req, res) => {
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 20;
+        const result = await this.clientService.getClientChangeLogs(page, limit);
+        return res.status(200).json({
+            success: true,
+            data: result.data,
+            pagination: result.pagination,
+        });
+    });
+
+    getClientDeleteLogs = catchAsync(async (req, res) => {
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 20;
+        const result = await this.clientService.getClientDeleteLogs(page, limit);
+        return res.status(200).json({
+            success: true,
+            data: result.data,
+            pagination: result.pagination,
+        });
+    });
+
+    getClientAuditLogsById = catchAsync(async (req, res) => {
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 20;
+        const result = await this.clientService.getClientAuditLogsById(parseInt(req.params.clientId, 10), page, limit);
+        return res.status(200).json({
+            success: true,
+            data: result.data,
+            pagination: result.pagination,
+        });
+    });
 }
 
 module.exports = ClientController;
