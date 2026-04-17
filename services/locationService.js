@@ -134,7 +134,9 @@ class LocationService {
                 await auditLogService.logAction({
                     userId: auditContext.userId,
                     action: 'UPDATE',
-                    previousValues: existingLocation,
+                    entityType: 'location',
+                    entityId: locationId,
+                    oldValues: existingLocation,
                     newValues: updatedLocation,
                     ipAddress: auditContext.ipAddress,
                     userAgent: auditContext.userAgent,

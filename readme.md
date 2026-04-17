@@ -1,3 +1,95 @@
+## Audit logs — “Deleted & Change History” API (frontend source of truth)
+
+**Branch:** implement and integrate against **`AuditLogs`**, created from **`development`**. Use this section as the contract until the branch is merged.
+
+### 1) Database (required before deploy)
+
+Run the migration script on MySQL 8+ (once per environment):
+
+`migrations/001_audit_logs_extend.sql`
+
+It extends `auditLogs.action` with `BULK_CANDIDATE_UPLOAD` and `BULK_UPDATE`, and adds: `resource_type`, `resource_id`, `verb`, `summary`, `http_method`, `http_path`, `occurred_at_utc`, plus indexes. Existing rows stay valid; new columns are nullable.
+
+When writers omit `resource_type` / `resource_id`, `auditLogService.logAction` **infers** them from `new_values` / `old_values` JSON using known primary-key fields (e.g. `interviewId` → `interview`, `candidateId` → `candidate`, `memberId` → `member`, `jobProfileId` → `job_profile`, `jobProfileRequirementId` → `job_profile_requirement`, etc.). Bulk operations may legitimately leave `resource_id` null.
+
+### 2) Suggested commit phases (for your PRs)
+
+| Phase | Scope |
+|-------|--------|
+| **Phase 1** | SQL migration applied; extended `INSERT`; `auditLogsRepository` wired to `db`; `logAction` writes new columns; `previousValues` → `oldValues` fixes; bulk upload audit uses `memberId`; quieter `auditContext`. |
+| **Phase 2** | Read API: `GET /audit-logs`, `GET /audit-logs/:id` (authenticated). |
+| **Phase 3** | `includeDiff=true` + shallow `fieldChanges` for `UPDATE` rows (`utils/auditDiff.js`). |
+
+*(This repo currently contains all three on `AuditLogs`; split commits locally using the table above.)*
+
+### 3) HTTP API
+
+**Base path:** `{API_BASE_URL}/audit-logs`  
+**Auth:** `Authorization: Bearer <access_token>` (same as other protected routes).  
+**Responses:** `utils/response.js` — payload under **`data`**.
+
+#### `GET /audit-logs` — paginated list
+
+| Query | Description |
+|-------|----------------|
+| `page` | Default `1` |
+| `pageSize` | Default `25`, max `100` |
+| `dateFrom` / `dateTo` | Filter on stored `timestamp` (inclusive range; use full datetime if needed) |
+| `userId` | Actor `memberId` |
+| `resourceType` | e.g. `candidate`, `offer` (lowercase as stored) |
+| `resourceId` | String PK |
+| `action` | `CREATE`, `UPDATE`, `DELETE`, `BULK_CANDIDATE_UPLOAD`, `BULK_UPDATE` |
+| `verb` | Substring match on `verb` |
+| `search` | `LIKE` on `summary` and stringified JSON blobs (use sparingly) |
+| `includeDiff` | `true` — for **`UPDATE`** items, include **`fieldChanges`** (shallow old/new diff) |
+
+**Success `data` shape:**
+
+```json
+{
+  "items": [ "/* AuditLogListItemDto; see below */" ],
+  "meta": {
+    "total": 0,
+    "page": 1,
+    "pageSize": 25,
+    "totalPages": 0
+  }
+}
+```
+
+#### `GET /audit-logs/:id` — single entry
+
+| Query | Description |
+|-------|-------------|
+| `includeDiff` | `true` — attach **`fieldChanges`** when `action` is `UPDATE` |
+
+404 → `error: "AUDIT_LOG_NOT_FOUND"` when id missing.
+
+#### `AuditLogListItemDto` / detail object
+
+| Field | Type | Notes |
+|-------|------|--------|
+| `id` | string | Audit row id |
+| `occurredAt` | string | ISO-8601 UTC; prefers `occurred_at_utc`, else `timestamp` |
+| `action` | string | Enum values above |
+| `verb` | string \| null | Stable machine verb, e.g. `candidate.created` |
+| `summary` | string \| null | Short timeline line |
+| `resourceType` | string \| null | |
+| `resourceId` | string \| null | |
+| `actor` | object | `{ memberId, name, email }` from `member` JOIN |
+| `request` | object | `{ method, path }` from request snapshot when present |
+| `client` | object | `{ ipAddress, userAgent }` |
+| `oldValues` | object \| null | Parsed JSON |
+| `newValues` | object \| null | Parsed JSON |
+| `reason` | any | Parsed JSON when possible |
+| `fieldChanges` | array \| omitted | `{ field, oldValue, newValue }[]` when `includeDiff` and `UPDATE` |
+
+### 4) RBAC note
+
+Routes are **authenticated** only today. Restrict to admin/compliance in the UI or add server-side role checks when product decides.
+
+---
+
 ## Member phone numbers (E.164 / WhatsApp)
 
 `member.memberContact` is validated and normalized to **strict E.164** on **register** and **member PATCH** via `utils/phone-validator.js` (`libphonenumber-js`). Staged column migration: **`docs/MEMBER_PHONE_E164.md`**, **`scripts/sql-migration.sql`**, **`scripts/migrate-phones.js`**, **`npm run migrate-phones`**.

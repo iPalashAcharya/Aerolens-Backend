@@ -219,7 +219,9 @@ class MemberService {
                 await auditLogService.logAction({
                     userId: auditContext.userId,
                     action: 'UPDATE',
-                    previousValues: existingMember,
+                    entityType: 'member',
+                    entityId: memberId,
+                    oldValues: existingMember,
                     newValues: {
                         ...updatedMember,
                         ...(skillsUpdateResult && { skillsUpdated: skillsUpdateResult.skillsCount })

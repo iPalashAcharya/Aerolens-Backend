@@ -6,22 +6,30 @@ describe('AuditLogRepository', () => {
     beforeEach(() => {
         mockConnection = {
             execute: jest.fn().mockResolvedValue([{ insertId: 1 }]),
-            release: jest.fn().mockResolvedValue(undefined),
+            query: jest.fn().mockResolvedValue([[{ total: 0 }], []]),
+            release: jest.fn().mockResolvedValue(undefined)
         };
         auditLogsRepository.db = {
-            getConnection: jest.fn().mockResolvedValue(mockConnection),
+            getConnection: jest.fn().mockResolvedValue(mockConnection)
         };
     });
 
     const samplePayload = () => ({
         userId: 1,
-        action: 'TEST',
+        action: 'CREATE',
+        resourceType: null,
+        resourceId: null,
+        verb: null,
+        summary: null,
         oldValues: null,
         newValues: null,
         ipAddress: '127.0.0.1',
         userAgent: 'jest',
+        httpMethod: null,
+        httpPath: null,
         reason: null,
         timestamp: '2024-01-01 00:00:00',
+        occurredAtUtc: null
     });
 
     it('create executes insert and releases connection', async () => {
@@ -34,7 +42,7 @@ describe('AuditLogRepository', () => {
 
     it('create with external client does not release', async () => {
         const client = {
-            execute: jest.fn().mockResolvedValue([]),
+            execute: jest.fn().mockResolvedValue([])
         };
 
         await auditLogsRepository.create(samplePayload(), client);
@@ -50,13 +58,13 @@ describe('AuditLogRepository', () => {
         ['ER_NO_REFERENCED_ROW_2', 400, 'FOREIGN_KEY_CONSTRAINT'],
         ['ER_ROW_IS_REFERENCED_2', 400, 'FK_CONSTRAINT_DELETE'],
         ['ECONNREFUSED', 503, 'DATABASE_CONNECTION_ERROR'],
-        ['ER_ACCESS_DENIED_ERROR', 503, 'DATABASE_ACCESS_DENIED'],
+        ['ER_ACCESS_DENIED_ERROR', 503, 'DATABASE_ACCESS_DENIED']
     ])('maps %s to AppError', async (code, status, errCode) => {
         mockConnection.execute.mockRejectedValue(Object.assign(new Error('db'), { code }));
 
         await expect(auditLogsRepository.create(samplePayload())).rejects.toMatchObject({
             statusCode: status,
-            errorCode: errCode,
+            errorCode: errCode
         });
     });
 
@@ -65,7 +73,42 @@ describe('AuditLogRepository', () => {
 
         await expect(auditLogsRepository.create(samplePayload())).rejects.toMatchObject({
             statusCode: 500,
-            errorCode: 'DATABASE_ERROR',
+            errorCode: 'DATABASE_ERROR'
         });
+    });
+
+    it('findMany returns rows and total', async () => {
+        mockConnection.query
+            .mockResolvedValueOnce([[{ total: 2 }]])
+            .mockResolvedValueOnce([
+                [
+                    {
+                        id: 1,
+                        user_id: 1,
+                        action: 'CREATE',
+                        resource_type: 'candidate',
+                        resource_id: '1',
+                        verb: 'candidate.created',
+                        summary: null,
+                        old_values: null,
+                        new_values: { x: 1 },
+                        ip_address: null,
+                        user_agent: null,
+                        http_method: null,
+                        http_path: null,
+                        reason: null,
+                        timestamp: new Date('2024-01-01T00:00:00.000Z'),
+                        occurred_at_utc: null,
+                        actor_name: 'A',
+                        actor_email: 'a@b.c'
+                    }
+                ]
+            ]);
+
+        const out = await auditLogsRepository.findMany({ page: 1, pageSize: 10 });
+
+        expect(out.total).toBe(2);
+        expect(out.rows).toHaveLength(1);
+        expect(mockConnection.release).toHaveBeenCalled();
     });
 });
