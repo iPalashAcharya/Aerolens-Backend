@@ -403,6 +403,72 @@ describe('ClientRepository', () => {
         });
     });
 
+    describe('getClientChangeLogs', () => {
+        it('should use query with clamped pagination and return metadata', async () => {
+            const rows = [{ id: 1, action: 'CREATE' }];
+            mockConnection.query
+                .mockResolvedValueOnce([rows])
+                .mockResolvedValueOnce([[{ total: 1 }]]);
+
+            const result = await clientRepository.getClientChangeLogs(0, 999, mockConnection);
+
+            expect(mockConnection.query).toHaveBeenCalledTimes(2);
+            expect(mockConnection.query).toHaveBeenNthCalledWith(
+                1,
+                expect.stringContaining("action IN ('CREATE', 'UPDATE')"),
+                [100, 0]
+            );
+            expect(result).toEqual({
+                rows,
+                total: 1,
+                page: 1,
+                limit: 100
+            });
+        });
+    });
+
+    describe('getClientDeleteLogs', () => {
+        it('should query delete logs with computed offset and return pagination', async () => {
+            const rows = [{ id: 2, action: 'DELETE' }];
+            mockConnection.query
+                .mockResolvedValueOnce([rows])
+                .mockResolvedValueOnce([[{ total: 7 }]]);
+
+            const result = await clientRepository.getClientDeleteLogs(2, 10, mockConnection);
+
+            expect(mockConnection.query).toHaveBeenCalledTimes(2);
+            expect(mockConnection.query).toHaveBeenNthCalledWith(
+                1,
+                expect.stringContaining("action = 'DELETE'"),
+                [10, 10]
+            );
+            expect(result).toEqual({
+                rows,
+                total: 7,
+                page: 2,
+                limit: 10
+            });
+        });
+
+        it('should map query errors through database error handler', async () => {
+            const dbError = new Error('Incorrect arguments to mysqld_stmt_execute');
+            dbError.code = 'ER_WRONG_ARGUMENTS';
+            dbError.sqlState = 'HY000';
+            mockConnection.query.mockRejectedValueOnce(dbError);
+
+            await expect(clientRepository.getClientDeleteLogs(1, 20, mockConnection))
+                .rejects.toMatchObject({
+                    statusCode: 500,
+                    errorCode: 'DATABASE_ERROR',
+                    details: {
+                        operation: 'getClientDeleteLogs',
+                        code: 'ER_WRONG_ARGUMENTS',
+                        sqlState: 'HY000'
+                    }
+                });
+        });
+    });
+
     describe('_handleDatabaseError', () => {
         it('should throw AppError with correct details for ER_DUP_ENTRY', () => {
             const error = new Error('Duplicate entry for clientName');

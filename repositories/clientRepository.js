@@ -212,10 +212,10 @@ class ClientRepository {
     async getClientChangeLogs(page = 1, limit = 20, client) {
         const connection = client;
         const safePage = Math.max(1, parseInt(page, 10) || 1);
-        const safeLimit = Math.max(1, parseInt(limit, 10) || 20);
+        const safeLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
         const offset = (safePage - 1) * safeLimit;
         try {
-            const [rows] = await connection.execute(
+            const [rows] = await connection.query(
                 `SELECT * FROM auditLogs
                  WHERE resource_type = 'CLIENT'
                    AND action IN ('CREATE', 'UPDATE')
@@ -223,7 +223,7 @@ class ClientRepository {
                  LIMIT ? OFFSET ?`,
                 [safeLimit, offset]
             );
-            const [countRows] = await connection.execute(
+            const [countRows] = await connection.query(
                 `SELECT COUNT(*) AS total FROM auditLogs
                  WHERE resource_type = 'CLIENT'
                    AND action IN ('CREATE', 'UPDATE')`
@@ -238,10 +238,10 @@ class ClientRepository {
     async getClientDeleteLogs(page = 1, limit = 20, client) {
         const connection = client;
         const safePage = Math.max(1, parseInt(page, 10) || 1);
-        const safeLimit = Math.max(1, parseInt(limit, 10) || 20);
+        const safeLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
         const offset = (safePage - 1) * safeLimit;
         try {
-            const [rows] = await connection.execute(
+            const [rows] = await connection.query(
                 `SELECT * FROM auditLogs
                  WHERE resource_type = 'CLIENT'
                    AND action = 'DELETE'
@@ -249,7 +249,7 @@ class ClientRepository {
                  LIMIT ? OFFSET ?`,
                 [safeLimit, offset]
             );
-            const [countRows] = await connection.execute(
+            const [countRows] = await connection.query(
                 `SELECT COUNT(*) AS total FROM auditLogs
                  WHERE resource_type = 'CLIENT'
                    AND action = 'DELETE'`
@@ -264,10 +264,10 @@ class ClientRepository {
     async getClientAuditLogsById(clientId, page = 1, limit = 20, client) {
         const connection = client;
         const safePage = Math.max(1, parseInt(page, 10) || 1);
-        const safeLimit = Math.max(1, parseInt(limit, 10) || 20);
+        const safeLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
         const offset = (safePage - 1) * safeLimit;
         try {
-            const [rows] = await connection.execute(
+            const [rows] = await connection.query(
                 `SELECT * FROM auditLogs
                  WHERE resource_type = 'CLIENT'
                    AND resource_id = ?
@@ -275,7 +275,7 @@ class ClientRepository {
                  LIMIT ? OFFSET ?`,
                 [String(clientId), safeLimit, offset]
             );
-            const [countRows] = await connection.execute(
+            const [countRows] = await connection.query(
                 `SELECT COUNT(*) AS total FROM auditLogs
                  WHERE resource_type = 'CLIENT'
                    AND resource_id = ?`,
