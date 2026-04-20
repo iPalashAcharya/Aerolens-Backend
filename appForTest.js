@@ -75,7 +75,6 @@ app.use(passport.initialize());
 AuthValidator.init(db);
 app.use('/auth', authRoutes);
 app.use('/client', clientRoutes);
-app.use('/clients', clientRoutes);
 app.use('/department', departmentRoutes);
 app.use('/contact', contactRoutes);
 JobProfileValidator.init(db);

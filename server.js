@@ -299,7 +299,6 @@ async function startServer() {
 
         app.use('/auth', authRoutes);
         app.use('/client', clientRoutes);
-        app.use('/clients', clientRoutes);
         app.use('/department', departmentRoutes);
         app.use('/contact', contactRoutes);
         app.use('/jobProfile', jobProfileRoutes);

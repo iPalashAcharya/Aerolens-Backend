@@ -107,9 +107,9 @@ performed on Client records. Logs are stored in the existing
 ### New API Endpoints
 | Method | Endpoint                          | Description                        |
 |--------|-----------------------------------|------------------------------------|
-| GET    | /clients/audit-logs/changes       | All CREATE + UPDATE logs (paginated)|
-| GET    | /clients/audit-logs/deletions     | All DELETE logs (paginated)         |
-| GET    | /clients/:clientId/audit-logs     | Logs for a specific client row      |
+| GET    | /client/audit-logs/changes        | All CREATE + UPDATE logs (paginated)|
+| GET    | /client/audit-logs/deletions      | All DELETE logs (paginated)         |
+| GET    | /client/:clientId/audit-logs      | Logs for a specific client row      |
 
 ### Query Parameters (all endpoints)
 | Param  | Type   | Default | Description          |
