@@ -73,12 +73,12 @@ class ClientController {
     });
 
     deleteClient = catchAsync(async (req, res) => {
-        await this.clientService.deleteClient(parseInt(req.params.id), req.auditContext);
+        const result = await this.clientService.deleteClient(parseInt(req.params.id), req.auditContext);
 
         return ApiResponse.success(
             res,
-            null,
-            'Client deleted successfully'
+            result.data,
+            result.message
         );
     });
 
@@ -112,6 +112,14 @@ class ClientController {
             success: true,
             data: result.data,
             pagination: result.pagination,
+        });
+    });
+
+    getDeletedClients = catchAsync(async (req, res) => {
+        const result = await this.clientService.getDeletedClients();
+        return res.status(200).json({
+            success: true,
+            data: result.data,
         });
     });
 }

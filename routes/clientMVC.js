@@ -35,6 +35,10 @@ router.get('/audit-logs/deletions',
     clientController.getClientDeleteLogs
 );
 
+router.get('/deletions',
+    clientController.getDeletedClients
+);
+
 router.get('/:clientId/audit-logs',
     ClientValidator.validateAuditClientId,
     clientController.getClientAuditLogsById

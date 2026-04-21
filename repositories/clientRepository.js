@@ -163,7 +163,15 @@ class ClientRepository {
     }
     async delete(clientId, client) {
         try {
-            const [result] = await client.execute(`DELETE FROM client WHERE clientId = ?`, [clientId]);
+            const [result] = await client.execute(
+                `UPDATE client 
+                 SET is_deleted = true,
+                     deleted_at = NOW(),
+                     updatedAt = NOW()
+                 WHERE clientId = ?
+                   AND (is_deleted = false OR is_deleted IS NULL)`,
+                [clientId]
+            );
             if (result.affectedRows === 0) {
                 return false;
             }
@@ -285,6 +293,30 @@ class ClientRepository {
             return { rows, total: Number(countRows[0]?.total || 0), page: safePage, limit: safeLimit };
         } catch (error) {
             this._handleDatabaseError(error, 'getClientAuditLogsById');
+        }
+    }
+
+    async getDeletedClients(client) {
+        const connection = client;
+        /*const safePage = Math.max(1, parseInt(page, 10) || 1);
+        const safeLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+        const offset = (safePage - 1) * safeLimit;*/
+        try {
+            const [rows] = await connection.query(
+                `SELECT clientId, clientName, address, is_deleted, deleted_at
+                 FROM client
+                 WHERE is_deleted = true
+                 ORDER BY deleted_at DESC`
+            );
+            /*const [countRows] = await connection.query(
+                `SELECT COUNT(*) AS total
+                 FROM client
+                 WHERE is_deleted = true`
+            );*/
+
+            return { rows };
+        } catch (error) {
+            this._handleDatabaseError(error, 'getDeletedClients');
         }
     }
     _handleDatabaseError(error, operation) {

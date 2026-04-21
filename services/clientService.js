@@ -328,12 +328,16 @@ class ClientService {
 
             await connection.commit();
 
+            const deletedAt = new Date().toISOString();
             return {
                 success: true,
                 message: "Client details deleted successfully",
                 data: {
-                    clientId,
-                    deletedAt: new Date().toISOString()
+                    clientId: client.clientId,
+                    clientName: client.clientName,
+                    address: client.address,
+                    is_deleted: true,
+                    deleted_at: deletedAt
                 }
             };
         } catch (error) {
@@ -402,6 +406,18 @@ class ClientService {
                     limit: result.limit,
                     totalPages: Math.ceil(result.total / result.limit),
                 },
+            };
+        } finally {
+            connection.release();
+        }
+    }
+
+    async getDeletedClients() {
+        const connection = await this.db.getConnection();
+        try {
+            const result = await this.clientRepository.getDeletedClients(connection);
+            return {
+                data: result.rows
             };
         } finally {
             connection.release();
