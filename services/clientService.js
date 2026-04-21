@@ -1,6 +1,14 @@
 const GeocodingService = require('./geocodingService2');
 const AppError = require('../utils/appError');
-const auditLogService = require('./auditLogService');
+const auditLogRepository = require('../repositories/auditLogsRepository');
+
+const toMysqlTimestamp = (dateInput) => {
+    const d = dateInput instanceof Date ? dateInput : new Date(dateInput || Date.now());
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toISOString().slice(0, 19).replace('T', ' ');
+};
+
+const safeStringify = (value) => (value == null ? null : JSON.stringify(value));
 
 class ClientService {
     constructor(clientRepository, db) {
@@ -140,13 +148,21 @@ class ClientService {
             }
 
             const result = await this.clientRepository.create(clientData, location, client);
-            await auditLogService.logAction({
+            await auditLogRepository.create({
                 userId: auditContext.userId,
                 action: 'CREATE',
-                newValues: result,
+                verb: 'CREATE',
+                resourceType: 'CLIENT',
+                resourceId: String(result.clientId),
+                oldValues: null,
+                newValues: safeStringify(result),
+                summary: `Created new client: ${result.clientName}`,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
-                timestamp: auditContext.timestamp
+                httpMethod: auditContext.method,
+                httpPath: auditContext.path,
+                timestamp: toMysqlTimestamp(auditContext.timestamp),
+                occurredAtUtc: auditContext.timestamp || new Date()
             }, client);
             await client.commit();
 
@@ -229,18 +245,26 @@ class ClientService {
                     }
                 );
             }
-            await auditLogService.logAction({
+            const updatedClient = await this.clientRepository.getById(clientId, client);
+            await auditLogRepository.create({
                 userId: auditContext.userId,
                 action: 'UPDATE',
-                oldValues: existingClient,
-                newValues: result,
+                verb: 'UPDATE',
+                resourceType: 'CLIENT',
+                resourceId: String(clientId),
+                oldValues: safeStringify(existingClient),
+                newValues: safeStringify(updatedClient),
+                summary: `Updated client: ${updatedClient?.clientName || existingClient.clientName}`,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
-                timestamp: auditContext.timestamp
+                httpMethod: auditContext.method,
+                httpPath: auditContext.path,
+                timestamp: toMysqlTimestamp(auditContext.timestamp),
+                occurredAtUtc: auditContext.timestamp || new Date()
             }, client);
             await client.commit();
 
-            return await this.clientRepository.getById(clientId, client);
+            return updatedClient;
         } catch (error) {
             await client.rollback();
             if (error instanceof AppError) {
@@ -285,23 +309,35 @@ class ClientService {
                 );
             }
 
-            await auditLogService.logAction({
+            await auditLogRepository.create({
                 userId: auditContext.userId,
                 action: 'DELETE',
-                oldValues: client,
+                verb: 'DELETE',
+                resourceType: 'CLIENT',
+                resourceId: String(clientId),
+                oldValues: safeStringify(client),
+                newValues: null,
+                summary: `Deleted client: ${client.clientName}`,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
-                timestamp: auditContext.timestamp
+                httpMethod: auditContext.method,
+                httpPath: auditContext.path,
+                timestamp: toMysqlTimestamp(auditContext.timestamp),
+                occurredAtUtc: auditContext.timestamp || new Date()
             }, connection);
 
             await connection.commit();
 
+            const deletedAt = new Date().toISOString();
             return {
                 success: true,
                 message: "Client details deleted successfully",
                 data: {
-                    clientId,
-                    deletedAt: new Date().toISOString()
+                    clientId: client.clientId,
+                    clientName: client.clientName,
+                    address: client.address,
+                    is_deleted: true,
+                    deleted_at: deletedAt
                 }
             };
         } catch (error) {
@@ -317,6 +353,72 @@ class ClientService {
                 "CLIENT_DELETION_ERROR",
                 { clientId, operation: "deleteClient" }
             );
+        } finally {
+            connection.release();
+        }
+    }
+
+    async getClientChangeLogs(page = 1, limit = 20) {
+        const connection = await this.db.getConnection();
+        try {
+            const result = await this.clientRepository.getClientChangeLogs(page, limit, connection);
+            return {
+                data: result.rows,
+                pagination: {
+                    total: result.total,
+                    page: result.page,
+                    limit: result.limit,
+                    totalPages: Math.ceil(result.total / result.limit),
+                },
+            };
+        } finally {
+            connection.release();
+        }
+    }
+
+    async getClientDeleteLogs(page = 1, limit = 20) {
+        const connection = await this.db.getConnection();
+        try {
+            const result = await this.clientRepository.getClientDeleteLogs(page, limit, connection);
+            return {
+                data: result.rows,
+                pagination: {
+                    total: result.total,
+                    page: result.page,
+                    limit: result.limit,
+                    totalPages: Math.ceil(result.total / result.limit),
+                },
+            };
+        } finally {
+            connection.release();
+        }
+    }
+
+    async getClientAuditLogsById(clientId, page = 1, limit = 20) {
+        const connection = await this.db.getConnection();
+        try {
+            const result = await this.clientRepository.getClientAuditLogsById(clientId, page, limit, connection);
+            return {
+                data: result.rows,
+                pagination: {
+                    total: result.total,
+                    page: result.page,
+                    limit: result.limit,
+                    totalPages: Math.ceil(result.total / result.limit),
+                },
+            };
+        } finally {
+            connection.release();
+        }
+    }
+
+    async getDeletedClients() {
+        const connection = await this.db.getConnection();
+        try {
+            const result = await this.clientRepository.getDeletedClients(connection);
+            return {
+                data: result.rows
+            };
         } finally {
             connection.release();
         }

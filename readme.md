@@ -90,6 +90,45 @@ Routes are **authenticated** only today. Restrict to admin/compliance in the UI 
 
 ---
 
+## Audit Logs — Client Module
+
+### Overview
+Audit logging tracks every CREATE, UPDATE, and DELETE operation
+performed on Client records. Logs are stored in the existing
+`auditLogs` table using `resource_type = 'CLIENT'`.
+
+### What is Logged
+| Operation     | action   | verb     | old_values        | new_values        |
+|---------------|----------|----------|-------------------|-------------------|
+| Create Client | CREATE   | CREATE   | null              | new client object |
+| Update Client | UPDATE   | UPDATE   | client before     | client after      |
+| Delete Client | DELETE   | DELETE   | client before     | null              |
+
+### New API Endpoints
+| Method | Endpoint                          | Description                        |
+|--------|-----------------------------------|------------------------------------|
+| GET    | /client/audit-logs/changes        | All CREATE + UPDATE logs (paginated)|
+| GET    | /client/deletions                 | All soft-deleted clients (non-paginated) |
+
+### Query Parameters (audit log endpoint)
+| Param  | Type   | Default | Description          |
+|--------|--------|---------|----------------------|
+| page   | number | 1       | Page number          |
+| limit  | number | 20      | Records per page     |
+
+### Frontend Usage
+- Cog icon on each client row → opens row-specific audit log dialog
+- "Change Logs" button in page header → shows all CREATE + UPDATE logs
+- "Deleted Clients" view → shows soft-deleted records from `client` table
+- Dialog has two tabs when opened globally: Change Logs / Deleted Clients
+- Paginated table with colored action badges and collapsible JSON values
+
+### Notes
+- Both `action` and `verb` columns are intentionally kept in sync.
+- The auditLogs table schema is NOT modified by this feature.
+- No new tables are created.
+- Deletion tracking source of truth is `client.is_deleted` and `client.deleted_at`.
+
 ## Member phone numbers (E.164 / WhatsApp)
 
 `member.memberContact` is validated and normalized to **strict E.164** on **register** and **member PATCH** via `utils/phone-validator.js` (`libphonenumber-js`). Staged column migration: **`docs/MEMBER_PHONE_E164.md`**, **`scripts/sql-migration.sql`**, **`scripts/migrate-phones.js`**, **`npm run migrate-phones`**.
@@ -1337,19 +1376,49 @@ Delete a client by ID.
 
 #### Behavior
 
-- Deletes client record if it exists.
+- Soft deletes client record if it exists.
+- Sets `is_deleted = true` and `deleted_at = NOW()`.
 - Returns error if client not found.
 - Validates ID parameter.
 
 #### Response
 
-- HTTP 200 OK with success message.
+- HTTP 200 OK with success message and deleted client details.
 - HTTP 400 Bad Request for invalid ID.
 - HTTP 404 Not Found if client does not exist.
 
 #### Example Request
 
 DELETE /client/3
+
+---
+
+### GET `/client/deletions`
+
+Get all soft-deleted client records.
+
+#### Behavior
+
+- Returns records from `client` where `is_deleted = true`.
+- Sort order: `deleted_at DESC`.
+- Non-paginated response.
+
+#### Response Example
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "clientId": 1,
+      "clientName": "ABC Corp",
+      "address": "Mumbai",
+      "is_deleted": true,
+      "deleted_at": "2026-04-21T10:00:00Z"
+    }
+  ]
+}
+```
 
 ---
 
@@ -8346,4 +8415,3 @@ Routes are registered in **server.js**.
 - **createdBy** is automatically populated using auditContextMiddleware.
 - The module follows the same architectural patterns used by the Candidate and Interview modules.
 - No additional frameworks or abstractions were introduced.
-

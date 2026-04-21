@@ -73,13 +73,54 @@ class ClientController {
     });
 
     deleteClient = catchAsync(async (req, res) => {
-        await this.clientService.deleteClient(parseInt(req.params.id), req.auditContext);
+        const result = await this.clientService.deleteClient(parseInt(req.params.id), req.auditContext);
 
         return ApiResponse.success(
             res,
-            null,
-            'Client deleted successfully'
+            result.data,
+            result.message
         );
+    });
+
+    getClientChangeLogs = catchAsync(async (req, res) => {
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 20;
+        const result = await this.clientService.getClientChangeLogs(page, limit);
+        return res.status(200).json({
+            success: true,
+            data: result.data,
+            pagination: result.pagination,
+        });
+    });
+
+    getClientDeleteLogs = catchAsync(async (req, res) => {
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 20;
+        const result = await this.clientService.getClientDeleteLogs(page, limit);
+        return res.status(200).json({
+            success: true,
+            data: result.data,
+            pagination: result.pagination,
+        });
+    });
+
+    getClientAuditLogsById = catchAsync(async (req, res) => {
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 20;
+        const result = await this.clientService.getClientAuditLogsById(parseInt(req.params.clientId, 10), page, limit);
+        return res.status(200).json({
+            success: true,
+            data: result.data,
+            pagination: result.pagination,
+        });
+    });
+
+    getDeletedClients = catchAsync(async (req, res) => {
+        const result = await this.clientService.getDeletedClients();
+        return res.status(200).json({
+            success: true,
+            data: result.data,
+        });
     });
 }
 

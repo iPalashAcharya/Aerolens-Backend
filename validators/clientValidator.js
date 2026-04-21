@@ -84,6 +84,18 @@ const clientSchemas = {
                 'any.required': 'Client ID is required'
             })
     }),
+    auditParams: Joi.object({
+        clientId: Joi.number()
+            .integer()
+            .positive()
+            .required()
+            .messages({
+                'number.base': 'Client ID must be a number',
+                'number.integer': 'Client ID must be an integer',
+                'number.positive': 'Client ID must be positive',
+                'any.required': 'Client ID is required'
+            })
+    }),
 
     pagination: Joi.object({
         page: Joi.number()
@@ -150,6 +162,18 @@ class ClientValidator {
 
     static validateDelete(req, res, next) {
         const { error } = clientSchemas.params.validate(req.params, { abortEarly: false });
+        if (error) {
+            const details = error.details.map(detail => ({
+                field: detail.path[0],
+                message: detail.message
+            }));
+            throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', { validationErrors: details });
+        }
+        next();
+    }
+
+    static validateAuditClientId(req, res, next) {
+        const { error } = clientSchemas.auditParams.validate(req.params, { abortEarly: false });
         if (error) {
             const details = error.details.map(detail => ({
                 field: detail.path[0],

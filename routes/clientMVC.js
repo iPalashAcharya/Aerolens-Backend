@@ -27,6 +27,23 @@ router.post('/',
     clientController.createClient
 );
 
+router.get('/audit-logs/changes',
+    clientController.getClientChangeLogs
+);
+
+router.get('/audit-logs/deletions',
+    clientController.getClientDeleteLogs
+);
+
+router.get('/deletions',
+    clientController.getDeletedClients
+);
+
+router.get('/:clientId/audit-logs',
+    ClientValidator.validateAuditClientId,
+    clientController.getClientAuditLogsById
+);
+
 router.get('/:id',
     ClientValidator.validateDelete,
     clientController.getClient
