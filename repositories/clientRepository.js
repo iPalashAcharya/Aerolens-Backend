@@ -16,7 +16,7 @@ class ClientRepository {
                 LIMIT ? OFFSET ?
             `;*/
             const dataQuery = `
-                SELECT clientId, clientName, address, location FROM client 
+                SELECT clientId, clientName, address, location FROM client where is_deleted = false OR is_deleted IS NULL
             `;
             /*const numLimit = Math.max(1, parseInt(limit, 10) || 10);
             const numOffset = Math.max(0, parseInt(offset, 10) || 0);
