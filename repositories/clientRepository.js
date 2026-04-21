@@ -166,7 +166,7 @@ class ClientRepository {
             const [result] = await client.execute(
                 `UPDATE client 
                  SET is_deleted = true,
-                     deleted_at = NOW(),
+                     deleted_at = UTC_TIMESTAMP(),
                      updatedAt = NOW()
                  WHERE clientId = ?
                    AND (is_deleted = false OR is_deleted IS NULL)`,
@@ -303,7 +303,15 @@ class ClientRepository {
         const offset = (safePage - 1) * safeLimit;*/
         try {
             const [rows] = await connection.query(
-                `SELECT clientId, clientName, address, is_deleted, deleted_at
+                `SELECT
+                    clientId,
+                    clientName,
+                    address,
+                    is_deleted,
+                    DATE_FORMAT(
+                        CONVERT_TZ(deleted_at, @@session.time_zone, '+00:00'),
+                        '%Y-%m-%dT%H:%i:%s.000Z'
+                    ) AS deleted_at
                  FROM client
                  WHERE is_deleted = true
                  ORDER BY deleted_at DESC`
