@@ -100,6 +100,7 @@ const vendorSchemas = {
                 'number.positive': 'Vendor ID must be a positive number'
             })
     })
+    
 };
 
 class VendorValidator {
@@ -141,6 +142,7 @@ class VendorValidator {
     }
 
     static validateDelete(req, res, next) {
+        console.log('Validating route parameters for vendor operations');
         const { error } = vendorSchemas.params.validate(req.params, { abortEarly: false });
         if (error) {
             const details = error.details.map(detail => ({
