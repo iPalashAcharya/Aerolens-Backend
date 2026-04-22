@@ -12,6 +12,7 @@ class VendorController {
     });
 
     getDeleted = catchAsync(async (req, res) => {
+        console.log('Fetching deleted vendors');
         const result = await this.vendorService.getDeletedVendors();
         return ApiResponse.success(res, result.data, 'Deleted Vendor entries retrieved successfully');
     });
