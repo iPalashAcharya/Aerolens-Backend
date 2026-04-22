@@ -1,4 +1,5 @@
 const express = require('express');
+const multer = require('multer');
 const JobProfileController = require('../controllers/jobProfileController');
 const JobProfileService = require('../services/jobProfileService');
 const JobProfileRepository = require('../repositories/jobProfileRepository');
