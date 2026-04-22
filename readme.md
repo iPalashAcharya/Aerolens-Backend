@@ -129,6 +129,44 @@ performed on Client records. Logs are stored in the existing
 - No new tables are created.
 - Deletion tracking source of truth is `client.is_deleted` and `client.deleted_at`.
 
+## Soft Delete Rollout — Job Profile, Job Profile Requirement, Member, Lookup, Vendor
+
+### Database migration
+
+Run:
+
+`migrations/002_soft_delete_non_client_modules.sql`
+
+This adds `is_deleted` and `deleted_at` columns (same pattern as client soft delete) to:
+
+- `jobProfile`
+- `jobProfileRequirement`
+- `member`
+- `lookup`
+- `recruitmentVendor` (Vendor module table in current backend schema)
+
+### API route additions
+
+New deleted-record listing endpoints:
+
+- `GET /jobProfile/deletions`
+- `GET /jobProfileRequirement/deletions`
+- `GET /member/deletions`
+- `GET /lookup/deletions`
+- `GET /vendor/deletions`
+
+### Existing route behavior changes
+
+Soft-delete behavior on existing delete routes:
+
+- `DELETE /jobProfile/:id`
+- `DELETE /jobProfileRequirement/:id`
+- `DELETE /member/:memberId`
+- `DELETE /lookup/:lookupKey`
+- `DELETE /vendor/:vendorId`
+
+Read/list routes for these modules now return only active rows (`is_deleted = false OR is_deleted IS NULL`).
+
 ## Member phone numbers (E.164 / WhatsApp)
 
 `member.memberContact` is validated and normalized to **strict E.164** on **register** and **member PATCH** via `utils/phone-validator.js` (`libphonenumber-js`). Staged column migration: **`docs/MEMBER_PHONE_E164.md`**, **`scripts/sql-migration.sql`**, **`scripts/migrate-phones.js`**, **`npm run migrate-phones`**.

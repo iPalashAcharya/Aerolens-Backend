@@ -19,6 +19,10 @@ router.get('/',
     vendorController.getAll
 );
 
+router.get('/deletions',
+    vendorController.getDeleted
+);
+
 router.post('/',
     VendorValidator.validateCreate,
     vendorController.createVendor

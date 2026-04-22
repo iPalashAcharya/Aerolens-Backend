@@ -17,6 +17,7 @@ class LookupRepository {
             `;*/
             const dataQuery = `
                 SELECT tag, lookupKey, value FROM lookup 
+                WHERE (is_deleted = false OR is_deleted IS NULL)
             `;
             /*const numLimit = Math.max(1, parseInt(limit, 10) ?? 10);
             const numOffset = Math.max(0, parseInt(offset, 10) ?? 0);*/
@@ -35,7 +36,12 @@ class LookupRepository {
     async getByKey(lookupKey, client) {
         const connection = client;
         try {
-            const dataQuery = `SELECT tag, lookupKey, value FROM lookup WHERE lookupKey=?`;
+            const dataQuery = `
+                SELECT tag, lookupKey, value
+                FROM lookup
+                WHERE lookupKey = ?
+                  AND (is_deleted = false OR is_deleted IS NULL)
+            `;
             const [lookupData] = await connection.query(dataQuery, [lookupKey]);
             return {
                 data: lookupData
@@ -47,7 +53,12 @@ class LookupRepository {
 
     async getByTag(tag, connection) {
         try {
-            const dataQuery = `SELECT lookupKey,tag,value FROM lookup WHERE tag=?`;
+            const dataQuery = `
+                SELECT lookupKey,tag,value
+                FROM lookup
+                WHERE tag = ?
+                  AND (is_deleted = false OR is_deleted IS NULL)
+            `;
             const [lookupData] = await connection.query(dataQuery, [tag]);
             return {
                 data: lookupData
@@ -107,7 +118,12 @@ class LookupRepository {
             const values = Object.values(filteredData);
 
             const setClause = fields.map(field => `${field} = ?`).join(', ');
-            const query = `UPDATE lookup SET ${setClause} WHERE lookupKey = ?`;
+            const query = `
+                UPDATE lookup
+                SET ${setClause}
+                WHERE lookupKey = ?
+                  AND (is_deleted = false OR is_deleted IS NULL)
+            `;
 
             const [result] = await connection.execute(query, [...values, lookupKey]);
             if (result.affectedRows === 0) {
@@ -129,9 +145,15 @@ class LookupRepository {
 
     async delete(lookupKey, client) {
         try {
-            const [result] = await client.execute(`DELETE FROM lookup WHERE lookupKey = ?`, [lookupKey]);
+            const [result] = await client.execute(
+                `UPDATE lookup
+                 SET is_deleted = true,
+                     deleted_at = UTC_TIMESTAMP()
+                 WHERE lookupKey = ?
+                   AND (is_deleted = false OR is_deleted IS NULL)`,
+                [lookupKey]
+            );
             if (result.affectedRows === 0) {
-                await client.rollback();
                 return false;
             }
             return result.affectedRows;
@@ -147,12 +169,37 @@ class LookupRepository {
         const connection = client;
         try {
             const [result] = await connection.execute(
-                `SELECT lookupKey FROM lookup WHERE value = ?`,
+                `SELECT lookupKey
+                 FROM lookup
+                 WHERE value = ?
+                   AND (is_deleted = false OR is_deleted IS NULL)`,
                 [value]
             );
             return result.length > 0 ? result[0] : null;
         } catch (error) {
             this._handleDatabaseError(error, 'exists');
+        }
+    }
+
+    async getDeletedLookups(client) {
+        const connection = client;
+        try {
+            const [rows] = await connection.query(
+                `SELECT
+                    lookupKey,
+                    tag,
+                    value,
+                    DATE_FORMAT(
+                        CONVERT_TZ(deleted_at, @@session.time_zone, '+00:00'),
+                        '%Y-%m-%dT%H:%i:%s.000Z'
+                    ) AS deleted_at
+                 FROM lookup
+                 WHERE is_deleted = true
+                 ORDER BY deleted_at DESC`
+            );
+            return { rows };
+        } catch (error) {
+            this._handleDatabaseError(error, 'getDeletedLookups');
         }
     }
 

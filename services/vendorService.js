@@ -27,6 +27,27 @@ class VendorService {
         }
     }
 
+    async getDeletedVendors() {
+        const client = await this.db.getConnection();
+        try {
+            const result = await this.vendorRepository.getDeletedVendors(client);
+            return { data: result.rows };
+        } catch (error) {
+            if (!(error instanceof AppError)) {
+                console.error('Error Fetching Deleted Vendors', error.stack);
+                throw new AppError(
+                    'Failed to fetch deleted Vendors',
+                    500,
+                    'DATABASE_ERROR',
+                    { operation: 'getDeletedVendors' }
+                );
+            }
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
     async createVendor(vendorData, auditContext) {
         const client = await this.db.getConnection();
 

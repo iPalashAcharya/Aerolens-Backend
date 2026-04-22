@@ -337,6 +337,27 @@ class JobProfileRequirementService {
         }
     }
 
+    async getDeletedJobProfileRequirements() {
+        const client = await this.db.getConnection();
+        try {
+            const result = await this.jobProfileRequirementRepository.getDeletedJobProfileRequirements(client);
+            return { data: result.rows };
+        } catch (error) {
+            if (!(error instanceof AppError)) {
+                console.error('Error Fetching Deleted Job Profile Requirements', error.stack);
+                throw new AppError(
+                    'Failed to fetch deleted job profile requirements',
+                    500,
+                    'JOB_PROFILE_REQUIREMENT_FETCH_ERROR',
+                    { operation: 'getDeletedJobProfileRequirements' }
+                );
+            }
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
     async searchJobProfileRequirements(searchCriteria) {
         const client = await this.db.getConnection();
 

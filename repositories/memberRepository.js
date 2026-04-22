@@ -10,13 +10,27 @@ class MemberRepository {
         SELECT lookupKey AS designationId, value AS designationName
         FROM lookup
         WHERE tag='designation'
+          AND (is_deleted = false OR is_deleted IS NULL)
         `);
 
-        const vendorPromise = connection.query(`SELECT vendorId,vendorName FROM recruitmentVendor`);
+        const vendorPromise = connection.query(`
+            SELECT vendorId,vendorName
+            FROM recruitmentVendor
+            WHERE (is_deleted = false OR is_deleted IS NULL)
+        `);
 
-        const clientPromise = connection.query(`SELECT clientId,clientName FROM client`);
+        const clientPromise = connection.query(`
+            SELECT clientId,clientName
+            FROM client
+            WHERE (is_deleted = false OR is_deleted IS NULL)
+        `);
 
-        const skillPromise = connection.query(`SELECT lookupKey AS skillId,value AS skillName FROM lookup WHERE tag='skill'`);
+        const skillPromise = connection.query(`
+            SELECT lookupKey AS skillId,value AS skillName
+            FROM lookup
+            WHERE tag='skill'
+              AND (is_deleted = false OR is_deleted IS NULL)
+        `);
 
         const locationPromise = connection.query(`
         SELECT locationId,cityName AS city,country,stateName AS state FROM location
@@ -42,9 +56,18 @@ class MemberRepository {
 
     async getCreateData(client) {
         const connection = client;
-        const designationPromise = connection.query(`SELECT lookupKey AS designationId, value AS designationName FROM lookup WHERE tag='designation'`);
+        const designationPromise = connection.query(`
+            SELECT lookupKey AS designationId, value AS designationName
+            FROM lookup
+            WHERE tag='designation'
+              AND (is_deleted = false OR is_deleted IS NULL)
+        `);
 
-        const vendorPromise = connection.query(`SELECT vendorId,vendorName FROM recruitmentVendor`);
+        const vendorPromise = connection.query(`
+            SELECT vendorId,vendorName
+            FROM recruitmentVendor
+            WHERE (is_deleted = false OR is_deleted IS NULL)
+        `);
 
         const [designations, vendors] = await Promise.all([designationPromise, vendorPromise]);
         return {
@@ -57,7 +80,10 @@ class MemberRepository {
         const connection = client;
         try {
             const [rows] = await connection.execute(
-                `SELECT vendorId FROM recruitmentVendor WHERE vendorId = ?`,
+                `SELECT vendorId
+                 FROM recruitmentVendor
+                 WHERE vendorId = ?
+                   AND (is_deleted = false OR is_deleted IS NULL)`,
                 [vendorId]
             );
 
@@ -86,22 +112,24 @@ class MemberRepository {
         }
     }
 
-    async findById(memberId) {
-        const connection = await db.getConnection();
+    async findById(memberId, client = null) {
+        const connection = client || await db.getConnection();
         try {
             const [rows] = await connection.execute(
                 `SELECT m.memberId, m.memberName, m.memberContact, m.email, m.password, l.value AS designation,
                         m.isRecruiter, m.isActive, m.lastLogin, m.createdAt, m.updatedAt
                  FROM member m INNER JOIN lookup l
                  ON m.designation = l.lookupKey
-                 WHERE m.memberId = ? AND m.isActive=TRUE`,
+                 WHERE m.memberId = ?
+                   AND m.isActive = TRUE
+                   AND (m.is_deleted = false OR m.is_deleted IS NULL)`,
                 [memberId]
             );
             return rows[0] || null;
         } catch (error) {
             throw new AppError('Database error while finding member', 500, 'DB_ERROR', error.message);
         } finally {
-            connection.release();
+            if (!client) connection.release();
         }
     }
 
@@ -154,8 +182,11 @@ class MemberRepository {
             ON ls.lookupKey = isk.skillId
         LEFT JOIN recruitmentVendor v
             ON m.vendorId = v.vendorId
+           AND (v.is_deleted = false OR v.is_deleted IS NULL)
 
-        WHERE m.isActive = TRUE AND m.memberId = ?
+        WHERE m.isActive = TRUE
+          AND (m.is_deleted = false OR m.is_deleted IS NULL)
+          AND m.memberId = ?
 
         GROUP BY
             m.memberId, m.memberName, m.memberContact, m.email, l.value,
@@ -391,8 +422,10 @@ class MemberRepository {
             ON ls.lookupKey = isk.skillId
         LEFT JOIN recruitmentVendor v
             ON m.vendorId = v.vendorId
+           AND (v.is_deleted = false OR v.is_deleted IS NULL)
 
         WHERE m.isActive = TRUE
+          AND (m.is_deleted = false OR m.is_deleted IS NULL)
 
         GROUP BY
             m.memberId, m.memberName, m.memberContact, m.email, l.value,
@@ -418,7 +451,9 @@ class MemberRepository {
                 `SELECT memberId, memberName, memberContact, email, password, designation,
                         isRecruiter, isActive, lastLogin, createdAt, updatedAt
                  FROM member 
-                 WHERE email = ?`,
+                 WHERE email = ?
+                   AND isActive = TRUE
+                   AND (is_deleted = false OR is_deleted IS NULL)`,
                 [email]
             );
             return rows[0] || null;
@@ -458,7 +493,9 @@ class MemberRepository {
                 ON isk.interviewerId = m.memberId
             LEFT JOIN lookup ls
                 ON ls.lookupKey = isk.skillId
-            WHERE m.email = ? AND m.isActive = TRUE
+            WHERE m.email = ?
+              AND m.isActive = TRUE
+              AND (m.is_deleted = false OR m.is_deleted IS NULL)
             GROUP BY
                 m.memberId, m.memberName, m.memberContact, m.email, l.value,
                 m.isRecruiter, m.isActive, m.lastLogin, m.createdAt, m.updatedAt,
@@ -553,6 +590,7 @@ class MemberRepository {
                          FROM member
                          WHERE email = ?
                            AND isActive = TRUE
+                           AND (is_deleted = false OR is_deleted IS NULL)
                            AND memberId != ?
                          LIMIT 1`,
                         [emailToCheck, memberId]
@@ -577,6 +615,7 @@ class MemberRepository {
                          FROM member
                          WHERE memberContact = ?
                            AND isActive = TRUE
+                           AND (is_deleted = false OR is_deleted IS NULL)
                            AND memberId != ?
                          LIMIT 1`,
                         [contactToCheck, memberId]
@@ -597,7 +636,12 @@ class MemberRepository {
             const values = Object.values(filteredData);
 
             const setClause = fields.map(field => `${field} = ?`).join(', ');
-            const query = `UPDATE member SET ${setClause} WHERE memberId = ?`;
+            const query = `
+                UPDATE member
+                SET ${setClause}
+                WHERE memberId = ?
+                  AND (is_deleted = false OR is_deleted IS NULL)
+            `;
 
             const [result] = await connection.execute(query, [...values, memberId]);
 
@@ -660,12 +704,14 @@ class MemberRepository {
         }
     }
 
-    async deactivateAccount(memberId, deletedByUserId) {
-        const connection = await db.getConnection();
+    async deactivateAccount(memberId, deletedByUserId, client = null) {
+        const connection = client || await db.getConnection();
         try {
             await connection.execute(
                 `UPDATE member
                  SET isActive = FALSE,
+                     is_deleted = TRUE,
+                     deleted_at = UTC_TIMESTAMP(),
                      deletedAt = NOW(),
                      deletedBy = ?,
                      memberContact = CASE
@@ -678,13 +724,14 @@ class MemberRepository {
                          THEN CONCAT(email, '_old_', memberId)
                          ELSE NULL
                      END
-                 WHERE memberId = ?`,
+                 WHERE memberId = ?
+                   AND (is_deleted = false OR is_deleted IS NULL)`,
                 [deletedByUserId, memberId]
             );
         } catch (error) {
             throw new AppError('Database error while deactivating account', 500, 'DB_ERROR', error.message);
         } finally {
-            connection.release();
+            if (!client) connection.release();
         }
     }
 
@@ -704,6 +751,29 @@ class MemberRepository {
         } catch (error) {
             if (error instanceof AppError) { throw error; }
             this._handleDatabaseError(error);
+        }
+    }
+
+    async getDeletedMembers(client) {
+        const connection = client;
+        try {
+            const [rows] = await connection.query(
+                `SELECT
+                    memberId,
+                    memberName,
+                    memberContact,
+                    email,
+                    DATE_FORMAT(
+                        CONVERT_TZ(deleted_at, @@session.time_zone, '+00:00'),
+                        '%Y-%m-%dT%H:%i:%s.000Z'
+                    ) AS deleted_at
+                 FROM member
+                 WHERE is_deleted = true
+                 ORDER BY deleted_at DESC`
+            );
+            return { rows };
+        } catch (error) {
+            throw new AppError('Database Error while fetching deleted members', 500, 'DB_ERROR', error.message);
         }
     }
 
