@@ -20,6 +20,10 @@ router.get('/',
     memberController.getAll
 );
 
+router.get('/deletions',
+    memberController.getDeleted
+);
+
 router.get('/form-data',
     memberController.getFormData
 );

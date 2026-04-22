@@ -157,6 +157,7 @@ class JobProfileRepository {
         ON l.lookupKey = jpts.lookupId
         AND l.tag = 'techSpecification'
         WHERE jp.jobProfileId = ?
+          AND (jp.is_deleted = false OR jp.is_deleted IS NULL)
         `;
 
             const [rows] = await connection.execute(query, [jobProfileId]);
@@ -184,6 +185,7 @@ class JobProfileRepository {
                 SELECT jobProfileId 
                 FROM jobProfile 
                 WHERE jobRole = ?
+                  AND (is_deleted = false OR is_deleted IS NULL)
             `;
             const params = [jobRole];
 
@@ -239,7 +241,12 @@ class JobProfileRepository {
                 const values = Object.values(filteredData);
                 const setClause = fields.map(field => `${field} = ?`).join(', ');
 
-                const query = `UPDATE jobProfile SET ${setClause} WHERE jobProfileId = ?`;
+                const query = `
+                    UPDATE jobProfile
+                    SET ${setClause}
+                    WHERE jobProfileId = ?
+                      AND (is_deleted = false OR is_deleted IS NULL)
+                `;
                 const [result] = await connection.execute(query, [...values, jobProfileId]);
 
                 if (result.affectedRows === 0) {
@@ -276,8 +283,13 @@ class JobProfileRepository {
                 throw new AppError('Job Profile ID is required', 400, 'MISSING_JOB_PROFILE_ID');
             }
 
-            // Technical specifications will be deleted automatically due to CASCADE
-            const query = `DELETE FROM jobProfile WHERE jobProfileId = ?`;
+            const query = `
+                UPDATE jobProfile
+                SET is_deleted = true,
+                    deleted_at = UTC_TIMESTAMP()
+                WHERE jobProfileId = ?
+                  AND (is_deleted = false OR is_deleted IS NULL)
+            `;
             const [result] = await connection.execute(query, [jobProfileId]);
 
             if (result.affectedRows === 0) {
@@ -324,6 +336,7 @@ class JobProfileRepository {
         LEFT JOIN lookup l
         ON l.lookupKey = jpts.lookupId
         AND l.tag = 'techSpecification'
+        WHERE (jp.is_deleted = false OR jp.is_deleted IS NULL)
         ORDER BY jp.createdAt DESC
         `;
 
@@ -345,7 +358,11 @@ class JobProfileRepository {
     async count(client) {
         const connection = client;
         try {
-            const query = `SELECT COUNT(*) as count FROM jobProfile`;
+            const query = `
+                SELECT COUNT(*) as count
+                FROM jobProfile
+                WHERE (is_deleted = false OR is_deleted IS NULL)
+            `;
             const [rows] = await connection.execute(query);
             return rows[0].count;
         } catch (error) {
@@ -364,6 +381,7 @@ class JobProfileRepository {
                 SELECT COUNT(*) as count 
                 FROM jobProfile
                 WHERE jobRole = ?
+                  AND (is_deleted = false OR is_deleted IS NULL)
             `;
             const params = [jobRole];
 
@@ -393,6 +411,7 @@ class JobProfileRepository {
                     jdOriginalName = ?, 
                     jdUploadDate = NOW()
                 WHERE jobProfileId = ?
+                  AND (is_deleted = false OR is_deleted IS NULL)
             `;
 
             const [result] = await connection.execute(query, [jdFilename, jdOriginalName, jobProfileId]);
@@ -423,6 +442,7 @@ class JobProfileRepository {
                 SELECT jdFileName, jdOriginalName, jdUploadDate
                 FROM jobProfile 
                 WHERE jobProfileId = ?
+                  AND (is_deleted = false OR is_deleted IS NULL)
             `;
 
             const [rows] = await connection.execute(query, [jobProfileId]);
@@ -446,6 +466,7 @@ class JobProfileRepository {
                     jdOriginalName = NULL, 
                     jdUploadDate = NULL
                 WHERE jobProfileId = ?
+                  AND (is_deleted = false OR is_deleted IS NULL)
             `;
 
             const [result] = await connection.execute(query, [jobProfileId]);
@@ -461,6 +482,27 @@ class JobProfileRepository {
             return result.affectedRows;
         } catch (error) {
             if (error instanceof AppError) throw error;
+            this._handleDatabaseError(error);
+        }
+    }
+
+    async getDeletedJobProfiles(client) {
+        const connection = client;
+        try {
+            const [rows] = await connection.query(
+                `SELECT
+                    jobProfileId,
+                    jobRole,
+                    DATE_FORMAT(
+                        CONVERT_TZ(deleted_at, @@session.time_zone, '+00:00'),
+                        '%Y-%m-%dT%H:%i:%s.000Z'
+                    ) AS deleted_at
+                 FROM jobProfile
+                 WHERE is_deleted = true
+                 ORDER BY deleted_at DESC`
+            );
+            return { rows };
+        } catch (error) {
             this._handleDatabaseError(error);
         }
     }

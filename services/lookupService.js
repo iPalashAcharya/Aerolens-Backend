@@ -43,6 +43,27 @@ class LookupService {
         }
     }
 
+    async getDeletedLookups() {
+        const client = await this.db.getConnection();
+        try {
+            const result = await this.lookupRepository.getDeletedLookups(client);
+            return { data: result.rows };
+        } catch (error) {
+            if (!(error instanceof AppError)) {
+                console.error('Error Fetching Deleted Lookup Data', error.stack);
+                throw new AppError(
+                    'Failed to fetch deleted lookup',
+                    500,
+                    'LOOKUP_FETCH_ERROR',
+                    { operation: 'getDeletedLookups' }
+                );
+            }
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
     async getDataByTag(tag) {
         const client = await this.db.getConnection();
         try {
@@ -126,7 +147,7 @@ class LookupService {
             await client.beginTransaction();
 
             const existingLookup = await this.lookupRepository.getByKey(lookupKey, client);
-            if (!existingLookup) {
+            if (!existingLookup || !Array.isArray(existingLookup.data) || existingLookup.data.length === 0) {
                 throw new AppError(
                     `Lookup with Key ${lookupKey} not found`,
                     404,
@@ -178,7 +199,7 @@ class LookupService {
         try {
             const lookupData = await this.lookupRepository.getByKey(lookupKey, client);
 
-            if (!lookupData) {
+            if (!lookupData || !Array.isArray(lookupData.data) || lookupData.data.length === 0) {
                 throw new AppError(
                     `Lookup Entry with Key ${lookupKey} not found`,
                     404,
@@ -213,7 +234,7 @@ class LookupService {
         try {
             await client.beginTransaction();
             const lookup = await this.lookupRepository.getByKey(lookupKey, client);
-            if (!lookup) {
+            if (!lookup || !Array.isArray(lookup.data) || lookup.data.length === 0) {
                 throw new AppError(
                     `Lookup Key with ${lookupKey} not found`,
                     404,

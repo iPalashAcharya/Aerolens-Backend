@@ -12,6 +12,7 @@ class VendorRepository {
             const query = `
             SELECT vendorId, vendorName, vendorPhone, vendorEmail, contactPersonName
             FROM recruitmentVendor
+            WHERE (is_deleted = false OR is_deleted IS NULL)
             `;
 
             const [rows] = await connection.execute(query);
@@ -54,6 +55,7 @@ class VendorRepository {
             SELECT vendorId, vendorName, vendorPhone, vendorEmail, contactPersonName
             FROM recruitmentVendor 
             WHERE vendorId = ?
+              AND (is_deleted = false OR is_deleted IS NULL)
             `;
 
             const [rows] = await connection.execute(query, [vendorId]);
@@ -86,7 +88,12 @@ class VendorRepository {
                 );
             }
             const setClause = fields.map(field => `${field} = ?`).join(', ');
-            const query = `UPDATE recruitmentVendor SET ${setClause} WHERE vendorId = ?`;
+            const query = `
+                UPDATE recruitmentVendor
+                SET ${setClause}
+                WHERE vendorId = ?
+                  AND (is_deleted = false OR is_deleted IS NULL)
+            `;
 
 
             const [result] = await connection.execute(query, [...values, vendorId]);
@@ -110,7 +117,13 @@ class VendorRepository {
         const connection = client;
 
         try {
-            const query = `DELETE FROM recruitmentVendor WHERE vendorId = ?`;
+            const query = `
+                UPDATE recruitmentVendor
+                SET is_deleted = true,
+                    deleted_at = UTC_TIMESTAMP()
+                WHERE vendorId = ?
+                  AND (is_deleted = false OR is_deleted IS NULL)
+            `;
             const [result] = await connection.execute(query, [vendorId]);
 
             if (result.affectedRows === 0) {
@@ -150,6 +163,7 @@ class VendorRepository {
         SELECT COUNT(*) as count
         FROM recruitmentVendor
         WHERE (${conditions.join(' OR ')})
+          AND (is_deleted = false OR is_deleted IS NULL)
     `;
 
         if (excludeId) {
@@ -159,6 +173,30 @@ class VendorRepository {
 
         const [rows] = await client.execute(query, params);
         return rows[0].count > 0;
+    }
+
+    async getDeletedVendors(client) {
+        const connection = client;
+        try {
+            const [rows] = await connection.query(
+                `SELECT
+                    vendorId,
+                    vendorName,
+                    vendorPhone,
+                    vendorEmail,
+                    contactPersonName,
+                    DATE_FORMAT(
+                        CONVERT_TZ(deleted_at, @@session.time_zone, '+00:00'),
+                        '%Y-%m-%dT%H:%i:%s.000Z'
+                    ) AS deleted_at
+                 FROM recruitmentVendor
+                 WHERE is_deleted = true
+                 ORDER BY deleted_at DESC`
+            );
+            return { rows };
+        } catch (error) {
+            this._handleDatabaseError(error);
+        }
     }
 
     _handleDatabaseError(error) {

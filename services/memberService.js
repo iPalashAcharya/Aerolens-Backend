@@ -139,6 +139,27 @@ class MemberService {
         }
     }
 
+    async getDeletedMembers() {
+        const client = await this.db.getConnection();
+        try {
+            const result = await this.memberRepository.getDeletedMembers(client);
+            return { data: result.rows };
+        } catch (error) {
+            if (!(error instanceof AppError)) {
+                console.error('Error Fetching Deleted Members', error.stack);
+                throw new AppError(
+                    'Failed to fetch deleted Members',
+                    500,
+                    'MEMBER_FETCH_ERROR',
+                    { operation: 'getDeletedMembers' }
+                );
+            }
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
     async updateMember(memberId, updateData, auditContext) {
         const client = await this.db.getConnection();
 
@@ -396,7 +417,7 @@ class MemberService {
 
             console.log(`Unlinked ${schedulerResult.affectedRows} interviews where member was scheduler`);
 
-            await this.memberRepository.deactivateAccount(memberId, auditContext?.userId || null);
+            await this.memberRepository.deactivateAccount(memberId, auditContext?.userId || null, client);
 
             await auditLogService.logAction({
                 userId: auditContext.userId,

@@ -11,6 +11,11 @@ class VendorController {
         return ApiResponse.success(res, result, 'Vendor entries retrieved successfully');
     });
 
+    getDeleted = catchAsync(async (req, res) => {
+        const result = await this.vendorService.getDeletedVendors();
+        return ApiResponse.success(res, result.data, 'Deleted Vendor entries retrieved successfully');
+    });
+
 
     createVendor = catchAsync(async (req, res) => {
         const vendor = await this.vendorService.createVendor(req.body, req.auditContext);

@@ -241,6 +241,15 @@ class JobProfileController {
         );
     });
 
+    getDeletedJobProfiles = catchAsync(async (req, res) => {
+        const result = await this.jobProfileService.getDeletedJobProfiles();
+        return ApiResponse.success(
+            res,
+            result.data,
+            'Deleted Job Profiles retrieved successfully'
+        );
+    });
+
     updateJobProfile = catchAsync(async (req, res, next) => {
         try {
             const jobProfileId = parseInt(req.params.id);

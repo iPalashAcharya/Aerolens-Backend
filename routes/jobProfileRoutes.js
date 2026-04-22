@@ -26,6 +26,10 @@ router.get('/',
     jobProfileController.getAllJobProfile
 );
 
+router.get('/deletions',
+    jobProfileController.getDeletedJobProfiles
+);
+
 router.post('/:id/upload-JD',
     JobProfileValidator.validateDelete,
     (req, res, next) => {
