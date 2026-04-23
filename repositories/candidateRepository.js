@@ -702,7 +702,14 @@ class CandidateRepository {
                 throw new AppError('Candidate ID is required', 400, 'MISSING_CANDIDATE_ID');
             }
 
-            const query = `UPDATE candidate SET isActive=FALSE WHERE candidateId=?`;
+            const query = `
+                UPDATE candidate
+                SET isActive = FALSE,
+                    is_deleted = 1,
+                    deleted_at = UTC_TIMESTAMP()
+                WHERE candidateId = ?
+                  AND isActive = TRUE
+            `;
             const [result] = await connection.execute(query, [candidateId]);
 
             if (result.affectedRows === 0) {
@@ -716,6 +723,34 @@ class CandidateRepository {
             return result.affectedRows;
         } catch (error) {
             if (error instanceof AppError) { throw error; }
+            this._handleDatabaseError(error);
+        }
+    }
+
+    async getDeletedCandidates(client) {
+        const connection = client;
+        try {
+            const [rows] = await connection.query(
+                `SELECT
+                    c.candidateId,
+                    c.candidateName,
+                    c.contactNumber,
+                    c.email,
+                    m.memberName AS recruiterName,
+                    jp.jobRole,
+                    DATE_FORMAT(
+                        CONVERT_TZ(c.deleted_at, @@session.time_zone, '+00:00'),
+                        '%Y-%m-%dT%H:%i:%s.000Z'
+                    ) AS deleted_at
+                 FROM candidate c
+                 LEFT JOIN member m ON m.memberId = c.recruiterId
+                 LEFT JOIN jobProfileRequirement jpr ON jpr.jobProfileRequirementId = c.appliedForJobProfileId
+                 LEFT JOIN jobProfile jp ON jp.jobProfileId = jpr.jobProfileId
+                 WHERE c.is_deleted = 1
+                 ORDER BY c.deleted_at DESC`
+            );
+            return { rows };
+        } catch (error) {
             this._handleDatabaseError(error);
         }
     }

@@ -20,6 +20,10 @@ router.get('/',
     interviewController.getAll
 );
 
+router.get('/deletions',
+    interviewController.getDeleted
+);
+
 router.get(
   '/capacity/interviewer-daily/:interviewerId',
   InterviewValidator.validateInterviewerDailyQuery,

@@ -16,6 +16,11 @@ class OfferController {
         return ApiResponse.success(res, offer, 'Offer created successfully', 201);
     });
 
+    getDeleted = catchAsync(async (req, res) => {
+        const result = await this.offerService.getDeletedOffers();
+        return ApiResponse.success(res, result.data, 'Deleted offers retrieved successfully');
+    });
+
     getOffers = catchAsync(async (req, res) => {
         const offers = await this.offerService.getOffers();
         return ApiResponse.success(res, offers, 'Offers retrieved successfully');

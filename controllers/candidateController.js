@@ -161,6 +161,11 @@ class CandidateController {
         }
     });
 
+    getDeleted = catchAsync(async (req, res) => {
+        const result = await this.candidateService.getDeletedCandidates();
+        return ApiResponse.success(res, result.data, 'Deleted candidates retrieved successfully');
+    });
+
     deleteCandidate = catchAsync(async (req, res) => {
         // Delete resume from S3 if exists
         const resumeInfo = await this.candidateService.getResumeInfo(parseInt(req.params.id));
