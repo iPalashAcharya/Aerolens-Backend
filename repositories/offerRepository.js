@@ -373,6 +373,34 @@ class OfferRepository {
         };
     }
 
+    async getDeletedOffers(client) {
+        const connection = client;
+        try {
+            const [rows] = await connection.query(
+                `SELECT
+                    o.offerId,
+                    c.candidateName,
+                    jp.jobRole,
+                    o.offerStatus,
+                    o.offeredCTCAmount,
+                    o.joiningDate,
+                    DATE_FORMAT(
+                        CONVERT_TZ(o.deletedAt, @@session.time_zone, '+00:00'),
+                        '%Y-%m-%dT%H:%i:%s.000Z'
+                    ) AS deleted_at
+                 FROM offer o
+                 LEFT JOIN candidate c ON c.candidateId = o.candidateId
+                 LEFT JOIN jobProfileRequirement jpr ON jpr.jobProfileRequirementId = o.jobProfileRequirementId
+                 LEFT JOIN jobProfile jp ON jp.jobProfileId = jpr.jobProfileId
+                 WHERE o.isDeleted = 1
+                 ORDER BY o.deletedAt DESC`
+            );
+            return { rows };
+        } catch (error) {
+            this._handleDatabaseError(error, 'getDeletedOffers');
+        }
+    }
+
     _handleDatabaseError(error, operation) {
         if (error instanceof AppError) throw error;
         const errorMappings = {

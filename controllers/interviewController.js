@@ -6,6 +6,11 @@ class InterviewController {
         this.interviewService = interviewService;
     }
 
+    getDeleted = catchAsync(async (req, res) => {
+        const result = await this.interviewService.getDeletedInterviews();
+        return ApiResponse.success(res, result.data, 'Deleted interviews retrieved successfully');
+    });
+
     getAll = catchAsync(async (req, res) => {
         try {
             /*const options = {

@@ -167,6 +167,46 @@ Soft-delete behavior on existing delete routes:
 
 Read/list routes for these modules now return only active rows (`is_deleted = false OR is_deleted IS NULL`).
 
+## Soft Delete Rollout — Candidate (Resume), Interview, Offer (Onboarding)
+
+### Database migration
+
+Run:
+
+`migrations/003_soft_delete_candidate_interview.sql`
+
+```sql
+ALTER TABLE `candidate`
+    ADD COLUMN is_deleted BOOLEAN DEFAULT false,
+    ADD COLUMN deleted_at TIMESTAMP NULL;
+
+ALTER TABLE `interview`
+    ADD COLUMN is_deleted BOOLEAN DEFAULT false,
+    ADD COLUMN deleted_at TIMESTAMP NULL;
+
+ALTER TABLE `offer`
+    ADD COLUMN is_deleted BOOLEAN DEFAULT false,
+    ADD COLUMN deleted_at TIMESTAMP NULL;
+```
+
+### API route additions
+
+New deleted-record listing endpoints (all require `authenticate`):
+
+- `GET /candidate/deletions` — soft-deleted candidates
+- `GET /interview/deletions` — soft-deleted interviews
+- `GET /offers/deletions` — soft-deleted offers
+
+### Existing route behavior changes
+
+Delete routes now also set `is_deleted = 1` and `deleted_at = UTC_TIMESTAMP()` in addition to existing flags:
+
+- `DELETE /candidate/:id` — sets `isActive = FALSE`, `is_deleted = 1`, `deleted_at`
+- `DELETE /interview/:interviewId` — sets `isActive = FALSE`, `is_deleted = 1`, `deletedAt`
+- `DELETE /offers/:offerId` — sets `isDeleted = 1`, `deletedAt` (unchanged, already correct)
+
+---
+
 ## Member phone numbers (E.164 / WhatsApp)
 
 `member.memberContact` is validated and normalized to **strict E.164** on **register** and **member PATCH** via `utils/phone-validator.js` (`libphonenumber-js`). Staged column migration: **`docs/MEMBER_PHONE_E164.md`**, **`scripts/sql-migration.sql`**, **`scripts/migrate-phones.js`**, **`npm run migrate-phones`**.

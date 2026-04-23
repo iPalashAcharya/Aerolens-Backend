@@ -234,6 +234,27 @@ class InterviewService {
         }
     }
 
+    async getDeletedInterviews() {
+        const client = await this.db.getConnection();
+        try {
+            const result = await this.interviewRepository.getDeletedInterviews(client);
+            return { data: result.rows };
+        } catch (error) {
+            if (!(error instanceof AppError)) {
+                console.error('Error Fetching Deleted Interviews', error.stack);
+                throw new AppError(
+                    'Failed to fetch deleted interviews',
+                    500,
+                    'DATABASE_ERROR',
+                    { operation: 'getDeletedInterviews' }
+                );
+            }
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
     async getAll() {
         //const { limit = 10, page = 1 } = options || {};
         const client = await this.db.getConnection();

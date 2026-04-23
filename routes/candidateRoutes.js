@@ -56,6 +56,10 @@ router.get('/',
     candidateController.getAllCandidates
 );
 
+router.get('/deletions',
+    candidateController.getDeleted
+);
+
 router.get('/create-data',
     candidateController.getCreateData
 );

@@ -47,6 +47,27 @@ class OfferService {
         }
     }
 
+    async getDeletedOffers() {
+        const client = await this.db.getConnection();
+        try {
+            const result = await this.offerRepository.getDeletedOffers(client);
+            return { data: result.rows };
+        } catch (error) {
+            if (!(error instanceof AppError)) {
+                console.error('Error Fetching Deleted Offers', error.stack);
+                throw new AppError(
+                    'Failed to fetch deleted offers',
+                    500,
+                    'DATABASE_ERROR',
+                    { operation: 'getDeletedOffers' }
+                );
+            }
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
     async getOffers() {
         const client = await this.db.getConnection();
         try {

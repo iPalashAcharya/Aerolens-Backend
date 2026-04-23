@@ -743,6 +743,27 @@ class CandidateService {
         }
     }
 
+    async getDeletedCandidates() {
+        const client = await this.db.getConnection();
+        try {
+            const result = await this.candidateRepository.getDeletedCandidates(client);
+            return { data: result.rows };
+        } catch (error) {
+            if (!(error instanceof AppError)) {
+                console.error('Error Fetching Deleted Candidates', error.stack);
+                throw new AppError(
+                    'Failed to fetch deleted candidates',
+                    500,
+                    'DATABASE_ERROR',
+                    { operation: 'getDeletedCandidates' }
+                );
+            }
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
     async permanentlyDeleteOldCandidates() {
         const client = await this.db.getConnection();
         try {

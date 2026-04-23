@@ -18,6 +18,8 @@ router.use(auditContextMiddleware);
 
 router.get('/form-data', offerController.getOfferFormData);
 
+router.get('/deletions', offerController.getDeleted);
+
 router.get('/', offerController.getOffers);
 
 router.get('/:offerId/details', offerController.getOfferDetails);
