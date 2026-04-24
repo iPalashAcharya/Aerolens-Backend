@@ -6,7 +6,7 @@ const ClientValidator = require('../validators/clientValidator');
 const { authenticate } = require('../middleware/authMiddleware');
 const db = require('../db');
 const auditContextMiddleware = require('../middleware/auditContext');
-
+// Checking deployment
 const router = express.Router();
 
 const clientRepository = new ClientRepository(db);
