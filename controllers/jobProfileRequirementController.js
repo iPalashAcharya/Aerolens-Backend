@@ -45,6 +45,15 @@ class JobProfileRequirementController {
         );
     });
 
+    getDeletedJobProfileRequirements = catchAsync(async (req, res) => {
+        const result = await this.jobProfileRequirementService.getDeletedJobProfileRequirements();
+        return ApiResponse.success(
+            res,
+            result.data,
+            'Deleted Job Profile Requirements retrieved successfully'
+        );
+    });
+
     getJobProfileRequirementsByClient = catchAsync(async (req, res) => {
         const clientId = parseInt(req.params.clientId);
         const { limit, offset } = req.query;

@@ -25,6 +25,10 @@ router.get('/',
     jobProfileRequirementController.getAllJobProfileRequirements
 );
 
+router.get('/deletions',
+    jobProfileRequirementController.getDeletedJobProfileRequirements
+);
+
 router.post('/',
     (req, res, next) => {
         console.log("==== Parsed body BEFORE validator ====");

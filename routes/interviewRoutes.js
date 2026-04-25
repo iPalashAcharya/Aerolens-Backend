@@ -20,6 +20,10 @@ router.get('/',
     interviewController.getAll
 );
 
+router.get('/deletions',
+    interviewController.getDeleted
+);
+
 router.get(
   '/capacity/interviewer-daily/:interviewerId',
   InterviewValidator.validateInterviewerDailyQuery,
@@ -51,7 +55,7 @@ router.get('/report/tracker',
 router.get('/report/overall',
     interviewController.getTotalSummary
 );
-
+// 
 router.get(
     '/report/monthly',
     InterviewValidator.validateQuery,

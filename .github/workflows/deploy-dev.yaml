@@ -53,7 +53,7 @@ jobs:
           docker push "$IMAGE"
         env:
           DOCKER_BUILDKIT: 1
-
+        
       - name: Send SSM command to deploy (dev instance)
         run: |
           aws ssm send-command \

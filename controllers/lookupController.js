@@ -26,6 +26,15 @@ class LookupController {
         }
     });
 
+    getDeleted = catchAsync(async (req, res) => {
+        const result = await this.lookupService.getDeletedLookups();
+        return ApiResponse.success(
+            res,
+            result.data,
+            'Deleted lookup entries retrieved successfully'
+        );
+    });
+
     getByKey = catchAsync(async (req, res) => {
         const lookup = await this.lookupService.getByKey(parseInt(req.params.lookupKey));
         return ApiResponse.success(

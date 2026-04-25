@@ -70,6 +70,7 @@ class JobProfileRequirementRepository {
             LEFT JOIN department d ON jpr.departmentId = d.departmentId
             LEFT JOIN lookup stat ON jpr.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
             WHERE jpr.jobProfileRequirementId = ?
+              AND (jpr.is_deleted = false OR jpr.is_deleted IS NULL)
             `;
 
             const [rows] = await connection.execute(query, [jobProfileRequirementId]);
@@ -122,7 +123,12 @@ class JobProfileRequirementRepository {
             const values = Object.values(filteredData);
 
             const setClause = fields.map(field => `${field} = ?`).join(', ');
-            const query = `UPDATE jobProfileRequirement SET ${setClause} WHERE jobProfileRequirementId = ?`;
+            const query = `
+                UPDATE jobProfileRequirement
+                SET ${setClause}
+                WHERE jobProfileRequirementId = ?
+                  AND (is_deleted = false OR is_deleted IS NULL)
+            `;
 
             const [result] = await connection.execute(query, [...values, jobProfileRequirementId]);
 
@@ -152,7 +158,13 @@ class JobProfileRequirementRepository {
                 throw new AppError('Job Profile Requirement ID is required', 400, 'MISSING_JOB_PROFILE_REQUIREMENT_ID');
             }
 
-            const query = `DELETE FROM jobProfileRequirement WHERE jobProfileRequirementId = ?`;
+            const query = `
+                UPDATE jobProfileRequirement
+                SET is_deleted = true,
+                    deleted_at = UTC_TIMESTAMP()
+                WHERE jobProfileRequirementId = ?
+                  AND (is_deleted = false OR is_deleted IS NULL)
+            `;
             const [result] = await connection.execute(query, [jobProfileRequirementId]);
 
             if (result.affectedRows === 0) {
@@ -201,6 +213,7 @@ class JobProfileRequirementRepository {
             LEFT JOIN department d ON jpr.departmentId = d.departmentId
             LEFT JOIN lookup stat ON jpr.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
             WHERE jpr.clientId = ?
+              AND (jpr.is_deleted = false OR jpr.is_deleted IS NULL)
             ORDER BY jpr.receivedOn DESC
             `;
 
@@ -260,6 +273,7 @@ class JobProfileRequirementRepository {
             LEFT JOIN department d ON jpr.departmentId = d.departmentId
             LEFT JOIN lookup stat ON jpr.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
             WHERE jpr.jobProfileId = ?
+              AND (jpr.is_deleted = false OR jpr.is_deleted IS NULL)
             ORDER BY jpr.receivedOn DESC
             `;
 
@@ -307,6 +321,7 @@ class JobProfileRequirementRepository {
             LEFT JOIN department d ON jpr.departmentId = d.departmentId
             LEFT JOIN lookup stat ON jpr.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
             WHERE jpr.statusId = ?
+              AND (jpr.is_deleted = false OR jpr.is_deleted IS NULL)
             ORDER BY jpr.receivedOn DESC
             `;
 
@@ -354,6 +369,7 @@ class JobProfileRequirementRepository {
             LEFT JOIN department d ON jpr.departmentId = d.departmentId
             LEFT JOIN lookup stat ON jpr.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
             WHERE jpr.departmentId = ?
+              AND (jpr.is_deleted = false OR jpr.is_deleted IS NULL)
             ORDER BY jpr.receivedOn DESC
             `;
 
@@ -378,7 +394,12 @@ class JobProfileRequirementRepository {
                 throw new AppError('Client ID is required', 400, 'MISSING_CLIENT_ID');
             }
 
-            const query = `SELECT COUNT(*) as count FROM jobProfileRequirement WHERE clientId = ?`;
+            const query = `
+                SELECT COUNT(*) as count
+                FROM jobProfileRequirement
+                WHERE clientId = ?
+                  AND (is_deleted = false OR is_deleted IS NULL)
+            `;
             const [rows] = await connection.execute(query, [clientId]);
             return rows[0].count;
         } catch (error) {
@@ -399,6 +420,7 @@ class JobProfileRequirementRepository {
             SELECT COUNT(*) as count 
             FROM jobProfileRequirement
             WHERE jobProfileId = ? AND clientId = ? AND departmentId = ?
+              AND (is_deleted = false OR is_deleted IS NULL)
             `;
             const params = [jobProfileId, clientId, departmentId];
 
@@ -443,6 +465,7 @@ class JobProfileRequirementRepository {
             LEFT JOIN client c ON jpr.clientId = c.clientId
             LEFT JOIN department d ON jpr.departmentId = d.departmentId
             LEFT JOIN lookup stat ON jpr.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
+            WHERE (jpr.is_deleted = false OR jpr.is_deleted IS NULL)
             ORDER BY jpr.receivedOn DESC
             `;
 
@@ -497,6 +520,7 @@ class JobProfileRequirementRepository {
             LEFT JOIN department d ON jpr.departmentId = d.departmentId
             LEFT JOIN lookup stat ON jpr.statusId = stat.lookupKey AND stat.tag = 'profileStatus'
             WHERE 1=1
+              AND (jpr.is_deleted = false OR jpr.is_deleted IS NULL)
             `;
 
             const params = [];
@@ -572,6 +596,30 @@ class JobProfileRequirementRepository {
             return rows;
         } catch (error) {
             if (error instanceof AppError) { throw error; }
+            this._handleDatabaseError(error);
+        }
+    }
+
+    async getDeletedJobProfileRequirements(client) {
+        const connection = client;
+        try {
+            const [rows] = await connection.query(
+                `SELECT
+                    jobProfileRequirementId,
+                    jobProfileId,
+                    clientId,
+                    departmentId,
+                    positions,
+                    DATE_FORMAT(
+                        CONVERT_TZ(deleted_at, @@session.time_zone, '+00:00'),
+                        '%Y-%m-%dT%H:%i:%s.000Z'
+                    ) AS deleted_at
+                 FROM jobProfileRequirement
+                 WHERE is_deleted = true
+                 ORDER BY deleted_at DESC`
+            );
+            return { rows };
+        } catch (error) {
             this._handleDatabaseError(error);
         }
     }

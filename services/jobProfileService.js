@@ -735,6 +735,27 @@ class JobProfileService {
         }
     }
 
+    async getDeletedJobProfiles() {
+        const client = await this.db.getConnection();
+        try {
+            const result = await this.jobProfileRepository.getDeletedJobProfiles(client);
+            return { data: result.rows };
+        } catch (error) {
+            if (!(error instanceof AppError)) {
+                console.error('Error Fetching Deleted Job Profiles', error.stack);
+                throw new AppError(
+                    'Failed to fetch deleted job profiles',
+                    500,
+                    'JOB_PROFILE_FETCH_ERROR',
+                    { operation: 'getDeletedJobProfiles' }
+                );
+            }
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
     async getJobProfileCount() {
         const client = await this.db.getConnection();
         try {

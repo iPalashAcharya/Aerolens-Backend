@@ -844,20 +844,16 @@ class InterviewRepository {
                 [interviewId]
             );
 
-            /*const [result] = await client.execute(
-                `UPDATE interview SET isActive=FALSE,deletedAt=NOW() WHERE interviewId=? AND isActive=TRUE`,
-                [interviewId]
-            );*/
             const [result] = await client.execute(
-                `UPDATE interview 
-             SET 
-                isActive = CASE WHEN interviewId = ? THEN FALSE ELSE isActive END,
-                deletedAt = CASE WHEN interviewId = ? THEN NOW() ELSE deletedAt END,
-                updatedAt = NOW()
-             WHERE interviewId = ? 
-               AND isActive = TRUE 
-               AND deletedAt IS NULL`,
-                [interviewId, interviewId, interviewId]
+                `UPDATE interview
+                 SET isActive   = FALSE,
+                     is_deleted  = 1,
+                     deletedAt   = UTC_TIMESTAMP(),
+                     updatedAt   = UTC_TIMESTAMP()
+                 WHERE interviewId = ?
+                   AND isActive = TRUE
+                   AND deletedAt IS NULL`,
+                [interviewId]
             );
 
             return {
@@ -866,6 +862,32 @@ class InterviewRepository {
             };
         } catch (error) {
             this._handleDatabaseError(error, 'delete');
+        }
+    }
+
+    async getDeletedInterviews(client) {
+        const connection = client;
+        try {
+            const [rows] = await connection.query(
+                `SELECT
+                    i.interviewId,
+                    c.candidateName,
+                    interviewer.memberName AS interviewerName,
+                    DATE(i.fromTimeUTC) AS interviewDate,
+                    i.result,
+                    DATE_FORMAT(
+                        CONVERT_TZ(i.deletedAt, @@session.time_zone, '+00:00'),
+                        '%Y-%m-%dT%H:%i:%s.000Z'
+                    ) AS deleted_at
+                 FROM interview i
+                 LEFT JOIN candidate c ON c.candidateId = i.candidateId
+                 LEFT JOIN member interviewer ON interviewer.memberId = i.interviewerId
+                 WHERE i.is_deleted = 1
+                 ORDER BY i.deletedAt DESC`
+            );
+            return { rows };
+        } catch (error) {
+            this._handleDatabaseError(error, 'getDeletedInterviews');
         }
     }
 

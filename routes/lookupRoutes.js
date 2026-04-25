@@ -20,6 +20,10 @@ router.get('/',
     lookupController.getAll
 );
 
+router.get('/deletions',
+    lookupController.getDeleted
+);
+
 router.post('/',
     LookupValidator.validateCreate,
     lookupController.createLookup

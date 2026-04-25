@@ -44,6 +44,15 @@ class MemberController {
         }
     });
 
+    getDeleted = catchAsync(async (req, res) => {
+        const result = await this.memberService.getDeletedMembers();
+        return ApiResponse.success(
+            res,
+            result.data,
+            'Deleted Members retrieved successfully'
+        );
+    });
+
     getById = catchAsync(async (req, res) => {
         const member = await this.memberService.getMemberById(parseInt(req.params.memberId));
         return ApiResponse.success(
