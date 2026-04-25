@@ -29,5 +29,4 @@ const pool = mysql.createPool({
     timezone: '+00:00',
     dateStrings: true
 });
-
 module.exports = pool.promise();
