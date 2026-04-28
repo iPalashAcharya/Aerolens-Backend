@@ -7,6 +7,7 @@ if (process.env.NODE_ENV === 'development') {
 } else {
     console.log('Running in NON-LOCAL mode:', process.env.NODE_ENV);
 }
+// 
 
 const { SecretsManagerClient, GetSecretValueCommand } = require('@aws-sdk/client-secrets-manager');
 const JobProfileRequirementValidator = require('./validators/jobProfileRequirementValidator');
