@@ -49,6 +49,11 @@ router.get('/:id',
     clientController.getClient
 );
 
+router.patch('/:id/restore',
+    ClientValidator.validateDelete,
+    clientController.restoreClient
+);
+
 router.patch('/:id',
     ClientValidator.validateUpdate,
     clientController.updateClient

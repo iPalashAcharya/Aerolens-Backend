@@ -108,6 +108,49 @@ class ContactService {
         }
     }
 
+    async getDeletedContacts(clientId) {
+        const connection = await this.db.getConnection();
+        try {
+            return await this.contactRepository.getDeletedByClientId(clientId, connection);
+        } catch (error) {
+            if (error instanceof AppError) throw error;
+            throw new AppError('Failed to fetch deleted contacts', 500, 'CONTACT_FETCH_ERROR', { operation: 'getDeletedContacts' });
+        } finally {
+            connection.release();
+        }
+    }
+
+    async restoreContact(contactId, auditContext) {
+        const connection = await this.db.getConnection();
+        try {
+            await connection.beginTransaction();
+
+            const restored = await this.contactRepository.restore(contactId, connection);
+            if (!restored) {
+                throw new AppError(`Contact with ID ${contactId} not found or already active`, 404, 'CLIENT_CONTACT_NOT_FOUND');
+            }
+
+            const contact = await this.contactRepository.getById(contactId, connection);
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'RESTORE',
+                newValues: contact ?? { contactId },
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, connection);
+
+            await connection.commit();
+            return { contactId };
+        } catch (error) {
+            await connection.rollback();
+            if (error instanceof AppError) throw error;
+            throw new AppError('Failed to restore contact', 500, 'CLIENT_CONTACT_RESTORE_ERROR', { operation: 'restoreContact', contactId });
+        } finally {
+            connection.release();
+        }
+    }
+
     async deleteContact(contactId, auditContext) {
         const connection = await this.db.getConnection();
         try {

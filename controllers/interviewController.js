@@ -219,6 +219,11 @@ class InterviewController {
             'Interview entry deleted successfully'
         );
     });
+
+    restoreInterview = catchAsync(async (req, res) => {
+        const result = await this.interviewService.restoreInterview(parseInt(req.params.interviewId), req.auditContext);
+        return ApiResponse.success(res, result, 'Interview restored successfully');
+    });
 }
 
 module.exports = InterviewController;

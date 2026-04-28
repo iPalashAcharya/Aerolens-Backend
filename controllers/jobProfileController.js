@@ -331,6 +331,11 @@ class JobProfileController {
             'Job Profiles retrieved successfully'
         );
     });
+
+    restoreJobProfile = catchAsync(async (req, res) => {
+        const result = await this.jobProfileService.restoreJobProfile(parseInt(req.params.id), req.auditContext);
+        return ApiResponse.success(res, result, 'Job profile restored successfully');
+    });
 }
 
 module.exports = JobProfileController;

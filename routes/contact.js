@@ -15,19 +15,14 @@ const contactController = new ContactController(contactService);
 router.use(authenticate);
 router.use(auditContextMiddleware);
 
-router.post('/',
-    ContactValidator.validateCreate,
-    contactController.createContact
-);
+router.get('/client/:clientId/deleted', contactController.getDeletedContacts);
 
-router.patch('/:contactId',
-    ContactValidator.validateUpdate,
-    contactController.updateContact
-);
+router.post('/', ContactValidator.validateCreate, contactController.createContact);
 
-router.delete('/:contactId',
-    ContactValidator.validateDelete,
-    contactController.deleteContact
-);
+router.patch('/:contactId/restore', contactController.restoreContact);
+
+router.patch('/:contactId', ContactValidator.validateUpdate, contactController.updateContact);
+
+router.delete('/:contactId', ContactValidator.validateDelete, contactController.deleteContact);
 
 module.exports = router;

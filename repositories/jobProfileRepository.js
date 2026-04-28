@@ -571,6 +571,20 @@ class JobProfileRepository {
                 );
         }
     }
+
+    async restore(jobProfileId, client) {
+        try {
+            const [result] = await client.execute(
+                `UPDATE jobProfile
+                 SET is_deleted = false, deleted_at = NULL
+                 WHERE jobProfileId = ? AND is_deleted = true`,
+                [jobProfileId]
+            );
+            return result.affectedRows > 0;
+        } catch (error) {
+            this._handleDatabaseError(error, 'restore');
+        }
+    }
 }
 
 module.exports = JobProfileRepository;

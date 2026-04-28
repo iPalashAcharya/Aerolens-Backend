@@ -85,6 +85,11 @@ class MemberController {
             'Member entry deactivated successfully and will be deleted from database in 10 days'
         );
     });
+
+    restoreMember = catchAsync(async (req, res) => {
+        const result = await this.memberService.restoreMember(parseInt(req.params.memberId), req.auditContext);
+        return ApiResponse.success(res, result, 'Member restored successfully');
+    });
 }
 
 module.exports = MemberController;

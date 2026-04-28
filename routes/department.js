@@ -9,36 +9,24 @@ const auditContextMiddleware = require('../middleware/auditContext');
 
 const router = express.Router();
 
-// Dependency injection
 const departmentRepository = new DepartmentRepository(db);
 const departmentService = new DepartmentService(departmentRepository, db);
 const departmentController = new DepartmentController(departmentService);
 router.use(authenticate);
 router.use(auditContextMiddleware);
 
-// Routes
-router.get('/client/:clientId',
-    departmentController.getDepartmentsByClient
-);
+router.get('/client/:clientId', departmentController.getDepartmentsByClient);
 
-router.post('/',
-    DepartmentValidator.validateCreate,
-    departmentController.createDepartment
-);
+router.get('/client/:clientId/deleted', departmentController.getDeletedDepartments);
 
-router.get('/:id',
-    DepartmentValidator.validateDelete, // Reusing for ID validation
-    departmentController.getDepartment
-);
+router.post('/', DepartmentValidator.validateCreate, departmentController.createDepartment);
 
-router.patch('/:id',
-    DepartmentValidator.validateUpdate,
-    departmentController.updateDepartment
-);
+router.patch('/:id/restore', departmentController.restoreDepartment);
 
-router.delete('/:id',
-    DepartmentValidator.validateDelete,
-    departmentController.deleteDepartment
-);
+router.get('/:id', DepartmentValidator.validateDelete, departmentController.getDepartment);
+
+router.patch('/:id', DepartmentValidator.validateUpdate, departmentController.updateDepartment);
+
+router.delete('/:id', DepartmentValidator.validateDelete, departmentController.deleteDepartment);
 
 module.exports = router;

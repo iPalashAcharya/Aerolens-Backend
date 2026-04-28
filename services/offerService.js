@@ -354,6 +354,33 @@ class OfferService {
             client.release();
         }
     }
+
+    async restoreOffer(offerId, auditContext) {
+        const client = await this.db.getConnection();
+        try {
+            await client.beginTransaction();
+            const restored = await this.offerRepository.restore(offerId, client);
+            if (!restored) {
+                throw new AppError(`Offer with ID ${offerId} not found or not deleted`, 404, 'OFFER_NOT_FOUND');
+            }
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'RESTORE',
+                oldValues: { offerId },
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, client);
+            await client.commit();
+            return { offerId };
+        } catch (error) {
+            await client.rollback();
+            if (error instanceof AppError) throw error;
+            throw new AppError('Failed to restore offer', 500, 'DATABASE_ERROR', { offerId, operation: 'restoreOffer' });
+        } finally {
+            client.release();
+        }
+    }
 }
 
 module.exports = OfferService;

@@ -165,6 +165,53 @@ class LocationService {
         }
     }
 
+    async getDeletedLocations() {
+        const client = await this.db.getConnection();
+        try {
+            return await this.locationRepository.getDeleted(client);
+        } catch (error) {
+            if (!(error instanceof AppError)) {
+                throw new AppError('Failed to fetch deleted locations', 500, 'LOCATION_FETCH_ERROR', { operation: 'getDeletedLocations' });
+            }
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
+    async restoreLocation(locationId, auditContext) {
+        const client = await this.db.getConnection();
+        try {
+            await client.beginTransaction();
+
+            const restored = await this.locationRepository.restore(locationId, client);
+            if (!restored) {
+                throw new AppError(`Location with ID ${locationId} not found or already active`, 404, 'LOCATION_NOT_FOUND');
+            }
+
+            const location = await this.locationRepository.getById(locationId, client);
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'RESTORE',
+                newValues: location?.data?.[0] ?? { locationId },
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, client);
+
+            await client.commit();
+            return { locationId };
+        } catch (error) {
+            await client.rollback();
+            if (!(error instanceof AppError)) {
+                throw new AppError('Failed to restore location', 500, 'LOCATION_RESTORE_ERROR', { operation: 'restoreLocation', locationId });
+            }
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
     async deleteLocation(locationId, auditContext) {
         const client = await this.db.getConnection();
 

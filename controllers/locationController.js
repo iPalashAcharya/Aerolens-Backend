@@ -69,6 +69,16 @@ class LocationController {
             'Location deleted successfully'
         );
     });
+
+    getDeleted = catchAsync(async (req, res) => {
+        const locations = await this.locationService.getDeletedLocations();
+        return ApiResponse.success(res, locations, 'Deleted locations retrieved successfully');
+    });
+
+    restoreLocation = catchAsync(async (req, res) => {
+        const result = await this.locationService.restoreLocation(parseInt(req.params.locationId), req.auditContext);
+        return ApiResponse.success(res, result, 'Location restored successfully');
+    });
 }
 
 module.exports = LocationController;

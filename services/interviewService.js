@@ -1140,6 +1140,33 @@ class InterviewService {
             client.release();
         }
     }
+
+    async restoreInterview(interviewId, auditContext) {
+        const client = await this.db.getConnection();
+        try {
+            await client.beginTransaction();
+            const restored = await this.interviewRepository.restore(interviewId, client);
+            if (!restored) {
+                throw new AppError(`Interview with ID ${interviewId} not found or not deleted`, 404, 'INTERVIEW_NOT_FOUND');
+            }
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'RESTORE',
+                oldValues: { interviewId },
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, client);
+            await client.commit();
+            return { interviewId };
+        } catch (error) {
+            await client.rollback();
+            if (error instanceof AppError) throw error;
+            throw new AppError('Failed to restore interview', 500, 'DATABASE_ERROR', { interviewId, operation: 'restoreInterview' });
+        } finally {
+            client.release();
+        }
+    }
 }
 
 module.exports = InterviewService;

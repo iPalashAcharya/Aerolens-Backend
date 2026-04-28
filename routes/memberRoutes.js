@@ -32,6 +32,11 @@ router.get('/create-data',
     memberController.getCreateData
 );
 
+router.patch('/:memberId/restore',
+    MemberValidator.validateDelete,
+    memberController.restoreMember
+);
+
 router.patch('/:memberId',
     MemberValidator.validateUpdate,
     memberController.updateMember

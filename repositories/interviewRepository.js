@@ -1105,6 +1105,20 @@ class InterviewRepository {
             }
         );
     }
+
+    async restore(interviewId, client) {
+        try {
+            const [result] = await client.execute(
+                `UPDATE interview
+                 SET isActive = TRUE, is_deleted = 0, deletedAt = NULL, updatedAt = UTC_TIMESTAMP()
+                 WHERE interviewId = ? AND is_deleted = 1`,
+                [interviewId]
+            );
+            return result.affectedRows > 0;
+        } catch (error) {
+            this._handleDatabaseError(error, 'restore');
+        }
+    }
 }
 
 module.exports = InterviewRepository;

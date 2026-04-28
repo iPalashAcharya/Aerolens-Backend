@@ -59,6 +59,11 @@ router.get('/:id',
     jobProfileRequirementController.getJobProfileRequirement
 );
 
+router.patch('/:id/restore',
+    JobProfileRequirementValidator.validateDelete,
+    jobProfileRequirementController.restoreJobProfileRequirement
+);
+
 router.patch('/:id',
     (req, res, next) => {
         console.log("==== Parsed body BEFORE validator ====");

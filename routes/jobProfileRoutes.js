@@ -103,6 +103,11 @@ router.get('/:id',
     jobProfileController.getJobProfile
 );
 
+router.patch('/:id/restore',
+    JobProfileValidator.validateDelete,
+    jobProfileController.restoreJobProfile
+);
+
 router.patch('/:id',
     jobProfileService.upload.single('JD'),
     (req, res, next) => {

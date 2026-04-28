@@ -266,6 +266,20 @@ class LookupRepository {
             }
         );
     }
+
+    async restore(lookupKey, client) {
+        try {
+            const [result] = await client.execute(
+                `UPDATE lookup
+                 SET is_deleted = false, deleted_at = NULL
+                 WHERE lookupKey = ? AND is_deleted = true`,
+                [lookupKey]
+            );
+            return result.affectedRows > 0;
+        } catch (error) {
+            this._handleDatabaseError(error, 'restore');
+        }
+    }
 }
 
 module.exports = LookupRepository;
