@@ -505,6 +505,33 @@ class MemberService {
             client.release();
         }
     }
+
+    async restoreMember(memberId, auditContext) {
+        const client = await this.db.getConnection();
+        try {
+            await client.beginTransaction();
+            const restored = await this.memberRepository.restore(memberId, client);
+            if (!restored) {
+                throw new AppError(`Member with ID ${memberId} not found or not deleted`, 404, 'MEMBER_NOT_FOUND');
+            }
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'RESTORE',
+                oldValues: { memberId },
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, client);
+            await client.commit();
+            return { memberId };
+        } catch (error) {
+            await client.rollback();
+            if (error instanceof AppError) throw error;
+            throw new AppError('Failed to restore member', 500, 'DATABASE_ERROR', { memberId, operation: 'restoreMember' });
+        } finally {
+            client.release();
+        }
+    }
 }
 
 module.exports = MemberService;

@@ -287,6 +287,33 @@ class LookupService {
             );
         }
     }
+
+    async restoreLookup(lookupKey, auditContext) {
+        const client = await this.db.getConnection();
+        try {
+            await client.beginTransaction();
+            const restored = await this.lookupRepository.restore(lookupKey, client);
+            if (!restored) {
+                throw new AppError(`Lookup with key ${lookupKey} not found or not deleted`, 404, 'LOOKUP_NOT_FOUND');
+            }
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'RESTORE',
+                oldValues: { lookupKey },
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, client);
+            await client.commit();
+            return { lookupKey };
+        } catch (error) {
+            await client.rollback();
+            if (error instanceof AppError) throw error;
+            throw new AppError('Failed to restore lookup', 500, 'DATABASE_ERROR', { lookupKey, operation: 'restoreLookup' });
+        } finally {
+            client.release();
+        }
+    }
 }
 
 module.exports = LookupService;

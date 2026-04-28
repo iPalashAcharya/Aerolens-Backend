@@ -415,6 +415,20 @@ class OfferRepository {
         }
         throw new AppError('Database operation failed', 500, 'DATABASE_ERROR', { operation, code: error.code });
     }
+
+    async restore(offerId, client) {
+        try {
+            const [result] = await client.execute(
+                `UPDATE offer
+                 SET isDeleted = 0, deletedAt = NULL
+                 WHERE offerId = ? AND isDeleted = 1`,
+                [offerId]
+            );
+            return result.affectedRows > 0;
+        } catch (error) {
+            this._handleDatabaseError(error, 'restore');
+        }
+    }
 }
 
 module.exports = OfferRepository;

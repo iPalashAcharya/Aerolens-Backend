@@ -29,6 +29,11 @@ router.post('/',
     lookupController.createLookup
 );
 
+router.patch('/:lookupKey/restore',
+    LookupValidator.validateDelete,
+    lookupController.restoreLookup
+);
+
 router.patch('/:lookupKey',
     LookupValidator.validateUpdate,
     lookupController.updateLookup

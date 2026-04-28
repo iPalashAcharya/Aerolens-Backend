@@ -412,6 +412,72 @@ class ClientService {
         }
     }
 
+    async restoreClient(clientId, auditContext) {
+        const connection = await this.db.getConnection();
+        try {
+            await connection.beginTransaction();
+            const client = await this.clientRepository.getById(clientId, connection);
+            if (!client) {
+                throw new AppError(
+                    `Client with ID ${clientId} not found`,
+                    404,
+                    'CLIENT_NOT_FOUND'
+                );
+            }
+            const restored = await this.clientRepository.restore(clientId, connection);
+            if (!restored) {
+                throw new AppError(
+                    `Client with ID ${clientId} is not currently deleted`,
+                    404,
+                    'CLIENT_NOT_FOUND',
+                    { clientId, suggestion: 'Please verify the client ID and try again' }
+                );
+            }
+            await auditLogRepository.create({
+                userId: auditContext.userId,
+                action: 'RESTORE',
+                verb: 'PATCH',
+                resourceType: 'CLIENT',
+                resourceId: String(clientId),
+                oldValues: safeStringify({ ...client, is_deleted: true }),
+                newValues: safeStringify({ ...client, is_deleted: false, deleted_at: null }),
+                summary: `Restored client: ${client.clientName}`,
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                httpMethod: auditContext.method,
+                httpPath: auditContext.path,
+                timestamp: toMysqlTimestamp(auditContext.timestamp),
+                occurredAtUtc: auditContext.timestamp || new Date()
+            }, connection);
+            await connection.commit();
+            return {
+                success: true,
+                message: 'Client restored successfully',
+                data: {
+                    clientId: client.clientId,
+                    clientName: client.clientName,
+                    address: client.address,
+                    is_deleted: false,
+                    deleted_at: null
+                }
+            };
+        } catch (error) {
+            await connection.rollback();
+            if (error instanceof AppError || error.name === 'AppError') {
+                throw error;
+            }
+            console.error('Error restoring client:', error.stack);
+            throw new AppError(
+                'Failed to restore client',
+                500,
+                'CLIENT_RESTORE_ERROR',
+                { clientId, operation: 'restoreClient' }
+            );
+        } finally {
+            connection.release();
+        }
+    }
+
     async getDeletedClients() {
         const connection = await this.db.getConnection();
         try {

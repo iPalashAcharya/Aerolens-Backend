@@ -809,6 +809,33 @@ class JobProfileService {
             client.release();
         }
     }
+
+    async restoreJobProfile(jobProfileId, auditContext) {
+        const client = await this.db.getConnection();
+        try {
+            await client.beginTransaction();
+            const restored = await this.jobProfileRepository.restore(jobProfileId, client);
+            if (!restored) {
+                throw new AppError(`Job profile with ID ${jobProfileId} not found or not deleted`, 404, 'JOB_PROFILE_NOT_FOUND');
+            }
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'RESTORE',
+                oldValues: { jobProfileId },
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, client);
+            await client.commit();
+            return { jobProfileId };
+        } catch (error) {
+            await client.rollback();
+            if (error instanceof AppError) throw error;
+            throw new AppError('Failed to restore job profile', 500, 'DATABASE_ERROR', { jobProfileId, operation: 'restoreJobProfile' });
+        } finally {
+            client.release();
+        }
+    }
 }
 
 module.exports = JobProfileService;

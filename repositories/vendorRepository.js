@@ -228,6 +228,20 @@ class VendorRepository {
             'DATABASE_ERROR'
         );
     }
+
+    async restore(vendorId, client) {
+        try {
+            const [result] = await client.execute(
+                `UPDATE recruitmentVendor
+                 SET is_deleted = false, deleted_at = NULL
+                 WHERE vendorId = ? AND is_deleted = true`,
+                [vendorId]
+            );
+            return result.affectedRows > 0;
+        } catch (error) {
+            this._handleDatabaseError(error, 'restore');
+        }
+    }
 }
 
 module.exports = VendorRepository;

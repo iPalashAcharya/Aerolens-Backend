@@ -94,6 +94,11 @@ class OfferController {
             }
         });
     });
+
+    restoreOffer = catchAsync(async (req, res) => {
+        const result = await this.offerService.restoreOffer(parseInt(req.params.offerId), req.auditContext);
+        return ApiResponse.success(res, result, 'Offer restored successfully');
+    });
 }
 
 module.exports = OfferController;

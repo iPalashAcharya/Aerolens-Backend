@@ -277,6 +277,33 @@ class VendorService {
             client.release();
         }
     }
+
+    async restoreVendor(vendorId, auditContext) {
+        const client = await this.db.getConnection();
+        try {
+            await client.beginTransaction();
+            const restored = await this.vendorRepository.restore(vendorId, client);
+            if (!restored) {
+                throw new AppError(`Vendor with ID ${vendorId} not found or not deleted`, 404, 'VENDOR_NOT_FOUND');
+            }
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'RESTORE',
+                oldValues: { vendorId },
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, client);
+            await client.commit();
+            return { vendorId };
+        } catch (error) {
+            await client.rollback();
+            if (error instanceof AppError) throw error;
+            throw new AppError('Failed to restore vendor', 500, 'DATABASE_ERROR', { vendorId, operation: 'restoreVendor' });
+        } finally {
+            client.release();
+        }
+    }
 }
 
 module.exports = VendorService;

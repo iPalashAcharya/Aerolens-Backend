@@ -6,41 +6,26 @@ class DepartmentRepository {
     }
 
     async create(departmentData, client) {
-        const connection = client;
-
         try {
-            const query = `
-            INSERT INTO department (departmentName, departmentDescription, clientId) 
-            VALUES (?, ?, ?)
-            `;
-
-            const [result] = await connection.execute(query, [
-                departmentData.departmentName,
-                departmentData.departmentDescription,
-                departmentData.clientId
-            ]);
-
-            return {
-                departmentId: result.insertId,
-                ...departmentData
-            };
+            const [result] = await client.execute(
+                `INSERT INTO department (departmentName, departmentDescription, clientId)
+                 VALUES (?, ?, ?)`,
+                [departmentData.departmentName, departmentData.departmentDescription, departmentData.clientId]
+            );
+            return { departmentId: result.insertId, ...departmentData };
         } catch (error) {
             this._handleDatabaseError(error);
         }
     }
 
     async findById(departmentId, client) {
-        const connection = client;
-
         try {
-            const query = `
-            SELECT departmentId, departmentName, departmentDescription, clientId, 
-            createdAt, updatedAt 
-            FROM department 
-            WHERE departmentId = ?
-            `;
-
-            const [rows] = await connection.execute(query, [departmentId]);
+            const [rows] = await client.execute(
+                `SELECT departmentId, departmentName, departmentDescription, clientId, createdAt, updatedAt
+                 FROM department
+                 WHERE departmentId = ?`,
+                [departmentId]
+            );
             return rows[0] || null;
         } catch (error) {
             this._handleDatabaseError(error);
@@ -48,93 +33,94 @@ class DepartmentRepository {
     }
 
     async update(departmentId, updateData, client) {
-        const connection = client;
-
         try {
             const fields = Object.keys(updateData);
             const values = Object.values(updateData);
+            const setClause = fields.map(f => `${f} = ?`).join(', ');
 
-            const setClause = fields.map(field => `${field} = ?`).join(', ');
-            const query = `UPDATE department SET ${setClause} WHERE departmentId = ?`;
-
-            const [result] = await connection.execute(query, [...values, departmentId]);
+            const [result] = await client.execute(
+                `UPDATE department SET ${setClause} WHERE departmentId = ? AND (is_deleted = 0 OR is_deleted IS NULL)`,
+                [...values, departmentId]
+            );
 
             if (result.affectedRows === 0) {
-                throw new AppError(
-                    `Department with ID ${departmentId} not found`,
-                    404,
-                    'DEPARTMENT_NOT_FOUND'
-                );
+                throw new AppError(`Department with ID ${departmentId} not found`, 404, 'DEPARTMENT_NOT_FOUND');
             }
-
-            return {
-                departmentId,
-                ...updateData
-            };
+            return { departmentId, ...updateData };
         } catch (error) {
-            if (error instanceof AppError) { throw error; }
+            if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
         }
     }
 
     async delete(departmentId, client) {
-        const connection = client;
-
         try {
-            const query = `DELETE FROM department WHERE departmentId = ?`;
-            const [result] = await connection.execute(query, [departmentId]);
-
+            const [result] = await client.execute(
+                `UPDATE department SET is_deleted = 1, deleted_at = UTC_TIMESTAMP()
+                 WHERE departmentId = ? AND (is_deleted = 0 OR is_deleted IS NULL)`,
+                [departmentId]
+            );
             if (result.affectedRows === 0) {
-                throw new AppError(
-                    `Department with ID ${departmentId} not found`,
-                    404,
-                    'DEPARTMENT_NOT_FOUND'
-                );
+                throw new AppError(`Department with ID ${departmentId} not found`, 404, 'DEPARTMENT_NOT_FOUND');
             }
-
             return result.affectedRows;
         } catch (error) {
-            if (error instanceof AppError) { throw error; }
+            if (error instanceof AppError) throw error;
             this._handleDatabaseError(error);
         }
     }
 
     async findByClientId(clientId, client) {
-        const connection = client;
-
         try {
-            const query = `
-            SELECT departmentId, departmentName, departmentDescription, clientId,
-            createdAt, updatedAt 
-            FROM department 
-            WHERE clientId = ? 
-            ORDER BY departmentName
-            `;
-
-            const [rows] = await connection.execute(query, [clientId]);
+            const [rows] = await client.execute(
+                `SELECT departmentId, departmentName, departmentDescription, clientId, createdAt, updatedAt
+                 FROM department
+                 WHERE clientId = ? AND (is_deleted = 0 OR is_deleted IS NULL)
+                 ORDER BY departmentName`,
+                [clientId]
+            );
             return rows;
         } catch (error) {
             this._handleDatabaseError(error);
         }
     }
 
-    async existsByName(departmentName, clientId, excludeId = null, client) {
-        const connection = client;
-
+    async getDeleted(clientId, client) {
         try {
-            let query = `
-            SELECT COUNT(*) as count 
-            FROM department 
-            WHERE departmentName = ? AND clientId = ?
-            `;
+            const [rows] = await client.execute(
+                `SELECT departmentId, departmentName, departmentDescription, clientId, deleted_at
+                 FROM department
+                 WHERE clientId = ? AND is_deleted = 1
+                 ORDER BY deleted_at DESC`,
+                [clientId]
+            );
+            return rows;
+        } catch (error) {
+            this._handleDatabaseError(error);
+        }
+    }
+
+    async restore(departmentId, client) {
+        try {
+            const [result] = await client.execute(
+                `UPDATE department SET is_deleted = 0, deleted_at = NULL
+                 WHERE departmentId = ? AND is_deleted = 1`,
+                [departmentId]
+            );
+            if (result.affectedRows === 0) return false;
+            return result.affectedRows;
+        } catch (error) {
+            this._handleDatabaseError(error);
+        }
+    }
+
+    async existsByName(departmentName, clientId, excludeId = null, client) {
+        try {
+            let query = `SELECT COUNT(*) as count FROM department
+                         WHERE departmentName = ? AND clientId = ? AND (is_deleted = 0 OR is_deleted IS NULL)`;
             const params = [departmentName, clientId];
-
-            if (excludeId) {
-                query += ` AND departmentId != ?`;
-                params.push(excludeId);
-            }
-
-            const [rows] = await connection.execute(query, params);
+            if (excludeId) { query += ` AND departmentId != ?`; params.push(excludeId); }
+            const [rows] = await client.execute(query, params);
             return rows[0].count > 0;
         } catch (error) {
             this._handleDatabaseError(error);
@@ -143,50 +129,17 @@ class DepartmentRepository {
 
     _handleDatabaseError(error) {
         console.error('Database error:', error);
-
         switch (error.code) {
             case 'ER_DUP_ENTRY':
-                throw new AppError(
-                    'A department with this name already exists for this client',
-                    409,
-                    'DUPLICATE_ENTRY',
-                    { field: 'departmentName' }
-                );
-
+                throw new AppError('A department with this name already exists for this client', 409, 'DUPLICATE_ENTRY', { field: 'departmentName' });
             case 'ER_DATA_TOO_LONG':
-                throw new AppError(
-                    'One or more fields exceed the maximum allowed length',
-                    400,
-                    'DATA_TOO_LONG',
-                    { originalError: error.message }
-                );
-
+                throw new AppError('One or more fields exceed the maximum allowed length', 400, 'DATA_TOO_LONG', { originalError: error.message });
             case 'ER_BAD_NULL_ERROR':
-                throw new AppError(
-                    'Required field cannot be null',
-                    400,
-                    'NULL_CONSTRAINT_VIOLATION',
-                    { originalError: error.message }
-                );
-
+                throw new AppError('Required field cannot be null', 400, 'NULL_CONSTRAINT_VIOLATION', { originalError: error.message });
             case 'ER_NO_REFERENCED_ROW_2':
-                throw new AppError(
-                    'Invalid client ID provided',
-                    400,
-                    'FOREIGN_KEY_CONSTRAINT',
-                    { field: 'clientId' }
-                );
-
+                throw new AppError('Invalid client ID provided', 400, 'FOREIGN_KEY_CONSTRAINT', { field: 'clientId' });
             default:
-                throw new AppError(
-                    'Database operation failed',
-                    500,
-                    'DATABASE_ERROR',
-                    {
-                        code: error.code,
-                        sqlState: error.sqlState
-                    }
-                );
+                throw new AppError('Database operation failed', 500, 'DATABASE_ERROR', { code: error.code, sqlState: error.sqlState });
         }
     }
 }

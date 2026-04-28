@@ -64,6 +64,11 @@ class VendorController {
             'Vendor deleted successfully'
         );
     });
+
+    restoreVendor = catchAsync(async (req, res) => {
+        const result = await this.vendorService.restoreVendor(parseInt(req.params.vendorId), req.auditContext);
+        return ApiResponse.success(res, result, 'Vendor restored successfully');
+    });
 }
 
 module.exports = VendorController;
