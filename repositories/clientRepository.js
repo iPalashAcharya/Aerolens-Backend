@@ -298,10 +298,15 @@ class ClientRepository {
         const offset = (safePage - 1) * safeLimit;
         try {
             const [rows] = await connection.query(
-                `SELECT * FROM auditLogs
-                 WHERE resource_type = 'CLIENT'
-                   AND resource_id = ?
-                 ORDER BY timestamp DESC
+                `SELECT a.id, a.action, a.verb, a.summary, a.resource_type, a.resource_id,
+                        a.old_values, a.new_values, a.timestamp,
+                        COALESCE(a.occurred_at_utc, a.timestamp) AS occurred_at,
+                        m.memberName AS actor_name
+                 FROM auditLogs a
+                 LEFT JOIN member m ON m.memberId = a.user_id
+                 WHERE a.resource_type = 'CLIENT'
+                   AND a.resource_id = ?
+                 ORDER BY a.timestamp DESC
                  LIMIT ? OFFSET ?`,
                 [String(clientId), safeLimit, offset]
             );

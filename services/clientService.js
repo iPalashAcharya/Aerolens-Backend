@@ -325,7 +325,6 @@ class ClientService {
                 timestamp: toMysqlTimestamp(auditContext.timestamp),
                 occurredAtUtc: auditContext.timestamp || new Date()
             }, connection);
-
             await connection.commit();
 
             const deletedAt = new Date().toISOString();

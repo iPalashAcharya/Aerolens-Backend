@@ -207,6 +207,59 @@ Delete routes now also set `is_deleted = 1` and `deleted_at = UTC_TIMESTAMP()` i
 
 ---
 
+## Client Row Change Logs
+
+Shows audit history for a specific selected client row via the cog menu → "Change Logs".
+
+### API endpoint
+
+```
+GET /client/:clientId/audit-logs?page=1&limit=20
+Authorization: Bearer <token>
+```
+
+**Postman example:**
+```
+GET http://localhost:3000/client/5/audit-logs?page=1&limit=20
+Authorization: Bearer <your_token>
+```
+
+**Response shape:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 101,
+      "action": "UPDATE",
+      "verb": "client.updated",
+      "summary": "Updated client #5",
+      "resource_type": "CLIENT",
+      "resource_id": "5",
+      "occurred_at": "2026-04-28T09:57:32.000Z",
+      "timestamp": "2026-04-28T09:57:32.000Z",
+      "actor_name": "Aksh Patel",
+      "old_values": {},
+      "new_values": {}
+    }
+  ],
+  "pagination": {
+    "total": 12,
+    "page": 1,
+    "limit": 20,
+    "totalPages": 1
+  }
+}
+```
+
+### Notes
+- `resource_type = 'CLIENT'` and `resource_id = clientId` filter the auditLogs table
+- Actor name is joined from the `member` table via `user_id`
+- No DB schema changes required — uses existing `auditLogs`, `resource_type`, `resource_id` columns
+- "Deleted Clients" tab in the same dialog is unchanged
+
+---
+
 ## Soft Delete Rollout — Location, Department, Contact
 
 ### Database migration
