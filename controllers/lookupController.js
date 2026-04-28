@@ -78,6 +78,11 @@ class LookupController {
             'Lookup entry deleted successfully'
         );
     });
+
+    restoreLookup = catchAsync(async (req, res) => {
+        const result = await this.lookupService.restoreLookup(parseInt(req.params.lookupKey), req.auditContext);
+        return ApiResponse.success(res, result, 'Lookup restored successfully');
+    });
 }
 
 module.exports = LookupController;

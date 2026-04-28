@@ -40,6 +40,17 @@ class ContactController {
             'client contact deleted successfully'
         );
     });
+
+    getDeletedContacts = catchAsync(async (req, res) => {
+        const clientId = parseInt(req.params.clientId);
+        const contacts = await this.contactService.getDeletedContacts(clientId);
+        return ApiResponse.success(res, contacts, 'Deleted contacts retrieved successfully');
+    });
+
+    restoreContact = catchAsync(async (req, res) => {
+        const result = await this.contactService.restoreContact(parseInt(req.params.contactId), req.auditContext);
+        return ApiResponse.success(res, result, 'Contact restored successfully');
+    });
 }
 
 module.exports = ContactController;

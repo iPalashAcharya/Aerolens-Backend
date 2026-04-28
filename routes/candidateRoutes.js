@@ -141,6 +141,11 @@ router.get('/:id',
     candidateController.getCandidate
 );
 
+router.patch('/:id/restore',
+    CandidateValidator.validateDelete,
+    candidateController.restoreCandidate
+);
+
 router.patch('/:id',
     candidateService.upload.single('resume'),
     (req, res, next) => {

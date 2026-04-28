@@ -336,6 +336,11 @@ class CandidateController {
             200
         );
     });
+
+    restoreCandidate = catchAsync(async (req, res) => {
+        const result = await this.candidateService.restoreCandidate(parseInt(req.params.id), req.auditContext);
+        return ApiResponse.success(res, result, 'Candidate restored successfully');
+    });
 }
 
 module.exports = CandidateController;

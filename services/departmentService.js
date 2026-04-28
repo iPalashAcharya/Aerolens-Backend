@@ -198,13 +198,55 @@ class DepartmentService {
             return await this.departmentRepository.findByClientId(clientId, client);
         } catch (error) {
             if (!(error instanceof AppError)) {
-                console.error('Error deleting Department', error.stack);
-                throw new AppError(
-                    'Failed to delete Department',
-                    500,
-                    'DEPARTMENT_DELETION_ERROR',
-                    { departmentId, operation: 'deleteDepartment' }
-                );
+                console.error('Error fetching Departments', error.stack);
+                throw new AppError('Failed to fetch Departments', 500, 'DEPARTMENT_FETCH_ERROR', { operation: 'getDepartmentsByClientId' });
+            }
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
+    async getDeletedDepartments(clientId) {
+        const client = await this.db.getConnection();
+        try {
+            return await this.departmentRepository.getDeleted(clientId, client);
+        } catch (error) {
+            if (!(error instanceof AppError)) {
+                throw new AppError('Failed to fetch deleted departments', 500, 'DEPARTMENT_FETCH_ERROR', { operation: 'getDeletedDepartments' });
+            }
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
+    async restoreDepartment(departmentId, auditContext) {
+        const client = await this.db.getConnection();
+        try {
+            await client.beginTransaction();
+
+            const restored = await this.departmentRepository.restore(departmentId, client);
+            if (!restored) {
+                throw new AppError(`Department with ID ${departmentId} not found or already active`, 404, 'DEPARTMENT_NOT_FOUND');
+            }
+
+            const department = await this.departmentRepository.findById(departmentId, client);
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'RESTORE',
+                newValues: department ?? { departmentId },
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, client);
+
+            await client.commit();
+            return { departmentId };
+        } catch (error) {
+            await client.rollback();
+            if (!(error instanceof AppError)) {
+                throw new AppError('Failed to restore department', 500, 'DEPARTMENT_RESTORE_ERROR', { operation: 'restoreDepartment', departmentId });
             }
             throw error;
         } finally {

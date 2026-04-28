@@ -33,6 +33,11 @@ router.get('/:vendorId',
     vendorController.getVendor
 );
 
+router.patch('/:vendorId/restore',
+    VendorValidator.validateDelete,
+    vendorController.restoreVendor
+);
+
 router.patch('/:vendorId',
     VendorValidator.validateUpdate,
     vendorController.updateVendor

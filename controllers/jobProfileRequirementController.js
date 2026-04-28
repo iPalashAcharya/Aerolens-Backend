@@ -246,6 +246,11 @@ class JobProfileRequirementController {
             'Job Profile Requirement deleted successfully'
         );
     });
+
+    restoreJobProfileRequirement = catchAsync(async (req, res) => {
+        const result = await this.jobProfileRequirementService.restoreJobProfileRequirement(parseInt(req.params.id), req.auditContext);
+        return ApiResponse.success(res, result, 'Job profile requirement restored successfully');
+    });
 }
 
 module.exports = JobProfileRequirementController;

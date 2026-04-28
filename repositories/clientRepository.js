@@ -51,6 +51,7 @@ class ClientRepository {
                         JSON_OBJECT('departmentId', departmentId, 'departmentName', departmentName, 'departmentDescription', departmentDescription)
                     ) AS departments
                     FROM department
+                    WHERE (is_deleted = false OR is_deleted IS NULL)
                     GROUP BY clientId
                 ) d ON c.clientId = d.clientId
                 LEFT JOIN (
@@ -58,6 +59,7 @@ class ClientRepository {
                         JSON_OBJECT('clientContactId', clientContactId, 'contactPersonName', contactPersonName, 'designation', designation, 'phone', phone, 'email', emailAddress)
                     ) AS contacts
                     FROM clientContact
+                    WHERE (is_deleted = false OR is_deleted IS NULL)
                     GROUP BY clientId
                 ) con ON c.clientId = con.clientId
                 WHERE 
@@ -164,7 +166,7 @@ class ClientRepository {
     async delete(clientId, client) {
         try {
             const [result] = await client.execute(
-                `UPDATE client 
+                `UPDATE client
                  SET is_deleted = true,
                      deleted_at = UTC_TIMESTAMP(),
                      updatedAt = NOW()
@@ -178,6 +180,26 @@ class ClientRepository {
             return result.affectedRows;
         } catch (error) {
             this._handleDatabaseError(error, 'delete');
+        }
+    }
+
+    async restore(clientId, client) {
+        try {
+            const [result] = await client.execute(
+                `UPDATE client
+                 SET is_deleted = false,
+                     deleted_at = NULL,
+                     updatedAt = NOW()
+                 WHERE clientId = ?
+                   AND is_deleted = true`,
+                [clientId]
+            );
+            if (result.affectedRows === 0) {
+                return false;
+            }
+            return result.affectedRows;
+        } catch (error) {
+            this._handleDatabaseError(error, 'restore');
         }
     }
 

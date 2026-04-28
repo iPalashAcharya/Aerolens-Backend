@@ -207,6 +207,71 @@ Delete routes now also set `is_deleted = 1` and `deleted_at = UTC_TIMESTAMP()` i
 
 ---
 
+## Soft Delete Rollout — Location, Department, Contact
+
+### Database migration
+
+Run each statement separately in your DB client:
+
+```sql
+ALTER TABLE `location`
+ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL;
+
+ALTER TABLE `department`
+ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL;
+
+ALTER TABLE `clientContact`
+ADD COLUMN is_deleted BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN deleted_at TIMESTAMP NULL DEFAULT NULL;
+```
+
+### API route additions
+
+All routes require `Authorization: Bearer <access_token>` (`authenticate` middleware).
+
+**Location** (`routes/locationRoutes.js`):
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/location/deletions` | List all soft-deleted locations |
+| `PATCH` | `/location/:locationId/restore` | Restore a soft-deleted location |
+
+**Department** (`routes/department.js`):
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/department/client/:clientId/deleted` | List deleted departments for a client |
+| `PATCH` | `/department/:id/restore` | Restore a soft-deleted department |
+
+**Contact** (`routes/contact.js`):
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/contact/client/:clientId/deleted` | List deleted contacts for a client |
+| `PATCH` | `/contact/:contactId/restore` | Restore a soft-deleted contact |
+
+### Existing route behaviour changes
+
+Delete routes now soft-delete instead of hard-delete:
+
+- `DELETE /location/:locationId` — sets `is_deleted = true`, `deleted_at = UTC_TIMESTAMP()`
+- `DELETE /department/:id` — sets `is_deleted = true`, `deleted_at = UTC_TIMESTAMP()`
+- `DELETE /contact/:contactId` — sets `is_deleted = true`, `deleted_at = UTC_TIMESTAMP()`
+
+Read/list routes now filter active rows only (`WHERE is_deleted = false OR is_deleted IS NULL`):
+
+- `GET /location` and `GET /location/:locationId`
+- `GET /department/client/:clientId` and `GET /department/:id`
+- Contacts fetched via client detail endpoint
+
+### Restore audit logging
+
+All restore operations call `auditLogService.logAction` with `action: 'RESTORE'`, logging the actor, timestamp, and restored record values into `auditLogs`.
+
+---
+
 ## Member phone numbers (E.164 / WhatsApp)
 
 `member.memberContact` is validated and normalized to **strict E.164** on **register** and **member PATCH** via `utils/phone-validator.js` (`libphonenumber-js`). Staged column migration: **`docs/MEMBER_PHONE_E164.md`**, **`scripts/sql-migration.sql`**, **`scripts/migrate-phones.js`**, **`npm run migrate-phones`**.
@@ -8493,3 +8558,276 @@ Routes are registered in **server.js**.
 - **createdBy** is automatically populated using auditContextMiddleware.
 - The module follows the same architectural patterns used by the Candidate and Interview modules.
 - No additional frameworks or abstractions were introduced.
+
+---
+
+## Restore Feature
+
+All modules now support restoring soft-deleted records via a `PATCH /:id/restore` endpoint.
+
+### How it works
+
+1. **Repository** — `restore(id, connection)` runs:
+   ```sql
+   UPDATE <table> SET is_deleted = false, deleted_at = NULL WHERE <pk> = ? AND is_deleted = true
+   ```
+   Modules with an `isActive` flag (Interview, Candidate, Member) also set `isActive = TRUE`.
+
+2. **Service** — `restoreX(id, auditContext)` wraps the call in a transaction and logs to `auditLogs` with `action = 'RESTORE'`.
+
+3. **Controller** — delegates to service, returns `ApiResponse.success`.
+
+4. **Route** — `PATCH /:id/restore` registered **before** `PATCH /:id` to avoid route conflicts. Reuses the existing `validateDelete` validator (validates the id param).
+
+### Required DB migration
+
+The `auditLogs.action` ENUM must include `RESTORE`. Run once per environment:
+
+```sql
+ALTER TABLE auditLogs MODIFY COLUMN action ENUM('CREATE','UPDATE','DELETE','RESTORE') NOT NULL;
+```
+
+### Modules covered
+
+| Module | Route | Primary Key |
+|---|---|---|
+| Client | `PATCH /client/:id/restore` | `clientId` |
+| Vendor | `PATCH /vendor/:vendorId/restore` | `vendorId` |
+| Job Profile | `PATCH /jobProfile/:id/restore` | `jobProfileId` |
+| Job Profile Requirement | `PATCH /jobProfileRequirement/:id/restore` | `jobProfileRequirementId` |
+| Interview | `PATCH /interview/:interviewId/restore` | `interviewId` |
+| Candidate | `PATCH /candidate/:id/restore` | `candidateId` |
+| Member | `PATCH /member/:memberId/restore` | `memberId` |
+| Lookup | `PATCH /lookup/:lookupKey/restore` | `lookupKey` |
+| Offer | `PATCH /offers/:offerId/restore` | `offerId` |
+
+### Adding restore to a new module
+
+Follow this checklist:
+
+- [ ] Add `restore(id, connection)` to the repository
+- [ ] Add `restoreX(id, auditContext)` to the service (transaction + `auditLogService.logAction` with `action: 'RESTORE'`)
+- [ ] Add `restoreX` handler to the controller
+- [ ] Add `router.patch('/:id/restore', validator.validateDelete, controller.restoreX)` before `router.patch('/:id', ...)` in the route file
+
+---
+
+## API Endpoints Reference
+
+All endpoints require `Authorization: Bearer <access_token>` unless noted. Base URL: `http://localhost:3000`.
+
+---
+
+### Client — `/client`
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/client` | Get all active clients |
+| `GET` | `/client/all` | Get all clients with departments (for dropdowns) |
+| `GET` | `/client/deletions` | Get soft-deleted clients |
+| `GET` | `/client/audit-logs/changes` | Get client CREATE/UPDATE audit logs |
+| `GET` | `/client/audit-logs/deletions` | Get client DELETE audit logs |
+| `GET` | `/client/:id` | Get client by ID |
+| `GET` | `/client/:clientId/audit-logs` | Get audit logs for a specific client |
+| `POST` | `/client` | Create client |
+| `PATCH` | `/client/:id/restore` | Restore soft-deleted client |
+| `PATCH` | `/client/:id` | Update client |
+| `DELETE` | `/client/:id` | Soft-delete client |
+
+---
+
+### Contact — `/contact`
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/contact` | Create contact for a client |
+| `PATCH` | `/contact/:contactId` | Update contact |
+| `DELETE` | `/contact/:contactId` | Delete contact |
+
+---
+
+### Department — `/department`
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/department/client/:clientId` | Get departments by client |
+| `GET` | `/department/:id` | Get department by ID |
+| `POST` | `/department` | Create department |
+| `PATCH` | `/department/:id` | Update department |
+| `DELETE` | `/department/:id` | Delete department |
+
+---
+
+### Job Profile — `/jobProfile`
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/jobProfile` | Get all active job profiles |
+| `GET` | `/jobProfile/deletions` | Get soft-deleted job profiles |
+| `GET` | `/jobProfile/:id` | Get job profile by ID |
+| `GET` | `/jobProfile/:id/JD/info` | Get JD file info |
+| `GET` | `/jobProfile/:id/get-JD` | Download JD file |
+| `GET` | `/jobProfile/:id/get-JD/preview` | Preview JD file |
+| `POST` | `/jobProfile` | Create job profile (multipart, optional JD upload) |
+| `POST` | `/jobProfile/:id/upload-JD` | Upload / replace JD file |
+| `PATCH` | `/jobProfile/:id/restore` | Restore soft-deleted job profile |
+| `PATCH` | `/jobProfile/:id` | Update job profile |
+| `DELETE` | `/jobProfile/:id` | Soft-delete job profile |
+| `DELETE` | `/jobProfile/:id/delete-JD` | Delete JD file from S3 |
+
+---
+
+### Job Profile Requirement — `/jobProfileRequirement`
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/jobProfileRequirement` | Get all active requirements |
+| `GET` | `/jobProfileRequirement/deletions` | Get soft-deleted requirements |
+| `GET` | `/jobProfileRequirement/:id` | Get requirement by ID |
+| `POST` | `/jobProfileRequirement` | Create requirement |
+| `PATCH` | `/jobProfileRequirement/:id/restore` | Restore soft-deleted requirement |
+| `PATCH` | `/jobProfileRequirement/:id` | Update requirement |
+| `DELETE` | `/jobProfileRequirement/:id` | Soft-delete requirement |
+
+---
+
+### Candidate — `/candidate`
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/candidate` | Get all active candidates |
+| `GET` | `/candidate/deletions` | Get soft-deleted candidates |
+| `GET` | `/candidate/create-data` | Get form lookup data |
+| `GET` | `/candidate/:id` | Get candidate by ID |
+| `GET` | `/candidate/:id/resume` | Download resume |
+| `GET` | `/candidate/:id/resume/preview` | Preview resume |
+| `GET` | `/candidate/:id/resume/info` | Get resume file info |
+| `POST` | `/candidate` | Create candidate (multipart, optional resume) |
+| `POST` | `/candidate/:id/resume` | Upload / replace resume |
+| `POST` | `/candidate/bulk-upload` | Bulk upload candidates from CSV |
+| `POST` | `/candidate/bulk-upload/patch-vendors` | Patch vendor field in bulk |
+| `POST` | `/candidate/resume-bulk-upload` | Upload ZIP of resumes for processing |
+| `GET` | `/candidate/resume-bulk-upload/:batchId/status` | Poll bulk upload status |
+| `PATCH` | `/candidate/:id/restore` | Restore soft-deleted candidate |
+| `PATCH` | `/candidate/:id` | Update candidate |
+| `DELETE` | `/candidate/:id` | Soft-delete candidate |
+| `DELETE` | `/candidate/:id/resume` | Delete resume from S3 |
+
+---
+
+### Interview — `/interview`
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/interview` | Get all active interviews |
+| `GET` | `/interview/deletions` | Get soft-deleted interviews |
+| `GET` | `/interview/create-data` | Get form lookup data |
+| `GET` | `/interview/:interviewId` | Get interview by ID |
+| `GET` | `/interview/:interviewId/finalize-data` | Get data needed to finalize round |
+| `GET` | `/interview/candidate/:candidateId` | Get interviews for a candidate |
+| `GET` | `/interview/capacity/interviewer-daily/:interviewerId` | Get interviewer daily capacity |
+| `GET` | `/interview/report/tracker` | Interview tracker report |
+| `GET` | `/interview/report/overall` | Overall summary report |
+| `GET` | `/interview/report/monthly` | Monthly summary report |
+| `GET` | `/interview/report/daily` | Daily summary report |
+| `GET` | `/interview/report/interviewer-workload` | Interviewer workload report |
+| `POST` | `/interview/:candidateId` | Create interview for candidate |
+| `POST` | `/interview/:candidateId/rounds` | Schedule next round |
+| `PATCH` | `/interview/:interviewId/restore` | Restore soft-deleted interview |
+| `PATCH` | `/interview/:interviewId` | Update interview |
+| `PUT` | `/interview/:interviewId/finalize` | Finalize interview result |
+| `DELETE` | `/interview/:interviewId` | Soft-delete interview |
+
+---
+
+### Member — `/member`
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/member` | Get all active members |
+| `GET` | `/member/deletions` | Get soft-deleted members |
+| `GET` | `/member/form-data` | Get form lookup data |
+| `GET` | `/member/create-data` | Get create form data |
+| `GET` | `/member/:memberId` | Get member by ID |
+| `PATCH` | `/member/:memberId/restore` | Restore soft-deleted member |
+| `PATCH` | `/member/:memberId` | Update member |
+| `DELETE` | `/member/:memberId` | Soft-delete (deactivate) member |
+
+---
+
+### Vendor — `/vendor`
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/vendor` | Get all active vendors |
+| `GET` | `/vendor/deletions` | Get soft-deleted vendors |
+| `GET` | `/vendor/:vendorId` | Get vendor by ID |
+| `POST` | `/vendor` | Create vendor |
+| `PATCH` | `/vendor/:vendorId/restore` | Restore soft-deleted vendor |
+| `PATCH` | `/vendor/:vendorId` | Update vendor |
+| `DELETE` | `/vendor/:vendorId` | Soft-delete vendor |
+
+---
+
+### Lookup — `/lookup`
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/lookup` | Get all active lookup entries |
+| `GET` | `/lookup/deletions` | Get soft-deleted lookup entries |
+| `GET` | `/lookup/:lookupKey` | Get lookup entry by key |
+| `POST` | `/lookup` | Create lookup entry |
+| `PATCH` | `/lookup/:lookupKey/restore` | Restore soft-deleted lookup entry |
+| `PATCH` | `/lookup/:lookupKey` | Update lookup entry |
+| `DELETE` | `/lookup/:lookupKey` | Soft-delete lookup entry |
+
+---
+
+### Location — `/location`
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/location` | Get all locations |
+| `GET` | `/location/:locationId` | Get location by ID |
+| `POST` | `/location` | Create location |
+| `PATCH` | `/location/:locationId` | Update location |
+| `DELETE` | `/location/:locationId` | Delete location |
+
+---
+
+### Offer — `/offers`
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/offers` | Get all active offers |
+| `GET` | `/offers/deletions` | Get soft-deleted offers |
+| `GET` | `/offers/form-data` | Get form lookup data |
+| `GET` | `/offers/:offerId/details` | Get offer details |
+| `POST` | `/offers/:candidateId` | Create offer for candidate |
+| `POST` | `/offers/:offerId/terminate` | Terminate offer |
+| `POST` | `/offers/:offerId/revise` | Revise offer |
+| `POST` | `/offers/:offerId/status` | Update offer status |
+| `PATCH` | `/offers/:offerId/restore` | Restore soft-deleted offer |
+| `DELETE` | `/offers/:offerId` | Soft-delete offer |
+
+---
+
+### Auth — `/auth`
+
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/auth/register` | Register new member |
+| `POST` | `/auth/login` | Login — returns access token + sets refresh cookie |
+| `POST` | `/auth/logout` | Logout — invalidates tokens |
+| `POST` | `/auth/refresh` | Refresh access token using cookie |
+| `POST` | `/auth/change-password` | Change password |
+
+---
+
+### Audit Logs — `/audit-logs`
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/audit-logs` | Paginated list (filters: `page`, `pageSize`, `dateFrom`, `dateTo`, `userId`, `resourceType`, `resourceId`, `action`, `search`, `includeDiff`) |
+| `GET` | `/audit-logs/:id` | Single audit log entry (`?includeDiff=true` for field diff on UPDATE) |
+

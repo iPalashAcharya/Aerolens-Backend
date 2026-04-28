@@ -115,6 +115,11 @@ class ClientController {
         });
     });
 
+    restoreClient = catchAsync(async (req, res) => {
+        const result = await this.clientService.restoreClient(parseInt(req.params.id), req.auditContext);
+        return ApiResponse.success(res, result.data, result.message);
+    });
+
     getDeletedClients = catchAsync(async (req, res) => {
         const result = await this.clientService.getDeletedClients();
         return res.status(200).json({

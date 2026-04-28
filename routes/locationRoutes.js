@@ -15,29 +15,18 @@ const locationController = new LocationController(locationService);
 router.use(authenticate);
 router.use(auditContextMiddleware);
 
+router.get('/', locationController.getAll);
 
-router.get('/',
-    locationController.getAll
-);
+router.get('/deletions', locationController.getDeleted);
 
-router.post('/',
-    LocationValidator.validateCreate,
-    locationController.createLocation
-)
+router.post('/', LocationValidator.validateCreate, locationController.createLocation);
 
-router.patch('/:locationId',
-    LocationValidator.validateUpdate,
-    locationController.updateLocation
-);
+router.patch('/:locationId/restore', locationController.restoreLocation);
 
-router.get('/:locationId',
-    LocationValidator.validateParams,
-    locationController.getById
-);
+router.patch('/:locationId', LocationValidator.validateUpdate, locationController.updateLocation);
 
-router.delete('/:locationId',
-    LocationValidator.validateDelete,
-    locationController.deleteLocation
-);
+router.get('/:locationId', LocationValidator.validateParams, locationController.getById);
+
+router.delete('/:locationId', LocationValidator.validateDelete, locationController.deleteLocation);
 
 module.exports = router;

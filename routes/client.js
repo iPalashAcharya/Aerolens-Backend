@@ -380,6 +380,7 @@ router.get('/:id', async (req, res) => {
                 JSON_OBJECT('departmentId', departmentId, 'departmentName', departmentName, 'departmentDescription', departmentDescription)
             ) AS departments
             FROM department
+            WHERE (is_deleted = false OR is_deleted IS NULL)
             GROUP BY clientId
             ) d ON c.clientId = d.clientId
             LEFT JOIN (
@@ -387,6 +388,7 @@ router.get('/:id', async (req, res) => {
                 JSON_OBJECT('clientContactId', clientContactId, 'contactPersonName', contactPersonName, 'designation', designation, 'phone', phone, 'email', emailAddress)
             ) AS contacts
             FROM clientContact
+            WHERE (is_deleted = false OR is_deleted IS NULL)
             GROUP BY clientId
             ) con ON c.clientId = con.clientId
             WHERE 

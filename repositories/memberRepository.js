@@ -806,6 +806,20 @@ class MemberRepository {
 
     return rows[0] || null;
 }
+
+    async restore(memberId, client) {
+        try {
+            const [result] = await client.execute(
+                `UPDATE member
+                 SET isActive = TRUE, is_deleted = FALSE, deleted_at = NULL, deletedAt = NULL
+                 WHERE memberId = ? AND is_deleted = TRUE`,
+                [memberId]
+            );
+            return result.affectedRows > 0;
+        } catch (error) {
+            throw error;
+        }
+    }
 }
 
 module.exports = MemberRepository;

@@ -567,6 +567,33 @@ class JobProfileRequirementService {
             client.release();
         }
     }
+
+    async restoreJobProfileRequirement(jobProfileRequirementId, auditContext) {
+        const client = await this.db.getConnection();
+        try {
+            await client.beginTransaction();
+            const restored = await this.jobProfileRequirementRepository.restore(jobProfileRequirementId, client);
+            if (!restored) {
+                throw new AppError(`Job profile requirement with ID ${jobProfileRequirementId} not found or not deleted`, 404, 'JOB_PROFILE_REQUIREMENT_NOT_FOUND');
+            }
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'RESTORE',
+                oldValues: { jobProfileRequirementId },
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, client);
+            await client.commit();
+            return { jobProfileRequirementId };
+        } catch (error) {
+            await client.rollback();
+            if (error instanceof AppError) throw error;
+            throw new AppError('Failed to restore job profile requirement', 500, 'DATABASE_ERROR', { jobProfileRequirementId, operation: 'restoreJobProfileRequirement' });
+        } finally {
+            client.release();
+        }
+    }
 }
 
 module.exports = JobProfileRequirementService;

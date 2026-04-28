@@ -1112,6 +1112,33 @@ class CandidateService {
             client.release();
         }
     }
+
+    async restoreCandidate(candidateId, auditContext) {
+        const client = await this.db.getConnection();
+        try {
+            await client.beginTransaction();
+            const restored = await this.candidateRepository.restore(candidateId, client);
+            if (!restored) {
+                throw new AppError(`Candidate with ID ${candidateId} not found or not deleted`, 404, 'CANDIDATE_NOT_FOUND');
+            }
+            await auditLogService.logAction({
+                userId: auditContext.userId,
+                action: 'RESTORE',
+                oldValues: { candidateId },
+                ipAddress: auditContext.ipAddress,
+                userAgent: auditContext.userAgent,
+                timestamp: auditContext.timestamp
+            }, client);
+            await client.commit();
+            return { candidateId };
+        } catch (error) {
+            await client.rollback();
+            if (error instanceof AppError) throw error;
+            throw new AppError('Failed to restore candidate', 500, 'DATABASE_ERROR', { candidateId, operation: 'restoreCandidate' });
+        } finally {
+            client.release();
+        }
+    }
 }
 
 module.exports = CandidateService;

@@ -1223,6 +1223,20 @@ class CandidateRepository {
                 );
         }
     }
+
+    async restore(candidateId, client) {
+        try {
+            const [result] = await client.execute(
+                `UPDATE candidate
+                 SET isActive = TRUE, is_deleted = 0, deleted_at = NULL
+                 WHERE candidateId = ? AND is_deleted = 1`,
+                [candidateId]
+            );
+            return result.affectedRows > 0;
+        } catch (error) {
+            this._handleDatabaseError(error, 'restore');
+        }
+    }
 }
 
 module.exports = CandidateRepository;

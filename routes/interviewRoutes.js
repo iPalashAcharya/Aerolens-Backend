@@ -86,6 +86,11 @@ router.post('/:candidateId/rounds',
     interviewController.scheduleNextRound
 );
 
+router.patch('/:interviewId/restore',
+    InterviewValidator.validateParams,
+    interviewController.restoreInterview
+);
+
 router.patch('/:interviewId',
     InterviewValidator.validateParams,
     InterviewValidator.validateUpdate,
