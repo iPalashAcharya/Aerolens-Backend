@@ -8884,3 +8884,58 @@ All endpoints require `Authorization: Bearer <access_token>` unless noted. Base 
 | `GET` | `/audit-logs` | Paginated list (filters: `page`, `pageSize`, `dateFrom`, `dateTo`, `userId`, `resourceType`, `resourceId`, `action`, `search`, `includeDiff`) |
 | `GET` | `/audit-logs/:id` | Single audit log entry (`?includeDiff=true` for field diff on UPDATE) |
 
+---
+
+### Change Logs — Per-Resource Audit Log Endpoints
+
+These endpoints return paginated audit log entries scoped to a single resource. Used by the **Change Logs** dialog in the frontend cog menu.
+
+**Auth:** `Authorization: Bearer <token>` required on all.  
+**Query params:** `?page=1&limit=20`
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/client/:clientId/audit-logs` | Change logs for a specific client |
+| `GET` | `/department/:departmentId/audit-logs` | Change logs for a specific department |
+| `GET` | `/contact/:contactId/audit-logs` | Change logs for a specific contact |
+
+**Response shape:**
+```json
+{
+  "success": true,
+  "data": {
+    "data": [
+      {
+        "id": 1,
+        "action": "UPDATE",
+        "verb": "UPDATE",
+        "summary": "Updated department: Engineering",
+        "resource_type": "department",
+        "resource_id": "86",
+        "old_values": { "departmentName": "Eng", "..." : "..." },
+        "new_values": { "departmentName": "Engineering", "..." : "..." },
+        "occurred_at": "2026-04-29T06:07:00.000Z",
+        "timestamp": "2026-04-29 11:37:00",
+        "actor_name": "Aksh Patel"
+      }
+    ],
+    "pagination": {
+      "total": 23,
+      "page": 1,
+      "limit": 20,
+      "totalPages": 2
+    }
+  }
+}
+```
+
+**Frontend dialogs:**
+
+| Module | Dialog component |
+|---|---|
+| Client | `ClientAuditLogsDialog.tsx` |
+| Department | `DepartmentAuditLogsDialog.tsx` |
+| Contact | `ContactAuditLogsDialog.tsx` |
+
+Column order in all dialogs: **Resource ID → Actor → Action → Verb → Summary → Resource Type → Occurred At**
+

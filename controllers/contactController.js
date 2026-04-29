@@ -51,6 +51,14 @@ class ContactController {
         const result = await this.contactService.restoreContact(parseInt(req.params.contactId), req.auditContext);
         return ApiResponse.success(res, result, 'Contact restored successfully');
     });
+
+    getContactAuditLogsById = catchAsync(async (req, res) => {
+        const contactId = parseInt(req.params.contactId);
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const result = await this.contactService.getContactAuditLogsById(contactId, page, limit);
+        return ApiResponse.success(res, result, 'Contact audit logs retrieved successfully');
+    });
 }
 
 module.exports = ContactController;
