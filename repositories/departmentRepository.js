@@ -127,6 +127,36 @@ class DepartmentRepository {
         }
     }
 
+    async getDepartmentAuditLogsById(departmentId, page = 1, limit = 20, client) {
+        const safePage = Math.max(1, parseInt(page, 10) || 1);
+        const safeLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 20));
+        const offset = (safePage - 1) * safeLimit;
+        try {
+            const [rows] = await client.query(
+                `SELECT a.id, a.action, a.verb, a.summary, a.resource_type, a.resource_id,
+                        a.old_values, a.new_values, a.timestamp,
+                        COALESCE(a.occurred_at_utc, a.timestamp) AS occurred_at,
+                        m.memberName AS actor_name
+                 FROM auditLogs a
+                 LEFT JOIN member m ON m.memberId = a.user_id
+                 WHERE a.resource_type = 'department'
+                   AND a.resource_id = ?
+                 ORDER BY a.timestamp DESC
+                 LIMIT ? OFFSET ?`,
+                [String(departmentId), safeLimit, offset]
+            );
+            const [countRows] = await client.query(
+                `SELECT COUNT(*) AS total FROM auditLogs
+                 WHERE resource_type = 'department'
+                   AND resource_id = ?`,
+                [String(departmentId)]
+            );
+            return { rows, total: Number(countRows[0]?.total || 0), page: safePage, limit: safeLimit };
+        } catch (error) {
+            this._handleDatabaseError(error);
+        }
+    }
+
     _handleDatabaseError(error) {
         console.error('Database error:', error);
         switch (error.code) {

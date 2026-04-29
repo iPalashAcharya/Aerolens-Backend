@@ -357,42 +357,6 @@ class ClientService {
         }
     }
 
-    async getClientChangeLogs(page = 1, limit = 20) {
-        const connection = await this.db.getConnection();
-        try {
-            const result = await this.clientRepository.getClientChangeLogs(page, limit, connection);
-            return {
-                data: result.rows,
-                pagination: {
-                    total: result.total,
-                    page: result.page,
-                    limit: result.limit,
-                    totalPages: Math.ceil(result.total / result.limit),
-                },
-            };
-        } finally {
-            connection.release();
-        }
-    }
-
-    async getClientDeleteLogs(page = 1, limit = 20) {
-        const connection = await this.db.getConnection();
-        try {
-            const result = await this.clientRepository.getClientDeleteLogs(page, limit, connection);
-            return {
-                data: result.rows,
-                pagination: {
-                    total: result.total,
-                    page: result.page,
-                    limit: result.limit,
-                    totalPages: Math.ceil(result.total / result.limit),
-                },
-            };
-        } finally {
-            connection.release();
-        }
-    }
-
     async getClientAuditLogsById(clientId, page = 1, limit = 20) {
         const connection = await this.db.getConnection();
         try {
