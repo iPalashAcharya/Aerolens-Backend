@@ -79,6 +79,8 @@ class LocationService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'CREATE',
+                resource_type: 'location',
+                resource_id: result?.locationId ?? null,
                 newValues: result,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
@@ -134,6 +136,8 @@ class LocationService {
                 await auditLogService.logAction({
                     userId: auditContext.userId,
                     action: 'UPDATE',
+                    resource_type: 'location',
+                    resource_id: locationId,
                     entityType: 'location',
                     entityId: locationId,
                     oldValues: existingLocation,
@@ -193,6 +197,8 @@ class LocationService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'RESTORE',
+                resource_type: 'location',
+                resource_id: locationId,
                 newValues: location?.data?.[0] ?? { locationId },
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
@@ -231,6 +237,8 @@ class LocationService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'DELETE',
+                resource_type: 'location',
+                resource_id: locationId,
                 oldValues: location,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,

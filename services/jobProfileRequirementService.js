@@ -21,6 +21,8 @@ class JobProfileRequirementService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'CREATE',
+                resource_type: 'job_profile_requirement',
+                resource_id: jobProfileRequirement.jobProfileRequirementId,
                 entityType: 'jobProfileRequirement',
                 entityId: jobProfileRequirement.jobProfileRequirementId,
                 newValues: jobProfileRequirement,
@@ -141,6 +143,8 @@ class JobProfileRequirementService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'UPDATE',
+                resource_type: 'job_profile_requirement',
+                resource_id: jobProfileRequirementId,
                 entityType: 'jobProfileRequirement',
                 entityId: jobProfileRequirementId,
                 oldValues: existingJobProfileRequirement,
@@ -194,6 +198,8 @@ class JobProfileRequirementService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'DELETE',
+                resource_type: 'job_profile_requirement',
+                resource_id: jobProfileRequirementId,
                 entityType: 'jobProfileRequirement',
                 entityId: jobProfileRequirementId,
                 oldValues: jobProfileRequirement,
@@ -513,6 +519,8 @@ class JobProfileRequirementService {
                     await auditLogService.logAction({
                         userId: auditContext.userId,
                         action: 'BULK_UPDATE',
+                        resource_type: 'job_profile_requirement',
+                        resource_id: jobProfileRequirementId,
                         entityType: 'jobProfileRequirement',
                         entityId: jobProfileRequirementId,
                         oldValues: existingJobProfileRequirement,
@@ -579,6 +587,8 @@ class JobProfileRequirementService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'RESTORE',
+                resource_type: 'job_profile_requirement',
+                resource_id: jobProfileRequirementId,
                 oldValues: { jobProfileRequirementId },
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,

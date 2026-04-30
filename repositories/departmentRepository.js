@@ -134,20 +134,21 @@ class DepartmentRepository {
         try {
             const [rows] = await client.query(
                 `SELECT a.id, a.action, a.verb, a.summary, a.resource_type, a.resource_id,
-                        a.old_values, a.new_values, a.timestamp,
-                        COALESCE(a.occurred_at_utc, a.timestamp) AS occurred_at,
+                        a.old_values, a.new_values,
+                        DATE_FORMAT(CONVERT_TZ(a.timestamp, @@session.time_zone, '+00:00'), '%Y-%m-%dT%H:%i:%s.000Z') AS timestamp,
+                        DATE_FORMAT(CONVERT_TZ(COALESCE(a.occurred_at_utc, a.timestamp), @@session.time_zone, '+00:00'), '%Y-%m-%dT%H:%i:%s.000Z') AS occurred_at,
                         m.memberName AS actor_name
                  FROM auditLogs a
                  LEFT JOIN member m ON m.memberId = a.user_id
-                 WHERE a.resource_type = 'department'
+                 WHERE LOWER(COALESCE(a.resource_type, '')) = 'department'
                    AND a.resource_id = ?
-                 ORDER BY a.timestamp DESC
+                 ORDER BY COALESCE(a.occurred_at_utc, a.timestamp) DESC, a.id DESC
                  LIMIT ? OFFSET ?`,
                 [String(departmentId), safeLimit, offset]
             );
             const [countRows] = await client.query(
                 `SELECT COUNT(*) AS total FROM auditLogs
-                 WHERE resource_type = 'department'
+                 WHERE LOWER(COALESCE(resource_type, '')) = 'department'
                    AND resource_id = ?`,
                 [String(departmentId)]
             );

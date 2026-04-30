@@ -565,6 +565,8 @@ class CandidateService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'CREATE',
+                resource_type: 'candidate',
+                resource_id: candidate?.candidateId ?? null,
                 newValues: candidate,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
@@ -671,6 +673,8 @@ class CandidateService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'UPDATE',
+                resource_type: 'candidate',
+                resource_id: candidateId,
                 oldValues: existingCandidate,
                 newValues: candidate,
                 ipAddress: auditContext.ipAddress,
@@ -717,6 +721,8 @@ class CandidateService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'DELETE',
+                resource_type: 'candidate',
+                resource_id: candidateId,
                 oldValues: candidate,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
@@ -1124,6 +1130,8 @@ class CandidateService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'RESTORE',
+                resource_type: 'candidate',
+                resource_id: candidateId,
                 oldValues: { candidateId },
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,

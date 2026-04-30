@@ -240,6 +240,8 @@ class MemberService {
                 await auditLogService.logAction({
                     userId: auditContext.userId,
                     action: 'UPDATE',
+                    resource_type: 'member',
+                    resource_id: memberId,
                     entityType: 'member',
                     entityId: memberId,
                     oldValues: existingMember,
@@ -422,6 +424,8 @@ class MemberService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'DELETE',
+                resource_type: 'member',
+                resource_id: memberId,
                 oldValues: member,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
@@ -517,6 +521,8 @@ class MemberService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'RESTORE',
+                resource_type: 'member',
+                resource_id: memberId,
                 oldValues: { memberId },
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,

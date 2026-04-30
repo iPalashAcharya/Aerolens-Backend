@@ -127,25 +127,29 @@ class ContactRepository {
         const safePage = Math.max(1, parseInt(page) || 1);
         const safeLimit = Math.max(1, Math.min(100, parseInt(limit) || 20));
         const offset = (safePage - 1) * safeLimit;
+        const contactIdStr = String(contactId);
+
         try {
             const [rows] = await client.query(
                 `SELECT a.id, a.action, a.verb, a.summary, a.resource_type, a.resource_id,
-                        a.old_values, a.new_values, a.timestamp,
-                        COALESCE(a.occurred_at_utc, a.timestamp) AS occurred_at,
+                        a.old_values, a.new_values,
+                        DATE_FORMAT(CONVERT_TZ(a.timestamp, @@session.time_zone, '+00:00'), '%Y-%m-%dT%H:%i:%s.000Z') AS timestamp,
+                        DATE_FORMAT(CONVERT_TZ(COALESCE(a.occurred_at_utc, a.timestamp), @@session.time_zone, '+00:00'), '%Y-%m-%dT%H:%i:%s.000Z') AS occurred_at,
                         m.memberName AS actor_name
                  FROM auditLogs a
                  LEFT JOIN member m ON m.memberId = a.user_id
                  WHERE a.resource_type = 'contact'
                    AND a.resource_id = ?
-                 ORDER BY a.timestamp DESC
+                 ORDER BY COALESCE(a.occurred_at_utc, a.timestamp) DESC, a.id DESC
                  LIMIT ? OFFSET ?`,
-                [String(contactId), safeLimit, offset]
+                [contactIdStr, safeLimit, offset]
             );
             const [countRows] = await client.query(
-                `SELECT COUNT(*) AS total FROM auditLogs
-                 WHERE resource_type = 'contact'
-                   AND resource_id = ?`,
-                [String(contactId)]
+                `SELECT COUNT(*) AS total
+                 FROM auditLogs a
+                 WHERE a.resource_type = 'contact'
+                   AND a.resource_id = ?`,
+                [contactIdStr]
             );
             return { rows, total: countRows[0].total, page: safePage, limit: safeLimit };
         } catch (error) {

@@ -84,6 +84,38 @@ When writers omit `resource_type` / `resource_id`, `auditLogService.logAction` *
 | `reason` | any | Parsed JSON when possible |
 | `fieldChanges` | array \| omitted | `{ field, oldValue, newValue }[]` when `includeDiff` and `UPDATE` |
 
+#### Row-level Change Logs (Client/App dialog contract)
+
+No new audit endpoint is required per module. Use the same `GET /audit-logs` route with `resourceType` + `resourceId`.
+
+Supported `resourceType` values for row dialogs:
+
+- `vendor`
+- `member`
+- `job_profile`
+- `job_profile_requirement`
+- `candidate` (Resume module)
+- `interview`
+- `offer` (Onboarding module)
+- `lookup` (Lookup Data module)
+- `location` (Location Lookup module)
+
+Example requests:
+
+```http
+GET /audit-logs?resourceType=vendor&resourceId=21&page=1&pageSize=20
+GET /audit-logs?resourceType=job_profile&resourceId=5&page=1&pageSize=20
+GET /audit-logs?resourceType=offer&resourceId=18&page=1&pageSize=20
+GET /audit-logs?resourceType=lookup&resourceId=127&page=1&pageSize=20
+GET /audit-logs?resourceType=location&resourceId=14&page=1&pageSize=20
+```
+
+Backend normalization rules:
+
+- Writers now set explicit `resource_type` and `resource_id` for the modules above.
+- Read filter is case-insensitive (`resourceType=OFFER` and `resourceType=offer` both match).
+- `resourceType` query is normalized to snake_case in service layer (`jobProfileRequirement` also resolves to `job_profile_requirement`).
+
 ### 4) RBAC note
 
 Routes are **authenticated** only today. Restrict to admin/compliance in the UI or add server-side role checks when product decides.
@@ -8938,4 +8970,3 @@ These endpoints return paginated audit log entries scoped to a single resource. 
 | Contact | `ContactAuditLogsDialog.tsx` |
 
 Column order in all dialogs: **Resource ID → Actor → Action → Verb → Summary → Resource Type → Occurred At**
-
