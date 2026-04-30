@@ -41,7 +41,7 @@ class CandidateService {
             metadata: (req, file, cb) => {
                 cb(null, {
                     fieldName: file.fieldname,
-                    originalName: file.originalname,
+                    originalName: encodeURIComponent(file.originalname),
                     uploadDate: new Date().toISOString(),
                     candidateId: req.params.id || req.body.candidateId || 'temp'
                 });
@@ -184,7 +184,7 @@ class CandidateService {
                 MetadataDirective: 'REPLACE',
                 Metadata: {
                     candidateId: candidateId.toString(),
-                    originalName: originalName,
+                    originalName: encodeURIComponent(originalName),
                     uploadDate: new Date().toISOString()
                 }
             });
