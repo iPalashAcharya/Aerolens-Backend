@@ -83,7 +83,7 @@ class AuditLogRepository {
             }
             if (resourceType) {
                 where.push('a.resource_type = ?');
-                params.push(resourceType);
+                params.push(String(resourceType).toLowerCase());
             }
             if (resourceId != null && resourceId !== '') {
                 where.push('a.resource_id = ?');

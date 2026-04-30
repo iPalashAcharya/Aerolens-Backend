@@ -325,7 +325,6 @@ class ClientService {
                 timestamp: toMysqlTimestamp(auditContext.timestamp),
                 occurredAtUtc: auditContext.timestamp || new Date()
             }, connection);
-
             await connection.commit();
 
             const deletedAt = new Date().toISOString();
@@ -353,42 +352,6 @@ class ClientService {
                 "CLIENT_DELETION_ERROR",
                 { clientId, operation: "deleteClient" }
             );
-        } finally {
-            connection.release();
-        }
-    }
-
-    async getClientChangeLogs(page = 1, limit = 20) {
-        const connection = await this.db.getConnection();
-        try {
-            const result = await this.clientRepository.getClientChangeLogs(page, limit, connection);
-            return {
-                data: result.rows,
-                pagination: {
-                    total: result.total,
-                    page: result.page,
-                    limit: result.limit,
-                    totalPages: Math.ceil(result.total / result.limit),
-                },
-            };
-        } finally {
-            connection.release();
-        }
-    }
-
-    async getClientDeleteLogs(page = 1, limit = 20) {
-        const connection = await this.db.getConnection();
-        try {
-            const result = await this.clientRepository.getClientDeleteLogs(page, limit, connection);
-            return {
-                data: result.rows,
-                pagination: {
-                    total: result.total,
-                    page: result.page,
-                    limit: result.limit,
-                    totalPages: Math.ceil(result.total / result.limit),
-                },
-            };
         } finally {
             connection.release();
         }

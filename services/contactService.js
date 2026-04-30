@@ -16,6 +16,10 @@ class ContactService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'CREATE',
+                verb: 'CREATE',
+                summary: `Created new contact: ${result.contactPersonName}`,
+                resource_type: 'contact',
+                resource_id: String(result.contactId),
                 newValues: result,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
@@ -81,6 +85,10 @@ class ContactService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'UPDATE',
+                verb: 'UPDATE',
+                summary: `Updated contact: ${result?.contactPersonName || existingContact.contactPersonName}`,
+                resource_type: 'contact',
+                resource_id: String(contactId),
                 oldValues: existingContact,
                 newValues: result,
                 ipAddress: auditContext.ipAddress,
@@ -134,6 +142,10 @@ class ContactService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'RESTORE',
+                verb: 'PATCH',
+                summary: `Restored contact: ${contact?.contactPersonName || contactId}`,
+                resource_type: 'contact',
+                resource_id: String(contactId),
                 newValues: contact ?? { contactId },
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
@@ -148,6 +160,24 @@ class ContactService {
             throw new AppError('Failed to restore contact', 500, 'CLIENT_CONTACT_RESTORE_ERROR', { operation: 'restoreContact', contactId });
         } finally {
             connection.release();
+        }
+    }
+
+    async getContactAuditLogsById(contactId, page = 1, limit = 20) {
+        const client = await this.db.getConnection();
+        try {
+            const result = await this.contactRepository.getContactAuditLogsById(contactId, page, limit, client);
+            return {
+                data: result.rows,
+                pagination: {
+                    total: result.total,
+                    page: result.page,
+                    limit: result.limit,
+                    totalPages: Math.ceil(result.total / result.limit),
+                },
+            };
+        } finally {
+            client.release();
         }
     }
 
@@ -179,6 +209,10 @@ class ContactService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'DELETE',
+                verb: 'DELETE',
+                summary: `Deleted contact: ${contact.contactPersonName}`,
+                resource_type: 'contact',
+                resource_id: String(contactId),
                 oldValues: contact,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,

@@ -84,6 +84,38 @@ When writers omit `resource_type` / `resource_id`, `auditLogService.logAction` *
 | `reason` | any | Parsed JSON when possible |
 | `fieldChanges` | array \| omitted | `{ field, oldValue, newValue }[]` when `includeDiff` and `UPDATE` |
 
+#### Row-level Change Logs (Client/App dialog contract)
+
+No new audit endpoint is required per module. Use the same `GET /audit-logs` route with `resourceType` + `resourceId`.
+
+Supported `resourceType` values for row dialogs:
+
+- `vendor`
+- `member`
+- `job_profile`
+- `job_profile_requirement`
+- `candidate` (Resume module)
+- `interview`
+- `offer` (Onboarding module)
+- `lookup` (Lookup Data module)
+- `location` (Location Lookup module)
+
+Example requests:
+
+```http
+GET /audit-logs?resourceType=vendor&resourceId=21&page=1&pageSize=20
+GET /audit-logs?resourceType=job_profile&resourceId=5&page=1&pageSize=20
+GET /audit-logs?resourceType=offer&resourceId=18&page=1&pageSize=20
+GET /audit-logs?resourceType=lookup&resourceId=127&page=1&pageSize=20
+GET /audit-logs?resourceType=location&resourceId=14&page=1&pageSize=20
+```
+
+Backend normalization rules:
+
+- Writers now set explicit `resource_type` and `resource_id` for the modules above.
+- Read filter is case-insensitive (`resourceType=OFFER` and `resourceType=offer` both match).
+- `resourceType` query is normalized to snake_case in service layer (`jobProfileRequirement` also resolves to `job_profile_requirement`).
+
 ### 4) RBAC note
 
 Routes are **authenticated** only today. Restrict to admin/compliance in the UI or add server-side role checks when product decides.
@@ -204,6 +236,59 @@ Delete routes now also set `is_deleted = 1` and `deleted_at = UTC_TIMESTAMP()` i
 - `DELETE /candidate/:id` — sets `isActive = FALSE`, `is_deleted = 1`, `deleted_at`
 - `DELETE /interview/:interviewId` — sets `isActive = FALSE`, `is_deleted = 1`, `deletedAt`
 - `DELETE /offers/:offerId` — sets `isDeleted = 1`, `deletedAt` (unchanged, already correct)
+
+---
+
+## Client Row Change Logs
+
+Shows audit history for a specific selected client row via the cog menu → "Change Logs".
+
+### API endpoint
+
+```
+GET /client/:clientId/audit-logs?page=1&limit=20
+Authorization: Bearer <token>
+```
+
+**Postman example:**
+```
+GET http://localhost:3000/client/5/audit-logs?page=1&limit=20
+Authorization: Bearer <your_token>
+```
+
+**Response shape:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 101,
+      "action": "UPDATE",
+      "verb": "client.updated",
+      "summary": "Updated client #5",
+      "resource_type": "CLIENT",
+      "resource_id": "5",
+      "occurred_at": "2026-04-28T09:57:32.000Z",
+      "timestamp": "2026-04-28T09:57:32.000Z",
+      "actor_name": "Aksh Patel",
+      "old_values": {},
+      "new_values": {}
+    }
+  ],
+  "pagination": {
+    "total": 12,
+    "page": 1,
+    "limit": 20,
+    "totalPages": 1
+  }
+}
+```
+
+### Notes
+- `resource_type = 'CLIENT'` and `resource_id = clientId` filter the auditLogs table
+- Actor name is joined from the `member` table via `user_id`
+- No DB schema changes required — uses existing `auditLogs`, `resource_type`, `resource_id` columns
+- "Deleted Clients" tab in the same dialog is unchanged
 
 ---
 
@@ -8831,3 +8916,57 @@ All endpoints require `Authorization: Bearer <access_token>` unless noted. Base 
 | `GET` | `/audit-logs` | Paginated list (filters: `page`, `pageSize`, `dateFrom`, `dateTo`, `userId`, `resourceType`, `resourceId`, `action`, `search`, `includeDiff`) |
 | `GET` | `/audit-logs/:id` | Single audit log entry (`?includeDiff=true` for field diff on UPDATE) |
 
+---
+
+### Change Logs — Per-Resource Audit Log Endpoints
+
+These endpoints return paginated audit log entries scoped to a single resource. Used by the **Change Logs** dialog in the frontend cog menu.
+
+**Auth:** `Authorization: Bearer <token>` required on all.  
+**Query params:** `?page=1&limit=20`
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/client/:clientId/audit-logs` | Change logs for a specific client |
+| `GET` | `/department/:departmentId/audit-logs` | Change logs for a specific department |
+| `GET` | `/contact/:contactId/audit-logs` | Change logs for a specific contact |
+
+**Response shape:**
+```json
+{
+  "success": true,
+  "data": {
+    "data": [
+      {
+        "id": 1,
+        "action": "UPDATE",
+        "verb": "UPDATE",
+        "summary": "Updated department: Engineering",
+        "resource_type": "department",
+        "resource_id": "86",
+        "old_values": { "departmentName": "Eng", "..." : "..." },
+        "new_values": { "departmentName": "Engineering", "..." : "..." },
+        "occurred_at": "2026-04-29T06:07:00.000Z",
+        "timestamp": "2026-04-29 11:37:00",
+        "actor_name": "Aksh Patel"
+      }
+    ],
+    "pagination": {
+      "total": 23,
+      "page": 1,
+      "limit": 20,
+      "totalPages": 2
+    }
+  }
+}
+```
+
+**Frontend dialogs:**
+
+| Module | Dialog component |
+|---|---|
+| Client | `ClientAuditLogsDialog.tsx` |
+| Department | `DepartmentAuditLogsDialog.tsx` |
+| Contact | `ContactAuditLogsDialog.tsx` |
+
+Column order in all dialogs: **Resource ID → Actor → Action → Verb → Summary → Resource Type → Occurred At**

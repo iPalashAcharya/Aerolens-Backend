@@ -78,6 +78,8 @@ class VendorService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'CREATE',
+                resource_type: 'vendor',
+                resource_id: vendor?.vendorId ?? null,
                 newValues: vendor,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
@@ -204,6 +206,8 @@ class VendorService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'UPDATE',
+                resource_type: 'vendor',
+                resource_id: vendorId,
                 oldValues: existingVendor,
                 newValues: updateData,
                 ipAddress: auditContext.ipAddress,
@@ -253,6 +257,8 @@ class VendorService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'DELETE',
+                resource_type: 'vendor',
+                resource_id: vendorId,
                 oldValues: vendor,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
@@ -289,6 +295,8 @@ class VendorService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'RESTORE',
+                resource_type: 'vendor',
+                resource_id: vendorId,
                 oldValues: { vendorId },
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,

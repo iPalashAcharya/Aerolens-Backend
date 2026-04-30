@@ -73,6 +73,17 @@ class DepartmentController {
         return ApiResponse.success(res, departments, 'Deleted departments retrieved successfully');
     });
 
+    getDepartmentAuditLogsById = catchAsync(async (req, res) => {
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 20;
+        const result = await this.departmentService.getDepartmentAuditLogsById(parseInt(req.params.departmentId, 10), page, limit);
+        return res.status(200).json({
+            success: true,
+            data: result.data,
+            pagination: result.pagination,
+        });
+    });
+
     restoreDepartment = catchAsync(async (req, res) => {
         const result = await this.departmentService.restoreDepartment(parseInt(req.params.id), req.auditContext);
         return ApiResponse.success(res, result, 'Department restored successfully');

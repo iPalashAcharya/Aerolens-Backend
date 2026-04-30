@@ -30,6 +30,8 @@ class OfferService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'CREATE',
+                resource_type: 'offer',
+                resource_id: offer?.offerId ?? null,
                 newValues: offer,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
@@ -135,6 +137,8 @@ class OfferService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'DELETE',
+                resource_type: 'offer',
+                resource_id: offerId,
                 oldValues: offer,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
@@ -170,6 +174,8 @@ class OfferService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'UPDATE',
+                resource_type: 'offer',
+                resource_id: offerId,
                 newValues: {
                     entityType: 'OFFER',
                     entityId: offerId,
@@ -253,6 +259,8 @@ class OfferService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'UPDATE',
+                resource_type: 'offer',
+                resource_id: offerId,
                 newValues: {
                     entityType: 'OFFER',
                     entityId: offerId,
@@ -332,6 +340,8 @@ class OfferService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'UPDATE',
+                resource_type: 'offer',
+                resource_id: offerId,
                 newValues: {
                     entityType: 'OFFER',
                     entityId: offerId,
@@ -366,6 +376,8 @@ class OfferService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'RESTORE',
+                resource_type: 'offer',
+                resource_id: offerId,
                 oldValues: { offerId },
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
