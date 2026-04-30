@@ -23,6 +23,8 @@ router.post('/', DepartmentValidator.validateCreate, departmentController.create
 
 router.patch('/:id/restore', departmentController.restoreDepartment);
 
+router.get('/:departmentId/audit-logs', departmentController.getDepartmentAuditLogsById);
+
 router.get('/:id', DepartmentValidator.validateDelete, departmentController.getDepartment);
 
 router.patch('/:id', DepartmentValidator.validateUpdate, departmentController.updateDepartment);

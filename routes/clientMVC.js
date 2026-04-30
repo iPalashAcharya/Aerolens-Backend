@@ -27,14 +27,6 @@ router.post('/',
     clientController.createClient
 );
 
-router.get('/audit-logs/changes',
-    clientController.getClientChangeLogs
-);
-
-router.get('/audit-logs/deletions',
-    clientController.getClientDeleteLogs
-);
-
 router.get('/deletions',
     clientController.getDeletedClients
 );

@@ -678,6 +678,8 @@ class InterviewService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'CREATE',
+                resource_type: 'interview',
+                resource_id: result?.interviewId ?? null,
                 newValues: result,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
@@ -853,6 +855,8 @@ class InterviewService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'UPDATE',
+                resource_type: 'interview',
+                resource_id: interviewId,
                 entityType: 'interview',
                 entityId: interviewId,
                 oldValues: existingInterview,
@@ -924,6 +928,8 @@ class InterviewService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'CREATE',
+                resource_type: 'interview',
+                resource_id: result?.interviewId ?? null,
                 newValues: result,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
@@ -993,6 +999,8 @@ class InterviewService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'UPDATE',
+                resource_type: 'interview',
+                resource_id: interviewId,
                 oldValues: existingInterview,
                 newValues: finalizedInterview,
                 ipAddress: auditContext.ipAddress,
@@ -1057,6 +1065,8 @@ class InterviewService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'DELETE',
+                resource_type: 'interview',
+                resource_id: interviewId,
                 oldValues: exists,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
@@ -1152,6 +1162,8 @@ class InterviewService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'RESTORE',
+                resource_type: 'interview',
+                resource_id: interviewId,
                 oldValues: { interviewId },
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,

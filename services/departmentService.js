@@ -32,6 +32,8 @@ class DepartmentService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'CREATE',
+                verb: 'CREATE',
+                summary: `Created new department: ${department.departmentName}`,
                 newValues: department,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
@@ -122,6 +124,8 @@ class DepartmentService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'UPDATE',
+                verb: 'UPDATE',
+                summary: `Updated department: ${department?.departmentName || existingDepartment.departmentName}`,
                 newValues: department,
                 oldValues: existingDepartment,
                 ipAddress: auditContext.ipAddress,
@@ -167,6 +171,8 @@ class DepartmentService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'DELETE',
+                verb: 'DELETE',
+                summary: `Deleted department: ${department.departmentName}`,
                 oldValues: department,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
@@ -221,6 +227,24 @@ class DepartmentService {
         }
     }
 
+    async getDepartmentAuditLogsById(departmentId, page = 1, limit = 20) {
+        const client = await this.db.getConnection();
+        try {
+            const result = await this.departmentRepository.getDepartmentAuditLogsById(departmentId, page, limit, client);
+            return {
+                data: result.rows,
+                pagination: {
+                    total: result.total,
+                    page: result.page,
+                    limit: result.limit,
+                    totalPages: Math.ceil(result.total / result.limit),
+                },
+            };
+        } finally {
+            client.release();
+        }
+    }
+
     async restoreDepartment(departmentId, auditContext) {
         const client = await this.db.getConnection();
         try {
@@ -235,6 +259,8 @@ class DepartmentService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'RESTORE',
+                verb: 'PATCH',
+                summary: `Restored department: ${department?.departmentName || departmentId}`,
                 newValues: department ?? { departmentId },
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,

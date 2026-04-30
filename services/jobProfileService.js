@@ -544,6 +544,8 @@ class JobProfileService {
                 await auditLogService.logAction({
                     userId: auditContext.userId,
                     action: 'CREATE',
+                    resource_type: 'job_profile',
+                    resource_id: jobProfile?.jobProfileId ?? null,
                     newValues: jobProfile,
                     ipAddress: auditContext.ipAddress,
                     userAgent: auditContext.userAgent,
@@ -638,6 +640,8 @@ class JobProfileService {
                 await auditLogService.logAction({
                     userId: auditContext.userId,
                     action: 'UPDATE',
+                    resource_type: 'job_profile',
+                    resource_id: jobProfileId,
                     oldValues: existingJobProfile,
                     newValues: jobProfile,
                     ipAddress: auditContext.ipAddress,
@@ -687,6 +691,8 @@ class JobProfileService {
                 await auditLogService.logAction({
                     userId: auditContext.userId,
                     action: 'DELETE',
+                    resource_type: 'job_profile',
+                    resource_id: jobProfileId,
                     oldValues: jobProfile,
                     ipAddress: auditContext.ipAddress,
                     userAgent: auditContext.userAgent,
@@ -821,6 +827,8 @@ class JobProfileService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'RESTORE',
+                resource_type: 'job_profile',
+                resource_id: jobProfileId,
                 oldValues: { jobProfileId },
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,

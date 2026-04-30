@@ -7,6 +7,14 @@ function toMysqlLocalTimestamp(date) {
     return d.toISOString().slice(0, 19).replace('T', ' ');
 }
 
+// mysql2 dateStrings:true returns DATETIME as "YYYY-MM-DD HH:MM:SS.mmm" with no tz marker.
+// The column is stored in UTC, so we must force UTC interpretation before converting.
+function parseMysqlUtcString(val) {
+    if (!val) return null;
+    if (val instanceof Date) return val;
+    return new Date(String(val).replace(' ', 'T') + 'Z');
+}
+
 /** UTC DATETIME(3) for occurred_at_utc column */
 function toMysqlUtcDatetime3(date) {
     if (!date) return null;
@@ -118,6 +126,8 @@ function inferVerb(action, resourceType) {
             return `${rt}.updated`;
         case 'DELETE':
             return `${rt}.deleted`;
+        case 'RESTORE':
+            return `${rt}.restored`;
         case 'BULK_CANDIDATE_UPLOAD':
             return 'candidate.bulk_imported';
         case 'BULK_UPDATE':
@@ -138,6 +148,8 @@ function inferSummary(action, resourceType, resourceId, explicitSummary) {
             return `Updated ${rt}${idPart}`.slice(0, 512);
         case 'DELETE':
             return `Deleted ${rt}${idPart}`.slice(0, 512);
+        case 'RESTORE':
+            return `Restored ${rt}${idPart}`.slice(0, 512);
         case 'BULK_CANDIDATE_UPLOAD':
             return 'Bulk candidate upload completed'.slice(0, 512);
         case 'BULK_UPDATE':
@@ -219,7 +231,7 @@ class AuditLogService {
             dateFrom,
             dateTo,
             userId,
-            resourceType,
+            resourceType: resourceTypeRaw,
             resourceId,
             action,
             verb,
@@ -228,6 +240,10 @@ class AuditLogService {
             pageSize,
             includeDiff
         } = query;
+
+        const resourceType = resourceTypeRaw
+            ? toSnakeResourceType(resourceTypeRaw)
+            : undefined;
 
         const { rows, total, page: p, pageSize: ps } = await auditLogRepository.findMany({
             dateFrom,
@@ -268,9 +284,9 @@ class AuditLogService {
 
         const occurredAt =
             row.occurred_at_utc != null
-                ? new Date(row.occurred_at_utc).toISOString()
+                ? parseMysqlUtcString(row.occurred_at_utc).toISOString()
                 : row.timestamp != null
-                  ? new Date(row.timestamp).toISOString()
+                  ? parseMysqlUtcString(row.timestamp).toISOString()
                   : null;
 
         const dto = {

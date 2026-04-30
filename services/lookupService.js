@@ -115,6 +115,8 @@ class LookupService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'CREATE',
+                resource_type: 'lookup',
+                resource_id: result?.lookupKey ?? null,
                 newValues: result,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
@@ -164,6 +166,8 @@ class LookupService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'UPDATE',
+                resource_type: 'lookup',
+                resource_id: lookupKey,
                 entityType: 'lookup',
                 entityId: lookupKey,
                 oldValues: existingLookup,
@@ -257,6 +261,8 @@ class LookupService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'DELETE',
+                resource_type: 'lookup',
+                resource_id: lookupKey,
                 oldValues: lookup,
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,
@@ -299,6 +305,8 @@ class LookupService {
             await auditLogService.logAction({
                 userId: auditContext.userId,
                 action: 'RESTORE',
+                resource_type: 'lookup',
+                resource_id: lookupKey,
                 oldValues: { lookupKey },
                 ipAddress: auditContext.ipAddress,
                 userAgent: auditContext.userAgent,

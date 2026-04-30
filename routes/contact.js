@@ -21,6 +21,8 @@ router.post('/', ContactValidator.validateCreate, contactController.createContac
 
 router.patch('/:contactId/restore', contactController.restoreContact);
 
+router.get('/:contactId/audit-logs', contactController.getContactAuditLogsById);
+
 router.patch('/:contactId', ContactValidator.validateUpdate, contactController.updateContact);
 
 router.delete('/:contactId', ContactValidator.validateDelete, contactController.deleteContact);

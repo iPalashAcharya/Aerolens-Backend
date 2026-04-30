@@ -123,6 +123,40 @@ class ContactRepository {
         }
     }
 
+    async getContactAuditLogsById(contactId, page, limit, client) {
+        const safePage = Math.max(1, parseInt(page) || 1);
+        const safeLimit = Math.max(1, Math.min(100, parseInt(limit) || 20));
+        const offset = (safePage - 1) * safeLimit;
+        const contactIdStr = String(contactId);
+
+        try {
+            const [rows] = await client.query(
+                `SELECT a.id, a.action, a.verb, a.summary, a.resource_type, a.resource_id,
+                        a.old_values, a.new_values,
+                        DATE_FORMAT(CONVERT_TZ(a.timestamp, @@session.time_zone, '+00:00'), '%Y-%m-%dT%H:%i:%s.000Z') AS timestamp,
+                        DATE_FORMAT(CONVERT_TZ(COALESCE(a.occurred_at_utc, a.timestamp), @@session.time_zone, '+00:00'), '%Y-%m-%dT%H:%i:%s.000Z') AS occurred_at,
+                        m.memberName AS actor_name
+                 FROM auditLogs a
+                 LEFT JOIN member m ON m.memberId = a.user_id
+                 WHERE a.resource_type = 'contact'
+                   AND a.resource_id = ?
+                 ORDER BY COALESCE(a.occurred_at_utc, a.timestamp) DESC, a.id DESC
+                 LIMIT ? OFFSET ?`,
+                [contactIdStr, safeLimit, offset]
+            );
+            const [countRows] = await client.query(
+                `SELECT COUNT(*) AS total
+                 FROM auditLogs a
+                 WHERE a.resource_type = 'contact'
+                   AND a.resource_id = ?`,
+                [contactIdStr]
+            );
+            return { rows, total: countRows[0].total, page: safePage, limit: safeLimit };
+        } catch (error) {
+            this._handleDatabaseError(error, 'getContactAuditLogsById');
+        }
+    }
+
     _handleDatabaseError(error, operation) {
         const errorMappings = {
             'ER_BAD_FIELD_ERROR': { status: 500, errorCode: 'DATABASE_SCHEMA_ERROR', message: 'Database schema error - invalid field reference', details: { operation } },
