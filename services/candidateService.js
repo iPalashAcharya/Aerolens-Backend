@@ -1147,6 +1147,49 @@ class CandidateService {
             client.release();
         }
     }
+    async analyzeResume(candidateId) {
+        const { extractTextFromS3Resume, buildJobDescription, analyzeWithClaude } = require('./resumeAnalysisService');
+        const client = await this.db.getConnection();
+        try {
+            const candidate = await this.candidateRepository.findById(candidateId, client);
+            if (!candidate) {
+                throw new AppError(`Candidate ${candidateId} not found`, 404, 'CANDIDATE_NOT_FOUND');
+            }
+            if (!candidate.resumeFilename) {
+                throw new AppError('No resume uploaded for this candidate', 400, 'NO_RESUME');
+            }
+            if (!candidate.jobProfileRequirementId) {
+                throw new AppError('No job profile linked to this candidate', 400, 'NO_JOB_PROFILE');
+            }
+
+            const jobProfile = await this.candidateRepository.getJobProfileForAnalysis(
+                candidate.jobProfileRequirementId, client
+            );
+            if (!jobProfile) {
+                throw new AppError('Linked job profile not found', 404, 'JOB_PROFILE_NOT_FOUND');
+            }
+
+            const [resumeText, jobDescription] = await Promise.all([
+                extractTextFromS3Resume(candidate.resumeFilename),
+                Promise.resolve(buildJobDescription(jobProfile))
+            ]);
+
+            const feedback = await analyzeWithClaude(resumeText, jobDescription);
+            await this.candidateRepository.saveAiFeedback(candidateId, feedback, client);
+            return feedback;
+        } finally {
+            client.release();
+        }
+    }
+
+    async getAiFeedback(candidateId) {
+        const client = await this.db.getConnection();
+        try {
+            return await this.candidateRepository.getAiFeedback(candidateId, client);
+        } finally {
+            client.release();
+        }
+    }
 }
 
 module.exports = CandidateService;

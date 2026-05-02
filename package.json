@@ -13,6 +13,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.92.0",
     "@aws-sdk/client-s3": "^3.927.0",
     "@aws-sdk/client-secrets-manager": "^3.943.0",
     "@aws-sdk/credential-providers": "^3.1002.0",
