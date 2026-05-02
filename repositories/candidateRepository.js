@@ -1237,6 +1237,70 @@ class CandidateRepository {
             this._handleDatabaseError(error, 'restore');
         }
     }
+
+    async getJobProfileForAnalysis(jobProfileRequirementId, client) {
+        try {
+            const [rows] = await client.execute(
+                `SELECT jp.jobRole,
+                        c.clientName,
+                        d.departmentName,
+                        jp.experienceText,
+                        jp.experienceMinYears,
+                        jp.experienceMaxYears,
+                        jpr.workArrangement,
+                        (SELECT JSON_OBJECT('city', l.cityName, 'country', l.country)
+                         FROM location l WHERE l.locationId = jpr.locationId) AS location
+                 FROM jobProfileRequirement jpr
+                 LEFT JOIN jobProfile jp ON jpr.jobProfileId = jp.jobProfileId
+                 LEFT JOIN client c ON jpr.clientId = c.clientId
+                 LEFT JOIN department d ON jpr.departmentId = d.departmentId
+                 WHERE jpr.jobProfileRequirementId = ?
+                   AND (jpr.is_deleted = 0 OR jpr.is_deleted IS NULL)`,
+                [jobProfileRequirementId]
+            );
+            return rows[0] || null;
+        } catch (error) {
+            this._handleDatabaseError(error);
+        }
+    }
+
+    async getAiFeedback(candidateId, client) {
+        try {
+            const [rows] = await client.execute(
+                `SELECT aiFeedback, aiFeedbackGeneratedAt
+                 FROM candidate WHERE candidateId = ? AND isActive = TRUE`,
+                [candidateId]
+            );
+            if (!rows[0]) return null;
+            const row = rows[0];
+            return {
+                feedback: row.aiFeedback
+                    ? (typeof row.aiFeedback === 'string' ? JSON.parse(row.aiFeedback) : row.aiFeedback)
+                    : null,
+                generatedAt: row.aiFeedbackGeneratedAt
+            };
+        } catch (error) {
+            this._handleDatabaseError(error);
+        }
+    }
+
+    async saveAiFeedback(candidateId, feedback, client) {
+        try {
+            const [result] = await client.execute(
+                `UPDATE candidate
+                 SET aiFeedback = ?, aiFeedbackGeneratedAt = NOW()
+                 WHERE candidateId = ? AND isActive = TRUE`,
+                [JSON.stringify(feedback), candidateId]
+            );
+            if (result.affectedRows === 0) {
+                throw new AppError(`Candidate ${candidateId} not found`, 404, 'CANDIDATE_NOT_FOUND');
+            }
+            return true;
+        } catch (error) {
+            if (error instanceof AppError) throw error;
+            this._handleDatabaseError(error);
+        }
+    }
 }
 
 module.exports = CandidateRepository;

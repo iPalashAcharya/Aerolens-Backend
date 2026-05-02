@@ -341,6 +341,21 @@ class CandidateController {
         const result = await this.candidateService.restoreCandidate(parseInt(req.params.id), req.auditContext);
         return ApiResponse.success(res, result, 'Candidate restored successfully');
     });
+
+    analyzeResume = catchAsync(async (req, res) => {
+        const candidateId = parseInt(req.params.id);
+        const feedback = await this.candidateService.analyzeResume(candidateId);
+        return ApiResponse.success(res, feedback, 'Resume analysed successfully');
+    });
+
+    getAiFeedback = catchAsync(async (req, res) => {
+        const candidateId = parseInt(req.params.id);
+        const result = await this.candidateService.getAiFeedback(candidateId);
+        if (!result?.feedback) {
+            return ApiResponse.success(res, null, 'No analysis found for this candidate');
+        }
+        return ApiResponse.success(res, result, 'AI feedback retrieved successfully');
+    });
 }
 
 module.exports = CandidateController;
