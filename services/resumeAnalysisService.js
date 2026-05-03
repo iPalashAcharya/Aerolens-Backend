@@ -96,9 +96,7 @@ function buildJobDescription(jobProfile) {
 }
 
 async function analyzeWithOllama(resumeText, jobDescription) {
-    const truncatedResume = resumeText.slice(0, 3000);
-    const truncatedJob = jobDescription.slice(0, 1000);
-    const prompt = ANALYSIS_PROMPT_TEMPLATE(truncatedJob, truncatedResume);
+    const prompt = ANALYSIS_PROMPT_TEMPLATE(jobDescription, resumeText);
 
     let res;
     try {
@@ -107,7 +105,7 @@ async function analyzeWithOllama(resumeText, jobDescription) {
         res = await fetch(`${OLLAMA_URL}/api/generate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: OLLAMA_MODEL, prompt, stream: false, options: { num_ctx: 2048, num_predict: 512 } }),
+            body: JSON.stringify({ model: OLLAMA_MODEL, prompt, stream: false }),
             signal: controller.signal,
         });
         clearTimeout(timeout);
