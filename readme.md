@@ -9004,7 +9004,7 @@ Authorization: Bearer <token>
 
 - Downloads the candidate's PDF from S3, extracts text, builds a job description from the linked `jobProfileRequirement`, sends both to Ollama, and saves the result.
 - Requires: candidate must have a resume uploaded **and** a job profile linked.
-- Only PDF resumes are supported.
+- Supports PDF and DOCX resume formats.
 
 **Success response (`200`):**
 ```json
@@ -9029,7 +9029,7 @@ Authorization: Bearer <token>
 |---|---|---|
 | `400` | `NO_RESUME` | Candidate has no resume uploaded |
 | `400` | `NO_JOB_PROFILE` | No job profile linked to candidate |
-| `400` | `UNSUPPORTED_RESUME_FORMAT` | Resume is not a PDF |
+| `400` | `UNSUPPORTED_RESUME_FORMAT` | Resume is not a PDF or DOCX |
 | `422` | `EMPTY_RESUME_TEXT` | PDF has no extractable text |
 | `502` | `OLLAMA_UNREACHABLE` | Ollama is not running |
 | `502` | `OLLAMA_ERROR` | Ollama returned a non-200 response |
