@@ -830,6 +830,8 @@ class CandidateRepository {
             c.resumeUploadDate,
             c.notes,
             c.referredBy,
+            c.aiFeedback,
+            DATE_FORMAT(c.aiFeedbackGeneratedAt, '%Y-%m-%dT%H:%i:%sZ') AS aiFeedbackGeneratedAt,
             DATE_FORMAT(c.createdAt, '%Y-%m-%dT%H:%i:%sZ') AS dateOfEntry
 
         FROM candidate c
@@ -838,7 +840,7 @@ class CandidateRepository {
             ON c.appliedForJobProfileId = jpReq.jobProfileRequirementId
 
         LEFT JOIN jobProfile jp
-            ON jpReq.jobProfileId = jp.jobProfileId  
+            ON jpReq.jobProfileId = jp.jobProfileId
 
         LEFT JOIN lookup stat
             ON c.statusId = stat.lookupKey
@@ -883,6 +885,10 @@ class CandidateRepository {
 
                 row.experienceYears =
                     row.experienceYears !== null ? Number(row.experienceYears) : null;
+
+                if (typeof row.aiFeedback === 'string') {
+                    try { row.aiFeedback = JSON.parse(row.aiFeedback); } catch { row.aiFeedback = null; }
+                }
             });
             return rows;
         } catch (error) {

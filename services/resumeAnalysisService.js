@@ -1,35 +1,31 @@
-const Anthropic = require('@anthropic-ai/sdk');
 const pdfParse = require('pdf-parse');
 const { GetObjectCommand } = require('@aws-sdk/client-s3');
 const { s3Client, bucketName } = require('../config/s3');
 const AppError = require('../utils/appError');
 
-const SYSTEM_PROMPT = `You are an expert technical recruiter and resume analyst.
+const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'mistral';
 
-Your task is to analyze a candidate's resume against a given job description and provide a structured evaluation.
+const ANALYSIS_PROMPT_TEMPLATE = (jobDescription, resumeText) =>
+`You are an expert technical recruiter. Analyze the resume against the job description below.
 
-Instructions:
-1. Carefully read both the resume and the job description.
-2. Identify key skills, experience, and qualifications from both.
-3. Compare the resume with the job requirements.
-4. Be objective and concise.
+Job Description:
+${jobDescription}
 
-Output format (STRICT JSON — no text outside JSON):
+Resume:
+${resumeText}
+
+Return ONLY valid JSON (no text outside JSON):
 {
-  "match_percentage": number (0-100),
-  "matched_skills": [list of skills present in both resume and job description],
-  "missing_skills": [list of important skills missing from the resume],
-  "strengths": [list of strong points in the resume relevant to the job],
-  "weaknesses": [list of gaps or weak areas],
-  "suggestions": [specific actionable improvements for the candidate],
-  "summary": "short 2-3 line overall evaluation"
+  "match_percentage": <number 0-100>,
+  "matched_skills": [<skills present in both>],
+  "missing_skills": [<important skills missing from resume>],
+  "strengths": [<strong points relevant to job>],
+  "weaknesses": [<gaps or weak areas>],
+  "suggestions": [<actionable improvements>],
+  "summary": "<2-3 line overall evaluation>"
 }
-
-Rules:
-- Output ONLY valid JSON, nothing else
-- Keep results realistic (do NOT always give high scores)
-- Focus on skills, experience, and relevance
-- If information is missing, make reasonable assumptions`;
+Rules: output ONLY the JSON object, nothing else. Be realistic, do not always give high scores.`;
 
 async function downloadS3Buffer(s3Key) {
     const command = new GetObjectCommand({ Bucket: bucketName, Key: s3Key });
@@ -90,38 +86,45 @@ function buildJobDescription(jobProfile) {
     return lines.join('\n');
 }
 
-async function analyzeWithClaude(resumeText, jobDescription) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-        throw new AppError('ANTHROPIC_API_KEY is not configured', 500, 'MISSING_API_KEY');
+async function analyzeWithOllama(resumeText, jobDescription) {
+    const prompt = ANALYSIS_PROMPT_TEMPLATE(jobDescription, resumeText);
+
+    let res;
+    try {
+        res = await fetch(`${OLLAMA_URL}/api/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: OLLAMA_MODEL, prompt, stream: false }),
+        });
+    } catch (err) {
+        throw new AppError(
+            `Ollama is unreachable at ${OLLAMA_URL} — make sure it is running`,
+            502,
+            'OLLAMA_UNREACHABLE'
+        );
     }
 
-    const client = new Anthropic({ apiKey });
+    if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new AppError(
+            `Ollama returned HTTP ${res.status}: ${body}`,
+            502,
+            'OLLAMA_ERROR'
+        );
+    }
 
-    const message = await client.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1024,
-        system: SYSTEM_PROMPT,
-        messages: [
-            {
-                role: 'user',
-                content: `### Job Description:\n${jobDescription}\n\n### Resume:\n${resumeText}`
-            }
-        ]
-    });
-
-    const raw = message.content[0]?.text ?? '';
+    const data = await res.json();
+    const raw = data.response ?? '';
 
     let feedback;
     try {
-        // Strip any accidental markdown code fences
-        const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+        const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
         feedback = JSON.parse(cleaned);
     } catch {
-        throw new AppError('Claude returned invalid JSON — analysis failed', 502, 'INVALID_AI_RESPONSE');
+        throw new AppError('Ollama returned invalid JSON — analysis failed', 502, 'INVALID_AI_RESPONSE');
     }
 
     return feedback;
 }
 
-module.exports = { extractTextFromS3Resume, buildJobDescription, analyzeWithClaude };
+module.exports = { extractTextFromS3Resume, buildJobDescription, analyzeWithOllama };
