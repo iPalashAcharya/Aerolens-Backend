@@ -5,7 +5,6 @@ const { s3Client, bucketName } = require('../config/s3');
 const AppError = require('../utils/appError');
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
-const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'mistral';
 
 const ANALYSIS_PROMPT_TEMPLATE = (jobDescription, resumeText) =>
 `You are an expert technical recruiter. Analyze the resume against the job description below.
@@ -96,6 +95,7 @@ function buildJobDescription(jobProfile) {
 }
 
 async function analyzeWithOllama(resumeText, jobDescription) {
+    const model = process.env.OLLAMA_MODEL || 'tinyllama';
     const prompt = ANALYSIS_PROMPT_TEMPLATE(jobDescription, resumeText);
 
     let res;
@@ -105,7 +105,7 @@ async function analyzeWithOllama(resumeText, jobDescription) {
         res = await fetch(`${OLLAMA_URL}/api/generate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: OLLAMA_MODEL, prompt, stream: false }),
+            body: JSON.stringify({ model, prompt, stream: false, options: { num_ctx: 2048 } }),
             signal: controller.signal,
         });
         clearTimeout(timeout);
