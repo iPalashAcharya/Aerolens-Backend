@@ -1,4 +1,5 @@
 const pdfParse = require('pdf-parse');
+const mammoth = require('mammoth');
 const { GetObjectCommand } = require('@aws-sdk/client-s3');
 const { s3Client, bucketName } = require('../config/s3');
 const AppError = require('../utils/appError');
@@ -43,18 +44,26 @@ async function extractTextFromS3Resume(resumeFilename) {
     }
 
     const ext = resumeFilename.split('.').pop().toLowerCase();
-    if (ext !== 'pdf') {
-        throw new AppError('Only PDF resumes can be analysed', 400, 'UNSUPPORTED_RESUME_FORMAT');
+    if (!['pdf', 'docx'].includes(ext)) {
+        throw new AppError('Only PDF and DOCX resumes can be analysed', 400, 'UNSUPPORTED_RESUME_FORMAT');
     }
 
     const buffer = await downloadS3Buffer(resumeFilename);
-    const parsed = await pdfParse(buffer);
 
-    if (!parsed.text || !parsed.text.trim()) {
-        throw new AppError('Could not extract text from resume PDF', 422, 'EMPTY_RESUME_TEXT');
+    let text;
+    if (ext === 'pdf') {
+        const parsed = await pdfParse(buffer);
+        text = parsed.text;
+    } else {
+        const result = await mammoth.extractRawText({ buffer });
+        text = result.value;
     }
 
-    return parsed.text;
+    if (!text || !text.trim()) {
+        throw new AppError('Could not extract text from resume file', 422, 'EMPTY_RESUME_TEXT');
+    }
+
+    return text;
 }
 
 function buildJobDescription(jobProfile) {
@@ -91,11 +100,15 @@ async function analyzeWithOllama(resumeText, jobDescription) {
 
     let res;
     try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000); // 5 min
         res = await fetch(`${OLLAMA_URL}/api/generate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ model: OLLAMA_MODEL, prompt, stream: false }),
+            signal: controller.signal,
         });
+        clearTimeout(timeout);
     } catch (err) {
         throw new AppError(
             `Ollama is unreachable at ${OLLAMA_URL} — make sure it is running`,
