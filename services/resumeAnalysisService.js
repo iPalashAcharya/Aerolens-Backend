@@ -4,7 +4,7 @@ const { GetObjectCommand } = require('@aws-sdk/client-s3');
 const { s3Client, bucketName } = require('../config/s3');
 const AppError = require('../utils/appError');
 
-const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 const ANALYSIS_PROMPT_TEMPLATE = (jobDescription, resumeText) =>
 `You are an expert technical recruiter. Analyze the resume against the job description below.
@@ -95,46 +95,64 @@ function buildJobDescription(jobProfile) {
 }
 
 async function analyzeWithOllama(resumeText, jobDescription) {
-    const model = process.env.OLLAMA_MODEL || 'tinyllama';
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    const model = process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.2-3b-instruct:free';
+
+    if (!apiKey) {
+        throw new AppError('OPENROUTER_API_KEY is not configured', 500, 'MISSING_API_KEY');
+    }
+
     const prompt = ANALYSIS_PROMPT_TEMPLATE(jobDescription, resumeText);
 
     let res;
     try {
         const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000); // 5 min
-        res = await fetch(`${OLLAMA_URL}/api/generate`, {
+        const timeout = setTimeout(() => controller.abort(), 5 * 60 * 1000);
+        res = await fetch(OPENROUTER_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model, prompt, stream: false, options: { num_ctx: 2048 } }),
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                model,
+                messages: [{ role: 'user', content: prompt }],
+                temperature: 0.3,
+            }),
             signal: controller.signal,
         });
         clearTimeout(timeout);
     } catch (err) {
-        throw new AppError(
-            `Ollama is unreachable at ${OLLAMA_URL} — make sure it is running`,
-            502,
-            'OLLAMA_UNREACHABLE'
-        );
+        throw new AppError('OpenRouter is unreachable — check your network connection', 502, 'OPENROUTER_UNREACHABLE');
     }
 
     if (!res.ok) {
         const body = await res.text().catch(() => '');
-        throw new AppError(
-            `Ollama returned HTTP ${res.status}: ${body}`,
-            502,
-            'OLLAMA_ERROR'
-        );
+        throw new AppError(`OpenRouter returned HTTP ${res.status}: ${body}`, 502, 'OPENROUTER_ERROR');
     }
 
     const data = await res.json();
-    const raw = data.response ?? '';
+    const raw = data.choices?.[0]?.message?.content ?? '';
+
+    if (!raw) {
+        throw new AppError('OpenRouter returned an empty response', 502, 'EMPTY_AI_RESPONSE');
+    }
 
     let feedback;
     try {
         const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
         feedback = JSON.parse(cleaned);
     } catch {
-        throw new AppError('Ollama returned invalid JSON — analysis failed', 502, 'INVALID_AI_RESPONSE');
+        const match = raw.match(/\{[\s\S]*\}/);
+        if (match) {
+            try {
+                feedback = JSON.parse(match[0]);
+            } catch {
+                throw new AppError('OpenRouter returned invalid JSON — analysis failed', 502, 'INVALID_AI_RESPONSE');
+            }
+        } else {
+            throw new AppError('OpenRouter returned invalid JSON — analysis failed', 502, 'INVALID_AI_RESPONSE');
+        }
     }
 
     return feedback;
