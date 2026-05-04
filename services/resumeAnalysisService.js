@@ -98,6 +98,8 @@ async function analyzeWithOllama(resumeText, jobDescription) {
     const apiKey = (process.env.OPENROUTER_API_KEY || '').trim();
     const model = (process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.2-3b-instruct:free').trim();
 
+    console.log('[OpenRouter] apiKey length:', apiKey.length, '| first10:', apiKey.slice(0, 10));
+
     if (!apiKey) {
         throw new AppError('OPENROUTER_API_KEY is not configured', 500, 'MISSING_API_KEY');
     }
