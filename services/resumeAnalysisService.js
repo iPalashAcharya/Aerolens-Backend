@@ -15,17 +15,17 @@ ${jobDescription}
 Resume:
 ${resumeText}
 
-Return ONLY valid JSON (no text outside JSON):
+Return ONLY a valid JSON object with exactly these 7 fields, no extra text before or after:
 {
-  "match_percentage": <number 0-100>,
-  "matched_skills": [<skills present in both>],
-  "missing_skills": [<important skills missing from resume>],
-  "strengths": [<strong points relevant to job>],
-  "weaknesses": [<gaps or weak areas>],
-  "suggestions": [<actionable improvements>],
-  "summary": "<2-3 line overall evaluation>"
+  "match_percentage": <integer 0-100>,
+  "matched_skills": ["skill1", "skill2"],
+  "missing_skills": ["skill1", "skill2"],
+  "strengths": ["strength1", "strength2"],
+  "weaknesses": ["weakness1", "weakness2"],
+  "suggestions": ["suggestion1", "suggestion2", "suggestion3"],
+  "summary": "2-3 sentence overall evaluation"
 }
-Rules: output ONLY the JSON object, nothing else. Be realistic, do not always give high scores.`;
+Important: ALL 7 fields are required. "suggestions" must always contain at least 2 actionable improvement items. Output ONLY the JSON object, nothing else.`;
 
 async function downloadS3Buffer(s3Key) {
     const command = new GetObjectCommand({ Bucket: bucketName, Key: s3Key });
