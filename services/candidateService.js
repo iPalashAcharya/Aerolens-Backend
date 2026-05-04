@@ -1175,9 +1175,8 @@ class CandidateService {
             ]);
 
             const feedback = await analyzeWithOllama(resumeText, jobDescription);
-            const generatedAt = new Date().toISOString();
             await this.candidateRepository.saveAiFeedback(candidateId, feedback, client);
-            return { feedback, generatedAt };
+            return feedback;
         } finally {
             client.release();
         }
