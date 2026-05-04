@@ -1273,7 +1273,7 @@ class CandidateRepository {
     async getAiFeedback(candidateId, client) {
         try {
             const [rows] = await client.execute(
-                `SELECT aiFeedback, aiFeedbackGeneratedAt
+                `SELECT aiFeedback, DATE_FORMAT(aiFeedbackGeneratedAt, '%Y-%m-%dT%H:%i:%sZ') AS aiFeedbackGeneratedAt
                  FROM candidate WHERE candidateId = ? AND isActive = TRUE`,
                 [candidateId]
             );

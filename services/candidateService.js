@@ -1148,7 +1148,7 @@ class CandidateService {
         }
     }
     async analyzeResume(candidateId) {
-        const { extractTextFromS3Resume, buildJobDescription, analyzeWithOllama } = require('./resumeAnalysisService');
+        const { extractTextFromS3Resume, buildJobDescription, analyzeWithOpenRouter } = require('./resumeAnalysisService');
         const client = await this.db.getConnection();
         try {
             const candidate = await this.candidateRepository.findById(candidateId, client);
@@ -1174,7 +1174,7 @@ class CandidateService {
                 Promise.resolve(buildJobDescription(jobProfile))
             ]);
 
-            const feedback = await analyzeWithOllama(resumeText, jobDescription);
+            const feedback = await analyzeWithOpenRouter(resumeText, jobDescription);
             await this.candidateRepository.saveAiFeedback(candidateId, feedback, client);
             return feedback;
         } finally {

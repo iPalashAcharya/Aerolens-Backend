@@ -94,7 +94,7 @@ function buildJobDescription(jobProfile) {
     return lines.join('\n');
 }
 
-async function analyzeWithOllama(resumeText, jobDescription) {
+async function analyzeWithOpenRouter(resumeText, jobDescription) {
     const apiKey = (process.env.OPENROUTER_API_KEY || '').trim();
     const model = (process.env.OPENROUTER_MODEL || 'meta-llama/llama-3.2-3b-instruct:free').trim();
 
@@ -160,4 +160,4 @@ async function analyzeWithOllama(resumeText, jobDescription) {
     return feedback;
 }
 
-module.exports = { extractTextFromS3Resume, buildJobDescription, analyzeWithOllama };
+module.exports = { extractTextFromS3Resume, buildJobDescription, analyzeWithOpenRouter };
