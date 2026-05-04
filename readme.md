@@ -9002,9 +9002,10 @@ POST /candidate/:id/analyze
 Authorization: Bearer <token>
 ```
 
-- Downloads the candidate's PDF from S3, extracts text, builds a job description from the linked `jobProfileRequirement`, sends both to Ollama, and saves the result.
+- Downloads the candidate's resume from S3, extracts text, builds a job description from the linked `jobProfileRequirement`, sends both to OpenRouter (LLM), and saves the result.
 - Requires: candidate must have a resume uploaded **and** a job profile linked.
 - Supports PDF and DOCX resume formats.
+- Requires `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` env vars (currently `nvidia/nemotron-3-super-120b-a12b:free`).
 
 **Success response (`200`):**
 ```json
@@ -9031,9 +9032,10 @@ Authorization: Bearer <token>
 | `400` | `NO_JOB_PROFILE` | No job profile linked to candidate |
 | `400` | `UNSUPPORTED_RESUME_FORMAT` | Resume is not a PDF or DOCX |
 | `422` | `EMPTY_RESUME_TEXT` | PDF has no extractable text |
-| `502` | `OLLAMA_UNREACHABLE` | Ollama is not running |
-| `502` | `OLLAMA_ERROR` | Ollama returned a non-200 response |
-| `502` | `INVALID_AI_RESPONSE` | Ollama response was not valid JSON |
+| `500` | `MISSING_API_KEY` | `OPENROUTER_API_KEY` is not configured |
+| `502` | `OPENROUTER_UNREACHABLE` | OpenRouter API is unreachable |
+| `502` | `OPENROUTER_ERROR` | OpenRouter returned a non-200 response (e.g. 401, 429) |
+| `502` | `INVALID_AI_RESPONSE` | OpenRouter response was not valid JSON |
 
 #### Fetch cached result
 
