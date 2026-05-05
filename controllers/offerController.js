@@ -99,6 +99,31 @@ class OfferController {
         const result = await this.offerService.restoreOffer(parseInt(req.params.offerId), req.auditContext);
         return ApiResponse.success(res, result, 'Offer restored successfully');
     });
+
+    generateDocument = catchAsync(async (req, res) => {
+        const offerId = parseInt(req.params.offerId, 10);
+        const generatedBy = req.auditContext.userId;
+        const doc = await this.offerService.generateDocument(offerId, generatedBy);
+        return ApiResponse.success(res, doc, 'Document generated successfully', 201);
+    });
+
+    regenerateDocument = catchAsync(async (req, res) => {
+        const offerId = parseInt(req.params.offerId, 10);
+        const generatedBy = req.auditContext.userId;
+        const doc = await this.offerService.regenerateDocument(offerId, generatedBy);
+        return ApiResponse.success(res, doc, 'Document regenerated successfully');
+    });
+
+    getDocument = catchAsync(async (req, res) => {
+        const offerId = parseInt(req.params.offerId, 10);
+        const doc = await this.offerService.getDocument(offerId);
+        return ApiResponse.success(res, doc ?? null, 'Document info retrieved');
+    });
+
+    downloadDocument = catchAsync(async (req, res) => {
+        const offerId = parseInt(req.params.offerId, 10);
+        await this.offerService.streamDocument(offerId, res);
+    });
 }
 
 module.exports = OfferController;

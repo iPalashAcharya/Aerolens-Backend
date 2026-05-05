@@ -36,4 +36,10 @@ router.post('/:offerId/status', OfferValidator.validateStatusUpdate, offerContro
 
 router.post('/:candidateId', OfferValidator.validateCreate, offerController.createOffer);
 
+// Document generation — must be placed after specific routes to avoid :candidateId conflicts
+router.post('/:offerId/document', offerController.generateDocument);
+router.post('/:offerId/document/regenerate', offerController.regenerateDocument);
+router.get('/:offerId/document', offerController.getDocument);
+router.get('/:offerId/document/download', offerController.downloadDocument);
+
 module.exports = router;
