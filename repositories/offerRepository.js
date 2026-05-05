@@ -416,6 +416,60 @@ class OfferRepository {
         throw new AppError('Database operation failed', 500, 'DATABASE_ERROR', { operation, code: error.code });
     }
 
+    async saveDocument(offerId, docData, client) {
+        const connection = client;
+        try {
+            const [result] = await connection.execute(
+                `UPDATE offer
+                 SET doc_type         = ?,
+                     doc_file_name    = ?,
+                     doc_s3_key       = ?,
+                     doc_mime_type    = ?,
+                     doc_file_size    = ?,
+                     doc_generated_at = NOW(),
+                     doc_generated_by = ?
+                 WHERE offerId = ? AND isDeleted = 0`,
+                [
+                    docData.docType,
+                    docData.docFileName,
+                    docData.docS3Key,
+                    docData.docMimeType ?? 'application/pdf',
+                    docData.docFileSize ?? null,
+                    docData.generatedBy ?? null,
+                    offerId,
+                ]
+            );
+            return result.affectedRows > 0;
+        } catch (error) {
+            this._handleDatabaseError(error, 'saveDocument');
+        }
+    }
+
+    async getDocument(offerId, client) {
+        const connection = client;
+        try {
+            const [rows] = await connection.execute(
+                `SELECT
+                    offerId,
+                    doc_type         AS docType,
+                    doc_file_name    AS docFileName,
+                    doc_s3_key       AS docS3Key,
+                    doc_mime_type    AS docMimeType,
+                    doc_file_size    AS docFileSize,
+                    doc_generated_by AS docGeneratedBy,
+                    DATE_FORMAT(doc_generated_at, '%Y-%m-%dT%H:%i:%sZ') AS docGeneratedAt
+                 FROM offer
+                 WHERE offerId = ? AND isDeleted = 0`,
+                [offerId]
+            );
+            const row = rows[0];
+            if (!row || !row.docType) return null;
+            return row;
+        } catch (error) {
+            this._handleDatabaseError(error, 'getDocument');
+        }
+    }
+
     async restore(offerId, client) {
         try {
             const [result] = await client.execute(

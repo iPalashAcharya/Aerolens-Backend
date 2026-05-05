@@ -1,5 +1,6 @@
 const AppError = require('../utils/appError');
 const auditLogService = require('./auditLogService');
+const { generateOnboardingDocument, getS3Stream } = require('./onboardingDocumentService');
 
 const TERMINAL_OFFER_STATUSES = ['ACCEPTED', 'REJECTED', 'TERMINATED'];
 
@@ -360,6 +361,103 @@ class OfferService {
             if (error instanceof AppError) throw error;
             console.error('Error updating offer status:', error.stack);
             throw new AppError('Failed to update offer status', 500, 'OFFER_STATUS_UPDATE_ERROR', { operation: 'updateOfferStatus', offerId });
+        } finally {
+            client.release();
+        }
+    }
+
+    async generateDocument(offerId, generatedBy) {
+        const client = await this.db.getConnection();
+        try {
+            const offer = await this.offerRepository.getOfferDetails(offerId, client);
+            if (!offer) {
+                throw new AppError('Offer not found', 404, 'OFFER_NOT_FOUND');
+            }
+
+            // Return existing document without regenerating
+            const existing = await this.offerRepository.getDocument(offerId, client);
+            if (existing) return existing;
+
+            const docInfo = await generateOnboardingDocument(
+                { ...offer, offerId },
+                generatedBy
+            );
+
+            await client.beginTransaction();
+            await this.offerRepository.saveDocument(offerId, docInfo, client);
+            await client.commit();
+
+            return await this.offerRepository.getDocument(offerId, client);
+        } catch (error) {
+            await client.rollback();
+            if (error instanceof AppError) throw error;
+            console.error('Error generating onboarding document:', error.stack);
+            throw new AppError('Failed to generate document', 500, 'DOCUMENT_GENERATION_ERROR');
+        } finally {
+            client.release();
+        }
+    }
+
+    async regenerateDocument(offerId, generatedBy) {
+        const client = await this.db.getConnection();
+        try {
+            const offer = await this.offerRepository.getOfferDetails(offerId, client);
+            if (!offer) {
+                throw new AppError('Offer not found', 404, 'OFFER_NOT_FOUND');
+            }
+
+            const docInfo = await generateOnboardingDocument(
+                { ...offer, offerId },
+                generatedBy
+            );
+
+            await client.beginTransaction();
+            await this.offerRepository.saveDocument(offerId, docInfo, client);
+            await client.commit();
+
+            return await this.offerRepository.getDocument(offerId, client);
+        } catch (error) {
+            await client.rollback();
+            if (error instanceof AppError) throw error;
+            console.error('Error regenerating onboarding document:', error.stack);
+            throw new AppError('Failed to regenerate document', 500, 'DOCUMENT_GENERATION_ERROR');
+        } finally {
+            client.release();
+        }
+    }
+
+    async getDocument(offerId) {
+        const client = await this.db.getConnection();
+        try {
+            return await this.offerRepository.getDocument(offerId, client);
+        } catch (error) {
+            if (error instanceof AppError) throw error;
+            throw new AppError('Failed to fetch document', 500, 'DATABASE_ERROR');
+        } finally {
+            client.release();
+        }
+    }
+
+    async streamDocument(offerId, res) {
+        const client = await this.db.getConnection();
+        try {
+            const doc = await this.offerRepository.getDocument(offerId, client);
+            if (!doc) {
+                throw new AppError('No document found for this offer', 404, 'DOCUMENT_NOT_FOUND');
+            }
+            const stream = await getS3Stream(doc.docS3Key);
+            res.setHeader('Content-Type', doc.docMimeType || 'application/pdf');
+            res.setHeader(
+                'Content-Disposition',
+                `attachment; filename="${doc.docFileName}"`
+            );
+            for await (const chunk of stream) {
+                res.write(chunk);
+            }
+            res.end();
+        } catch (error) {
+            if (error instanceof AppError) throw error;
+            throw new AppError('Failed to stream document', 500, 'STREAM_ERROR');
         } finally {
             client.release();
         }
