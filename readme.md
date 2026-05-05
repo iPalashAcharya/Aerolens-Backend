@@ -8969,4 +8969,106 @@ These endpoints return paginated audit log entries scoped to a single resource. 
 | Department | `DepartmentAuditLogsDialog.tsx` |
 | Contact | `ContactAuditLogsDialog.tsx` |
 
+---
+
+## Resume AI Analysis (Ollama)
+
+Analyzes a candidate's PDF resume against the linked job profile using a local Ollama LLM. No external API key required.
+
+### Prerequisites
+
+1. Install Ollama: https://ollama.com/download
+2. Pull the model:
+   ```bash
+   ollama pull llama3
+   ```
+3. Start Ollama (runs on `http://localhost:11434` by default):
+   ```bash
+   ollama serve
+   ```
+
+Optional `.env` overrides:
+```
+OLLAMA_URL=http://localhost:11434   # default
+OLLAMA_MODEL=llama3                 # default
+```
+
+### Endpoints
+
+#### Trigger analysis
+
+```
+POST /candidate/:id/analyze
+Authorization: Bearer <token>
+```
+
+- Downloads the candidate's resume from S3, extracts text, builds a job description from the linked `jobProfileRequirement`, sends both to OpenRouter (LLM), and saves the result.
+- Requires: candidate must have a resume uploaded **and** a job profile linked.
+- Supports PDF and DOCX resume formats.
+- Requires `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` env vars (currently `nvidia/nemotron-3-super-120b-a12b:free`).
+
+**Success response (`200`):**
+```json
+{
+  "success": true,
+  "message": "Resume analysed successfully",
+  "data": {
+    "match_percentage": 72,
+    "matched_skills": ["React", "Node.js", "MySQL"],
+    "missing_skills": ["Docker", "Kubernetes"],
+    "strengths": ["Strong frontend experience", "REST API design"],
+    "weaknesses": ["No cloud deployment experience"],
+    "suggestions": ["Add Docker projects to portfolio"],
+    "summary": "Good match for the role. Candidate covers core stack but lacks DevOps exposure required for senior-level expectations."
+  }
+}
+```
+
+**Error codes:**
+
+| HTTP | Code | Cause |
+|---|---|---|
+| `400` | `NO_RESUME` | Candidate has no resume uploaded |
+| `400` | `NO_JOB_PROFILE` | No job profile linked to candidate |
+| `400` | `UNSUPPORTED_RESUME_FORMAT` | Resume is not a PDF or DOCX |
+| `422` | `EMPTY_RESUME_TEXT` | PDF has no extractable text |
+| `500` | `MISSING_API_KEY` | `OPENROUTER_API_KEY` is not configured |
+| `502` | `OPENROUTER_UNREACHABLE` | OpenRouter API is unreachable |
+| `502` | `OPENROUTER_ERROR` | OpenRouter returned a non-200 response (e.g. 401, 429) |
+| `502` | `INVALID_AI_RESPONSE` | OpenRouter response was not valid JSON |
+
+#### Fetch cached result
+
+```
+GET /candidate/:id/analyze
+Authorization: Bearer <token>
+```
+
+Returns the previously saved `aiFeedback` and `aiFeedbackGeneratedAt` without re-running the analysis.
+
+**Response (`200`):**
+```json
+{
+  "success": true,
+  "data": {
+    "feedback": { ... },
+    "generatedAt": "2026-05-03T10:00:00.000Z"
+  }
+}
+```
+
+Returns `data: null` if no analysis has been run yet.
+
+### Test with curl
+
+```bash
+# Run analysis
+curl -X POST http://localhost:3000/candidate/42/analyze \
+  -H "Authorization: Bearer <your_token>"
+
+# Fetch cached result
+curl http://localhost:3000/candidate/42/analyze \
+  -H "Authorization: Bearer <your_token>"
+```
+
 Column order in all dialogs: **Resource ID → Actor → Action → Verb → Summary → Resource Type → Occurred At**
