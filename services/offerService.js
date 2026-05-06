@@ -85,6 +85,19 @@ class OfferService {
         }
     }
 
+    async getActiveOfferForCandidate(candidateId) {
+        const client = await this.db.getConnection();
+        try {
+            return await this.offerRepository.getActiveOfferWithDocByCandidate(candidateId, client);
+        } catch (error) {
+            if (error instanceof AppError) throw error;
+            console.error('Error fetching active offer for candidate:', error.stack);
+            throw new AppError('Failed to fetch active offer', 500, 'OFFER_FETCH_ERROR', { operation: 'getActiveOfferForCandidate' });
+        } finally {
+            client.release();
+        }
+    }
+
     async getOfferFormData() {
         const client = await this.db.getConnection();
         try {

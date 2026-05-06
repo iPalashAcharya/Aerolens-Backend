@@ -470,6 +470,38 @@ class OfferRepository {
         }
     }
 
+    async getActiveOfferWithDocByCandidate(candidateId, client) {
+        const connection = client;
+        try {
+            const [rows] = await connection.execute(
+                `SELECT
+                    o.offerId, o.candidateId, o.jobProfileRequirementId, o.vendorId, o.reportingManagerId,
+                    o.employmentTypeLookupId, o.workModelLookupId,
+                    DATE_FORMAT(o.joiningDate, '%Y-%m-%d') AS joiningDate,
+                    o.offeredCTCAmount, o.currencyLookupId, o.compensationTypeLookupId,
+                    o.variablePay, o.joiningBonus,
+                    o.offerLetterSent, o.serviceAgreementSent, o.ndaSent, o.codeOfConductSent,
+                    o.offerStatus,
+                    let.value AS employmentTypeName,
+                    o.doc_type         AS docType,
+                    o.doc_file_name    AS docFileName,
+                    o.doc_s3_key       AS docS3Key,
+                    o.doc_mime_type    AS docMimeType,
+                    o.doc_file_size    AS docFileSize,
+                    o.doc_generated_by AS docGeneratedBy,
+                    DATE_FORMAT(o.doc_generated_at, '%Y-%m-%dT%H:%i:%sZ') AS docGeneratedAt
+                 FROM offer o
+                 LEFT JOIN lookup let ON let.lookupKey = o.employmentTypeLookupId AND let.tag = 'employmentType'
+                 WHERE o.candidateId = ? AND o.isDeleted = 0 AND o.offerStatus = 'PENDING'
+                 LIMIT 1`,
+                [candidateId]
+            );
+            return rows[0] || null;
+        } catch (error) {
+            this._handleDatabaseError(error, 'getActiveOfferWithDocByCandidate');
+        }
+    }
+
     async restore(offerId, client) {
         try {
             const [result] = await client.execute(

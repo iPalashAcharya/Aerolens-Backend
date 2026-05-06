@@ -17,6 +17,7 @@ router.use(authenticate);
 router.use(auditContextMiddleware);
 
 router.get('/form-data', offerController.getOfferFormData);
+router.get('/by-candidate/:candidateId', offerController.getActiveOfferForCandidate);
 
 router.get('/deletions', offerController.getDeleted);
 
