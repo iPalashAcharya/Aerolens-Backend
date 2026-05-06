@@ -246,7 +246,10 @@ async function generateOnboardingDocument(offerDetails, generatedBy) {
     const title = docType === 'offer_letter' ? 'OFFER LETTER' : 'SERVICE AGREEMENT';
     const prompt = buildPrompt(docType, offerDetails);
     const rawText = await callOpenRouter(prompt);
-    const documentText = rawText.replaceAll(DATE_PLACEHOLDER, formatUtcDate(generatedAt));
+    const formattedDate = formatUtcDate(generatedAt);
+    const documentText = rawText
+        .replaceAll(DATE_PLACEHOLDER, formattedDate)
+        .replace(/^Date:.*$/m, `Date: ${formattedDate}`);
     const pdfBuffer = await buildPdfBuffer(documentText, title);
 
     const timestamp = generatedAt.getTime();
