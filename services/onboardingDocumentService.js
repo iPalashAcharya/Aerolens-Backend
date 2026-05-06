@@ -21,7 +21,12 @@ function resolveDocType(employmentTypeName) {
 
 // ─── Prompt builder ───────────────────────────────────────────────────────────
 
-const DATE_PLACEHOLDER = '[[TODAY_DATE]]';
+const DATE_PLACEHOLDER = new Date().toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+});
 
 function formatUtcDate(date) {
     return date.toLocaleDateString('en-GB', {
