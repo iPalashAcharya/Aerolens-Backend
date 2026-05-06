@@ -21,7 +21,7 @@ function resolveDocType(employmentTypeName) {
 
 // ─── Prompt builder ───────────────────────────────────────────────────────────
 
-const DATE_PLACEHOLDER = formatUtcDate(new Date());
+const DATE_PLACEHOLDER = '[[TODAY_DATE]]';
 
 function formatUtcDate(date) {
     return date.toLocaleDateString('en-GB', {
@@ -248,6 +248,7 @@ async function generateOnboardingDocument(offerDetails, generatedBy) {
     }
 
     const generatedAt = new Date();
+    console.log('[onboardingDoc] generatedAt:', generatedAt.toISOString());
 
     const title = docType === 'offer_letter' ? 'OFFER LETTER' : 'SERVICE AGREEMENT';
     const prompt = buildPrompt(docType, offerDetails);
