@@ -255,7 +255,12 @@ async function generateOnboardingDocument(offerDetails, generatedBy) {
     const formattedDate = formatUtcDate(generatedAt);
     const documentText = rawText
         .replaceAll(DATE_PLACEHOLDER, formattedDate)
-        .replace(/^[ \t]*Date:[ \t]*.*/gim, `Date: ${formattedDate}`);
+        // "Date: <anything>" lines
+        .replace(/^[ \t]*Date:[ \t]*.*/gim, `Date: ${formattedDate}`)
+        // bare date lines the AI writes without a "Date:" prefix (e.g. "2 April 2025")
+        .replace(/^[ \t]*\d{1,2}\s+[A-Za-z]+\s+\d{4}[ \t]*$/gm, `Date: ${formattedDate}`)
+        // strip hallucinated "by <date>" / "on or before <date>" deadline phrases
+        .replace(/\s+(on or before|by)\s+\d{1,2}\s+[A-Za-z]+\s+\d{4}\b/gi, '');
     const pdfBuffer = await buildPdfBuffer(documentText, title);
 
     const timestamp = generatedAt.getTime();
