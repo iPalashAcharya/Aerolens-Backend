@@ -21,7 +21,7 @@ function resolveDocType(employmentTypeName) {
 
 // ─── Prompt builder ───────────────────────────────────────────────────────────
 
-const DATE_PLACEHOLDER = '[[LETTER_DATE]]';
+const DATE_PLACEHOLDER = formatUtcDate(new Date());
 
 function formatUtcDate(date) {
     return date.toLocaleDateString('en-GB', {
