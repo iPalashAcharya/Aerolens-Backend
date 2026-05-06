@@ -21,7 +21,7 @@ function resolveDocType(employmentTypeName) {
 
 // ─── Prompt builder ───────────────────────────────────────────────────────────
 
-function buildPrompt(docType, offer) {
+function buildPrompt(docType, offer, generatedAt) {
     const {
         candidateName = 'Candidate',
         jobRole = 'Position',
@@ -42,6 +42,11 @@ function buildPrompt(docType, offer) {
     const ctcLine = [offeredCTCAmount, currencyName, compensationTypeName]
         .filter(Boolean)
         .join(' ');
+    const todayFormatted = generatedAt.toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+    });
     const dateFormatted = joiningDate
         ? new Date(joiningDate).toLocaleDateString('en-GB', {
               day: 'numeric',
@@ -55,6 +60,7 @@ function buildPrompt(docType, offer) {
 Output ONLY the letter text — no JSON, no markdown fences, no preamble, no commentary.
 
 Details:
+- Letter Date: ${todayFormatted}
 - Candidate: ${candidateName}
 - Role: ${jobRole}
 - Company: ${company}
@@ -78,6 +84,7 @@ Tone: professional, warm, legally appropriate. Keep it under two pages.`;
 Output ONLY the agreement text — no JSON, no markdown fences, no preamble, no commentary.
 
 Details:
+- Agreement Date: ${todayFormatted}
 - Consultant: ${candidateName}
 - Engagement Role: ${jobRole}
 - Client Company: ${company}${vendorName ? `\n- Vendor/Agency: ${vendorName}` : ''}
@@ -225,12 +232,14 @@ async function generateOnboardingDocument(offerDetails, generatedBy) {
         );
     }
 
+    const generatedAt = new Date();
+
     const title = docType === 'offer_letter' ? 'OFFER LETTER' : 'SERVICE AGREEMENT';
-    const prompt = buildPrompt(docType, offerDetails);
+    const prompt = buildPrompt(docType, offerDetails, generatedAt);
     const documentText = await callOpenRouter(prompt);
     const pdfBuffer = await buildPdfBuffer(documentText, title);
 
-    const timestamp = Date.now();
+    const timestamp = generatedAt.getTime();
     const safeName = (offerDetails.candidateName || 'candidate')
         .toLowerCase()
         .replace(/[^a-z0-9]/g, '_');
@@ -246,6 +255,7 @@ async function generateOnboardingDocument(offerDetails, generatedBy) {
         docMimeType: 'application/pdf',
         docFileSize: pdfBuffer.length,
         generatedBy,
+        docGeneratedAt: generatedAt,
     };
 }
 
