@@ -74,7 +74,8 @@ class OfferRepository {
                 lcur.value AS currencyName,
                 lcomp.value AS compensationTypeName,
                 m.memberName AS createdByName,
-                DATE_FORMAT(o.createdAt, '%Y-%m-%dT%H:%i:%sZ') AS createdAt
+                DATE_FORMAT(o.createdAt, '%Y-%m-%dT%H:%i:%sZ') AS createdAt,
+                o.doc_type AS docType
             FROM offer o
             LEFT JOIN candidate c ON c.candidateId = o.candidateId
             LEFT JOIN jobProfileRequirement jpr ON jpr.jobProfileRequirementId = o.jobProfileRequirementId
