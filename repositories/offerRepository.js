@@ -427,7 +427,7 @@ class OfferRepository {
                      doc_s3_key       = ?,
                      doc_mime_type    = ?,
                      doc_file_size    = ?,
-                     doc_generated_at = ?,
+                     doc_generated_at = NOW(),
                      doc_generated_by = ?
                  WHERE offerId = ? AND isDeleted = 0`,
                 [
@@ -436,7 +436,6 @@ class OfferRepository {
                     docData.docS3Key,
                     docData.docMimeType ?? 'application/pdf',
                     docData.docFileSize ?? null,
-                    docData.docGeneratedAt ?? new Date(),
                     docData.generatedBy ?? null,
                     offerId,
                 ]

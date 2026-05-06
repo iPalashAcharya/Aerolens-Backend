@@ -21,7 +21,18 @@ function resolveDocType(employmentTypeName) {
 
 // ─── Prompt builder ───────────────────────────────────────────────────────────
 
-function buildPrompt(docType, offer, generatedAt) {
+const DATE_PLACEHOLDER = '[[LETTER_DATE]]';
+
+function formatUtcDate(date) {
+    return date.toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+        timeZone: 'UTC',
+    });
+}
+
+function buildPrompt(docType, offer) {
     const {
         candidateName = 'Candidate',
         jobRole = 'Position',
@@ -42,25 +53,22 @@ function buildPrompt(docType, offer, generatedAt) {
     const ctcLine = [offeredCTCAmount, currencyName, compensationTypeName]
         .filter(Boolean)
         .join(' ');
-    const todayFormatted = generatedAt.toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-    });
     const dateFormatted = joiningDate
         ? new Date(joiningDate).toLocaleDateString('en-GB', {
               day: 'numeric',
               month: 'long',
               year: 'numeric',
+              timeZone: 'UTC',
           })
         : 'To be confirmed';
 
     if (docType === 'offer_letter') {
         return `You are a professional HR document writer. Generate a complete, formal Offer Letter.
 Output ONLY the letter text — no JSON, no markdown fences, no preamble, no commentary.
+IMPORTANT: Where the letter date appears in the letterhead, output the exact token ${DATE_PLACEHOLDER} and nothing else — do not replace it with any other date.
 
 Details:
-- Letter Date: ${todayFormatted}
+- Letter Date: ${DATE_PLACEHOLDER}
 - Candidate: ${candidateName}
 - Role: ${jobRole}
 - Company: ${company}
@@ -70,7 +78,7 @@ Details:
 - Offered CTC: ${ctcLine || 'As discussed'}${variablePay ? `\n- Variable Pay: ${variablePay} ${currencyName || ''}` : ''}${joiningBonus ? `\n- Joining Bonus: ${joiningBonus} ${currencyName || ''}` : ''}
 
 Structure the letter with these sections (use plain text, no markdown):
-1. Company letterhead block (company name, date)
+1. Company letterhead block (company name, then "Date: ${DATE_PLACEHOLDER}")
 2. Addressee block (candidate name and greeting)
 3. Offer paragraph — role, CTC, joining date
 4. Terms summary — work arrangement, reporting line
@@ -82,9 +90,10 @@ Tone: professional, warm, legally appropriate. Keep it under two pages.`;
 
     return `You are a professional HR document writer. Generate a complete, formal Service Agreement for an independent consultant.
 Output ONLY the agreement text — no JSON, no markdown fences, no preamble, no commentary.
+IMPORTANT: Where the agreement date appears, output the exact token ${DATE_PLACEHOLDER} and nothing else — do not replace it with any other date.
 
 Details:
-- Agreement Date: ${todayFormatted}
+- Agreement Date: ${DATE_PLACEHOLDER}
 - Consultant: ${candidateName}
 - Engagement Role: ${jobRole}
 - Client Company: ${company}${vendorName ? `\n- Vendor/Agency: ${vendorName}` : ''}
@@ -93,7 +102,7 @@ Details:
 - Agreed Rate: ${ctcLine || 'As discussed'}${variablePay ? `\n- Performance Bonus: ${variablePay} ${currencyName || ''}` : ''}
 
 Structure the agreement with these numbered sections (plain text, no markdown):
-1. TITLE: SERVICE AGREEMENT
+1. TITLE: SERVICE AGREEMENT (then "Date: ${DATE_PLACEHOLDER}")
 2. Parties (Client and Consultant/Vendor)
 3. Scope of Services
 4. Term and Start Date
@@ -235,8 +244,9 @@ async function generateOnboardingDocument(offerDetails, generatedBy) {
     const generatedAt = new Date();
 
     const title = docType === 'offer_letter' ? 'OFFER LETTER' : 'SERVICE AGREEMENT';
-    const prompt = buildPrompt(docType, offerDetails, generatedAt);
-    const documentText = await callOpenRouter(prompt);
+    const prompt = buildPrompt(docType, offerDetails);
+    const rawText = await callOpenRouter(prompt);
+    const documentText = rawText.replaceAll(DATE_PLACEHOLDER, formatUtcDate(generatedAt));
     const pdfBuffer = await buildPdfBuffer(documentText, title);
 
     const timestamp = generatedAt.getTime();
@@ -255,7 +265,6 @@ async function generateOnboardingDocument(offerDetails, generatedBy) {
         docMimeType: 'application/pdf',
         docFileSize: pdfBuffer.length,
         generatedBy,
-        docGeneratedAt: generatedAt,
     };
 }
 
