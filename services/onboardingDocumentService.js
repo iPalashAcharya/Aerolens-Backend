@@ -249,7 +249,7 @@ async function generateOnboardingDocument(offerDetails, generatedBy) {
     const formattedDate = formatUtcDate(generatedAt);
     const documentText = rawText
         .replaceAll(DATE_PLACEHOLDER, formattedDate)
-        .replace(/^Date:.*$/m, `Date: ${formattedDate}`);
+        .replace(/^[ \t]*Date:[ \t]*.*/gim, `Date: ${formattedDate}`);
     const pdfBuffer = await buildPdfBuffer(documentText, title);
 
     const timestamp = generatedAt.getTime();
