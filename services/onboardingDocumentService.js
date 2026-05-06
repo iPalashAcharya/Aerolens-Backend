@@ -65,7 +65,10 @@ function buildPrompt(docType, offer) {
     if (docType === 'offer_letter') {
         return `You are a professional HR document writer. Generate a complete, formal Offer Letter.
 Output ONLY the letter text — no JSON, no markdown fences, no preamble, no commentary.
-IMPORTANT: Where the letter date appears in the letterhead, output the exact token ${DATE_PLACEHOLDER} and nothing else — do not replace it with any other date.
+CRITICAL DATE RULES — FOLLOW EXACTLY:
+1. For the letter date in the letterhead, write the exact token ${DATE_PLACEHOLDER} — do not substitute any date.
+2. Do NOT invent, guess, or include any other dates anywhere in the letter.
+3. The only real date you may use is the Joining Date provided below.
 
 Details:
 - Letter Date: ${DATE_PLACEHOLDER}
@@ -82,7 +85,7 @@ Structure the letter with these sections (use plain text, no markdown):
 2. Addressee block (candidate name and greeting)
 3. Offer paragraph — role, CTC, joining date
 4. Terms summary — work arrangement, reporting line
-5. Acceptance instructions (sign and return by a date)
+5. Acceptance instructions (sign and return at your earliest convenience — do NOT mention any deadline date)
 6. Closing with HR Director signature block
 
 Tone: professional, warm, legally appropriate. Keep it under two pages.`;
@@ -90,7 +93,10 @@ Tone: professional, warm, legally appropriate. Keep it under two pages.`;
 
     return `You are a professional HR document writer. Generate a complete, formal Service Agreement for an independent consultant.
 Output ONLY the agreement text — no JSON, no markdown fences, no preamble, no commentary.
-IMPORTANT: Where the agreement date appears, output the exact token ${DATE_PLACEHOLDER} and nothing else — do not replace it with any other date.
+CRITICAL DATE RULES — FOLLOW EXACTLY:
+1. For the agreement date, write the exact token ${DATE_PLACEHOLDER} — do not substitute any date.
+2. Do NOT invent, guess, or include any other dates anywhere in the agreement.
+3. The only real date you may use is the Engagement Start Date provided below.
 
 Details:
 - Agreement Date: ${DATE_PLACEHOLDER}
