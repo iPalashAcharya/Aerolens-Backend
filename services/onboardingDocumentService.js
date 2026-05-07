@@ -212,7 +212,7 @@ function buildOfferLetterPdf(offer) {
             doc.fontSize(7.5).font('Times-Roman').fillColor(LGRAY)
                .text('Aerolens India Private Limited',
                      ML, HDR_Y + 2,  { width: CW, align: 'right' })
-               .text('2nd Floor, Binori B Square III, Sindhu Bhavan Road, Ahmedabad - 380059',
+               .text('Brain Wire Block C, 11th Floor, Navratna Business Park, Near Sindhu Bhavan Road, Opp. GTPL House, Bodakdev, Ahmedabad - 380059',
                      ML, HDR_Y + 13, { width: CW, align: 'right' })
                .text('www.aerolens.net  hr@aerolens.net',
                      ML, HDR_Y + 24, { width: CW, align: 'right' });
@@ -225,7 +225,7 @@ function buildOfferLetterPdf(offer) {
                .text('Aerolens India Private Limited',
                      ML, FTR_Y + 2, { width: CW, align: 'center' });
             doc.fontSize(7.5).font('Times-Roman').fillColor(DGRAY)
-               .text('2nd Floor, Binori B Square III, Sindhu Bhavan Road, Ahmedabad - 380059',
+               .text('Brain Wire Block C, 11th Floor, Navratna Business Park, Near Sindhu Bhavan Road, Opp. GTPL House, Bodakdev, Ahmedabad - 380059',
                      ML, FTR_Y + 14, { width: CW, align: 'center' })
                .text('www.aerolens.net   hr@aerolens.net',
                      ML, FTR_Y + 26, { width: CW, align: 'center' });
@@ -383,7 +383,7 @@ function buildOfferLetterPdf(offer) {
         doc.font('Times-Roman').text('. You will be reporting to ', { continued: true });
         doc.font('Times-Bold').text(rmLine || '___________', { continued: true });
         doc.font('Times-Roman')
-           .text(' and our office located at 2nd Floor, Binori B Square III, Sindhu Bhavan Road, Ahmedabad - 380059',
+           .text(' and our office located at Brain Wire Block C, 11th Floor, Navratna Business Park, Near Sindhu Bhavan Road, Opp. GTPL House, Bodakdev, Ahmedabad - 380059',
                  { align: 'justify', lineGap: 0 });
         doc.moveDown(0.45);
 
@@ -455,23 +455,7 @@ function buildOfferLetterPdf(offer) {
         doc.font('Times-Roman')
            .text('. As discussed and agreed upon mutually during your interview process. Salary break-up is as below.',
                  { align: 'justify', lineGap: 0 });
-        doc.moveDown(0.4);
-
-        if (offer.variablePay != null && Number(offer.variablePay) > 0) {
-            doc.fontSize(10).font('Times-Roman').fillColor(BLACK)
-               .text('•  Variable Pay: ', ML + 14, doc.y, { continued: true, width: CW - 14, lineGap: 0 });
-            doc.font('Times-Bold').text(`${fmt(offer.variablePay)} ${compType}`);
-            doc.moveDown(0.4);
-        }
-
-        if (offer.joiningBonus != null && Number(offer.joiningBonus) > 0) {
-            doc.fontSize(10).font('Times-Roman').fillColor(BLACK)
-               .text('•  Joining Bonus: ', ML + 14, doc.y, { continued: true, width: CW - 14, lineGap: 0 });
-            doc.font('Times-Bold').text(fmt(offer.joiningBonus));
-            doc.moveDown(0.4);
-        }
-
-        doc.moveDown(0.1);
+        doc.moveDown(0.5);
 
         // Salary table
         const tableEndY = drawSalaryTable(doc.y);
