@@ -64,58 +64,91 @@ function fmtDate(d) {
     });
 }
 
-// ── Indian currency formatter (no Unicode ₹ — uses built-in PDF fonts) ───────
+// ── Currency helpers ──────────────────────────────────────────────────────────
 
-function fmtINR(n) {
+function getCurrencyPrefix(currencyName) {
+    const c = (currencyName || 'INR').trim().toUpperCase();
+    if (c === 'USD') return '$ ';
+    if (c === 'GBP') return '\xa3 ';   // £ — in Latin-1, safe with Times-Roman
+    if (c === 'EUR') return 'EUR ';    // € is not reliably in built-in PDF fonts
+    return 'Rs. ';                      // INR and all others
+}
+
+function fmtAmount(n, currencyName) {
     if (n === null || n === undefined || isNaN(Number(n))) return '--';
-    const rounded = Math.round(Number(n));
-    const abs     = Math.abs(rounded);
-    const s       = String(abs);
-    let formatted;
-    if (s.length <= 3) {
-        formatted = s;
-    } else {
-        let rest = s.slice(0, -3);
-        let tail = s.slice(-3);
-        while (rest.length > 2) {
-            tail = rest.slice(-2) + ',' + tail;
-            rest = rest.slice(0, -2);
+    const rounded  = Math.round(Number(n));
+    const abs      = Math.abs(rounded);
+    const prefix   = getCurrencyPrefix(currencyName);
+    const sign     = rounded < 0 ? '-' : '';
+    const c        = (currencyName || 'INR').trim().toUpperCase();
+
+    if (c === 'INR') {
+        // Indian grouping: last 3 digits, then groups of 2
+        const s = String(abs);
+        let formatted;
+        if (s.length <= 3) {
+            formatted = s;
+        } else {
+            let rest = s.slice(0, -3);
+            let tail = s.slice(-3);
+            while (rest.length > 2) {
+                tail = rest.slice(-2) + ',' + tail;
+                rest = rest.slice(0, -2);
+            }
+            formatted = rest + ',' + tail;
         }
-        formatted = rest + ',' + tail;
+        return prefix + sign + formatted;
     }
-    return 'Rs. ' + (rounded < 0 ? '-' : '') + formatted;
+    // Western grouping for all other currencies
+    return prefix + sign + abs.toLocaleString('en-US');
 }
 
 // ── Salary calculator ─────────────────────────────────────────────────────────
-// offeredCTCAmount is stored in LPA (e.g. 6 = 6 LPA = Rs. 6,00,000/year).
+// For INR + LPA (annual): amount treated as lakhs per annum.
+// For Hourly: amount × 160 hrs/month.
+// For Monthly: amount is already monthly.
+// Indian statutory components (PF, ESIC, PT, Gratuity) only applied for INR.
 
-function calcSalary(ctcLPA) {
-    if (!ctcLPA || Number(ctcLPA) <= 0) return null;
+function calcSalary(amount, currencyName, compensationTypeName) {
+    if (!amount || Number(amount) <= 0) return null;
 
-    const monthly = (Number(ctcLPA) * 100000) / 12;
+    const amt      = Number(amount);
+    const currency = (currencyName || 'INR').trim().toUpperCase();
+    const compType = (compensationTypeName || '').trim().toLowerCase();
+    const isINR    = currency === 'INR' || currency === '';
+
+    let monthly;
+    if (compType.includes('hour')) {
+        monthly = amt * 160;
+    } else if (compType.includes('month')) {
+        monthly = amt;
+    } else {
+        // Annual / LPA (default)
+        monthly = isINR ? (amt * 100000) / 12 : (amt * 1000) / 12;
+    }
 
     const basic = Math.round(monthly * 0.40);
     const hra   = Math.round(basic   * 0.50);
     const conv  = Math.round(basic   * 0.10);
     const gross = basic + hra + conv;
 
-    // Employer-side contributions
-    const epf_er   = Math.min(Math.round(basic * 0.12), 1800);
-    const esic_er  = gross <= 21000 ? Math.round(gross * 0.0325) : 0;
-    const sbonus   = gross <= 21000 ? Math.round(Math.min(basic, 7000) * 0.0833) : 0;
-    const gratuity = Math.round(basic * 0.0481);
+    // Indian statutory components — only for INR
+    const epf_er   = isINR ? Math.min(Math.round(basic * 0.12), 1800) : 0;
+    const esic_er  = (isINR && gross <= 21000) ? Math.round(gross * 0.0325) : 0;
+    const sbonus   = (isINR && gross <= 21000) ? Math.round(Math.min(basic, 7000) * 0.0833) : 0;
+    const gratuity = isINR ? Math.round(basic * 0.0481) : 0;
     const emp_b    = epf_er + esic_er + sbonus + gratuity;
     const tot_comp = gross + emp_b;
 
-    // Employee deductions
     const epf_ee  = epf_er;
-    const esic_ee = gross <= 21000 ? Math.round(gross * 0.0075) : 0;
-    const pt      = 200;
+    const esic_ee = (isINR && gross <= 21000) ? Math.round(gross * 0.0075) : 0;
+    const pt      = isINR ? 200 : 0;
     const tot_ded = epf_ee + esic_ee + pt;
     const net     = gross - tot_ded;
 
     const row = (m) => ({ m, y: m * 12 });
     return {
+        isINR,
         basic:    row(basic),
         hra:      row(hra),
         conv:     row(conv),
@@ -147,17 +180,20 @@ function buildOfferLetterPdf(offer) {
         const logoPath = getAsset('logo.png');
         const sigPath  = getAsset('signature.png');
 
-        const letterDate = fmtDate(new Date());
-        const startDate  = fmtDate(offer.joiningDate)    || '___________';
-        const signBefore = offer.signBeforeDate
+        const letterDate   = fmtDate(new Date());
+        const startDate    = fmtDate(offer.joiningDate)    || '___________';
+        const signBefore   = offer.signBeforeDate
             ? fmtDate(offer.signBeforeDate)
             : '___________';
-        const rmLine = [offer.reportingManagerName, offer.reportingManagerDesignation]
+        const rmLine       = [offer.reportingManagerName, offer.reportingManagerDesignation]
             .filter(Boolean).join(' – ');  // en-dash (in WinANSI)
-        const ctcDisplay = offer.offeredCTCAmount != null
-            ? `${offer.offeredCTCAmount} LPA`
+        const currencyName = (offer.currencyName || 'INR').trim();
+        const compType     = (offer.compensationTypeName || 'LPA').trim();
+        const ctcDisplay   = offer.offeredCTCAmount != null
+            ? `${offer.offeredCTCAmount} ${currencyName} ${compType}`
             : 'As discussed';
-        const salary = calcSalary(offer.offeredCTCAmount);
+        const salary       = calcSalary(offer.offeredCTCAmount, currencyName, compType);
+        const fmt          = (n) => fmtAmount(n, currencyName);
 
         // ── Drawing primitives ────────────────────────────────────────────────
 
@@ -268,28 +304,28 @@ function buildOfferLetterPdf(offer) {
             tRow('Particulars', 'Monthly', 'Yearly', { hdr: true });
 
             if (s) {
-                tRow('Basic Wage',             fmtINR(s.basic.m),    fmtINR(s.basic.y));
-                tRow('HRA',                    fmtINR(s.hra.m),      fmtINR(s.hra.y));
-                tRow('Conveyance Allowance',   fmtINR(s.conv.m),     fmtINR(s.conv.y));
-                tRow('Gross Salary (A)',        fmtINR(s.gross.m),    fmtINR(s.gross.y),    { bold: true });
+                tRow('Basic Wage',             fmt(s.basic.m),    fmt(s.basic.y));
+                tRow('HRA',                    fmt(s.hra.m),      fmt(s.hra.y));
+                tRow('Conveyance Allowance',   fmt(s.conv.m),     fmt(s.conv.y));
+                tRow('Gross Salary (A)',        fmt(s.gross.m),    fmt(s.gross.y),    { bold: true });
                 tRow('Employer Contributions (B)', '', '',            { bold: true });
-                tRow("Employers' Contribution - Provident Fund", fmtINR(s.epf_er.m),   fmtINR(s.epf_er.y));
+                tRow("Employers' Contribution - Provident Fund", fmt(s.epf_er.m),   fmt(s.epf_er.y));
                 tRow("Employers' Contribution - ESIC",
-                     s.esic_er.m ? fmtINR(s.esic_er.m) : 'N/A',
-                     s.esic_er.y ? fmtINR(s.esic_er.y) : 'N/A');
+                     s.esic_er.m ? fmt(s.esic_er.m) : 'N/A',
+                     s.esic_er.y ? fmt(s.esic_er.y) : 'N/A');
                 tRow('Statutory Bonus',
-                     s.sbonus.m ? fmtINR(s.sbonus.m) : 'N/A',
-                     s.sbonus.y ? fmtINR(s.sbonus.y) : 'N/A');
-                tRow('Gratuity*',              fmtINR(s.gratuity.m), fmtINR(s.gratuity.y));
-                tRow('Total Compensation & Benefits (A+B)', fmtINR(s.tot_comp.m), fmtINR(s.tot_comp.y), { bold: true });
+                     s.sbonus.m ? fmt(s.sbonus.m) : 'N/A',
+                     s.sbonus.y ? fmt(s.sbonus.y) : 'N/A');
+                tRow('Gratuity*',              fmt(s.gratuity.m), fmt(s.gratuity.y));
+                tRow('Total Compensation & Benefits (A+B)', fmt(s.tot_comp.m), fmt(s.tot_comp.y), { bold: true });
                 tRow('Deductions', '', '',     { bold: true });
-                tRow('Employee Contribution - Provident Fund', fmtINR(s.epf_ee.m), fmtINR(s.epf_ee.y));
+                tRow('Employee Contribution - Provident Fund', fmt(s.epf_ee.m), fmt(s.epf_ee.y));
                 tRow('Employee Contribution - ESIC',
-                     s.esic_ee.m ? fmtINR(s.esic_ee.m) : 'N/A',
-                     s.esic_ee.y ? fmtINR(s.esic_ee.y) : 'N/A');
-                tRow('Professional Tax',       fmtINR(s.pt.m),       fmtINR(s.pt.y));
-                tRow('Total Deductions',       fmtINR(s.tot_ded.m),  fmtINR(s.tot_ded.y),  { bold: true });
-                tRow('Net Pay',                fmtINR(s.net.m),      fmtINR(s.net.y),       { bold: true });
+                     s.esic_ee.m ? fmt(s.esic_ee.m) : 'N/A',
+                     s.esic_ee.y ? fmt(s.esic_ee.y) : 'N/A');
+                tRow('Professional Tax',       fmt(s.pt.m),       fmt(s.pt.y));
+                tRow('Total Deductions',       fmt(s.tot_ded.m),  fmt(s.tot_ded.y),  { bold: true });
+                tRow('Net Pay',                fmt(s.net.m),      fmt(s.net.y),       { bold: true });
             } else {
                 ['Basic Wage', 'HRA', 'Conveyance Allowance'].forEach((l) => tRow(l, '', ''));
                 tRow('Gross Salary (A)', '', '', { bold: true });
@@ -419,7 +455,23 @@ function buildOfferLetterPdf(offer) {
         doc.font('Times-Roman')
            .text('. As discussed and agreed upon mutually during your interview process. Salary break-up is as below.',
                  { align: 'justify', lineGap: 0 });
-        doc.moveDown(0.5);
+        doc.moveDown(0.4);
+
+        if (offer.variablePay != null && Number(offer.variablePay) > 0) {
+            doc.fontSize(10).font('Times-Roman').fillColor(BLACK)
+               .text('•  Variable Pay: ', ML + 14, doc.y, { continued: true, width: CW - 14, lineGap: 0 });
+            doc.font('Times-Bold').text(`${fmt(offer.variablePay)} ${compType}`);
+            doc.moveDown(0.4);
+        }
+
+        if (offer.joiningBonus != null && Number(offer.joiningBonus) > 0) {
+            doc.fontSize(10).font('Times-Roman').fillColor(BLACK)
+               .text('•  Joining Bonus: ', ML + 14, doc.y, { continued: true, width: CW - 14, lineGap: 0 });
+            doc.font('Times-Bold').text(fmt(offer.joiningBonus));
+            doc.moveDown(0.4);
+        }
+
+        doc.moveDown(0.1);
 
         // Salary table
         const tableEndY = drawSalaryTable(doc.y);
