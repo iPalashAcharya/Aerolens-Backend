@@ -113,6 +113,9 @@ async function startServer() {
             'http://localhost:5173',
             'http://127.0.0.1:5173',
             'http://localhost:3000',
+            'https://aerolensportal.net',
+            'https://www.aerolensportal.net',
+            'https://test.aerolensportal.net',
             process.env.FRONTEND_URL
         ];
 
