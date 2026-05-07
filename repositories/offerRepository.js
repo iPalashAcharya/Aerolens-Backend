@@ -11,11 +11,11 @@ class OfferRepository {
             const query = `
             INSERT INTO offer (
                 candidateId, jobProfileRequirementId, vendorId, reportingManagerId,
-                employmentTypeLookupId, workModelLookupId, joiningDate, offeredCTCAmount,
+                employmentTypeLookupId, workModelLookupId, joiningDate, sign_before_date, offeredCTCAmount,
                 currencyLookupId, compensationTypeLookupId, variablePay, joiningBonus,
                 offerLetterSent, serviceAgreementSent, ndaSent, codeOfConductSent,
                 offerStatus, offerVersion, createdBy
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             const [result] = await connection.execute(query, [
                 offerData.candidateId,
@@ -25,6 +25,7 @@ class OfferRepository {
                 offerData.employmentTypeLookupId,
                 offerData.workModelLookupId,
                 offerData.joiningDate,
+                offerData.sign_before_date ?? null,
                 offerData.offeredCTCAmount ?? null,
                 offerData.currencyLookupId ?? null,
                 offerData.compensationTypeLookupId ?? null,
@@ -249,6 +250,7 @@ class OfferRepository {
                     o.currencyLookupId, o.compensationTypeLookupId, o.variablePay, o.joiningBonus,
                     o.offerLetterSent, o.serviceAgreementSent, o.ndaSent, o.codeOfConductSent,
                     o.offerStatus, o.offerVersion, o.createdBy, o.createdAt, o.updatedAt,
+                    o.sign_before_date AS signBeforeDate,
                     c.candidateName,
                     jp.jobRole,
                     let.value AS employmentTypeName,
@@ -258,6 +260,7 @@ class OfferRepository {
                     lcomp.value AS compensationTypeName,
                     m.memberName AS createdByName,
                     rm.memberName AS reportingManagerName,
+                    rm_desig.value AS reportingManagerDesignation,
                     DATE_FORMAT(o.createdAt, '%Y-%m-%dT%H:%i:%sZ') AS createdAtFormatted
                  FROM offer o
                  LEFT JOIN candidate c ON c.candidateId = o.candidateId
@@ -270,6 +273,7 @@ class OfferRepository {
                  LEFT JOIN lookup lcomp ON lcomp.lookupKey = o.compensationTypeLookupId AND lcomp.tag = 'compensationType'
                  LEFT JOIN member m ON m.memberId = o.createdBy
                  LEFT JOIN member rm ON rm.memberId = o.reportingManagerId
+                 LEFT JOIN lookup rm_desig ON rm_desig.lookupKey = rm.designation AND rm_desig.tag = 'designation'
                  WHERE o.offerId = ? AND o.isDeleted = 0`,
                 [offerId]
             );

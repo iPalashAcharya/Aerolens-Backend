@@ -19,6 +19,11 @@ const offerSchemas = {
                 'string.pattern.base': 'Joining date must be YYYY-MM-DD',
                 'any.required': 'Joining date is required'
             }),
+        sign_before_date: Joi.string()
+            .pattern(/^\d{4}-\d{2}-\d{2}$/)
+            .optional()
+            .allow(null, '')
+            .messages({ 'string.pattern.base': 'Sign before date must be YYYY-MM-DD' }),
         offeredCTCAmount: Joi.number().min(1).optional().allow(null),
         currencyLookupId: Joi.number().integer().positive().optional().allow(null),
         compensationTypeLookupId: Joi.number().integer().positive().optional().allow(null),
