@@ -21,13 +21,6 @@ function resolveDocType(employmentTypeName) {
 
 // ─── Prompt builder ───────────────────────────────────────────────────────────
 
-const DATE_PLACEHOLDER = new Date().toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC',
-});
-
 function formatUtcDate(date) {
     return date.toLocaleDateString('en-GB', {
         day: 'numeric',
@@ -37,7 +30,7 @@ function formatUtcDate(date) {
     });
 }
 
-function buildPrompt(docType, offer) {
+function buildPrompt(docType, offer, letterDate) {
     const {
         candidateName = 'Candidate',
         jobRole = 'Position',
@@ -70,13 +63,10 @@ function buildPrompt(docType, offer) {
     if (docType === 'offer_letter') {
         return `You are a professional HR document writer. Generate a complete, formal Offer Letter.
 Output ONLY the letter text — no JSON, no markdown fences, no preamble, no commentary.
-CRITICAL DATE RULES — FOLLOW EXACTLY:
-1. For the letter date in the letterhead, write the exact token ${DATE_PLACEHOLDER} — do not substitute any date.
-2. Do NOT invent, guess, or include any other dates anywhere in the letter.
-3. The only real date you may use is the Joining Date provided below.
+Do NOT invent or include any dates other than the ones explicitly provided below.
 
 Details:
-- Letter Date: ${DATE_PLACEHOLDER}
+- Letter Date: ${letterDate}
 - Candidate: ${candidateName}
 - Role: ${jobRole}
 - Company: ${company}
@@ -86,7 +76,7 @@ Details:
 - Offered CTC: ${ctcLine || 'As discussed'}${variablePay ? `\n- Variable Pay: ${variablePay} ${currencyName || ''}` : ''}${joiningBonus ? `\n- Joining Bonus: ${joiningBonus} ${currencyName || ''}` : ''}
 
 Structure the letter with these sections (use plain text, no markdown):
-1. Company letterhead block (company name, then "Date: ${DATE_PLACEHOLDER}")
+1. Company letterhead block (company name, then "Date: ${letterDate}")
 2. Addressee block (candidate name and greeting)
 3. Offer paragraph — role, CTC, joining date
 4. Terms summary — work arrangement, reporting line
@@ -98,13 +88,10 @@ Tone: professional, warm, legally appropriate. Keep it under two pages.`;
 
     return `You are a professional HR document writer. Generate a complete, formal Service Agreement for an independent consultant.
 Output ONLY the agreement text — no JSON, no markdown fences, no preamble, no commentary.
-CRITICAL DATE RULES — FOLLOW EXACTLY:
-1. For the agreement date, write the exact token ${DATE_PLACEHOLDER} — do not substitute any date.
-2. Do NOT invent, guess, or include any other dates anywhere in the agreement.
-3. The only real date you may use is the Engagement Start Date provided below.
+Do NOT invent or include any dates other than the ones explicitly provided below.
 
 Details:
-- Agreement Date: ${DATE_PLACEHOLDER}
+- Agreement Date: ${letterDate}
 - Consultant: ${candidateName}
 - Engagement Role: ${jobRole}
 - Client Company: ${company}${vendorName ? `\n- Vendor/Agency: ${vendorName}` : ''}
@@ -113,7 +100,7 @@ Details:
 - Agreed Rate: ${ctcLine || 'As discussed'}${variablePay ? `\n- Performance Bonus: ${variablePay} ${currencyName || ''}` : ''}
 
 Structure the agreement with these numbered sections (plain text, no markdown):
-1. TITLE: SERVICE AGREEMENT (then "Date: ${DATE_PLACEHOLDER}")
+1. TITLE: SERVICE AGREEMENT (then "Date: ${letterDate}")
 2. Parties (Client and Consultant/Vendor)
 3. Scope of Services
 4. Term and Start Date
@@ -253,17 +240,15 @@ async function generateOnboardingDocument(offerDetails, generatedBy) {
     }
 
     const generatedAt = new Date();
-    console.log('[onboardingDoc] generatedAt:', generatedAt.toISOString());
+    const formattedDate = formatUtcDate(generatedAt);
 
     const title = docType === 'offer_letter' ? 'OFFER LETTER' : 'SERVICE AGREEMENT';
-    const prompt = buildPrompt(docType, offerDetails);
+    const prompt = buildPrompt(docType, offerDetails, formattedDate);
     const rawText = await callOpenRouter(prompt);
-    const formattedDate = formatUtcDate(generatedAt);
     const documentText = rawText
-        .replaceAll(DATE_PLACEHOLDER, formattedDate)
-        // "Date: <anything>" lines
+        // "Date: <anything>" lines — enforce correct date in case AI drifts
         .replace(/^[ \t]*Date:[ \t]*.*/gim, `Date: ${formattedDate}`)
-        // bare date lines the AI writes without a "Date:" prefix (e.g. "2 April 2025")
+        // bare date lines with no prefix (e.g. "6 May 2025" on its own line)
         .replace(/^[ \t]*\d{1,2}\s+[A-Za-z]+\s+\d{4}[ \t]*$/gm, `Date: ${formattedDate}`)
         // strip hallucinated "by <date>" / "on or before <date>" deadline phrases
         .replace(/\s+(on or before|by)\s+\d{1,2}\s+[A-Za-z]+\s+\d{4}\b/gi, '');
