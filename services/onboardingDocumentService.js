@@ -256,8 +256,8 @@ function buildOfferLetterPdf(offer) {
 
         function drawHeader() {
             const logoSrc  = fs.existsSync(BRAND_LOGO) ? BRAND_LOGO : logoPath;
-            const maxW     = CW;                        // full content width
-            const maxH     = HDR_LINE_Y - HDR_Y - 14;  // header height minus padding
+            const maxW     = CW * 0.7;                  // 70% of content width
+            const maxH     = HDR_LINE_Y - HDR_Y - 20;  // header height minus padding
             if (logoSrc) {
                 // fit keeps aspect ratio; align:'center' centres within [ML, ML+maxW]
                 doc.image(logoSrc, ML, HDR_Y + 7, { fit: [maxW, maxH], align: 'center', valign: 'center' });
