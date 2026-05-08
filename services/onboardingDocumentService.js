@@ -492,17 +492,38 @@ function buildOfferLetterPdf(offer) {
         doc.moveDown(0.4);
 
         if (offer.variablePay != null && Number(offer.variablePay) > 0) {
+            const vpDisplay = fmtCtcDisplay(offer.variablePay, currencyName, compType);
+            // Bullet line: • Variable Pay: [amount]
             doc.fontSize(10).font('Times-Roman').fillColor(BLACK)
                .text('•  Variable Pay: ', ML + 14, doc.y, { continued: true, width: CW - 14, lineGap: 0 });
-            doc.font('Times-Bold').text(fmtCtcDisplay(offer.variablePay, currencyName, compType));
-            doc.moveDown(0.4);
+            doc.font('Times-Bold').text(vpDisplay);
+            doc.moveDown(0.25);
+            // Clause paragraph
+            doc.fontSize(10).font('Times-Roman').fillColor(BLACK)
+               .text(
+                   `A total of ${vpDisplay} will be allocated as variable pay, which will be disbursed in ` +
+                   'two equal installments. 50% after six months and the remaining 50% in the following six ' +
+                   'months. The disbursement will be subject to overall company performance and is at the sole ' +
+                   'discretion of the management.',
+                   ML + 14, doc.y, { width: CW - 14, align: 'justify', lineGap: 0 });
+            doc.moveDown(0.45);
         }
 
         if (offer.joiningBonus != null && Number(offer.joiningBonus) > 0) {
+            const jbDisplay = fmt(offer.joiningBonus);
+            // Bullet line: • Joining Bonus: [amount]
             doc.fontSize(10).font('Times-Roman').fillColor(BLACK)
                .text('•  Joining Bonus: ', ML + 14, doc.y, { continued: true, width: CW - 14, lineGap: 0 });
-            doc.font('Times-Bold').text(fmt(offer.joiningBonus));
-            doc.moveDown(0.4);
+            doc.font('Times-Bold').text(jbDisplay);
+            doc.moveDown(0.25);
+            // Clause paragraph
+            doc.fontSize(10).font('Times-Roman').fillColor(BLACK)
+               .text(
+                   `A one-time joining bonus of ${jbDisplay} will be extended as a token of appreciation for ` +
+                   'choosing to join our team. This gesture reflects our commitment to recognizing talent and ' +
+                   'welcoming you onboard with encouragement and support. This will be added in the first month payroll.',
+                   ML + 14, doc.y, { width: CW - 14, align: 'justify', lineGap: 0 });
+            doc.moveDown(0.45);
         }
 
         doc.moveDown(0.1);
