@@ -184,8 +184,9 @@ function calcSalary(amount, currencyName, compensationTypeName) {
 
     const annualGross    = annualCTC - annualPF_er - annualGratuity - annualESIC_er;
     const monthlyGross   = Math.round(annualGross / 12);
-    const annualConv     = annualGross - annualBasic - annualHRA;  // Conveyance — exact balancing
-    const monthlyConv    = monthlyGross - basicM - hraM;           // monthly balancing
+    // Conveyance = Total CTC − Basic − HRA − Employer PF − Employer ESIC − Statutory Bonus − Gratuity
+    const annualConv     = annualCTC - annualBasic - annualHRA - annualPF_er - annualESIC_er - annualGratuity;
+    const monthlyConv    = Math.round(annualConv / 12);
 
     // Total Compensation (A+B): yearly = exact CTC entered, monthly = round(CTC/12)
     const monthlyTotComp = Math.round(annualCTC / 12);
