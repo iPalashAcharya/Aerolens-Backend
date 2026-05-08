@@ -39,7 +39,6 @@ const FTR_Y      = 791;                  // footer text top
 
 const BLACK    = '#000000';
 const DGRAY    = '#444444';
-const LGRAY    = '#888888';
 const RULE_CLR = '#BBBBBB';
 const TBL_HDR  = '#FFC000';   // amber — matches original template header row
 const TBL_BOLD = '#E0E0E0';   // light grey for sub-header rows
@@ -47,12 +46,17 @@ const TBL_BORD = '#AAAAAA';
 
 // ── Assets ────────────────────────────────────────────────────────────────────
 
-const ASSETS_DIR = path.join(__dirname, '../assets');
+const ASSETS_DIR   = path.join(__dirname, '../assets');
+const BRAND_LOGO   = path.join(__dirname, '../../AerolensApp/src/assets/Logo and name without background 2.png');
 
 function getAsset(name) {
     const p = path.join(ASSETS_DIR, name);
     return fs.existsSync(p) ? p : null;
 }
+
+// ── Body font size ────────────────────────────────────────────────────────────
+
+const BODY_SZ = 10.5;
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -250,19 +254,15 @@ function buildOfferLetterPdf(offer) {
         }
 
         function drawHeader() {
-            if (logoPath) {
-                doc.image(logoPath, ML, HDR_Y, { width: 110 });
+            const lw      = 200;
+            const logoX   = (PAGE_W - lw) / 2;
+            const logoSrc = fs.existsSync(BRAND_LOGO) ? BRAND_LOGO : logoPath;
+            if (logoSrc) {
+                doc.image(logoSrc, logoX, HDR_Y + 8, { width: lw });
             } else {
                 doc.fontSize(20).font('Times-Bold').fillColor('#1a1a6e')
-                   .text('aerolens', ML, HDR_Y + 6);
+                   .text('aerolens', ML, HDR_Y + 20, { width: CW, align: 'center' });
             }
-            doc.fontSize(7.5).font('Times-Roman').fillColor(LGRAY)
-               .text('Aerolens India Private Limited',
-                     ML, HDR_Y + 2,  { width: CW, align: 'right' })
-               .text('Brain Wire Block C, 11th Floor, Navratna Business Park, Near Sindhu Bhavan Road, Opp. GTPL House, Bodakdev, Ahmedabad - 380059',
-                     ML, HDR_Y + 13, { width: CW, align: 'right' })
-               .text('www.aerolens.net  hr@aerolens.net',
-                     ML, HDR_Y + 24, { width: CW, align: 'right' });
             hRule(HDR_LINE_Y);
         }
 
@@ -288,7 +288,7 @@ function buildOfferLetterPdf(offer) {
 
         // Write a paragraph from the current doc.y; updates doc.y on exit.
         function para(text, opts = {}) {
-            doc.fontSize(opts.size || 10)
+            doc.fontSize(opts.size || BODY_SZ)
                .font(opts.bold ? 'Times-Bold' : 'Times-Roman')
                .fillColor(BLACK)
                .text(text, ML, doc.y, {
@@ -296,26 +296,26 @@ function buildOfferLetterPdf(offer) {
                    align: opts.align || 'justify',
                    lineGap: 0,
                });
-            doc.moveDown(opts.gap !== undefined ? opts.gap : 0.45);
+            doc.moveDown(opts.gap !== undefined ? opts.gap : 0.3);
         }
 
         // Bullet point using a drawn circle (avoids Unicode glyph issues).
         function bullet(text) {
             const y0     = doc.y;
             const indent = 18;
-            doc.circle(ML + indent - 11, y0 + 5.5, 2.2).fill(BLACK);
-            doc.fillColor(BLACK).fontSize(10).font('Times-Roman')
+            doc.circle(ML + indent - 11, y0 + 6, 2.2).fill(BLACK);
+            doc.fillColor(BLACK).fontSize(BODY_SZ).font('Times-Roman')
                .text(text, ML + indent, y0, { width: CW - indent, align: 'justify', lineGap: 0 });
-            doc.moveDown(0.4);
+            doc.moveDown(0.25);
         }
 
         // Inline "Bold label: " + normal body text on the same paragraph.
         function labelPara(boldLabel, normalText) {
-            doc.fontSize(10).font('Times-Bold').fillColor(BLACK)
+            doc.fontSize(BODY_SZ).font('Times-Bold').fillColor(BLACK)
                .text(boldLabel, ML, doc.y, { width: CW, continued: true, lineGap: 0 });
             doc.font('Times-Roman')
                .text(normalText, { align: 'justify', lineGap: 0 });
-            doc.moveDown(0.45);
+            doc.moveDown(0.3);
         }
 
         // ── Salary table ──────────────────────────────────────────────────────
@@ -393,19 +393,19 @@ function buildOfferLetterPdf(offer) {
         newPage();
 
         // Date
-        doc.fontSize(10).font('Times-Bold').fillColor(BLACK)
+        doc.fontSize(BODY_SZ).font('Times-Bold').fillColor(BLACK)
            .text(`Date: ${letterDate}`, ML, doc.y);
-        doc.moveDown(0.8);
+        doc.moveDown(0.5);
 
         // Centred underlined heading
-        doc.fontSize(10).font('Times-Bold').fillColor(BLACK)
+        doc.fontSize(BODY_SZ).font('Times-Bold').fillColor(BLACK)
            .text('Offer Letter', ML, doc.y, { width: CW, align: 'center', underline: true });
-        doc.moveDown(0.9);
+        doc.moveDown(0.5);
 
         // Greeting
-        doc.fontSize(10).font('Times-Roman').fillColor(BLACK)
+        doc.fontSize(BODY_SZ).font('Times-Roman').fillColor(BLACK)
            .text(`Dear ${offer.candidateName || '___________'},`, ML, doc.y);
-        doc.moveDown(0.55);
+        doc.moveDown(0.35);
 
         // Opening paragraph
         para(
@@ -417,17 +417,17 @@ function buildOfferLetterPdf(offer) {
         );
 
         // Employment start paragraph — inline bold placeholders
-        doc.fontSize(10).font('Times-Roman').fillColor(BLACK)
+        doc.fontSize(BODY_SZ).font('Times-Roman').fillColor(BLACK)
            .text('Your employment will begin on ', ML, doc.y, { continued: true, width: CW, lineGap: 0 });
         doc.font('Times-Bold').text(startDate, { continued: true });
         doc.font('Times-Roman').text(' and your work location will be ', { continued: true });
         doc.font('Times-Bold').text(offer.workModeName || '___________', { continued: true });
         doc.font('Times-Roman').text('. You will be reporting to ', { continued: true });
-        doc.font('Times-Bold').text(rmLine || '___________', { continued: true });
+        doc.font('Times-Bold').text((rmLine || '___________') + ' ', { continued: true });
         doc.font('Times-Roman')
-           .text(' and our office located at Brain Wire Block C, 11th Floor, Navratna Business Park, Near Sindhu Bhavan Road, Opp. GTPL House, Bodakdev, Ahmedabad - 380059',
+           .text('and our office located at Brain Wire Block C, 11th Floor, Navratna Business Park, Near Sindhu Bhavan Road, Opp. GTPL House, Bodakdev, Ahmedabad - 380059',
                  { align: 'justify', lineGap: 0 });
-        doc.moveDown(0.45);
+        doc.moveDown(0.3);
 
         // Working Schedule
         labelPara('Working Schedule: ',
@@ -439,7 +439,7 @@ function buildOfferLetterPdf(offer) {
             'is committed to fostering a performance-driven culture while supporting a healthy work-life balance.');
 
         // Probation
-        doc.fontSize(10).font('Times-Bold').fillColor(BLACK)
+        doc.fontSize(BODY_SZ).font('Times-Bold').fillColor(BLACK)
            .text('Probation: ', ML, doc.y, { continued: true, width: CW, lineGap: 0 });
         doc.font('Times-Roman').text('Your ', { continued: true });
         doc.font('Times-Bold').text('90 days', { continued: true });
@@ -453,10 +453,10 @@ function buildOfferLetterPdf(offer) {
                'If not communicated otherwise, after completion of the stipulated probation period, you will ' +
                'automatically be converted into a confirmed employee.',
                { align: 'justify', lineGap: 0 });
-        doc.moveDown(0.45);
+        doc.moveDown(0.3);
 
         // Separation
-        doc.fontSize(10).font('Times-Bold').fillColor(BLACK)
+        doc.fontSize(BODY_SZ).font('Times-Bold').fillColor(BLACK)
            .text('Separation: ', ML, doc.y, { continued: true, width: CW, lineGap: 0 });
         doc.font('Times-Roman').text('A minimum of ', { continued: true });
         doc.font('Times-Bold').text('3 (three) months\' notice period', { continued: true });
@@ -468,7 +468,7 @@ function buildOfferLetterPdf(offer) {
                'the purpose of the notice period means total cost to the company (CTC). In case of incomplete ' +
                'assignment, the company has the discretion to relieve you only at the end of 3 months\' notice period.',
                { align: 'justify', lineGap: 0 });
-        doc.moveDown(0.45);
+        doc.moveDown(0.3);
 
         bullet('During the probation period, employees are required to give a minimum of 4 (Four) weeks\' notice period before separation.');
         bullet('Our compensation and benefit package or any discussion of the same is not a commitment that your employment will have a minimum or a fixed term or that it is terminable only for a cause. No promises can be expressed or implied by anyone, that your employment is for any minimum or fixed term or that cause is required for the termination of the employment relationship. By signing below, you acknowledge that your employment at the Company is for an unspecified duration, and neither this letter, nor your acceptance thereof, constitutes a contract for employment.');
@@ -492,49 +492,53 @@ function buildOfferLetterPdf(offer) {
         para('Compensation and Benefits:', { bold: true, align: 'left', gap: 0.3 });
 
         // CTC line
-        doc.fontSize(10).font('Times-Roman').fillColor(BLACK)
+        doc.fontSize(BODY_SZ).font('Times-Roman').fillColor(BLACK)
            .text('•  Total CTC ', ML + 14, doc.y, { continued: true, width: CW - 14, lineGap: 0 });
         doc.font('Times-Bold').text(ctcDisplay, { continued: true });
         doc.font('Times-Roman')
            .text('. As discussed and agreed upon mutually during your interview process. Salary break-up is as below.',
                  { align: 'justify', lineGap: 0 });
-        doc.moveDown(0.4);
+        doc.moveDown(0.3);
 
         if (offer.variablePay != null && Number(offer.variablePay) > 0) {
             const vpDisplay = fmtCtcDisplay(offer.variablePay, currencyName, compType);
-            doc.fontSize(10).font('Times-Roman').fillColor(BLACK)
+            doc.fontSize(BODY_SZ).font('Times-Bold').fillColor(BLACK)
+               .text('Variable Pay: ', ML + 14, doc.y, { continued: true, width: CW - 14, lineGap: 0 });
+            doc.font('Times-Roman')
                .text(
                    `A total of ${vpDisplay} will be allocated as variable pay, which will be disbursed in ` +
                    'two equal installments. 50% after six months and the remaining 50% in the following six ' +
                    'months. The disbursement will be subject to overall company performance and is at the sole ' +
                    'discretion of the management.',
-                   ML + 14, doc.y, { width: CW - 14, align: 'justify', lineGap: 0 });
-            doc.moveDown(0.45);
+                   { align: 'justify', lineGap: 0 });
+            doc.moveDown(0.3);
         }
 
         if (offer.joiningBonus != null && Number(offer.joiningBonus) > 0) {
             const jbDisplay = fmt(offer.joiningBonus);
-            doc.fontSize(10).font('Times-Roman').fillColor(BLACK)
+            doc.fontSize(BODY_SZ).font('Times-Bold').fillColor(BLACK)
+               .text('Joining Bonus Clause: ', ML + 14, doc.y, { continued: true, width: CW - 14, lineGap: 0 });
+            doc.font('Times-Roman')
                .text(
                    `A one-time joining bonus of ${jbDisplay} will be extended as a token of appreciation for ` +
                    'choosing to join our team. This gesture reflects our commitment to recognizing talent and ' +
                    'welcoming you onboard with encouragement and support. This will be added in the first month payroll.',
-                   ML + 14, doc.y, { width: CW - 14, align: 'justify', lineGap: 0 });
-            doc.moveDown(0.45);
+                   { align: 'justify', lineGap: 0 });
+            doc.moveDown(0.3);
         }
 
         doc.moveDown(0.1);
 
         // Salary table
         const tableEndY = drawSalaryTable(doc.y);
-        doc.y = tableEndY + 5;
+        doc.y = tableEndY + 3;
 
         doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
            .text('* Subject to applicability.', ML, doc.y);
-        doc.moveDown(0.6);
+        doc.moveDown(0.35);
 
         // Obligatory Deductions
-        doc.fontSize(10).font('Times-Roman').fillColor(BLACK)
+        doc.fontSize(BODY_SZ).font('Times-Roman').fillColor(BLACK)
            .text('•  ', ML + 14, doc.y, { continued: true, width: CW - 14, lineGap: 0 });
         doc.font('Times-Bold').text('Obligatory Deductions. ', { continued: true });
         doc.font('Times-Roman')
@@ -547,10 +551,10 @@ function buildOfferLetterPdf(offer) {
                'Bonus / Statutory Bonus, if applicable as per The Payment of Bonus Act, 1965, shall be paid ' +
                'in 12 equal monthly instalments in advance.',
                { align: 'justify', lineGap: 0 });
-        doc.moveDown(0.45);
+        doc.moveDown(0.3);
 
         // Benefits
-        doc.fontSize(10).font('Times-Roman').fillColor(BLACK)
+        doc.fontSize(BODY_SZ).font('Times-Roman').fillColor(BLACK)
            .text('•  ', ML + 14, doc.y, { continued: true, width: CW - 14, lineGap: 0 });
         doc.font('Times-Bold').text('Benefits. ', { continued: true });
         doc.font('Times-Roman')
@@ -558,13 +562,13 @@ function buildOfferLetterPdf(offer) {
                'As an employee, in addition to your compensation package, you will also be eligible to receive ' +
                'the benefits which are offered to all Company employees, as described below:',
                { align: 'justify', lineGap: 0 });
-        doc.moveDown(0.45);
+        doc.moveDown(0.3);
 
-        doc.fontSize(10).font('Times-Roman').fillColor(BLACK)
+        doc.fontSize(BODY_SZ).font('Times-Roman').fillColor(BLACK)
            .text('A.  You are eligible for paid leaves as follows which will begin to earn immediately after ' +
                'joining and accrue monthly (total leave equally divided in 12 months)',
                ML + 22, doc.y, { width: CW - 22, align: 'justify', lineGap: 0 });
-        doc.moveDown(0.5);
+        doc.moveDown(0.3);
 
         para('Additional Leaves', { bold: true, align: 'center', gap: 0.3 });
 
@@ -587,7 +591,7 @@ function buildOfferLetterPdf(offer) {
                .text(val,   ML + lc0 + 4, lY + 4, { width: lc1 - 8, lineBreak: false });
             lY += 16;
         });
-        doc.y = lY + 8;
+        doc.y = lY + 4;
 
         // ════════════════════════════════════════════════════════════════════
         // PAGE 3
@@ -603,7 +607,7 @@ function buildOfferLetterPdf(offer) {
         {
             const y0 = doc.y;
             doc.circle(ML + 7, y0 + 5.5, 2.2).fill(BLACK);
-            doc.fillColor(BLACK).fontSize(10).font('Times-Roman')
+            doc.fillColor(BLACK).fontSize(BODY_SZ).font('Times-Roman')
                .text(
                    'The Offer letter is issued / enclosed in duplicate, please sign the duplicate copy in ' +
                    'acknowledgment of your acceptance of the above stated terms and conditions and return to us by ',
@@ -612,7 +616,7 @@ function buildOfferLetterPdf(offer) {
             doc.font('Times-Roman')
                .text(' after which the offer stands automatically withdrawn.',
                      { align: 'justify', lineGap: 0 });
-            doc.moveDown(0.55);
+            doc.moveDown(0.3);
         }
 
         para(
@@ -632,7 +636,7 @@ function buildOfferLetterPdf(offer) {
         doc.moveDown(0.2);
 
         // Reporting Date
-        doc.fontSize(10).font('Times-Bold').fillColor(BLACK)
+        doc.fontSize(BODY_SZ).font('Times-Bold').fillColor(BLACK)
            .text('Reporting Date: ', ML, doc.y, { continued: true, width: CW, lineGap: 0 });
         doc.font('Times-Roman')
            .text('This appointment will take effect from the date of joining duty, which shall not be later than ',
@@ -641,22 +645,22 @@ function buildOfferLetterPdf(offer) {
         doc.font('Times-Roman')
            .text('. It is the company\'s discretion to change the joining date based on mutual agreement between company and candidate.',
                  { align: 'justify', lineGap: 0 });
-        doc.moveDown(0.55);
+        doc.moveDown(0.35);
 
         para('Should you have any questions about joining the Company, please do not hesitate to contact the undersigned.');
 
-        doc.fontSize(10).font('Times-Roman').fillColor(BLACK)
+        doc.fontSize(BODY_SZ).font('Times-Roman').fillColor(BLACK)
            .text('We are excited about the opportunity to work with you at ', ML, doc.y, { continued: true, lineGap: 0 });
         doc.font('Times-Bold').text('Aerolens India Pvt Ltd');
-        doc.moveDown(0.7);
+        doc.moveDown(0.4);
 
         para('Sincerely,', { align: 'left', gap: 0.2 });
 
         if (sigPath) {
             doc.image(sigPath, ML, doc.y, { width: 170 });
-            doc.moveDown(0.5);
+            doc.moveDown(0.3);
         } else {
-            doc.moveDown(3);
+            doc.moveDown(2.5);
         }
 
         para('Bhavin Trivedi', { bold: true, align: 'left', gap: 0.1 });
@@ -669,7 +673,7 @@ function buildOfferLetterPdf(offer) {
 
         para('Acknowledgement:', { bold: true, align: 'left', gap: 0.5 });
 
-        doc.fontSize(10).font('Times-Roman').fillColor(BLACK)
+        doc.fontSize(BODY_SZ).font('Times-Roman').fillColor(BLACK)
            .text(
                'I have read and accepted the terms and conditions outlined above. I agree to keep the terms of ' +
                'this letter confidential. As desired, I shall join services w.e.f. ',
@@ -680,7 +684,7 @@ function buildOfferLetterPdf(offer) {
         para('Name:', { bold: true, align: 'left', gap: 1.4 });
 
         // Signature / Date line
-        doc.fontSize(10).font('Times-Bold').fillColor(BLACK)
+        doc.fontSize(BODY_SZ).font('Times-Bold').fillColor(BLACK)
            .text('Signature: ', ML, doc.y, { continued: true, lineGap: 0 });
         doc.font('Times-Roman').text('__________________________', { continued: true });
         doc.font('Times-Bold').text('   Date: ', { continued: true });
