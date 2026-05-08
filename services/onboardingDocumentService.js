@@ -69,9 +69,9 @@ function fmtDate(d) {
 function getCurrencyPrefix(currencyName) {
     const c = (currencyName || 'INR').trim().toUpperCase();
     if (c === 'USD') return '$ ';
-    if (c === 'GBP') return '\xa3 ';   // £ — in Latin-1, safe with Times-Roman
-    if (c === 'EUR') return 'EUR ';    // € is not reliably in built-in PDF fonts
-    return 'Rs. ';                      // INR and all others
+    if (c === 'GBP') return '\xa3 ';   // £ — WinAnsi 0xA3, safe with Times-Roman
+    if (c === 'EUR') return '€ '; // € — WinAnsi 0x80, supported in Times-Roman
+    return 'Rs. ';                      // INR default (₹ requires Unicode TTF not bundled)
 }
 
 function fmtAmount(n, currencyName) {
@@ -101,6 +101,22 @@ function fmtAmount(n, currencyName) {
     }
     // Western grouping for all other currencies
     return prefix + sign + abs.toLocaleString('en-US');
+}
+
+// Format CTC / variable pay display where the amount is in LPA (INR) or absolute (other currencies).
+// For INR: shows raw number + compType (e.g. "12 LPA") — the "Rs." prefix is misleading for LPA values.
+// For other currencies: shows currency prefix + comma-grouped number + compType (e.g. "$ 100,000 Annual").
+function fmtCtcDisplay(amount, currencyName, compTypeName) {
+    if (amount == null || amount === '') return 'As discussed';
+    const c     = (currencyName || 'INR').trim().toUpperCase();
+    const ct    = (compTypeName || 'LPA').trim();
+    const isINR = c === 'INR' || c === '';
+    const num   = Number(amount);
+    if (isNaN(num)) return `${amount} ${ct}`;
+    if (isINR) return `${num} ${ct}`;
+    const prefix    = getCurrencyPrefix(c);
+    const formatted = Math.round(num).toLocaleString('en-US');
+    return `${prefix}${formatted} ${ct}`;
 }
 
 // ── Salary calculator ─────────────────────────────────────────────────────────
@@ -189,9 +205,7 @@ function buildOfferLetterPdf(offer) {
             .filter(Boolean).join(' – ');  // en-dash (in WinANSI)
         const currencyName = (offer.currencyName || 'INR').trim();
         const compType     = (offer.compensationTypeName || 'LPA').trim();
-        const ctcDisplay   = offer.offeredCTCAmount != null
-            ? `${offer.offeredCTCAmount} ${currencyName} ${compType}`
-            : 'As discussed';
+        const ctcDisplay   = fmtCtcDisplay(offer.offeredCTCAmount, currencyName, compType);
         const salary       = calcSalary(offer.offeredCTCAmount, currencyName, compType);
         const fmt          = (n) => fmtAmount(n, currencyName);
 
@@ -455,7 +469,23 @@ function buildOfferLetterPdf(offer) {
         doc.font('Times-Roman')
            .text('. As discussed and agreed upon mutually during your interview process. Salary break-up is as below.',
                  { align: 'justify', lineGap: 0 });
-        doc.moveDown(0.5);
+        doc.moveDown(0.4);
+
+        if (offer.variablePay != null && Number(offer.variablePay) > 0) {
+            doc.fontSize(10).font('Times-Roman').fillColor(BLACK)
+               .text('•  Variable Pay: ', ML + 14, doc.y, { continued: true, width: CW - 14, lineGap: 0 });
+            doc.font('Times-Bold').text(fmtCtcDisplay(offer.variablePay, currencyName, compType));
+            doc.moveDown(0.4);
+        }
+
+        if (offer.joiningBonus != null && Number(offer.joiningBonus) > 0) {
+            doc.fontSize(10).font('Times-Roman').fillColor(BLACK)
+               .text('•  Joining Bonus: ', ML + 14, doc.y, { continued: true, width: CW - 14, lineGap: 0 });
+            doc.font('Times-Bold').text(fmt(offer.joiningBonus));
+            doc.moveDown(0.4);
+        }
+
+        doc.moveDown(0.1);
 
         // Salary table
         const tableEndY = drawSalaryTable(doc.y);

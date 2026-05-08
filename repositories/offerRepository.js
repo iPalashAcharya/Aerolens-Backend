@@ -55,6 +55,54 @@ class OfferRepository {
         }
     }
 
+    async updateOffer(offerId, offerData, client) {
+        const connection = client;
+        try {
+            await connection.execute(
+                `UPDATE offer SET
+                    jobProfileRequirementId   = ?,
+                    vendorId                  = ?,
+                    reportingManagerId        = ?,
+                    employmentTypeLookupId    = ?,
+                    workModelLookupId         = ?,
+                    joiningDate               = ?,
+                    sign_before_date          = ?,
+                    offeredCTCAmount          = ?,
+                    currencyLookupId          = ?,
+                    compensationTypeLookupId  = ?,
+                    variablePay               = ?,
+                    joiningBonus              = ?,
+                    offerLetterSent           = ?,
+                    serviceAgreementSent      = ?,
+                    ndaSent                   = ?,
+                    codeOfConductSent         = ?
+                 WHERE offerId = ? AND isDeleted = 0`,
+                [
+                    offerData.jobProfileRequirementId  ?? null,
+                    offerData.vendorId                 ?? null,
+                    offerData.reportingManagerId       ?? null,
+                    offerData.employmentTypeLookupId   ?? null,
+                    offerData.workModelLookupId        ?? null,
+                    offerData.joiningDate              ?? null,
+                    offerData.sign_before_date         ?? null,
+                    offerData.offeredCTCAmount         ?? null,
+                    offerData.currencyLookupId         ?? null,
+                    offerData.compensationTypeLookupId ?? null,
+                    offerData.variablePay              ?? null,
+                    offerData.joiningBonus             ?? null,
+                    offerData.offerLetterSent          ?? null,
+                    offerData.serviceAgreementSent     ?? null,
+                    offerData.ndaSent                  ?? null,
+                    offerData.codeOfConductSent        ?? null,
+                    offerId,
+                ]
+            );
+            return await this.getOfferById(offerId, client);
+        } catch (error) {
+            this._handleDatabaseError(error, 'updateOffer');
+        }
+    }
+
     async getOffers(client) {
         const connection = client;
         try {

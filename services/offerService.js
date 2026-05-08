@@ -50,6 +50,36 @@ class OfferService {
         }
     }
 
+    async updateOffer(offerId, offerData, auditContext) {
+        const client = await this.db.getConnection();
+        try {
+            await client.beginTransaction();
+            const existing = await this.offerRepository.getOfferById(offerId, client);
+            if (!existing) throw new AppError('Offer not found', 404, 'OFFER_NOT_FOUND');
+            const updated = await this.offerRepository.updateOffer(offerId, offerData, client);
+            await auditLogService.logAction({
+                userId:       auditContext.userId,
+                action:       'UPDATE',
+                resource_type:'offer',
+                resource_id:  offerId,
+                oldValues:    existing,
+                newValues:    updated,
+                ipAddress:    auditContext.ipAddress,
+                userAgent:    auditContext.userAgent,
+                timestamp:    auditContext.timestamp,
+            }, client);
+            await client.commit();
+            return updated;
+        } catch (error) {
+            await client.rollback();
+            if (error instanceof AppError) throw error;
+            console.error('Error updating offer:', error.stack);
+            throw new AppError('Failed to update offer', 500, 'OFFER_UPDATE_ERROR', { operation: 'updateOffer', offerId });
+        } finally {
+            client.release();
+        }
+    }
+
     async getDeletedOffers() {
         const client = await this.db.getConnection();
         try {

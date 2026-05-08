@@ -26,6 +26,7 @@ router.get('/', offerController.getOffers);
 router.get('/:offerId/details', offerController.getOfferDetails);
 
 router.patch('/:offerId/restore', offerController.restoreOffer);
+router.patch('/:offerId', OfferValidator.validateUpdate, offerController.updateOffer);
 
 router.delete('/:offerId', offerController.deleteOffer);
 

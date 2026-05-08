@@ -78,6 +78,12 @@ class OfferController {
         return ApiResponse.success(res, null, 'Offer status updated successfully');
     });
 
+    updateOffer = catchAsync(async (req, res) => {
+        const offerId = parseInt(req.params.offerId, 10);
+        const updated = await this.offerService.updateOffer(offerId, req.body, req.auditContext);
+        return ApiResponse.success(res, updated, 'Offer updated successfully');
+    });
+
     getActiveOfferForCandidate = catchAsync(async (req, res) => {
         const candidateId = parseInt(req.params.candidateId, 10);
         const offer = await this.offerService.getActiveOfferForCandidate(candidateId);
