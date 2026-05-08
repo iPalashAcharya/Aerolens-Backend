@@ -159,37 +159,42 @@ function calcSalary(amount, currencyName, compensationTypeName) {
         // Annual (absolute value): INR amount is in rupees; non-INR in thousands
         monthly = isINR ? (amt / 12) : (amt * 1000) / 12;
     }
+    monthly = Math.round(monthly); // ensure whole rupees before breakdown
 
-    const basic = Math.round(monthly * 0.40);
-    const hra   = Math.round(basic   * 0.50);
-    const conv  = Math.round(basic   * 0.10);
-    const gross = basic + hra + conv;
+    // Official Aerolens salary structure (per People Experience team):
+    //   Basic  = 50% of CTC monthly
+    //   HRA    = 50% of Basic (25% of CTC)
+    //   Special Allowance = balancing figure (Gross - Basic - HRA = 25% of CTC)
+    //   Gross  = Basic + HRA + Special Allowance  = 100% of CTC monthly
+    const basic   = Math.round(monthly * 0.50);
+    const hra     = Math.round(basic   * 0.50);
+    const special = monthly - basic - hra;   // absorbs rounding remainder
+    const gross   = basic + hra + special;   // equals monthly exactly
 
-    // Indian statutory components — only for INR
-    const epf_er   = isINR ? Math.min(Math.round(basic * 0.12), 1800) : 0;
+    // Employer contributions — INR only
+    const epf_er   = isINR ? Math.min(Math.round(basic * 0.12), 1800) : 0; // 12% of Basic, capped at ₹1,800
     const esic_er  = (isINR && gross <= 21000) ? Math.round(gross * 0.0325) : 0;
-    const sbonus   = (isINR && gross <= 21000) ? Math.round(Math.min(basic, 7000) * 0.0833) : 0;
-    const gratuity = isINR ? Math.round(basic * 15 / 312) : 0; // exact: 15-day provision ÷ 26 working days ÷ 12 months
-    const emp_b    = epf_er + esic_er + sbonus + gratuity;
+    const gratuity = isINR ? Math.round(basic * 0.0481) : 0;               // 4.81% of Basic per HR policy
+    const emp_b    = epf_er + esic_er + gratuity;
     const tot_comp = gross + emp_b;
 
+    // Employee deductions
     const epf_ee  = epf_er;
     const esic_ee = (isINR && gross <= 21000) ? Math.round(gross * 0.0075) : 0;
     const pt      = isINR ? 200 : 0;
     const tot_ded = epf_ee + esic_ee + pt;
-    const net     = gross - tot_ded;
+    const net     = gross - tot_ded;         // Net Pay = Gross (A) − Employee Deductions (C)
 
     const row = (m) => ({ m, y: m * 12 });
     return {
         isINR,
-        basic:    row(basic),
-        hra:      row(hra),
-        conv:     row(conv),
-        gross:    row(gross),
-        epf_er:   row(epf_er),
-        esic_er:  row(esic_er),
-        sbonus:   row(sbonus),
-        gratuity: row(gratuity),
+        basic:   row(basic),
+        hra:     row(hra),
+        special: row(special),
+        gross:   row(gross),
+        epf_er:  row(epf_er),
+        esic_er: row(esic_er),
+        gratuity:row(gratuity),
         emp_b:    row(emp_b),
         tot_comp: row(tot_comp),
         epf_ee:   row(epf_ee),
@@ -335,35 +340,32 @@ function buildOfferLetterPdf(offer) {
             tRow('Particulars', 'Monthly', 'Yearly', { hdr: true });
 
             if (s) {
-                tRow('Basic Wage',             fmt(s.basic.m),    fmt(s.basic.y));
-                tRow('HRA',                    fmt(s.hra.m),      fmt(s.hra.y));
-                tRow('Conveyance Allowance',   fmt(s.conv.m),     fmt(s.conv.y));
-                tRow('Gross Salary (A)',        fmt(s.gross.m),    fmt(s.gross.y),    { bold: true });
-                tRow('Employer Contributions (B)', '', '',            { bold: true });
-                tRow("Employers' Contribution - Provident Fund", fmt(s.epf_er.m),   fmt(s.epf_er.y));
+                tRow('Basic Salary',                fmt(s.basic.m),   fmt(s.basic.y));
+                tRow('House Rent Allowance (HRA)',   fmt(s.hra.m),     fmt(s.hra.y));
+                tRow('Special Allowance',            fmt(s.special.m), fmt(s.special.y));
+                tRow('Gross Salary (A)',             fmt(s.gross.m),   fmt(s.gross.y),   { bold: true });
+                tRow('Employer Contributions (B)',   '', '',            { bold: true });
+                tRow("Employers' Contribution - Provident Fund", fmt(s.epf_er.m), fmt(s.epf_er.y));
                 tRow("Employers' Contribution - ESIC",
                      s.esic_er.m ? fmt(s.esic_er.m) : 'N/A',
                      s.esic_er.y ? fmt(s.esic_er.y) : 'N/A');
-                tRow('Statutory Bonus',
-                     s.sbonus.m ? fmt(s.sbonus.m) : 'N/A',
-                     s.sbonus.y ? fmt(s.sbonus.y) : 'N/A');
-                tRow('Gratuity*',              fmt(s.gratuity.m), fmt(s.gratuity.y));
+                tRow('Gratuity*',                   fmt(s.gratuity.m), fmt(s.gratuity.y));
                 tRow('Total Compensation & Benefits (A+B)', fmt(s.tot_comp.m), fmt(s.tot_comp.y), { bold: true });
-                tRow('Deductions', '', '',     { bold: true });
+                tRow('Deductions',                  '', '',            { bold: true });
                 tRow('Employee Contribution - Provident Fund', fmt(s.epf_ee.m), fmt(s.epf_ee.y));
                 tRow('Employee Contribution - ESIC',
                      s.esic_ee.m ? fmt(s.esic_ee.m) : 'N/A',
                      s.esic_ee.y ? fmt(s.esic_ee.y) : 'N/A');
-                tRow('Professional Tax',       fmt(s.pt.m),       fmt(s.pt.y));
-                tRow('Total Deductions',       fmt(s.tot_ded.m),  fmt(s.tot_ded.y),  { bold: true });
-                tRow('Net Pay',                fmt(s.net.m),      fmt(s.net.y),       { bold: true });
+                tRow('Professional Tax',            fmt(s.pt.m),      fmt(s.pt.y));
+                tRow('Total Deductions',            fmt(s.tot_ded.m), fmt(s.tot_ded.y), { bold: true });
+                tRow('Net Pay',                     fmt(s.net.m),     fmt(s.net.y),     { bold: true });
             } else {
-                ['Basic Wage', 'HRA', 'Conveyance Allowance'].forEach((l) => tRow(l, '', ''));
+                ['Basic Salary', 'House Rent Allowance (HRA)', 'Special Allowance'].forEach((l) => tRow(l, '', ''));
                 tRow('Gross Salary (A)', '', '', { bold: true });
                 tRow('Employer Contributions (B)', '', '', { bold: true });
                 ["Employers' Contribution - Provident Fund",
                  "Employers' Contribution - ESIC",
-                 'Statutory Bonus', 'Gratuity*'].forEach((l) => tRow(l, '', ''));
+                 'Gratuity*'].forEach((l) => tRow(l, '', ''));
                 tRow('Total Compensation & Benefits (A+B)', '', '', { bold: true });
                 tRow('Deductions', '', '', { bold: true });
                 ['Employee Contribution - Provident Fund',
