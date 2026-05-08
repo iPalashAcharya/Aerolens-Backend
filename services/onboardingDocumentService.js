@@ -103,26 +103,40 @@ function fmtAmount(n, currencyName) {
     return prefix + sign + abs.toLocaleString('en-US');
 }
 
-// Format CTC / variable pay display where the amount is in LPA (INR) or absolute (other currencies).
-// For INR: shows raw number + compType (e.g. "12 LPA") — the "Rs." prefix is misleading for LPA values.
-// For other currencies: shows currency prefix + comma-grouped number + compType (e.g. "$ 100,000 Annual").
+// Format CTC / variable pay for the display line in the offer letter.
+//   LPA (INR)        : "12 LPA"              — raw lakh figure, no currency prefix
+//   Annual INR       : "Rs. 6,00,000 Annual" — absolute rupee amount
+//   Annual non-INR   : "$ 64,000 Annual"     — amount × 1,000 (entered in thousands)
+//   Monthly / Hourly : fmtAmount of the absolute figure + type label
 function fmtCtcDisplay(amount, currencyName, compTypeName) {
     if (amount == null || amount === '') return 'As discussed';
-    const c     = (currencyName || 'INR').trim().toUpperCase();
-    const ct    = (compTypeName || 'LPA').trim();
-    const isINR = c === 'INR' || c === '';
-    const num   = Number(amount);
+    const c      = (currencyName || 'INR').trim().toUpperCase();
+    const ct     = (compTypeName || 'LPA').trim();
+    const ctl    = ct.toLowerCase();
+    const isINR  = c === 'INR' || c === '';
+    const num    = Number(amount);
     if (isNaN(num)) return `${amount} ${ct}`;
-    if (isINR) return `${num} ${ct}`;
-    const prefix    = getCurrencyPrefix(c);
-    const formatted = Math.round(num).toLocaleString('en-US');
-    return `${prefix}${formatted} ${ct}`;
+
+    if (ctl.includes('lpa')) {
+        return `${num} ${ct}`;                           // "12 LPA"
+    }
+    if (!ctl.includes('month') && !ctl.includes('hour') && !isINR) {
+        // Non-INR Annual: user enters thousands (64 = $64,000)
+        const prefix    = getCurrencyPrefix(c);
+        const formatted = Math.round(num * 1000).toLocaleString('en-US');
+        return `${prefix}${formatted} ${ct}`;            // "$ 64,000 Annual"
+    }
+    // INR Annual / Monthly / Hourly, or non-INR Monthly / Hourly — absolute amount
+    return `${fmtAmount(num, c)} ${ct}`;                 // "Rs. 6,00,000 Annual"
 }
 
 // ── Salary calculator ─────────────────────────────────────────────────────────
-// For INR + LPA (annual): amount treated as lakhs per annum.
-// For Hourly: amount × 160 hrs/month.
-// For Monthly: amount is already monthly.
+// LPA  (Lakhs Per Annum, INR only): amount is in lakhs → ×100,000 then ÷12.
+// Annual: amount is the absolute annual figure (rupees for INR; thousands for
+//         non-INR, e.g. 64 = $64,000).  Divide by 12 (with the 1,000 scaling
+//         for non-INR).
+// Monthly: amount is already monthly.
+// Hourly:  amount × 160 hrs/month.
 // Indian statutory components (PF, ESIC, PT, Gratuity) only applied for INR.
 
 function calcSalary(amount, currencyName, compensationTypeName) {
@@ -138,9 +152,12 @@ function calcSalary(amount, currencyName, compensationTypeName) {
         monthly = amt * 160;
     } else if (compType.includes('month')) {
         monthly = amt;
+    } else if (compType.includes('lpa')) {
+        // LPA: amount is in lakhs (e.g. 12 → ₹12,00,000/year)
+        monthly = (amt * 100000) / 12;
     } else {
-        // Annual / LPA (default)
-        monthly = isINR ? (amt * 100000) / 12 : (amt * 1000) / 12;
+        // Annual (absolute value): INR amount is in rupees; non-INR in thousands
+        monthly = isINR ? (amt / 12) : (amt * 1000) / 12;
     }
 
     const basic = Math.round(monthly * 0.40);
@@ -152,7 +169,7 @@ function calcSalary(amount, currencyName, compensationTypeName) {
     const epf_er   = isINR ? Math.min(Math.round(basic * 0.12), 1800) : 0;
     const esic_er  = (isINR && gross <= 21000) ? Math.round(gross * 0.0325) : 0;
     const sbonus   = (isINR && gross <= 21000) ? Math.round(Math.min(basic, 7000) * 0.0833) : 0;
-    const gratuity = isINR ? Math.round(basic * 0.0481) : 0;
+    const gratuity = isINR ? Math.round(basic * 15 / 312) : 0; // exact: 15-day provision ÷ 26 working days ÷ 12 months
     const emp_b    = epf_er + esic_er + sbonus + gratuity;
     const tot_comp = gross + emp_b;
 
@@ -452,10 +469,11 @@ function buildOfferLetterPdf(offer) {
         // ════════════════════════════════════════════════════════════════════
         newPage();
 
-        // No Inconsistent Obligations
-        labelPara('No Inconsistent Obligations: ',
-            'You represent that you are aware of no obligations legal or otherwise, inconsistent with the terms ' +
-            'of this Agreement or with you undertaking employment with the Company.');
+        // No Conflicts of Interest
+        labelPara('No Conflicts of Interest: ',
+            'By accepting this offer, you confirm that you have no existing legal, contractual, or other ' +
+            'obligations that would prevent you from joining Aerolens India Pvt Ltd or performing your duties ' +
+            'as described in this offer.');
 
         doc.moveDown(0.2);
 
