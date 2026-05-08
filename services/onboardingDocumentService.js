@@ -47,7 +47,8 @@ const TBL_BORD = '#AAAAAA';
 // ── Assets ────────────────────────────────────────────────────────────────────
 
 const ASSETS_DIR   = path.join(__dirname, '../assets');
-const BRAND_LOGO   = path.join(__dirname, '../../AerolensApp/src/assets/Logo and name without background 2.png');
+// JPEG copy of brand logo — PDFKit renders JPEG in full colour; PNG with alpha loses colour
+const BRAND_LOGO   = path.join(__dirname, '../assets/logo_brand.jpg');
 
 function getAsset(name) {
     const p = path.join(ASSETS_DIR, name);
@@ -254,11 +255,12 @@ function buildOfferLetterPdf(offer) {
         }
 
         function drawHeader() {
-            const lw      = 200;
-            const logoX   = (PAGE_W - lw) / 2;
-            const logoSrc = fs.existsSync(BRAND_LOGO) ? BRAND_LOGO : logoPath;
+            const logoSrc  = fs.existsSync(BRAND_LOGO) ? BRAND_LOGO : logoPath;
+            const maxW     = CW;                        // full content width
+            const maxH     = HDR_LINE_Y - HDR_Y - 14;  // header height minus padding
             if (logoSrc) {
-                doc.image(logoSrc, logoX, HDR_Y + 8, { width: lw });
+                // fit keeps aspect ratio; align:'center' centres within [ML, ML+maxW]
+                doc.image(logoSrc, ML, HDR_Y + 7, { fit: [maxW, maxH], align: 'center', valign: 'center' });
             } else {
                 doc.fontSize(20).font('Times-Bold').fillColor('#1a1a6e')
                    .text('aerolens', ML, HDR_Y + 20, { width: CW, align: 'center' });
@@ -442,10 +444,10 @@ function buildOfferLetterPdf(offer) {
         doc.fontSize(BODY_SZ).font('Times-Bold').fillColor(BLACK)
            .text('Probation: ', ML, doc.y, { continued: true, width: CW, lineGap: 0 });
         doc.font('Times-Roman').text('Your ', { continued: true });
-        doc.font('Times-Bold').text('90 days', { continued: true });
+        doc.font('Times-Bold').text('90 days ', { continued: true });
         doc.font('Times-Roman')
            .text(
-               ' of service following your training will be considered probationary and you will be appraised ' +
+               'of service following your training will be considered probationary and you will be appraised ' +
                'for satisfactory performance. If your performance is found unsatisfactory, Aerolens India Pvt Ltd ' +
                'may extend the probation period or terminate your employment with immediate effect. During the ' +
                'extension of the probation period, if your performance is still found unsatisfactory, Aerolens ' +
