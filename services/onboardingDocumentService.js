@@ -147,61 +147,71 @@ function calcSalary(amount, currencyName, compensationTypeName) {
     const compType = (compensationTypeName || '').trim().toLowerCase();
     const isINR    = currency === 'INR' || currency === '';
 
-    let monthly;
+    // Derive exact annual CTC first so annual column figures are precise
+    let annualCTC;
     if (compType.includes('hour')) {
-        monthly = amt * 160;
+        annualCTC = Math.round(amt * 160 * 12);
     } else if (compType.includes('month')) {
-        monthly = amt;
+        annualCTC = Math.round(amt * 12);
     } else if (compType.includes('lpa')) {
-        // LPA: amount is in lakhs (e.g. 12 → ₹12,00,000/year)
-        monthly = (amt * 100000) / 12;
+        annualCTC = Math.round(amt * 100000);
     } else {
-        // Annual (absolute value): INR amount is in rupees; non-INR in thousands
-        monthly = isINR ? (amt / 12) : (amt * 1000) / 12;
+        // Annual — INR: absolute rupees; non-INR: entered in thousands
+        annualCTC = isINR ? Math.round(amt) : Math.round(amt * 1000);
     }
-    monthly = Math.round(monthly); // ensure whole rupees before breakdown
 
-    // Official Aerolens salary structure (per People Experience team):
-    //   Basic  = 50% of CTC monthly
-    //   HRA    = 50% of Basic (25% of CTC)
-    //   Special Allowance = balancing figure (Gross - Basic - HRA = 25% of CTC)
-    //   Gross  = Basic + HRA + Special Allowance  = 100% of CTC monthly
-    const basic   = Math.round(monthly * 0.50);
-    const hra     = Math.round(basic   * 0.50);
-    const special = monthly - basic - hra;   // absorbs rounding remainder
-    const gross   = basic + hra + special;   // equals monthly exactly
+    // Earnings: annual first for exact figures, monthly derived from annual
+    //   Basic = 50% of CTC annual | HRA = 50% of Basic annual
+    const annualBasic = Math.round(annualCTC  * 0.50);
+    const annualHRA   = Math.round(annualBasic * 0.50);
+    const basicM      = Math.round(annualBasic / 12);
+    const hraM        = Math.round(annualHRA   / 12);
 
-    // Employer contributions — INR only
-    const epf_er   = isINR ? Math.min(Math.round(basic * 0.12), 1800) : 0; // 12% of Basic, capped at ₹1,800
-    const esic_er  = (isINR && gross <= 21000) ? Math.round(gross * 0.0325) : 0;
-    const gratuity = isINR ? Math.round(basic * 0.0481) : 0;               // 4.81% of Basic per HR policy
-    const emp_b    = epf_er + esic_er + gratuity;
-    const tot_comp = gross + emp_b;
+    // Employer contributions (INR only) — computed on annual basic for precision
+    //   PF capped at ₹1,800/month (12% of Basic, EPFO ceiling ₹15,000)
+    //   Gratuity = 4.81% of annual Basic
+    const monthlyPF_er    = isINR ? Math.min(Math.round(basicM * 0.12), 1800) : 0;
+    const annualPF_er     = monthlyPF_er * 12;
+    const annualGratuity  = isINR ? Math.round(annualBasic * 0.0481) : 0;
+    const monthlyGratuity = isINR ? Math.round(annualGratuity / 12) : 0;
+
+    // Gross (A) = CTC − employer contributions; estimate gross to check ESIC
+    const annualGross_est  = annualCTC - annualPF_er - annualGratuity;
+    const monthlyGross_est = Math.round(annualGross_est / 12);
+    const esicApplies      = isINR && monthlyGross_est <= 21000;
+    const monthlyESIC_er   = esicApplies ? Math.round(monthlyGross_est * 0.0325) : 0;
+    const annualESIC_er    = monthlyESIC_er * 12;
+
+    const annualGross    = annualCTC - annualPF_er - annualGratuity - annualESIC_er;
+    const monthlyGross   = Math.round(annualGross / 12);
+    const annualConv     = annualGross - annualBasic - annualHRA;  // Conveyance — exact balancing
+    const monthlyConv    = monthlyGross - basicM - hraM;           // monthly balancing
+
+    // Total Compensation (A+B): yearly = exact CTC entered, monthly = round(CTC/12)
+    const monthlyTotComp = Math.round(annualCTC / 12);
 
     // Employee deductions
-    const epf_ee  = epf_er;
-    const esic_ee = (isINR && gross <= 21000) ? Math.round(gross * 0.0075) : 0;
-    const pt      = isINR ? 200 : 0;
-    const tot_ded = epf_ee + esic_ee + pt;
-    const net     = gross - tot_ded;         // Net Pay = Gross (A) − Employee Deductions (C)
+    const monthlyESIC_ee = esicApplies ? Math.round(monthlyGross * 0.0075) : 0;
+    const annualESIC_ee  = monthlyESIC_ee * 12;
+    const monthlyPT      = isINR ? 200 : 0;
+    const annualTotDed   = annualPF_er + annualESIC_ee + (monthlyPT * 12);
+    const monthlyTotDed  = Math.round(annualTotDed / 12);
 
-    const row = (m) => ({ m, y: m * 12 });
     return {
         isINR,
-        basic:   row(basic),
-        hra:     row(hra),
-        special: row(special),
-        gross:   row(gross),
-        epf_er:  row(epf_er),
-        esic_er: row(esic_er),
-        gratuity:row(gratuity),
-        emp_b:    row(emp_b),
-        tot_comp: row(tot_comp),
-        epf_ee:   row(epf_ee),
-        esic_ee:  row(esic_ee),
-        pt:       row(pt),
-        tot_ded:  row(tot_ded),
-        net:      row(net),
+        basic:    { m: basicM,          y: annualBasic },
+        hra:      { m: hraM,            y: annualHRA },
+        special:  { m: monthlyConv,     y: annualConv },
+        gross:    { m: monthlyGross,    y: annualGross },
+        epf_er:   { m: monthlyPF_er,    y: annualPF_er },
+        esic_er:  { m: monthlyESIC_er,  y: annualESIC_er },
+        gratuity: { m: monthlyGratuity, y: annualGratuity },
+        tot_comp: { m: monthlyTotComp,  y: annualCTC },
+        epf_ee:   { m: monthlyPF_er,    y: annualPF_er },
+        esic_ee:  { m: monthlyESIC_ee,  y: annualESIC_ee },
+        pt:       { m: monthlyPT,       y: monthlyPT * 12 },
+        tot_ded:  { m: monthlyTotDed,   y: annualTotDed },
+        net:      { m: monthlyGross - monthlyTotDed, y: annualGross - annualTotDed },
     };
 }
 
@@ -340,31 +350,29 @@ function buildOfferLetterPdf(offer) {
             tRow('Particulars', 'Monthly', 'Yearly', { hdr: true });
 
             if (s) {
-                tRow('Basic Salary',                fmt(s.basic.m),   fmt(s.basic.y));
-                tRow('House Rent Allowance (HRA)',   fmt(s.hra.m),     fmt(s.hra.y));
-                tRow('Special Allowance',            fmt(s.special.m), fmt(s.special.y));
-                tRow('Gross Salary (A)',             fmt(s.gross.m),   fmt(s.gross.y),   { bold: true });
-                tRow('Employer Contributions (B)',   '', '',            { bold: true });
-                tRow("Employers' Contribution - Provident Fund", fmt(s.epf_er.m), fmt(s.epf_er.y));
-                tRow("Employers' Contribution - ESIC",
-                     s.esic_er.m ? fmt(s.esic_er.m) : 'N/A',
-                     s.esic_er.y ? fmt(s.esic_er.y) : 'N/A');
-                tRow('Gratuity*',                   fmt(s.gratuity.m), fmt(s.gratuity.y));
+                tRow('Basic Wage',                  fmt(s.basic.m),    fmt(s.basic.y));
+                tRow('HRA',                          fmt(s.hra.m),      fmt(s.hra.y));
+                tRow('Conveyance Allowance',         fmt(s.special.m),  fmt(s.special.y));
+                tRow('Gross Salary (A)',             fmt(s.gross.m),    fmt(s.gross.y),    { bold: true });
+                tRow('Employer Contributions (B)',   '', '',             { bold: true });
+                tRow("Employers' Contribution - Provident Fund", fmt(s.epf_er.m),  fmt(s.epf_er.y));
+                tRow("Employers' Contribution - ESIC",           fmt(s.esic_er.m), fmt(s.esic_er.y));
+                tRow('Statutory Bonus',              fmt(0),            fmt(0));
+                tRow('Gratuity*',                    fmt(s.gratuity.m), fmt(s.gratuity.y));
                 tRow('Total Compensation & Benefits (A+B)', fmt(s.tot_comp.m), fmt(s.tot_comp.y), { bold: true });
-                tRow('Deductions',                  '', '',            { bold: true });
-                tRow('Employee Contribution - Provident Fund', fmt(s.epf_ee.m), fmt(s.epf_ee.y));
-                tRow('Employee Contribution - ESIC',
-                     s.esic_ee.m ? fmt(s.esic_ee.m) : 'N/A',
-                     s.esic_ee.y ? fmt(s.esic_ee.y) : 'N/A');
-                tRow('Professional Tax',            fmt(s.pt.m),      fmt(s.pt.y));
-                tRow('Total Deductions',            fmt(s.tot_ded.m), fmt(s.tot_ded.y), { bold: true });
-                tRow('Net Pay',                     fmt(s.net.m),     fmt(s.net.y),     { bold: true });
+                tRow('Deductions',                   '', '',             { bold: true });
+                tRow('Employee Contribution - Provident Fund', fmt(s.epf_ee.m),  fmt(s.epf_ee.y));
+                tRow('Employee Contribution - ESIC',           fmt(s.esic_ee.m), fmt(s.esic_ee.y));
+                tRow('Professional Tax',             fmt(s.pt.m),       fmt(s.pt.y));
+                tRow('Total Deductions',             fmt(s.tot_ded.m),  fmt(s.tot_ded.y),  { bold: true });
+                tRow('Net Pay',                      fmt(s.net.m),      fmt(s.net.y),      { bold: true, hdr: true });
             } else {
-                ['Basic Salary', 'House Rent Allowance (HRA)', 'Special Allowance'].forEach((l) => tRow(l, '', ''));
+                ['Basic Wage', 'HRA', 'Conveyance Allowance'].forEach((l) => tRow(l, '', ''));
                 tRow('Gross Salary (A)', '', '', { bold: true });
                 tRow('Employer Contributions (B)', '', '', { bold: true });
                 ["Employers' Contribution - Provident Fund",
                  "Employers' Contribution - ESIC",
+                 'Statutory Bonus',
                  'Gratuity*'].forEach((l) => tRow(l, '', ''));
                 tRow('Total Compensation & Benefits (A+B)', '', '', { bold: true });
                 tRow('Deductions', '', '', { bold: true });
@@ -372,7 +380,7 @@ function buildOfferLetterPdf(offer) {
                  'Employee Contribution - ESIC',
                  'Professional Tax'].forEach((l) => tRow(l, '', ''));
                 tRow('Total Deductions', '', '', { bold: true });
-                tRow('Net Pay',          '', '', { bold: true });
+                tRow('Net Pay',          '', '', { bold: true, hdr: true });
             }
 
             return y;
@@ -493,12 +501,6 @@ function buildOfferLetterPdf(offer) {
 
         if (offer.variablePay != null && Number(offer.variablePay) > 0) {
             const vpDisplay = fmtCtcDisplay(offer.variablePay, currencyName, compType);
-            // Bullet line: • Variable Pay: [amount]
-            doc.fontSize(10).font('Times-Roman').fillColor(BLACK)
-               .text('•  Variable Pay: ', ML + 14, doc.y, { continued: true, width: CW - 14, lineGap: 0 });
-            doc.font('Times-Bold').text(vpDisplay);
-            doc.moveDown(0.25);
-            // Clause paragraph
             doc.fontSize(10).font('Times-Roman').fillColor(BLACK)
                .text(
                    `A total of ${vpDisplay} will be allocated as variable pay, which will be disbursed in ` +
@@ -511,12 +513,6 @@ function buildOfferLetterPdf(offer) {
 
         if (offer.joiningBonus != null && Number(offer.joiningBonus) > 0) {
             const jbDisplay = fmt(offer.joiningBonus);
-            // Bullet line: • Joining Bonus: [amount]
-            doc.fontSize(10).font('Times-Roman').fillColor(BLACK)
-               .text('•  Joining Bonus: ', ML + 14, doc.y, { continued: true, width: CW - 14, lineGap: 0 });
-            doc.font('Times-Bold').text(jbDisplay);
-            doc.moveDown(0.25);
-            // Clause paragraph
             doc.fontSize(10).font('Times-Roman').fillColor(BLACK)
                .text(
                    `A one-time joining bonus of ${jbDisplay} will be extended as a token of appreciation for ` +
