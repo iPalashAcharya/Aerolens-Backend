@@ -256,11 +256,11 @@ function buildOfferLetterPdf(offer) {
 
         function drawHeader() {
             const logoSrc  = fs.existsSync(BRAND_LOGO) ? BRAND_LOGO : logoPath;
-            const maxW     = CW * 0.5;                  // 50% of content width
-            const maxH     = HDR_LINE_Y - HDR_Y - 20;  // header height minus padding
+            const maxW     = CW * 0.4;                         // 40% of content width
+            const maxH     = HDR_LINE_Y - HDR_Y - 20;         // header height minus padding
+            const logoX    = (PAGE_W - maxW) / 2;             // centre box on page
             if (logoSrc) {
-                // fit keeps aspect ratio; align:'center' centres within [ML, ML+maxW]
-                doc.image(logoSrc, ML, HDR_Y + 7, { fit: [maxW, maxH], align: 'center', valign: 'center' });
+                doc.image(logoSrc, logoX, HDR_Y + 7, { fit: [maxW, maxH], align: 'center', valign: 'center' });
             } else {
                 doc.fontSize(20).font('Times-Bold').fillColor('#1a1a6e')
                    .text('aerolens', ML, HDR_Y + 20, { width: CW, align: 'center' });
