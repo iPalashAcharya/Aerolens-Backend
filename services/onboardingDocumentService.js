@@ -421,8 +421,8 @@ function buildOfferLetterPdf(offer) {
         // Employment start paragraph — inline bold placeholders
         doc.fontSize(BODY_SZ).font('Times-Roman').fillColor(BLACK)
            .text('Your employment will begin on ', ML, doc.y, { continued: true, width: CW, lineGap: 0 });
-        doc.font('Times-Bold').text(startDate, { continued: true });
-        doc.font('Times-Roman').text(' and your work location will be ', { continued: true });
+        doc.font('Times-Bold').text(startDate + ' ', { continued: true });
+        doc.font('Times-Roman').text('and your work location will be ', { continued: true });
         doc.font('Times-Bold').text(offer.workModeName || '___________', { continued: true });
         doc.font('Times-Roman').text('. You will be reporting to ', { continued: true });
         doc.font('Times-Bold').text((rmLine || '___________') + ' ', { continued: true });
@@ -461,10 +461,10 @@ function buildOfferLetterPdf(offer) {
         doc.fontSize(BODY_SZ).font('Times-Bold').fillColor(BLACK)
            .text('Separation: ', ML, doc.y, { continued: true, width: CW, lineGap: 0 });
         doc.font('Times-Roman').text('A minimum of ', { continued: true });
-        doc.font('Times-Bold').text('3 (three) months\' notice period', { continued: true });
+        doc.font('Times-Bold').text('3 (three) months\' notice period ', { continued: true });
         doc.font('Times-Roman')
            .text(
-               ' or salary in lieu of notice period is required for termination of employment terms by either ' +
+               'or salary in lieu of notice period is required for termination of employment terms by either ' +
                'side seeking the termination. However, it will be the discretion of management to accept the ' +
                'salary in lieu of the notice period or ask an employee to serve the notice period. Salary for ' +
                'the purpose of the notice period means total cost to the company (CTC). In case of incomplete ' +
@@ -614,9 +614,9 @@ function buildOfferLetterPdf(offer) {
                    'The Offer letter is issued / enclosed in duplicate, please sign the duplicate copy in ' +
                    'acknowledgment of your acceptance of the above stated terms and conditions and return to us by ',
                    ML + 18, y0, { continued: true, width: CW - 18, lineGap: 0 });
-            doc.font('Times-Bold').text(signBefore, { continued: true });
+            doc.font('Times-Bold').text(signBefore + ' ', { continued: true });
             doc.font('Times-Roman')
-               .text(' after which the offer stands automatically withdrawn.',
+               .text('after which the offer stands automatically withdrawn.',
                      { align: 'justify', lineGap: 0 });
             doc.moveDown(0.3);
         }
@@ -628,10 +628,10 @@ function buildOfferLetterPdf(offer) {
 
         [
             'Signed Offer Letter.',
-            'Latest passport sized photograph-2 Nos.',
+            'Latest passport sized photograph - 2 Nos.',
             'Soft copies of highest educational degree held & other professional qualification(s) certificates, if any.',
             'Soft copy of Residence Proof (Passport / Aadhar Card / Voter ID Card).',
-            'Soft copy of Identity Proof (PAN card/ Passport / Driving License / Voter ID).',
+            'Soft copy of Identity Proof (PAN card / Passport / Driving License / Voter ID).',
             'Relieving & Experience letter of previous 2 employments.',
         ].forEach(bullet);
 
