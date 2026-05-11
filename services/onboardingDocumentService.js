@@ -731,9 +731,11 @@ function buildOfferLetterPdf(offer) {
     });
 }
 
-// ── OpenRouter (Service Agreement only) ──────────────────────────────────────
+// ── Service Agreement body builder ───────────────────────────────────────────
+// Returns the pre-filled document body directly — no AI call needed.
+// All content is deterministic: the template is fixed and values are interpolated.
 
-function buildServiceAgreementPrompt(offer) {
+function buildServiceAgreementBody(offer) {
     const {
         candidateName     = '___________',
         jobRole           = '___________',
@@ -744,27 +746,14 @@ function buildServiceAgreementPrompt(offer) {
         contractorAddress,
     } = offer;
 
-    const todayDMY    = fmtDateDMY(new Date());
-    const startDMY    = joiningDate ? fmtDateDMY(new Date(joiningDate)) : '___________';
-    const address     = (contractorAddress || '').trim() || '___________';
-    const ctcLine     = offeredCTCAmount
-        ? `${fmtAmount(offeredCTCAmount, (currencyName || 'INR').trim())} + GST/${(compensationTypeName || 'Monthly').trim()}`
-        : 'As discussed';
+    const todayDMY = fmtDateDMY(new Date());
+    const startDMY = joiningDate ? fmtDateDMY(new Date(joiningDate)) : '___________';
+    const address  = (contractorAddress || '').trim() || '___________';
 
-    return `You are generating a formal Agreement of Service for Aerolens India Private Limited.
-Output ONLY the document body — no JSON, no markdown fences, no preamble, no commentary.
-Do NOT invent dates, names, or addresses. Use ONLY the values provided below.
+    // ctcLine is used by buildServiceAgreementPdf directly from offer — not needed here
+    void offeredCTCAmount; void currencyName; void compensationTypeName;
 
-Substitute these values exactly where shown:
-- Agreement Date: ${todayDMY}
-- Effective Date: ${startDMY}
-- Consultant Name: ${candidateName}
-- Consultant Address: ${address}
-- Services / Tech Stack: ${jobRole}
-
-Output the following document verbatim with the above values filled in:
-
-AGREEMENT OF SERVICE
+    return `AGREEMENT OF SERVICE
 
 This Agreement of Service is made on ${todayDMY} and shall be effective from ${startDMY} called for Services as per Statement of Work in Appendix A between
 
@@ -874,10 +863,10 @@ NOW THEREFORE, the parties HEREBY AGREE as follows:
 
 20. GOVERNING LAW and JURISDICTION
 
-20.1 This Agreement shall be governed and construed in accordance with the India law. The Parties shall use all reasonable endeavors to negotiate in good faith at the highest executive levels to settle amicably any dispute of whatever nature arising in connection with this Agreement. If such executive negotiations for the amicable settlement are unsuccessful, the dispute arising shall be referred to the exclusive jurisdiction of the India competent courts.
-
-Output this document exactly as shown with only the four provided values substituted in. Do not add, remove, or rephrase any legal clause. CTC for reference (used only in Appendix B, not in the body above): ${ctcLine}`;
+20.1 This Agreement shall be governed and construed in accordance with the India law. The Parties shall use all reasonable endeavors to negotiate in good faith at the highest executive levels to settle amicably any dispute of whatever nature arising in connection with this Agreement. If such executive negotiations for the amicable settlement are unsuccessful, the dispute arising shall be referred to the exclusive jurisdiction of the India competent courts.`;
 }
+
+// ── OpenRouter (Service Agreement review pass) ───────────────────────────────
 
 async function callOpenRouter(prompt) {
     const apiKey = (process.env.OPENROUTER_API_KEY || '').trim();
@@ -895,7 +884,7 @@ async function callOpenRouter(prompt) {
         res = await fetch(OPENROUTER_URL, {
             method: 'POST',
             headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.4 }),
+            body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], temperature: 0.3 }),
             signal: controller.signal,
         });
     } catch {
@@ -911,9 +900,19 @@ async function callOpenRouter(prompt) {
 
     const data    = await res.json();
     const content = data.choices?.[0]?.message?.content ?? '';
-    if (!content.trim()) throw new AppError('OpenRouter returned an empty response', 502, 'EMPTY_AI_RESPONSE');
-    return content.trim();
+    return content.trim(); // empty string is handled by caller — no throw here
 }
+
+// Builds a short review prompt for OpenRouter (body already pre-filled)
+function buildServiceAgreementPrompt(body) {
+    return (
+        'You are a professional legal document reviewer for Aerolens India Private Limited.\n' +
+        'Review the following Agreement of Service for correctness and professional quality.\n' +
+        'Output ONLY the complete document text — no JSON, no markdown, no commentary, no changes to legal clauses.\n\n' +
+        body
+    );
+}
+
 
 function buildServiceAgreementPdf(rawBody, offer) {
     return new Promise((resolve, reject) => {
@@ -1201,9 +1200,19 @@ async function generateOnboardingDocument(offerDetails, generatedBy) {
     if (docType === 'offer_letter') {
         pdfBuffer = await buildOfferLetterPdf(offerDetails);
     } else {
-        const prompt  = buildServiceAgreementPrompt(offerDetails);
-        const rawText = await callOpenRouter(prompt);
-        pdfBuffer     = await buildServiceAgreementPdf(rawText, offerDetails);
+        // Pre-fill all dynamic fields into the document body deterministically
+        const preBuiltBody = buildServiceAgreementBody(offerDetails);
+        // Pass through OpenRouter for a professional review pass; fall back to
+        // the pre-built body if the model returns empty or the call fails.
+        let finalBody = preBuiltBody;
+        try {
+            const prompt  = buildServiceAgreementPrompt(preBuiltBody);
+            const aiText  = await callOpenRouter(prompt);
+            if (aiText) finalBody = aiText;
+        } catch {
+            // OpenRouter unavailable or model error — use pre-built body as-is
+        }
+        pdfBuffer = await buildServiceAgreementPdf(finalBody, offerDetails);
     }
 
     await uploadToS3(pdfBuffer, s3Key);
