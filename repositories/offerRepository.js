@@ -11,11 +11,12 @@ class OfferRepository {
             const query = `
             INSERT INTO offer (
                 candidateId, jobProfileRequirementId, vendorId, reportingManagerId,
-                employmentTypeLookupId, workModelLookupId, joiningDate, sign_before_date, offeredCTCAmount,
+                employmentTypeLookupId, workModelLookupId, joiningDate, sign_before_date,
+                contractor_address, offeredCTCAmount,
                 currencyLookupId, compensationTypeLookupId, variablePay, joiningBonus,
                 offerLetterSent, serviceAgreementSent, ndaSent, codeOfConductSent,
                 offerStatus, offerVersion, createdBy
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             const [result] = await connection.execute(query, [
                 offerData.candidateId,
@@ -26,6 +27,7 @@ class OfferRepository {
                 offerData.workModelLookupId,
                 offerData.joiningDate,
                 offerData.sign_before_date ?? null,
+                offerData.contractorAddress ?? null,
                 offerData.offeredCTCAmount ?? null,
                 offerData.currencyLookupId ?? null,
                 offerData.compensationTypeLookupId ?? null,
@@ -67,6 +69,7 @@ class OfferRepository {
                     workModelLookupId         = ?,
                     joiningDate               = ?,
                     sign_before_date          = ?,
+                    contractor_address        = ?,
                     offeredCTCAmount          = ?,
                     currencyLookupId          = ?,
                     compensationTypeLookupId  = ?,
@@ -85,6 +88,7 @@ class OfferRepository {
                     offerData.workModelLookupId        ?? null,
                     offerData.joiningDate              ?? null,
                     offerData.sign_before_date         ?? null,
+                    offerData.contractorAddress        ?? null,
                     offerData.offeredCTCAmount         ?? null,
                     offerData.currencyLookupId         ?? null,
                     offerData.compensationTypeLookupId ?? null,
@@ -299,6 +303,7 @@ class OfferRepository {
                     o.offerLetterSent, o.serviceAgreementSent, o.ndaSent, o.codeOfConductSent,
                     o.offerStatus, o.offerVersion, o.createdBy, o.createdAt, o.updatedAt,
                     o.sign_before_date AS signBeforeDate,
+                    o.contractor_address AS contractorAddress,
                     c.candidateName,
                     jp.jobRole,
                     let.value AS employmentTypeName,
@@ -535,6 +540,8 @@ class OfferRepository {
                     o.variablePay, o.joiningBonus,
                     o.offerLetterSent, o.serviceAgreementSent, o.ndaSent, o.codeOfConductSent,
                     o.offerStatus,
+                    DATE_FORMAT(o.sign_before_date, '%Y-%m-%d') AS signBeforeDate,
+                    o.contractor_address AS contractorAddress,
                     let.value AS employmentTypeName,
                     o.doc_type         AS docType,
                     o.doc_file_name    AS docFileName,

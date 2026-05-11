@@ -34,6 +34,7 @@ const offerSchemas = {
         joiningBonus: Joi.number().min(0).optional().allow(null),
         offerLetterSent: Joi.boolean().optional().allow(null),
         serviceAgreementSent: Joi.boolean().optional().allow(null),
+        contractorAddress: Joi.string().trim().max(500).optional().allow(null, ''),
         ndaSent: Joi.boolean().required()
             .messages({ 'any.required': 'NDA sent is required' }),
         codeOfConductSent: Joi.boolean().required()
@@ -54,6 +55,7 @@ const offerSchemas = {
         joiningBonus:             Joi.number().min(0).optional().allow(null),
         offerLetterSent:          Joi.boolean().optional().allow(null),
         serviceAgreementSent:     Joi.boolean().optional().allow(null),
+        contractorAddress:        Joi.string().trim().max(500).optional().allow(null, ''),
         ndaSent:                  Joi.boolean().optional(),
         codeOfConductSent:        Joi.boolean().optional(),
     }),

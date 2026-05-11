@@ -61,6 +61,15 @@ const BODY_SZ = 10.5;
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
 
+// dd/mm/yyyy — used in service agreement (template uses numeric dates)
+function fmtDateDMY(d) {
+    if (!d) return '';
+    const dt = d instanceof Date ? d : new Date(d);
+    const dd = String(dt.getUTCDate()).padStart(2, '0');
+    const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
+    return `${dd}/${mm}/${dt.getUTCFullYear()}`;
+}
+
 function fmtDate(d) {
     if (!d) return '';
     const dt = d instanceof Date ? d : new Date(d);
@@ -219,6 +228,32 @@ function calcSalary(amount, currencyName, compensationTypeName) {
         tot_ded:  { m: monthlyTotDed,   y: annualTotDed },
         net:      { m: monthlyGross - monthlyTotDed, y: annualGross - annualTotDed },
     };
+}
+
+// ── Shared page chrome (reused by both offer letter and service agreement) ────
+
+function drawPageChrome(doc) {
+    const logoSrc = fs.existsSync(BRAND_LOGO) ? BRAND_LOGO : getAsset('logo.png');
+    const maxW    = CW * 0.4;
+    const maxH    = HDR_LINE_Y - HDR_Y - 20;
+    const logoX   = (PAGE_W - maxW) / 2;
+    if (logoSrc) {
+        doc.image(logoSrc, logoX, HDR_Y + 7, { fit: [maxW, maxH], align: 'center', valign: 'center' });
+    } else {
+        doc.fontSize(20).font('Times-Bold').fillColor('#1a1a6e')
+           .text('aerolens', ML, HDR_Y + 20, { width: CW, align: 'center' });
+    }
+    doc.moveTo(ML, HDR_LINE_Y).lineTo(PAGE_W - MR, HDR_LINE_Y)
+       .strokeColor(RULE_CLR).lineWidth(0.6).stroke();
+    doc.moveTo(ML, FTR_LINE_Y).lineTo(PAGE_W - MR, FTR_LINE_Y)
+       .strokeColor(RULE_CLR).lineWidth(0.6).stroke();
+    doc.fontSize(9).font('Times-Bold').fillColor(BLACK)
+       .text('Aerolens India Private Limited', ML, FTR_Y + 2, { width: CW, align: 'center' });
+    doc.fontSize(7.5).font('Times-Roman').fillColor(DGRAY)
+       .text('Brain Wire Block C, 11th Floor, Navratna Business Park, Near Sindhu Bhavan Road, Opp. GTPL House, Bodakdev, Ahmedabad - 380059',
+             ML, FTR_Y + 14, { width: CW, align: 'center' })
+       .text('www.aerolens.net   hr@aerolens.net',
+             ML, FTR_Y + 26, { width: CW, align: 'center' });
 }
 
 // ── Offer letter PDF builder ──────────────────────────────────────────────────
@@ -698,59 +733,150 @@ function buildOfferLetterPdf(offer) {
 
 // ── OpenRouter (Service Agreement only) ──────────────────────────────────────
 
-function formatUtcDate(date) {
-    return date.toLocaleDateString('en-GB', {
-        day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
-    });
-}
-
-function buildServiceAgreementPrompt(offer, letterDate) {
+function buildServiceAgreementPrompt(offer) {
     const {
-        candidateName = 'Candidate',
-        jobRole       = 'Position',
-        clientName,
-        companyName,
+        candidateName     = '___________',
+        jobRole           = '___________',
         offeredCTCAmount,
         currencyName,
         compensationTypeName,
         joiningDate,
-        workModeName,
-        variablePay,
-        vendorName,
+        contractorAddress,
     } = offer;
 
-    const company  = clientName || companyName || 'Aerolens';
-    const ctcLine  = [offeredCTCAmount, currencyName, compensationTypeName].filter(Boolean).join(' ');
-    const dateStr  = joiningDate
-        ? new Date(joiningDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
-        : 'To be confirmed';
+    const todayDMY    = fmtDateDMY(new Date());
+    const startDMY    = joiningDate ? fmtDateDMY(new Date(joiningDate)) : '___________';
+    const address     = (contractorAddress || '').trim() || '___________';
+    const ctcLine     = offeredCTCAmount
+        ? `${fmtAmount(offeredCTCAmount, (currencyName || 'INR').trim())} + GST/${(compensationTypeName || 'Monthly').trim()}`
+        : 'As discussed';
 
-    return `You are a professional HR document writer. Generate a complete, formal Service Agreement for an independent consultant.
-Output ONLY the agreement text — no JSON, no markdown fences, no preamble, no commentary.
-Do NOT invent or include any dates other than the ones explicitly provided below.
+    return `You are generating a formal Agreement of Service for Aerolens India Private Limited.
+Output ONLY the document body — no JSON, no markdown fences, no preamble, no commentary.
+Do NOT invent dates, names, or addresses. Use ONLY the values provided below.
 
-Details:
-- Agreement Date: ${letterDate}
-- Consultant: ${candidateName}
-- Engagement Role: ${jobRole}
-- Client Company: ${company}${vendorName ? `\n- Vendor/Agency: ${vendorName}` : ''}
-- Work Arrangement: ${workModeName || 'As agreed'}
-- Engagement Start Date: ${dateStr}
-- Agreed Rate: ${ctcLine || 'As discussed'}${variablePay ? `\n- Performance Bonus: ${variablePay} ${currencyName || ''}` : ''}
+Substitute these values exactly where shown:
+- Agreement Date: ${todayDMY}
+- Effective Date: ${startDMY}
+- Consultant Name: ${candidateName}
+- Consultant Address: ${address}
+- Services / Tech Stack: ${jobRole}
 
-Structure the agreement with these numbered sections (plain text, no markdown):
-1. TITLE: SERVICE AGREEMENT (then "Date: ${letterDate}")
-2. Parties (Client and Consultant/Vendor)
-3. Scope of Services
-4. Term and Start Date
-5. Compensation and Payment Terms
-6. Confidentiality
-7. Intellectual Property
-8. Termination
-9. Governing Law
-10. Signature Blocks (both parties)
+Output the following document verbatim with the above values filled in:
 
-Tone: professional, formal, legally appropriate.`;
+AGREEMENT OF SERVICE
+
+This Agreement of Service is made on ${todayDMY} and shall be effective from ${startDMY} called for Services as per Statement of Work in Appendix A between
+
+1. Aerolens India Private Limited whose registered address is Brain Wire Block C, 10th & 11th Floor, Navratna Business Park, Near Sindhu Bhavan Road, Opp. GTPL House, Bodakdev, Ahmedabad – 380059 ("Aerolens") and
+
+2. ${candidateName}, with its place of business, office at, ${address} (Hereafter referred as "Consultant") hereby agree on the following terms:
+
+RECITALS
+
+WHEREAS AEROLENS has entered into a certain Master Services Agreement with their clients (hereinafter called the "Customer") for the execution of certain services around ${jobRole} (hereinafter called the "Services");
+
+WHEREAS Aerolens desires to have the Consultant to execute, upon the terms hereinafter appearing, the Services to the Customer as a Consultant to Aerolens; and
+
+WHEREAS, the Consultant agrees to execute the Services subject to the terms and conditions of this Agreement.
+
+NOW THEREFORE, the parties HEREBY AGREE as follows:
+
+1. THE SERVICES
+
+1.1 The Consultant agrees and undertakes to execute and complete the Services as described in Appendix A of this Agreement. The Consultant shall exercise all reasonable skills, care and diligence in the execution and completion of the Services.
+
+1.2 The Consultant shall provide all labor and materials, and everything required for the execution and completion of the Services.
+
+2. PRICE AND TERMS OF PAYMENT
+
+2.1 In consideration of Consultant executing and completing the Services in accordance with this Agreement, Aerolens agrees to pay the Consultant the price described in Appendix B of this Agreement.
+
+2.2 Aerolens will make payment to the Consultant, in accordance with the terms and conditions of payment as stated in Appendix B of this Agreement.
+
+3. TERM
+
+3.1 The term for the execution and completion of the Services shall be commencing on the Effective Date and ending as per mutually agreed date or further extension thereafter.
+
+4. RIGHTS GRANTED
+
+4.1 Upon payment for the Services, the Consultant hereby grants the Customer a perpetual, non-exclusive, non-assignable, royalty free license to use for the Customer internal business operations, anything developed by the Consultant and delivered to the Customer under this Agreement.
+
+5. OWNERSHIP AND RESTRICTIONS
+
+5.1 The Customer shall own title and all property right (including Intellectual property rights) in all materials and deliverables, which are developed specifically for the Customer as a part of the Services.
+
+6. WARRANTIES AND DISCLAIMERS
+
+6.1 The Consultant warrants that, the Services will be provided in a professional manner consistent with internationally recognized industry standards. Aerolens must notify the Consultant of any warranty deficiencies within one (1) year from the performance of the Service described in the Appendix A of this Agreement.
+
+6.2 For any breach of the warranty the Consultant's liability shall be the re-performance of the deficient Service or if the Consultant cannot substantially correct a breach in a commercially reasonable manner, Aerolens may end the relevant Service and recover fees paid to the Consultant for the deficient Service.
+
+7. CONFIDENTIAL INFORMATION
+
+7.1 This Agreement and all information disclosed under or in connection therewith, including the Customer information, shall be treated by the Consultant as confidential and shall not be divulged to any third parties without the prior written consent of the Aerolens. The Consultant shall ensure that the persons to whom such information is divulged shall themselves observe the requirements of this condition. Confidential information shall not include information that: (i) is or becomes a part of the public domain through no act or omission of the other party; (ii) was in the other party's lawful possession prior to the disclosure and had not been obtained by the other party either directly or indirectly from the disclosing party; (iii) is lawfully disclosed to the other party by a third party without restriction on the disclosure; or (iv) is independently developed by the other party.
+
+7.2 The parties agree to hold confidential information disclosed under this Agreement, including the Customer information, in confidence for a period of two (2) years from the date of disclosure. Also, the parties agree to disclose confidential information only to those employees or agents who are required to protect it against unauthorized disclosure. Nothing shall prevent either party from disclosing the terms or pricing under this agreement or orders submitted under this agreement in any legal proceeding arising from or in connection with this agreement or disclosing the information to a federal or state governmental entity as required by law.
+
+8. NON-COMPETE
+
+8.1 During the term this Agreement is in effect and for a period of two (2) years thereafter, Consultant shall not seek to engage in the same customer project directly, for which Consultant has been contracted for, and bypass Aerolens as partner, unless both parties have reached prior written consent.
+
+9. LIMITATION OF LIABILITY
+
+9.1 Neither party shall be liable to the other for any indirect, incidental, consequential nor reliance damages (including lost profits), whether in contract or tort and whether or not such damages are foreseen. Except for breach of confidentiality, breach of intellectual property, negligence and willful misconduct, the maximum aggregate liability of the Consultant, if held legally liable, regardless of the nature or form of action giving rise to such liability (whether in contract, tort or otherwise) shall under no circumstances exceed the fees received by Contractor for the Services rendered under this Agreement.
+
+10. FORCE MAJEURE
+
+10.1 Neither Party shall be in breach of this Agreement if there is any total or partial failure of performance of its duties and obligations under this Agreement which results from Force Majeure Event. If the Force Majeure Event continues for a period of more than three calendar months and substantially affects the performance of this Agreement each Party shall have the right to terminate this Agreement upon giving written notice of such termination to the other Party, unless the Parties agree otherwise. For the purposes of this Clause "Force Majeure Event" means any act outside the reasonable control of a Party to this Agreement, which shall include acts of God, any war, armed conflict, national emergency, riots, civil commotion, fire, explosion, flood, epidemic, lock-outs, strikes or other industrial disputes, nuclear, chemical or biological contamination arising from such events; or acts of any governmental or supra-national authority.
+
+11. PROGRAM AND SOFTWARE LICENSES
+
+11.1 In case of ordering Services relevant to the implementation of software programs developed by a 3rd party vendor, end customer is fully responsible for ensuring that the Customer is complying with the terms of use imposed by the 3rd party vendor. The Consultant will not be responsible in any form or way for any breach of the terms of use of any 3rd party software.
+
+12. ASSIGNMENT & SUBCONTRACTS
+
+12.1 The Consultant shall not assign or otherwise transfer the Services or any benefit or interest therein, whether in whole or in part.
+
+13. PUBLICITY
+
+13.1 The Consultant shall NOT issue a news release, public announcement, advertisement, or any other form of publicity to the press or other public media concerning this Agreement or the subject matter thereof, without obtaining prior written approval from Aerolens.
+
+14. INDEMNITIES
+
+14.1 The Consultant shall at all times defend, hold harmless and indemnify Aerolens and the Customer against all liabilities, damages, losses or costs (including reasonable attorney's fees) arising from or in connection with any willful or negligent act or omission by the Consultant.
+
+15. TERMINATION
+
+15.1 If the Main Contract is terminated for any reason whatsoever before the Consultant has fully performed his obligations under this Agreement, then Aerolens may at any time thereafter by written notice to the Consultant forthwith terminate this Agreement without any liability. Upon such a termination of this Agreement (i) all rights and obligations of the parties shall cease to have effect (ii) each party shall return to the other party any Confidential Information; and (iii) Consultant shall be entitled to be paid the full value of the Services properly completed to the satisfaction of the Customer provided Aerolens have been paid by the customer for the delivered service.
+
+15.2 This Agreement may, at any time during its term, be terminated by either party if the other party commits a material breach of any term or condition of this Agreement and fails to remedy such breach within ten (10) calendar days of being brought to the attention of the other party.
+
+15.3 Either party may terminate this Agreement by written notice in writing upon bankruptcy of the other party.
+
+15.4 Either party may terminate this Agreement by giving two months' notice in writing.
+
+16. BENEFIT OF THE AGREEMENT
+
+16.1 The rights and liabilities of the parties hereto shall bind and inure to the benefit of the parties and the successors and permitted assigns of each party.
+
+17. COMPLETE UNDERSTANDING AND AMENDMENT
+
+17.1 This Agreement constitutes the entire agreement between the parties and supersedes all prior agreements and understandings between the parties, with respect to its subject matter and may not be amended unless mutually agreed in writing by both parties.
+
+18. NOTICES
+
+18.1 Any notices required hereunder shall be in writing, signed by the party giving it and shall be personally delivered, sent by courier, certified mail or by fax to the address of the party notified as set forth hereabove, or to such other address as that party may designate in writing. A notice shall be deemed to be received: (a) at the time of delivery, if delivered personally; (b) five (5) days following delivery, if sent by courier; (c) in the case of fax or email, on the day of transmission if sent before 3:30 p.m. on any business day and otherwise at 8:30 a.m. on the next business day provided that, at the time of transmission, an error-free transmission report has been received by the sender in case of fax and a confirmatory letter is sent by fax within twenty four (24) hours after the sending of the email in case the notice sent by email.
+
+19. WAIVER
+
+19.1 No waiver by a party of any right under this Agreement shall be valid unless such waiver is in writing and signed by the party waiving such right.
+
+20. GOVERNING LAW and JURISDICTION
+
+20.1 This Agreement shall be governed and construed in accordance with the India law. The Parties shall use all reasonable endeavors to negotiate in good faith at the highest executive levels to settle amicably any dispute of whatever nature arising in connection with this Agreement. If such executive negotiations for the amicable settlement are unsuccessful, the dispute arising shall be referred to the exclusive jurisdiction of the India competent courts.
+
+Output this document exactly as shown with only the four provided values substituted in. Do not add, remove, or rephrase any legal clause. CTC for reference (used only in Appendix B, not in the body above): ${ctcLine}`;
 }
 
 async function callOpenRouter(prompt) {
@@ -789,30 +915,246 @@ async function callOpenRouter(prompt) {
     return content.trim();
 }
 
-function buildServiceAgreementPdfBuffer(text) {
+function buildServiceAgreementPdf(rawBody, offer) {
     return new Promise((resolve, reject) => {
-        const doc = new PDFDocument({ margin: 72, size: 'A4' });
+        const doc    = new PDFDocument({ autoFirstPage: false, size: 'A4', margin: 0 });
         const chunks = [];
         doc.on('data',  (c) => chunks.push(c));
         doc.on('end',   ()  => resolve(Buffer.concat(chunks)));
         doc.on('error', reject);
 
-        doc.fontSize(16).font('Helvetica-Bold').text('SERVICE AGREEMENT', { align: 'center' });
-        doc.moveDown(1.5);
-        doc.fontSize(11).font('Helvetica');
+        const sigPath       = getAsset('signature.png');
+        const BOTTOM_LIMIT  = FTR_LINE_Y - 15;
+        const SA_SZ         = 10.5;
+        const INDENT_SUB    = 22;
 
-        for (const para of text.split(/\n{2,}/)) {
-            const trimmed = para.trim();
-            if (!trimmed) continue;
-            for (const line of trimmed.split('\n')) {
-                const l = line.trim();
-                if (!l) continue;
-                const isHeader = /^\d+\.\s+[A-Z]/.test(l) || (/^[A-Z\s:]{4,}$/.test(l) && l.length < 60);
-                if (isHeader) { doc.font('Helvetica-Bold').text(l); doc.font('Helvetica'); }
-                else { doc.text(l); }
-            }
-            doc.moveDown(0.8);
+        function newPage() {
+            doc.addPage({ size: 'A4', margin: 0 });
+            drawPageChrome(doc);
+            doc.x = ML;
+            doc.y = BODY_Y;
         }
+
+        // Safe text block — auto-page-breaks before rendering
+        function safeBlock(renderFn, estH = 40) {
+            if (doc.y + estH > BOTTOM_LIMIT) newPage();
+            renderFn();
+        }
+
+        function safeText(text, opts = {}) {
+            const indent = opts.indent || 0;
+            const w      = CW - indent;
+            const h      = doc.heightOfString(text, { width: w, lineGap: 0 }) + 8;
+            if (doc.y + h > BOTTOM_LIMIT) newPage();
+            doc.fontSize(opts.size || SA_SZ)
+               .font(opts.bold ? 'Times-Bold' : 'Times-Roman')
+               .fillColor(BLACK)
+               .text(text, ML + indent, doc.y, {
+                   width: w,
+                   align: opts.align || 'justify',
+                   lineGap: 0,
+               });
+            doc.moveDown(opts.gap !== undefined ? opts.gap : 0.3);
+        }
+
+        // ── Pages 1+ : AI-generated body ────────────────────────────────────
+        newPage();
+
+        const paragraphs = rawBody.split(/\n{2,}/);
+        for (const p of paragraphs) {
+            const trimmed = p.trim();
+            if (!trimmed) continue;
+
+            // Title line already shown via prompt — skip if echoed back
+            if (/^AGREEMENT OF SERVICE$/i.test(trimmed)) {
+                safeText('AGREEMENT OF SERVICE', { bold: true, align: 'center', size: 13, gap: 0.8 });
+                continue;
+            }
+
+            // Section header: "1. THE SERVICES", "RECITALS", "NOW THEREFORE", etc.
+            const isSectionHdr = /^(\d+\.\s+[A-Z])/.test(trimmed) ||
+                                  /^(RECITALS|NOW THEREFORE)$/.test(trimmed);
+            // Sub-section: "1.1 ...", "15.2 ..."
+            const isSubSection = /^\d+\.\d+\s/.test(trimmed);
+
+            const indent = isSubSection ? INDENT_SUB : 0;
+            safeText(trimmed, {
+                bold:   isSectionHdr,
+                indent,
+                align:  isSectionHdr ? 'left' : 'justify',
+                gap:    isSectionHdr ? 0.35 : 0.3,
+            });
+        }
+
+        // ── Appendix A ───────────────────────────────────────────────────────
+        newPage();
+
+        safeText('Appendix A', { bold: true, align: 'center', size: 12, gap: 0.3 });
+        safeText('Scope and Description of the Services', { bold: true, align: 'center', size: 11, gap: 0.6 });
+        safeText('Scope of Services', { bold: true, align: 'left', gap: 0.3 });
+        safeText(
+            `Consultant agrees to provide the professional consulting service on ${offer.jobRole || '___________'} ` +
+            'project according to the agreed scope of work, offer, below roles and responsibility and project plan.',
+            { gap: 0.4 }
+        );
+        safeText('Roles and Responsibility (Inclusive)', { bold: true, align: 'left', gap: 0.3 });
+
+        const roleDesc = (offer.jobRole || '').toLowerCase();
+        const roles = roleDesc.includes('backend') || roleDesc.includes('engineer') || roleDesc.includes('developer') ? [
+            'Design, develop, and maintain scalable systems and APIs',
+            'Work across the full SDLC, including requirement analysis, design, development, testing, deployment, and maintenance',
+            'Write clean, efficient, and reusable code following best practices',
+            'Collaborate with cross-functional teams (frontend, QA, DevOps, product)',
+            'Optimize application performance, scalability, and security',
+            'Troubleshoot, debug, and upgrade existing systems',
+            'Participate in code reviews and ensure high-quality deliverables',
+        ] : [
+            `Deliver professional services in the capacity of ${offer.jobRole || 'the agreed role'}`,
+            'Work according to the agreed scope, timelines, and quality standards',
+            'Collaborate with Aerolens and customer teams as required',
+            'Provide regular status updates and adhere to project plans',
+            'Ensure deliverables meet the requirements agreed upon in this Agreement',
+        ];
+
+        roles.forEach((r) => {
+            safeBlock(() => {
+                const y0 = doc.y;
+                doc.circle(ML + 7, y0 + 5.5, 2.2).fill(BLACK);
+                doc.fillColor(BLACK).fontSize(SA_SZ).font('Times-Roman')
+                   .text(r, ML + 16, y0, { width: CW - 16, align: 'justify', lineGap: 0 });
+                doc.moveDown(0.25);
+            }, 20);
+        });
+
+        doc.moveDown(0.4);
+        safeText('Workplace and execution of professional services at Customer or Consultant offices', { bold: true, align: 'left', gap: 0.3 });
+
+        const wm = (offer.workModeName || '').trim() || '___________';
+        safeBlock(() => {
+            const y0 = doc.y;
+            doc.circle(ML + 7, y0 + 5.5, 2.2).fill(BLACK);
+            doc.fillColor(BLACK).fontSize(SA_SZ).font('Times-Bold')
+               .text(wm, ML + 16, y0, { width: CW - 16, lineGap: 0 });
+            doc.moveDown(0.25);
+        }, 20);
+
+        // ── Appendix B ───────────────────────────────────────────────────────
+        newPage();
+
+        safeText('Appendix B', { bold: true, align: 'center', size: 12, gap: 0.3 });
+        safeText('Invoicing & Payment Term', { bold: true, align: 'center', size: 11, gap: 0.6 });
+
+        const todayDMY  = fmtDateDMY(new Date());
+        const startDMY  = offer.joiningDate ? fmtDateDMY(new Date(offer.joiningDate)) : '___________';
+        const ctcFormatted = offer.offeredCTCAmount
+            ? `${fmtAmount(offer.offeredCTCAmount, (offer.currencyName || 'INR').trim())} + GST/${(offer.compensationTypeName || 'Monthly').trim()}`
+            : 'As discussed';
+        const wml   = (offer.workModeName || '').toLowerCase();
+        const conn  = wml.includes('remote')
+            ? 'Remote Working using reliable broadband connection and good specification Laptop'
+            : 'Onsite at designated work location';
+
+        const appBRows = [
+            [
+                'Total Fixed Cost: ' + ctcFormatted + ' for the agreed consultant (' + (offer.candidateName || '___________') + ')\n' +
+                '  •  Mode of Hiring: Full Time Contract\n' +
+                '  •  Start date: ' + startDMY + '\n' +
+                '  •  Work Timing: The standard working hours are 02:00 PM to 11:00 PM, which may vary based on project, client, or location requirements\n' +
+                '  •  Designation: ' + (offer.jobRole || '___________') + '\n' +
+                '  •  Payment Mode: Bank payment against monthly invoice\n' +
+                '  •  Payment term: Maximum 30 days from receiving approved timesheet & correct invoice\n' +
+                '  •  Connectivity: ' + conn,
+            ],
+            ['Above amount is inclusive of all the charges i.e. Consulting Fee, Technical Support, Functional Support, etc.'],
+            ['Consultant (' + (offer.candidateName || '___________') + ') is required to fill Timesheet to record weekly time which shall be approved by PM'],
+            [(offer.candidateName || '___________') + ' is expected to submit invoice at the end of each month or end of the assignment whichever is earlier, along with approved timesheet.'],
+            [
+                'Payment would be made at the completion of the work based on the approved timesheet & on receipt of signed invoice.\n' +
+                'Payment will be processed within 30 days of acceptance of invoice through bank transfer.',
+            ],
+            [
+                'Invoices must be addressed to\nAerolens India Private Limited\nbhavin.trivedi@aerolens.net\n' +
+                'Attn: Mr. Bhavin Trivedi\nC/o Brain Wire Block C, 10th & 11th Floor, Navratna Business Park,\n' +
+                'Near Sindhu Bhavan Road, Opp. GTPL House, Bodakdev, Ahmedabad – 380059\n' +
+                'Mobile: +91 - 81410 09822\nGSTIN: 24ABBCA0868P1ZE',
+            ],
+        ];
+
+        const col0W = 40;
+        const col1W = CW - col0W;
+        const tBord = TBL_BORD;
+
+        appBRows.forEach((cols, idx) => {
+            const cellText = cols[0];
+            const h = Math.max(doc.heightOfString(cellText, { width: col1W - 10, lineGap: 1 }) + 14, 24);
+            if (doc.y + h > BOTTOM_LIMIT) newPage();
+            const rowY = doc.y;
+            doc.rect(ML,          rowY, col0W, h).strokeColor(tBord).lineWidth(0.4).stroke();
+            doc.rect(ML + col0W,  rowY, col1W, h).strokeColor(tBord).lineWidth(0.4).stroke();
+            doc.fontSize(9).font('Times-Bold').fillColor(BLACK)
+               .text(String(idx + 1), ML + 4, rowY + 6, { width: col0W - 8, align: 'center', lineBreak: false });
+            doc.fontSize(8.5).font('Times-Roman').fillColor(BLACK)
+               .text(cellText, ML + col0W + 5, rowY + 6, { width: col1W - 10, lineGap: 1 });
+            doc.y = rowY + h;
+        });
+
+        // ── Signature page ───────────────────────────────────────────────────
+        newPage();
+
+        safeText('IN WITNESS WHEREOF, the parties have executed this Agreement on the written date.', { gap: 0.8 });
+
+        const sigBoxW = (CW - 10) / 2;
+        const sigBoxH = 160;
+        const leftX   = ML;
+        const rightX  = ML + sigBoxW + 10;
+        const boxY    = doc.y;
+
+        doc.rect(leftX,  boxY, sigBoxW, sigBoxH).strokeColor(TBL_BORD).lineWidth(0.4).stroke();
+        doc.rect(rightX, boxY, sigBoxW, sigBoxH).strokeColor(TBL_BORD).lineWidth(0.4).stroke();
+
+        // Left header
+        doc.fontSize(9).font('Times-Bold').fillColor(BLACK)
+           .text('AEROLENS INDIA PRIVATE LIMITED', leftX + 5, boxY + 6, { width: sigBoxW - 10 });
+        // Right header
+        doc.fontSize(9).font('Times-Bold').fillColor(BLACK)
+           .text('CONSULTANT', rightX + 5, boxY + 6, { width: sigBoxW - 10 });
+
+        // Aerolens signature image
+        if (sigPath) {
+            doc.image(sigPath, leftX + 5, boxY + 22, { width: 120 });
+        }
+
+        const lineY    = boxY + 88;
+        const lineGap  = 19;
+
+        // Signature lines
+        doc.moveTo(leftX  + 5, lineY).lineTo(leftX  + sigBoxW - 5, lineY).strokeColor(BLACK).lineWidth(0.5).stroke();
+        doc.moveTo(rightX + 5, lineY).lineTo(rightX + sigBoxW - 5, lineY).strokeColor(BLACK).lineWidth(0.5).stroke();
+        doc.fontSize(8).font('Times-Roman').fillColor(BLACK)
+           .text('(Authorised Signature)', leftX  + 5, lineY + 2, { width: sigBoxW - 10 })
+           .text('(Authorised Signature)', rightX + 5, lineY + 2, { width: sigBoxW - 10 });
+
+        // Printed names
+        doc.fontSize(8.5).font('Times-Roman').fillColor(BLACK)
+           .text('Printed Name: ', leftX + 5, lineY + lineGap, { continued: true, width: sigBoxW - 10 });
+        doc.font('Times-Bold').text('BHAVIN TRIVEDI');
+        doc.fontSize(8.5).font('Times-Roman').fillColor(BLACK)
+           .text('Printed Name: ', rightX + 5, lineY + lineGap, { continued: true, width: sigBoxW - 10 });
+        doc.font('Times-Bold').text((offer.candidateName || '___________').toUpperCase());
+
+        // Title/Position
+        doc.fontSize(8.5).font('Times-Roman').fillColor(BLACK)
+           .text('Title/Position: Head of Engineering', leftX + 5, lineY + lineGap * 2, { width: sigBoxW - 10 });
+        doc.fontSize(8.5).font('Times-Roman').fillColor(BLACK)
+           .text('Title/Position: ', rightX + 5, lineY + lineGap * 2, { continued: true, width: sigBoxW - 10 });
+        doc.font('Times-Bold').text(offer.jobRole || '___________');
+
+        // Date of signature
+        doc.fontSize(8.5).font('Times-Roman').fillColor(BLACK)
+           .text('Date of Signature: ', leftX + 5, lineY + lineGap * 3, { continued: true, width: sigBoxW - 10 });
+        doc.font('Times-Bold').text(todayDMY);
+        doc.fontSize(8.5).font('Times-Roman').fillColor(BLACK)
+           .text('Date of Signature:', rightX + 5, lineY + lineGap * 3, { width: sigBoxW - 10 });
 
         doc.end();
     });
@@ -859,16 +1201,9 @@ async function generateOnboardingDocument(offerDetails, generatedBy) {
     if (docType === 'offer_letter') {
         pdfBuffer = await buildOfferLetterPdf(offerDetails);
     } else {
-        const letterDate = formatUtcDate(generatedAt);
-        const prompt     = buildServiceAgreementPrompt(offerDetails, letterDate);
-        let   rawText    = await callOpenRouter(prompt);
-
-        rawText = rawText
-            .replace(/^[ \t]*Date:[ \t]*.*/gim,            `Date: ${letterDate}`)
-            .replace(/^[ \t]*\d{1,2}\s+[A-Za-z]+\s+\d{4}[ \t]*$/gm, `Date: ${letterDate}`)
-            .replace(/\s+(on or before|by)\s+\d{1,2}\s+[A-Za-z]+\s+\d{4}\b/gi, '');
-
-        pdfBuffer = await buildServiceAgreementPdfBuffer(rawText);
+        const prompt  = buildServiceAgreementPrompt(offerDetails);
+        const rawText = await callOpenRouter(prompt);
+        pdfBuffer     = await buildServiceAgreementPdf(rawText, offerDetails);
     }
 
     await uploadToS3(pdfBuffer, s3Key);
