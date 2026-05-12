@@ -945,15 +945,16 @@ function buildServiceAgreementPdf(rawBody, offer, attachments = {}) {
         function safeText(text, opts = {}) {
             const indent = opts.indent || 0;
             const w      = CW - indent;
-            const h      = doc.heightOfString(text, { width: w, lineGap: 0 }) + 8;
+            const h      = doc.heightOfString(text, { width: w, lineGap: 1 }) + 8;
             if (doc.y + h > BOTTOM_LIMIT) newPage();
             doc.fontSize(opts.size || SA_SZ)
                .font(opts.bold ? 'Times-Bold' : 'Times-Roman')
-               .fillColor(BLACK)
+               .fillColor(opts.color || BLACK)
                .text(text, ML + indent, doc.y, {
                    width: w,
                    align: opts.align || 'justify',
-                   lineGap: 0,
+                   lineGap: 1,
+                   underline: opts.underline || false,
                });
             doc.moveDown(opts.gap !== undefined ? opts.gap : 0.15);
         }
@@ -967,22 +968,33 @@ function buildServiceAgreementPdf(rawBody, offer, attachments = {}) {
             if (!trimmed) continue;
 
             if (/^AGREEMENT OF SERVICE$/i.test(trimmed)) {
-                safeText('AGREEMENT OF SERVICE', { bold: true, align: 'center', size: 13, gap: 0.5 });
+                safeText('AGREEMENT OF SERVICE', { bold: true, align: 'center', size: 13, gap: 0.5, color: '#C00000' });
                 continue;
             }
 
-            // Section header: "1. THE SERVICES", "RECITALS", "NOW THEREFORE", etc.
-            const isSectionHdr = /^(\d+\.\s+[A-Z])/.test(trimmed) ||
-                                  /^(RECITALS|NOW THEREFORE)$/.test(trimmed);
-            // Sub-section: "1.1 ...", "15.2 ..."
-            const isSubSection = /^\d+\.\d+\s/.test(trimmed);
+            // Numbered section header: ALL-CAPS after number ("1. THE SERVICES" ✓, "1. Aerolens..." ✗)
+            const isNumberedHdr = /^\d+\.\s+[A-Z]{2}/.test(trimmed);
+            const isRECITALS    = trimmed === 'RECITALS';
+            const isWordHdr     = isRECITALS || trimmed === 'NOW THEREFORE';
+            const isSectionHdr  = isNumberedHdr || isWordHdr;
+            // Sub-section: "1.1 ...", "15.4 ..."
+            const isSubSection  = /^\d+\.\d+\s/.test(trimmed);
+            // Party list items: "1. Aerolens India..." or "2. [Name]..." (proper case, not ALL-CAPS)
+            const isPartyItem   = /^\d+\.\s+[A-Z][a-z]/.test(trimmed);
 
-            const indent = isSubSection ? INDENT_SUB : 0;
+            // Clear space before each section header
+            if (isSectionHdr && doc.y > BODY_Y + 20) {
+                if (doc.y + 20 > BOTTOM_LIMIT) newPage();
+                else doc.moveDown(0.35);
+            }
+
+            const indent = isSubSection ? INDENT_SUB : (isPartyItem ? 14 : 0);
             safeText(trimmed, {
-                bold:   isSectionHdr,
+                bold:      isSectionHdr,
+                underline: isRECITALS,
                 indent,
-                align:  isSectionHdr ? 'left' : 'justify',
-                gap:    isSectionHdr ? 0.2 : 0.15,
+                align:     isSectionHdr ? 'left' : 'justify',
+                gap:       isSectionHdr ? 0.1 : 0.2,
             });
         }
 
@@ -990,7 +1002,7 @@ function buildServiceAgreementPdf(rawBody, offer, attachments = {}) {
         newPage();
 
         safeText('Appendix A', { bold: true, align: 'center', size: 12, gap: 0.2 });
-        safeText('Scope and Description of the Services', { bold: true, align: 'center', size: 11, gap: 0.4 });
+        safeText('Scope and Description of the Services', { bold: true, underline: true, align: 'center', size: 11, gap: 0.4 });
         safeText('Scope of Services', { bold: true, align: 'left', gap: 0.2 });
         safeText(
             `Consultant agrees to provide the professional consulting service on ${offer.jobRole || '___________'} ` +
