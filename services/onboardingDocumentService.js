@@ -744,11 +744,13 @@ function buildServiceAgreementBody(offer) {
         compensationTypeName,
         joiningDate,
         contractorAddress,
+        workModeName,
     } = offer;
 
     const todayDMY = fmtDateDMY(new Date());
     const startDMY = joiningDate ? fmtDateDMY(new Date(joiningDate)) : '___________';
-    const address  = (contractorAddress || '').trim() || '___________';
+    // For Contractor: use their Aadhaar address. For Consultant: fall back to work location.
+    const address  = (contractorAddress || '').trim() || (workModeName || '').trim() || '___________';
 
     // ctcLine is used by buildServiceAgreementPdf directly from offer — not needed here
     void offeredCTCAmount; void currencyName; void compensationTypeName;
@@ -1154,9 +1156,9 @@ function buildServiceAgreementPdf(rawBody, offer, attachments = {}) {
         doc.fontSize(8.5).font('Times-Roman').fillColor(BLACK)
            .text('Date of Signature:', rightX + 5, lineY + lineGap * 3, { width: sigBoxW - 10 });
 
-        // ── Attachment page (contractor ID documents) ────────────────────────
+        // ── Attachment page (always included in service agreement) ──────────
         const { professionalPhoto, aadhaarFront, aadhaarBack, panCard } = attachments;
-        if (professionalPhoto || aadhaarFront || aadhaarBack || panCard) {
+        {
             newPage();
 
             // Professional Photo — centred at top
@@ -1167,6 +1169,9 @@ function buildServiceAgreementPdf(rawBody, offer, attachments = {}) {
             if (professionalPhoto) {
                 doc.image(professionalPhoto, photoX + 2, photoY + 2,
                     { fit: [photoW - 4, photoH - 4], align: 'center', valign: 'center' });
+            } else {
+                doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
+                   .text('Professional Photo', photoX, photoY + photoH / 2 - 5, { width: photoW, align: 'center' });
             }
             doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
                .text('Professional Photo', photoX, photoY + photoH + 3, { width: photoW, align: 'center' });
@@ -1181,10 +1186,16 @@ function buildServiceAgreementPdf(rawBody, offer, attachments = {}) {
             if (aadhaarFront) {
                 doc.image(aadhaarFront, ML + 2, aY + 2,
                     { fit: [idW - 4, idH - 4], align: 'center', valign: 'center' });
+            } else {
+                doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
+                   .text('IF IC – Aadhaar Card Front', ML, aY + idH / 2 - 5, { width: idW, align: 'center' });
             }
             if (aadhaarBack) {
                 doc.image(aadhaarBack, ML + idW + 12, aY + 2,
                     { fit: [idW - 4, idH - 4], align: 'center', valign: 'center' });
+            } else {
+                doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
+                   .text('IF IC – Aadhaar Card Back', ML + idW + 10, aY + idH / 2 - 5, { width: idW, align: 'center' });
             }
             doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
                .text('IF IC – Aadhaar Card Front', ML,            aY + idH + 3, { width: idW,  align: 'center' })
@@ -1200,6 +1211,9 @@ function buildServiceAgreementPdf(rawBody, offer, attachments = {}) {
             if (panCard) {
                 doc.image(panCard, panX + 2, panY + 2,
                     { fit: [panW - 4, panH - 4], align: 'center', valign: 'center' });
+            } else {
+                doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
+                   .text('IF Client – Owner Pan Card', panX, panY + panH / 2 - 5, { width: panW, align: 'center' });
             }
             doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
                .text('IF Client – Owner Pan Card', panX, panY + panH + 3, { width: panW, align: 'center' });
