@@ -1050,14 +1050,20 @@ function buildServiceAgreementPdf(rawBody, offer, attachments = {}) {
             doc.moveDown(0.25);
         }, 20);
 
-        // ── Appendix B ───────────────────────────────────────────────────────
-        newPage();
+        // ── Appendix B — Consultant only (Contractor has no invoicing table) ──
+        const isContractorType = (offer.employmentTypeName || '').toLowerCase().trim() === 'contractor';
+        if (isContractorType) {
+            // Skip Appendix B for contractors
+            // Jump straight to signature page below
+        }
+        // Needed for both Appendix B (consultant only) and signature page (all types)
+        const todayDMY = fmtDateDMY(new Date());
+        const startDMY = offer.joiningDate ? fmtDateDMY(new Date(offer.joiningDate)) : '___________';
+
+        if (!isContractorType) { newPage();
 
         safeText('Appendix B', { bold: true, align: 'center', size: 12, gap: 0.3 });
         safeText('Invoicing & Payment Term', { bold: true, align: 'center', size: 11, gap: 0.6 });
-
-        const todayDMY  = fmtDateDMY(new Date());
-        const startDMY  = offer.joiningDate ? fmtDateDMY(new Date(offer.joiningDate)) : '___________';
         const ctcFormatted = offer.offeredCTCAmount
             ? `${fmtAmount(offer.offeredCTCAmount, (offer.currencyName || 'INR').trim())} + GST/${(offer.compensationTypeName || 'Monthly').trim()}`
             : 'As discussed';
@@ -1109,6 +1115,7 @@ function buildServiceAgreementPdf(rawBody, offer, attachments = {}) {
                .text(cellText, ML + col0W + 5, rowY + 6, { width: col1W - 10, lineGap: 1 });
             doc.y = rowY + h;
         });
+        } // end if (!isContractorType) — Appendix B
 
         // ── Signature page ───────────────────────────────────────────────────
         newPage();
@@ -1168,67 +1175,61 @@ function buildServiceAgreementPdf(rawBody, offer, attachments = {}) {
         doc.fontSize(8.5).font('Times-Roman').fillColor(BLACK)
            .text('Date of Signature:', rightX + 5, lineY + lineGap * 3, { width: sigBoxW - 10 });
 
-        // ── Attachment page (always included in service agreement) ──────────
+        // ── Attachment page — Consultant only (with uploaded images) ────────
         const { professionalPhoto, aadhaarFront, aadhaarBack, panCard } = attachments;
-        {
+        if (!isContractorType) {
             newPage();
+            // Reset PDFKit persistent lineGap state accumulated from body text —
+            // without this, lineGap:1 inherited from safeText() corrupts image placement
+            doc.lineGap(0);
+            doc.fillColor(BLACK);
 
-            // Professional Photo — centred at top
+            // Helper: place image in box, fall back to label if buffer missing or invalid
+            function placeImage(buf, x, y, w, h, label) {
+                if (buf) {
+                    try {
+                        doc.fillColor(BLACK);
+                        doc.image(buf, x + 2, y + 2,
+                            { fit: [w - 4, h - 4], align: 'center', valign: 'center' });
+                    } catch {
+                        doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
+                           .text(label, x, y + h / 2 - 5, { width: w, align: 'center', lineGap: 0 });
+                    }
+                } else {
+                    doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
+                       .text(label, x, y + h / 2 - 5, { width: w, align: 'center', lineGap: 0 });
+                }
+                doc.fillColor(BLACK);
+            }
+
+            // All y-positions are fixed from BODY_Y — not dependent on doc.y
             const photoW = 130, photoH = 110;
             const photoX = ML + (CW - photoW) / 2;
-            const photoY = doc.y;
+            const photoY = BODY_Y;
             doc.rect(photoX, photoY, photoW, photoH).strokeColor(TBL_BORD).lineWidth(0.5).stroke();
-            if (professionalPhoto) {
-                doc.image(professionalPhoto, photoX + 2, photoY + 2,
-                    { fit: [photoW - 4, photoH - 4], align: 'center', valign: 'center' });
-            } else {
-                doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
-                   .text('Professional Photo', photoX, photoY + photoH / 2 - 5, { width: photoW, align: 'center' });
-            }
+            placeImage(professionalPhoto, photoX, photoY, photoW, photoH, 'Professional Photo');
             doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
-               .text('Professional Photo', photoX, photoY + photoH + 3, { width: photoW, align: 'center' });
+               .text('Professional Photo', photoX, photoY + photoH + 4,
+                     { width: photoW, align: 'center', lineGap: 0 });
 
-            doc.y = photoY + photoH + 18;
-
-            // Aadhaar Front + Back — side by side
             const idW = (CW - 10) / 2, idH = 120;
-            const aY  = doc.y;
+            const aY  = photoY + photoH + 24;
             doc.rect(ML,            aY, idW, idH).strokeColor(TBL_BORD).lineWidth(0.5).stroke();
             doc.rect(ML + idW + 10, aY, idW, idH).strokeColor(TBL_BORD).lineWidth(0.5).stroke();
-            if (aadhaarFront) {
-                doc.image(aadhaarFront, ML + 2, aY + 2,
-                    { fit: [idW - 4, idH - 4], align: 'center', valign: 'center' });
-            } else {
-                doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
-                   .text(' Aadhaar Card Front', ML, aY + idH / 2 - 5, { width: idW, align: 'center' });
-            }
-            if (aadhaarBack) {
-                doc.image(aadhaarBack, ML + idW + 12, aY + 2,
-                    { fit: [idW - 4, idH - 4], align: 'center', valign: 'center' });
-            } else {
-                doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
-                   .text('Aadhaar Card Back', ML + idW + 10, aY + idH / 2 - 5, { width: idW, align: 'center' });
-            }
+            placeImage(aadhaarFront, ML,           aY, idW, idH, 'IF IC – Aadhaar Card Front');
+            placeImage(aadhaarBack,  ML + idW + 10, aY, idW, idH, 'IF IC – Aadhaar Card Back');
             doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
-               .text(' Aadhaar Card Front', ML,            aY + idH + 3, { width: idW,  align: 'center' })
-               .text(' Aadhaar Card Back',  ML + idW + 10, aY + idH + 3, { width: idW,  align: 'center' });
+               .text('IF IC – Aadhaar Card Front', ML,            aY + idH + 4, { width: idW, align: 'center', lineGap: 0 })
+               .text('IF IC – Aadhaar Card Back',  ML + idW + 10, aY + idH + 4, { width: idW, align: 'center', lineGap: 0 });
 
-            doc.y = aY + idH + 18;
-
-            // Owner PAN Card — centred
             const panW = 160, panH = 110;
             const panX = ML + (CW - panW) / 2;
-            const panY = doc.y;
+            const panY = aY + idH + 24;
             doc.rect(panX, panY, panW, panH).strokeColor(TBL_BORD).lineWidth(0.5).stroke();
-            if (panCard) {
-                doc.image(panCard, panX + 2, panY + 2,
-                    { fit: [panW - 4, panH - 4], align: 'center', valign: 'center' });
-            } else {
-                doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
-                   .text('IF Client – Owner Pan Card', panX, panY + panH / 2 - 5, { width: panW, align: 'center' });
-            }
+            placeImage(panCard, panX, panY, panW, panH, 'IF Client – Owner Pan Card');
             doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
-               .text('IF Client – Owner Pan Card', panX, panY + panH + 3, { width: panW, align: 'center' });
+               .text('IF Client – Owner Pan Card', panX, panY + panH + 4,
+                     { width: panW, align: 'center', lineGap: 0 });
         }
 
         doc.end();
