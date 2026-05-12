@@ -1188,18 +1188,18 @@ function buildServiceAgreementPdf(rawBody, offer, attachments = {}) {
                     { fit: [idW - 4, idH - 4], align: 'center', valign: 'center' });
             } else {
                 doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
-                   .text('IF IC – Aadhaar Card Front', ML, aY + idH / 2 - 5, { width: idW, align: 'center' });
+                   .text(' Aadhaar Card Front', ML, aY + idH / 2 - 5, { width: idW, align: 'center' });
             }
             if (aadhaarBack) {
                 doc.image(aadhaarBack, ML + idW + 12, aY + 2,
                     { fit: [idW - 4, idH - 4], align: 'center', valign: 'center' });
             } else {
                 doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
-                   .text('IF IC – Aadhaar Card Back', ML + idW + 10, aY + idH / 2 - 5, { width: idW, align: 'center' });
+                   .text('Aadhaar Card Back', ML + idW + 10, aY + idH / 2 - 5, { width: idW, align: 'center' });
             }
             doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
-               .text('IF IC – Aadhaar Card Front', ML,            aY + idH + 3, { width: idW,  align: 'center' })
-               .text('IF IC – Aadhaar Card Back',  ML + idW + 10, aY + idH + 3, { width: idW,  align: 'center' });
+               .text(' Aadhaar Card Front', ML,            aY + idH + 3, { width: idW,  align: 'center' })
+               .text(' Aadhaar Card Back',  ML + idW + 10, aY + idH + 3, { width: idW,  align: 'center' });
 
             doc.y = aY + idH + 18;
 
