@@ -1,6 +1,6 @@
 const AppError = require('../utils/appError');
 const auditLogService = require('./auditLogService');
-const { generateOnboardingDocument, getS3Stream } = require('./onboardingDocumentService');
+const { generateOnboardingDocument, generateOnboardingDocumentWithAttachments, getS3Stream } = require('./onboardingDocumentService');
 
 const TERMINAL_OFFER_STATUSES = ['ACCEPTED', 'REJECTED', 'TERMINATED'];
 
@@ -463,6 +463,57 @@ class OfferService {
             await client.rollback();
             if (error instanceof AppError) throw error;
             console.error('Error regenerating onboarding document:', error.stack);
+            throw new AppError('Failed to regenerate document', 500, 'DOCUMENT_GENERATION_ERROR');
+        } finally {
+            client.release();
+        }
+    }
+
+    async generateDocumentWithAttachments(offerId, generatedBy, attachments) {
+        const client = await this.db.getConnection();
+        try {
+            const offer = await this.offerRepository.getOfferDetails(offerId, client);
+            if (!offer) throw new AppError('Offer not found', 404, 'OFFER_NOT_FOUND');
+
+            const existing = await this.offerRepository.getDocument(offerId, client);
+            if (existing) return existing;
+
+            const docInfo = await generateOnboardingDocumentWithAttachments(
+                { ...offer, offerId }, generatedBy, attachments
+            );
+
+            await client.beginTransaction();
+            await this.offerRepository.saveDocument(offerId, docInfo, client);
+            await client.commit();
+            return await this.offerRepository.getDocument(offerId, client);
+        } catch (error) {
+            await client.rollback();
+            if (error instanceof AppError) throw error;
+            console.error('Error generating document with attachments:', error.stack);
+            throw new AppError('Failed to generate document', 500, 'DOCUMENT_GENERATION_ERROR');
+        } finally {
+            client.release();
+        }
+    }
+
+    async regenerateDocumentWithAttachments(offerId, generatedBy, attachments) {
+        const client = await this.db.getConnection();
+        try {
+            const offer = await this.offerRepository.getOfferDetails(offerId, client);
+            if (!offer) throw new AppError('Offer not found', 404, 'OFFER_NOT_FOUND');
+
+            const docInfo = await generateOnboardingDocumentWithAttachments(
+                { ...offer, offerId }, generatedBy, attachments
+            );
+
+            await client.beginTransaction();
+            await this.offerRepository.saveDocument(offerId, docInfo, client);
+            await client.commit();
+            return await this.offerRepository.getDocument(offerId, client);
+        } catch (error) {
+            await client.rollback();
+            if (error instanceof AppError) throw error;
+            console.error('Error regenerating document with attachments:', error.stack);
             throw new AppError('Failed to regenerate document', 500, 'DOCUMENT_GENERATION_ERROR');
         } finally {
             client.release();

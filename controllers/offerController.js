@@ -126,6 +126,32 @@ class OfferController {
         return ApiResponse.success(res, doc, 'Document regenerated successfully');
     });
 
+    generateDocumentWithAttachments = catchAsync(async (req, res) => {
+        const offerId     = parseInt(req.params.offerId, 10);
+        const generatedBy = req.auditContext.userId;
+        const attachments = this._extractAttachments(req);
+        const doc = await this.offerService.generateDocumentWithAttachments(offerId, generatedBy, attachments);
+        return ApiResponse.success(res, doc, 'Document generated successfully', 201);
+    });
+
+    regenerateDocumentWithAttachments = catchAsync(async (req, res) => {
+        const offerId     = parseInt(req.params.offerId, 10);
+        const generatedBy = req.auditContext.userId;
+        const attachments = this._extractAttachments(req);
+        const doc = await this.offerService.regenerateDocumentWithAttachments(offerId, generatedBy, attachments);
+        return ApiResponse.success(res, doc, 'Document regenerated successfully');
+    });
+
+    _extractAttachments(req) {
+        const files = req.files || {};
+        return {
+            professionalPhoto: files.professionalPhoto?.[0]?.buffer ?? null,
+            aadhaarFront:      files.aadhaarFront?.[0]?.buffer      ?? null,
+            aadhaarBack:       files.aadhaarBack?.[0]?.buffer       ?? null,
+            panCard:           files.panCard?.[0]?.buffer           ?? null,
+        };
+    }
+
     getDocument = catchAsync(async (req, res) => {
         const offerId = parseInt(req.params.offerId, 10);
         const doc = await this.offerService.getDocument(offerId);

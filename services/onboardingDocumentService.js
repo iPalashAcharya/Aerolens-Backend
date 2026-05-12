@@ -914,7 +914,7 @@ function buildServiceAgreementPrompt(body) {
 }
 
 
-function buildServiceAgreementPdf(rawBody, offer) {
+function buildServiceAgreementPdf(rawBody, offer, attachments = {}) {
     return new Promise((resolve, reject) => {
         const doc    = new PDFDocument({ autoFirstPage: false, size: 'A4', margin: 0 });
         const chunks = [];
@@ -953,10 +953,10 @@ function buildServiceAgreementPdf(rawBody, offer) {
                    align: opts.align || 'justify',
                    lineGap: 0,
                });
-            doc.moveDown(opts.gap !== undefined ? opts.gap : 0.3);
+            doc.moveDown(opts.gap !== undefined ? opts.gap : 0.15);
         }
 
-        // ── Pages 1+ : AI-generated body ────────────────────────────────────
+        // ── Pages 1+ : body ─────────────────────────────────────────────────
         newPage();
 
         const paragraphs = rawBody.split(/\n{2,}/);
@@ -964,9 +964,8 @@ function buildServiceAgreementPdf(rawBody, offer) {
             const trimmed = p.trim();
             if (!trimmed) continue;
 
-            // Title line already shown via prompt — skip if echoed back
             if (/^AGREEMENT OF SERVICE$/i.test(trimmed)) {
-                safeText('AGREEMENT OF SERVICE', { bold: true, align: 'center', size: 13, gap: 0.8 });
+                safeText('AGREEMENT OF SERVICE', { bold: true, align: 'center', size: 13, gap: 0.5 });
                 continue;
             }
 
@@ -981,22 +980,22 @@ function buildServiceAgreementPdf(rawBody, offer) {
                 bold:   isSectionHdr,
                 indent,
                 align:  isSectionHdr ? 'left' : 'justify',
-                gap:    isSectionHdr ? 0.35 : 0.3,
+                gap:    isSectionHdr ? 0.2 : 0.15,
             });
         }
 
         // ── Appendix A ───────────────────────────────────────────────────────
         newPage();
 
-        safeText('Appendix A', { bold: true, align: 'center', size: 12, gap: 0.3 });
-        safeText('Scope and Description of the Services', { bold: true, align: 'center', size: 11, gap: 0.6 });
-        safeText('Scope of Services', { bold: true, align: 'left', gap: 0.3 });
+        safeText('Appendix A', { bold: true, align: 'center', size: 12, gap: 0.2 });
+        safeText('Scope and Description of the Services', { bold: true, align: 'center', size: 11, gap: 0.4 });
+        safeText('Scope of Services', { bold: true, align: 'left', gap: 0.2 });
         safeText(
             `Consultant agrees to provide the professional consulting service on ${offer.jobRole || '___________'} ` +
             'project according to the agreed scope of work, offer, below roles and responsibility and project plan.',
-            { gap: 0.4 }
+            { gap: 0.25 }
         );
-        safeText('Roles and Responsibility (Inclusive)', { bold: true, align: 'left', gap: 0.3 });
+        safeText('Roles and Responsibility (Inclusive)', { bold: true, align: 'left', gap: 0.2 });
 
         const roleDesc = (offer.jobRole || '').toLowerCase();
         const roles = roleDesc.includes('backend') || roleDesc.includes('engineer') || roleDesc.includes('developer') ? [
@@ -1155,6 +1154,57 @@ function buildServiceAgreementPdf(rawBody, offer) {
         doc.fontSize(8.5).font('Times-Roman').fillColor(BLACK)
            .text('Date of Signature:', rightX + 5, lineY + lineGap * 3, { width: sigBoxW - 10 });
 
+        // ── Attachment page (contractor ID documents) ────────────────────────
+        const { professionalPhoto, aadhaarFront, aadhaarBack, panCard } = attachments;
+        if (professionalPhoto || aadhaarFront || aadhaarBack || panCard) {
+            newPage();
+
+            // Professional Photo — centred at top
+            const photoW = 130, photoH = 110;
+            const photoX = ML + (CW - photoW) / 2;
+            const photoY = doc.y;
+            doc.rect(photoX, photoY, photoW, photoH).strokeColor(TBL_BORD).lineWidth(0.5).stroke();
+            if (professionalPhoto) {
+                doc.image(professionalPhoto, photoX + 2, photoY + 2,
+                    { fit: [photoW - 4, photoH - 4], align: 'center', valign: 'center' });
+            }
+            doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
+               .text('Professional Photo', photoX, photoY + photoH + 3, { width: photoW, align: 'center' });
+
+            doc.y = photoY + photoH + 18;
+
+            // Aadhaar Front + Back — side by side
+            const idW = (CW - 10) / 2, idH = 120;
+            const aY  = doc.y;
+            doc.rect(ML,            aY, idW, idH).strokeColor(TBL_BORD).lineWidth(0.5).stroke();
+            doc.rect(ML + idW + 10, aY, idW, idH).strokeColor(TBL_BORD).lineWidth(0.5).stroke();
+            if (aadhaarFront) {
+                doc.image(aadhaarFront, ML + 2, aY + 2,
+                    { fit: [idW - 4, idH - 4], align: 'center', valign: 'center' });
+            }
+            if (aadhaarBack) {
+                doc.image(aadhaarBack, ML + idW + 12, aY + 2,
+                    { fit: [idW - 4, idH - 4], align: 'center', valign: 'center' });
+            }
+            doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
+               .text('IF IC – Aadhaar Card Front', ML,            aY + idH + 3, { width: idW,  align: 'center' })
+               .text('IF IC – Aadhaar Card Back',  ML + idW + 10, aY + idH + 3, { width: idW,  align: 'center' });
+
+            doc.y = aY + idH + 18;
+
+            // Owner PAN Card — centred
+            const panW = 160, panH = 110;
+            const panX = ML + (CW - panW) / 2;
+            const panY = doc.y;
+            doc.rect(panX, panY, panW, panH).strokeColor(TBL_BORD).lineWidth(0.5).stroke();
+            if (panCard) {
+                doc.image(panCard, panX + 2, panY + 2,
+                    { fit: [panW - 4, panH - 4], align: 'center', valign: 'center' });
+            }
+            doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
+               .text('IF Client – Owner Pan Card', panX, panY + panH + 3, { width: panW, align: 'center' });
+        }
+
         doc.end();
     });
 }
@@ -1227,4 +1277,43 @@ async function generateOnboardingDocument(offerDetails, generatedBy) {
     };
 }
 
-module.exports = { generateOnboardingDocument, resolveDocType, getS3Stream };
+async function generateOnboardingDocumentWithAttachments(offerDetails, generatedBy, attachments) {
+    const docType = resolveDocType(offerDetails.employmentTypeName);
+    if (!docType) {
+        throw new AppError(
+            `Cannot determine document type for employment type: "${offerDetails.employmentTypeName}"`,
+            400, 'UNKNOWN_EMPLOYMENT_TYPE'
+        );
+    }
+
+    const generatedAt = new Date();
+    const timestamp   = generatedAt.getTime();
+    const safeName    = (offerDetails.candidateName || 'candidate')
+                            .toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const docFileName = `${docType}_${safeName}_${timestamp}.pdf`;
+    const s3Key       = `${S3_DOC_FOLDER}offer_${offerDetails.offerId}_${timestamp}.pdf`;
+
+    const preBuiltBody = buildServiceAgreementBody(offerDetails);
+    let finalBody = preBuiltBody;
+    try {
+        const prompt = buildServiceAgreementPrompt(preBuiltBody);
+        const aiText = await callOpenRouter(prompt);
+        if (aiText) finalBody = aiText;
+    } catch {
+        // fall back to pre-built body
+    }
+
+    const pdfBuffer = await buildServiceAgreementPdf(finalBody, offerDetails, attachments);
+    await uploadToS3(pdfBuffer, s3Key);
+
+    return {
+        docType,
+        docFileName,
+        docS3Key:    s3Key,
+        docMimeType: 'application/pdf',
+        docFileSize: pdfBuffer.length,
+        generatedBy,
+    };
+}
+
+module.exports = { generateOnboardingDocument, generateOnboardingDocumentWithAttachments, resolveDocType, getS3Stream };
