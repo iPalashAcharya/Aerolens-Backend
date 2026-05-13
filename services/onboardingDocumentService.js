@@ -1,7 +1,8 @@
 'use strict';
 
 const path = require('path');
-const fs = require('fs');
+const fs   = require('fs');
+const os   = require('os');
 const PDFDocument = require('pdfkit');
 const { PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { s3Client, bucketName } = require('../config/s3');
@@ -1184,14 +1185,23 @@ function buildServiceAgreementPdf(rawBody, offer, attachments = {}) {
             doc.lineGap(0);
             doc.fillColor(BLACK);
 
-            // Helper: place image in box, fall back to label if buffer missing or invalid
+            // Helper: write buffer to temp file then embed via path (more reliable than raw Buffer)
             function placeImage(buf, x, y, w, h, label) {
                 if (buf) {
+                    const ext     = (buf[0] === 0xFF && buf[1] === 0xD8) ? '.jpg' : '.png';
+                    const tmpFile = path.join(os.tmpdir(), `aerolens_attach_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`);
+                    let placed = false;
                     try {
+                        fs.writeFileSync(tmpFile, buf);
                         doc.fillColor(BLACK);
-                        doc.image(buf, x + 2, y + 2,
+                        doc.image(tmpFile, x + 2, y + 2,
                             { fit: [w - 4, h - 4], align: 'center', valign: 'center' });
-                    } catch {
+                        placed = true;
+                    } catch { /* fall through to label */ }
+                    finally {
+                        try { fs.unlinkSync(tmpFile); } catch { /* ignore cleanup errors */ }
+                    }
+                    if (!placed) {
                         doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
                            .text(label, x, y + h / 2 - 5, { width: w, align: 'center', lineGap: 0 });
                     }
@@ -1216,19 +1226,19 @@ function buildServiceAgreementPdf(rawBody, offer, attachments = {}) {
             const aY  = photoY + photoH + 24;
             doc.rect(ML,            aY, idW, idH).strokeColor(TBL_BORD).lineWidth(0.5).stroke();
             doc.rect(ML + idW + 10, aY, idW, idH).strokeColor(TBL_BORD).lineWidth(0.5).stroke();
-            placeImage(aadhaarFront, ML,           aY, idW, idH, 'IF IC – Aadhaar Card Front');
-            placeImage(aadhaarBack,  ML + idW + 10, aY, idW, idH, 'IF IC – Aadhaar Card Back');
+            placeImage(aadhaarFront, ML,           aY, idW, idH, 'Aadhaar Card Front');
+            placeImage(aadhaarBack,  ML + idW + 10, aY, idW, idH, 'Aadhaar Card Back');
             doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
-               .text('IF IC – Aadhaar Card Front', ML,            aY + idH + 4, { width: idW, align: 'center', lineGap: 0 })
-               .text('IF IC – Aadhaar Card Back',  ML + idW + 10, aY + idH + 4, { width: idW, align: 'center', lineGap: 0 });
+               .text('Aadhaar Card Front', ML,            aY + idH + 4, { width: idW, align: 'center', lineGap: 0 })
+               .text('Aadhaar Card Back',  ML + idW + 10, aY + idH + 4, { width: idW, align: 'center', lineGap: 0 });
 
             const panW = 160, panH = 110;
             const panX = ML + (CW - panW) / 2;
             const panY = aY + idH + 24;
             doc.rect(panX, panY, panW, panH).strokeColor(TBL_BORD).lineWidth(0.5).stroke();
-            placeImage(panCard, panX, panY, panW, panH, 'IF Client – Owner Pan Card');
+            placeImage(panCard, panX, panY, panW, panH, 'Owner Pan Card');
             doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
-               .text('IF Client – Owner Pan Card', panX, panY + panH + 4,
+               .text('Owner Pan Card', panX, panY + panH + 4,
                      { width: panW, align: 'center', lineGap: 0 });
         }
 
