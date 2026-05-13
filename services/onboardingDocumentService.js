@@ -1284,9 +1284,12 @@ async function loadConsultantImages(offer) {
             try {
                 const stream = await getS3Stream(key);
                 attachments[field] = await streamToBuffer(stream);
-            } catch {
-                // image unavailable — render empty box
+                console.log(`[images] loaded ${field} from S3 key: ${key}`);
+            } catch (err) {
+                console.error(`[images] failed to load ${field} from S3 key "${key}":`, err?.message || err);
             }
+        } else {
+            console.log(`[images] ${field}: no S3 key stored — box will be empty`);
         }
     }
     return attachments;
