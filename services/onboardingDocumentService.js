@@ -2,7 +2,6 @@
 
 const path = require('path');
 const fs   = require('fs');
-const os   = require('os');
 const PDFDocument = require('pdfkit');
 const { PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { s3Client, bucketName } = require('../config/s3');
@@ -1185,31 +1184,17 @@ function buildServiceAgreementPdf(rawBody, offer, attachments = {}) {
             doc.lineGap(0);
             doc.fillColor(BLACK);
 
-            // Helper: write buffer to temp file then embed via path (more reliable than raw Buffer)
+            // Helper: embed image buffer directly, fall back to label if missing
             function placeImage(buf, x, y, w, h, label) {
                 if (buf) {
-                    const ext     = (buf[0] === 0xFF && buf[1] === 0xD8) ? '.jpg' : '.png';
-                    const tmpFile = path.join(os.tmpdir(), `aerolens_attach_${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`);
-                    let placed = false;
-                    try {
-                        fs.writeFileSync(tmpFile, buf);
-                        doc.fillColor(BLACK);
-                        doc.image(tmpFile, x + 2, y + 2,
-                            { fit: [w - 4, h - 4], align: 'center', valign: 'center' });
-                        placed = true;
-                    } catch { /* fall through to label */ }
-                    finally {
-                        try { fs.unlinkSync(tmpFile); } catch { /* ignore cleanup errors */ }
-                    }
-                    if (!placed) {
-                        doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
-                           .text(label, x, y + h / 2 - 5, { width: w, align: 'center', lineGap: 0 });
-                    }
+                    doc.fillColor(BLACK);
+                    doc.image(buf, x + 2, y + 2,
+                        { fit: [w - 4, h - 4], align: 'center', valign: 'center' });
                 } else {
                     doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
                        .text(label, x, y + h / 2 - 5, { width: w, align: 'center', lineGap: 0 });
+                    doc.fillColor(BLACK);
                 }
-                doc.fillColor(BLACK);
             }
 
             // All y-positions are fixed from BODY_Y — not dependent on doc.y
