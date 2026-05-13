@@ -417,10 +417,6 @@ class OfferService {
                 throw new AppError('Offer not found', 404, 'OFFER_NOT_FOUND');
             }
 
-            // Return existing document without regenerating
-            const existing = await this.offerRepository.getDocument(offerId, client);
-            if (existing) return existing;
-
             const docInfo = await generateOnboardingDocument(
                 { ...offer, offerId },
                 generatedBy
@@ -581,6 +577,18 @@ class OfferService {
         } finally {
             client.release();
         }
+    }
+
+    async streamCodeOfConduct(res) {
+        const fs   = require('fs');
+        const path = require('path');
+        const filePath = path.join(__dirname, '../assets/Code_of_Business_Conduct.pdf');
+        if (!fs.existsSync(filePath)) {
+            throw new AppError('Code of Conduct document not found', 404, 'COC_NOT_FOUND');
+        }
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', 'inline; filename="Code_of_Business_Conduct_and_Guidelines.pdf"');
+        fs.createReadStream(filePath).pipe(res);
     }
 
     async streamConsultantImage(offerId, field, res) {

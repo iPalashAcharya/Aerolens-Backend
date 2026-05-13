@@ -58,6 +58,9 @@ router.post('/:offerId/status', OfferValidator.validateStatusUpdate, offerContro
 
 router.post('/:candidateId', OfferValidator.validateCreate, offerController.createOffer);
 
+// Static company documents
+router.get('/code-of-conduct', offerController.getCodeOfConduct);
+
 // Consultant identity document images (stored in S3, keys saved to offer table)
 router.post('/:offerId/consultant-images', attachmentFields, offerController.uploadConsultantImages);
 router.get('/:offerId/consultant-images/:field',              offerController.getConsultantImage);

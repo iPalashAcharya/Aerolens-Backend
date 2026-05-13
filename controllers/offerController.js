@@ -138,6 +138,10 @@ class OfferController {
         await this.offerService.streamConsultantImage(offerId, field, res);
     });
 
+    getCodeOfConduct = catchAsync(async (_req, res) => {
+        await this.offerService.streamCodeOfConduct(res);
+    });
+
     generateDocumentWithAttachments = catchAsync(async (req, res) => {
         const offerId     = parseInt(req.params.offerId, 10);
         const generatedBy = req.auditContext.userId;
