@@ -78,6 +78,18 @@ class OfferController {
         return ApiResponse.success(res, null, 'Offer status updated successfully');
     });
 
+    updateOffer = catchAsync(async (req, res) => {
+        const offerId = parseInt(req.params.offerId, 10);
+        const updated = await this.offerService.updateOffer(offerId, req.body, req.auditContext);
+        return ApiResponse.success(res, updated, 'Offer updated successfully');
+    });
+
+    getActiveOfferForCandidate = catchAsync(async (req, res) => {
+        const candidateId = parseInt(req.params.candidateId, 10);
+        const offer = await this.offerService.getActiveOfferForCandidate(candidateId);
+        return ApiResponse.success(res, offer ?? null, 'Active offer retrieved');
+    });
+
     getOfferFormData = catchAsync(async (req, res) => {
         const formData = await this.offerService.getOfferFormData();
         res.status(200).json({
@@ -98,6 +110,78 @@ class OfferController {
     restoreOffer = catchAsync(async (req, res) => {
         const result = await this.offerService.restoreOffer(parseInt(req.params.offerId), req.auditContext);
         return ApiResponse.success(res, result, 'Offer restored successfully');
+    });
+
+    generateDocument = catchAsync(async (req, res) => {
+        const offerId = parseInt(req.params.offerId, 10);
+        const generatedBy = req.auditContext.userId;
+        const doc = await this.offerService.generateDocument(offerId, generatedBy);
+        return ApiResponse.success(res, doc, 'Document generated successfully', 201);
+    });
+
+    regenerateDocument = catchAsync(async (req, res) => {
+        const offerId = parseInt(req.params.offerId, 10);
+        const generatedBy = req.auditContext.userId;
+        const doc = await this.offerService.regenerateDocument(offerId, generatedBy);
+        return ApiResponse.success(res, doc, 'Document regenerated successfully');
+    });
+
+    uploadConsultantImages = catchAsync(async (req, res) => {
+        const offerId = parseInt(req.params.offerId, 10);
+        const result  = await this.offerService.uploadConsultantImages(offerId, req.files || {});
+        return ApiResponse.success(res, result, 'Images uploaded successfully');
+    });
+
+    getConsultantImage = catchAsync(async (req, res) => {
+        const offerId = parseInt(req.params.offerId, 10);
+        const { field } = req.params;
+        await this.offerService.streamConsultantImage(offerId, field, res);
+    });
+
+    generateDocumentWithAttachments = catchAsync(async (req, res) => {
+        const offerId     = parseInt(req.params.offerId, 10);
+        const generatedBy = req.auditContext.userId;
+        const attachments = this._extractAttachments(req);
+        const doc = await this.offerService.generateDocumentWithAttachments(offerId, generatedBy, attachments);
+        return ApiResponse.success(res, doc, 'Document generated successfully', 201);
+    });
+
+    regenerateDocumentWithAttachments = catchAsync(async (req, res) => {
+        const offerId     = parseInt(req.params.offerId, 10);
+        const generatedBy = req.auditContext.userId;
+        const attachments = this._extractAttachments(req);
+        const doc = await this.offerService.regenerateDocumentWithAttachments(offerId, generatedBy, attachments);
+        return ApiResponse.success(res, doc, 'Document regenerated successfully');
+    });
+
+    _extractAttachments(req) {
+        const files = req.files || {};
+        return {
+            professionalPhoto: files.professionalPhoto?.[0]?.buffer ?? null,
+            aadhaarFront:
+                files.aadhaarFront?.[0]?.buffer ??
+                files.aadharFront?.[0]?.buffer ??
+                null,
+            aadhaarBack:
+                files.aadhaarBack?.[0]?.buffer ??
+                files.aadharBack?.[0]?.buffer ??
+                null,
+            panCard:
+                files.panCard?.[0]?.buffer ??
+                files.pancard?.[0]?.buffer ??
+                null,
+        };
+    }
+
+    getDocument = catchAsync(async (req, res) => {
+        const offerId = parseInt(req.params.offerId, 10);
+        const doc = await this.offerService.getDocument(offerId);
+        return ApiResponse.success(res, doc ?? null, 'Document info retrieved');
+    });
+
+    downloadDocument = catchAsync(async (req, res) => {
+        const offerId = parseInt(req.params.offerId, 10);
+        await this.offerService.streamDocument(offerId, res);
     });
 }
 

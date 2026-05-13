@@ -11,11 +11,12 @@ class OfferRepository {
             const query = `
             INSERT INTO offer (
                 candidateId, jobProfileRequirementId, vendorId, reportingManagerId,
-                employmentTypeLookupId, workModelLookupId, joiningDate, offeredCTCAmount,
+                employmentTypeLookupId, workModelLookupId, joiningDate, sign_before_date,
+                contractor_address, offeredCTCAmount,
                 currencyLookupId, compensationTypeLookupId, variablePay, joiningBonus,
                 offerLetterSent, serviceAgreementSent, ndaSent, codeOfConductSent,
                 offerStatus, offerVersion, createdBy
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `;
             const [result] = await connection.execute(query, [
                 offerData.candidateId,
@@ -25,6 +26,8 @@ class OfferRepository {
                 offerData.employmentTypeLookupId,
                 offerData.workModelLookupId,
                 offerData.joiningDate,
+                offerData.sign_before_date ?? null,
+                offerData.contractorAddress ?? null,
                 offerData.offeredCTCAmount ?? null,
                 offerData.currencyLookupId ?? null,
                 offerData.compensationTypeLookupId ?? null,
@@ -54,6 +57,56 @@ class OfferRepository {
         }
     }
 
+    async updateOffer(offerId, offerData, client) {
+        const connection = client;
+        try {
+            await connection.execute(
+                `UPDATE offer SET
+                    jobProfileRequirementId   = ?,
+                    vendorId                  = ?,
+                    reportingManagerId        = ?,
+                    employmentTypeLookupId    = ?,
+                    workModelLookupId         = ?,
+                    joiningDate               = ?,
+                    sign_before_date          = ?,
+                    contractor_address        = ?,
+                    offeredCTCAmount          = ?,
+                    currencyLookupId          = ?,
+                    compensationTypeLookupId  = ?,
+                    variablePay               = ?,
+                    joiningBonus              = ?,
+                    offerLetterSent           = ?,
+                    serviceAgreementSent      = ?,
+                    ndaSent                   = ?,
+                    codeOfConductSent         = ?
+                 WHERE offerId = ? AND isDeleted = 0`,
+                [
+                    offerData.jobProfileRequirementId  ?? null,
+                    offerData.vendorId                 ?? null,
+                    offerData.reportingManagerId       ?? null,
+                    offerData.employmentTypeLookupId   ?? null,
+                    offerData.workModelLookupId        ?? null,
+                    offerData.joiningDate              ?? null,
+                    offerData.sign_before_date         ?? null,
+                    offerData.contractorAddress        ?? null,
+                    offerData.offeredCTCAmount         ?? null,
+                    offerData.currencyLookupId         ?? null,
+                    offerData.compensationTypeLookupId ?? null,
+                    offerData.variablePay              ?? null,
+                    offerData.joiningBonus             ?? null,
+                    offerData.offerLetterSent          ?? null,
+                    offerData.serviceAgreementSent     ?? null,
+                    offerData.ndaSent                  ?? null,
+                    offerData.codeOfConductSent        ?? null,
+                    offerId,
+                ]
+            );
+            return await this.getOfferById(offerId, client);
+        } catch (error) {
+            this._handleDatabaseError(error, 'updateOffer');
+        }
+    }
+
     async getOffers(client) {
         const connection = client;
         try {
@@ -74,7 +127,8 @@ class OfferRepository {
                 lcur.value AS currencyName,
                 lcomp.value AS compensationTypeName,
                 m.memberName AS createdByName,
-                DATE_FORMAT(o.createdAt, '%Y-%m-%dT%H:%i:%sZ') AS createdAt
+                DATE_FORMAT(o.createdAt, '%Y-%m-%dT%H:%i:%sZ') AS createdAt,
+                o.doc_type AS docType
             FROM offer o
             LEFT JOIN candidate c ON c.candidateId = o.candidateId
             LEFT JOIN jobProfileRequirement jpr ON jpr.jobProfileRequirementId = o.jobProfileRequirementId
@@ -248,6 +302,12 @@ class OfferRepository {
                     o.currencyLookupId, o.compensationTypeLookupId, o.variablePay, o.joiningBonus,
                     o.offerLetterSent, o.serviceAgreementSent, o.ndaSent, o.codeOfConductSent,
                     o.offerStatus, o.offerVersion, o.createdBy, o.createdAt, o.updatedAt,
+                    o.sign_before_date AS signBeforeDate,
+                    o.contractor_address AS contractorAddress,
+                    o.photo_s3_key          AS photoS3Key,
+                    o.aadhaar_front_s3_key  AS aadhaarFrontS3Key,
+                    o.aadhaar_back_s3_key   AS aadhaarBackS3Key,
+                    o.pan_card_s3_key       AS panCardS3Key,
                     c.candidateName,
                     jp.jobRole,
                     let.value AS employmentTypeName,
@@ -257,6 +317,7 @@ class OfferRepository {
                     lcomp.value AS compensationTypeName,
                     m.memberName AS createdByName,
                     rm.memberName AS reportingManagerName,
+                    rm_desig.value AS reportingManagerDesignation,
                     DATE_FORMAT(o.createdAt, '%Y-%m-%dT%H:%i:%sZ') AS createdAtFormatted
                  FROM offer o
                  LEFT JOIN candidate c ON c.candidateId = o.candidateId
@@ -269,6 +330,7 @@ class OfferRepository {
                  LEFT JOIN lookup lcomp ON lcomp.lookupKey = o.compensationTypeLookupId AND lcomp.tag = 'compensationType'
                  LEFT JOIN member m ON m.memberId = o.createdBy
                  LEFT JOIN member rm ON rm.memberId = o.reportingManagerId
+                 LEFT JOIN lookup rm_desig ON rm_desig.lookupKey = rm.designation AND rm_desig.tag = 'designation'
                  WHERE o.offerId = ? AND o.isDeleted = 0`,
                 [offerId]
             );
@@ -414,6 +476,128 @@ class OfferRepository {
             throw new AppError(mapping.message, mapping.status, mapping.errorCode, { operation });
         }
         throw new AppError('Database operation failed', 500, 'DATABASE_ERROR', { operation, code: error.code });
+    }
+
+    async saveDocument(offerId, docData, client) {
+        const connection = client;
+        try {
+            const [result] = await connection.execute(
+                `UPDATE offer
+                 SET doc_type         = ?,
+                     doc_file_name    = ?,
+                     doc_s3_key       = ?,
+                     doc_mime_type    = ?,
+                     doc_file_size    = ?,
+                     doc_generated_at = NOW(),
+                     doc_generated_by = ?
+                 WHERE offerId = ? AND isDeleted = 0`,
+                [
+                    docData.docType,
+                    docData.docFileName,
+                    docData.docS3Key,
+                    docData.docMimeType ?? 'application/pdf',
+                    docData.docFileSize ?? null,
+                    docData.generatedBy ?? null,
+                    offerId,
+                ]
+            );
+            return result.affectedRows > 0;
+        } catch (error) {
+            this._handleDatabaseError(error, 'saveDocument');
+        }
+    }
+
+    async getDocument(offerId, client) {
+        const connection = client;
+        try {
+            const [rows] = await connection.execute(
+                `SELECT
+                    offerId,
+                    doc_type         AS docType,
+                    doc_file_name    AS docFileName,
+                    doc_s3_key       AS docS3Key,
+                    doc_mime_type    AS docMimeType,
+                    doc_file_size    AS docFileSize,
+                    doc_generated_by AS docGeneratedBy,
+                    DATE_FORMAT(doc_generated_at, '%Y-%m-%dT%H:%i:%sZ') AS docGeneratedAt
+                 FROM offer
+                 WHERE offerId = ? AND isDeleted = 0`,
+                [offerId]
+            );
+            const row = rows[0];
+            if (!row || !row.docType) return null;
+            return row;
+        } catch (error) {
+            this._handleDatabaseError(error, 'getDocument');
+        }
+    }
+
+    async getActiveOfferWithDocByCandidate(candidateId, client) {
+        const connection = client;
+        try {
+            const [rows] = await connection.execute(
+                `SELECT
+                    o.offerId, o.candidateId, o.jobProfileRequirementId, o.vendorId, o.reportingManagerId,
+                    o.employmentTypeLookupId, o.workModelLookupId,
+                    DATE_FORMAT(o.joiningDate, '%Y-%m-%d') AS joiningDate,
+                    o.offeredCTCAmount, o.currencyLookupId, o.compensationTypeLookupId,
+                    o.variablePay, o.joiningBonus,
+                    o.offerLetterSent, o.serviceAgreementSent, o.ndaSent, o.codeOfConductSent,
+                    o.offerStatus,
+                    DATE_FORMAT(o.sign_before_date, '%Y-%m-%d') AS signBeforeDate,
+                    o.contractor_address  AS contractorAddress,
+                    o.photo_s3_key         AS photoS3Key,
+                    o.aadhaar_front_s3_key AS aadhaarFrontS3Key,
+                    o.aadhaar_back_s3_key  AS aadhaarBackS3Key,
+                    o.pan_card_s3_key      AS panCardS3Key,
+                    let.value AS employmentTypeName,
+                    o.doc_type         AS docType,
+                    o.doc_file_name    AS docFileName,
+                    o.doc_s3_key       AS docS3Key,
+                    o.doc_mime_type    AS docMimeType,
+                    o.doc_file_size    AS docFileSize,
+                    o.doc_generated_by AS docGeneratedBy,
+                    DATE_FORMAT(o.doc_generated_at, '%Y-%m-%dT%H:%i:%sZ') AS docGeneratedAt
+                 FROM offer o
+                 LEFT JOIN lookup let ON let.lookupKey = o.employmentTypeLookupId AND let.tag = 'employmentType'
+                 WHERE o.candidateId = ? AND o.isDeleted = 0 AND o.offerStatus = 'PENDING'
+                 LIMIT 1`,
+                [candidateId]
+            );
+            return rows[0] || null;
+        } catch (error) {
+            this._handleDatabaseError(error, 'getActiveOfferWithDocByCandidate');
+        }
+    }
+
+    async saveImageKeys(offerId, keys, client) {
+        const connection = client;
+        try {
+            const setClauses = Object.keys(keys).map((k) => `${k} = ?`).join(', ');
+            await connection.execute(
+                `UPDATE offer SET ${setClauses} WHERE offerId = ? AND isDeleted = 0`,
+                [...Object.values(keys), offerId]
+            );
+        } catch (error) {
+            this._handleDatabaseError(error, 'saveImageKeys');
+        }
+    }
+
+    async getImageKeys(offerId, client) {
+        const connection = client;
+        try {
+            const [rows] = await connection.execute(
+                `SELECT photo_s3_key         AS photoS3Key,
+                        aadhaar_front_s3_key AS aadhaarFrontS3Key,
+                        aadhaar_back_s3_key  AS aadhaarBackS3Key,
+                        pan_card_s3_key      AS panCardS3Key
+                 FROM offer WHERE offerId = ? AND isDeleted = 0`,
+                [offerId]
+            );
+            return rows[0] || null;
+        } catch (error) {
+            this._handleDatabaseError(error, 'getImageKeys');
+        }
     }
 
     async restore(offerId, client) {

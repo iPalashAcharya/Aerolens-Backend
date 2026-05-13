@@ -9072,3 +9072,139 @@ curl http://localhost:3000/candidate/42/analyze \
 ```
 
 Column order in all dialogs: **Resource ID → Actor → Action → Verb → Summary → Resource Type → Occurred At**
+
+---
+
+## Onboarding Document Generation
+
+Generates an AI-written PDF document (Offer Letter or Service Agreement) for an existing offer and stores it on S3. The document type is determined by the offer's employment type.
+
+| Employment Type | Document Type |
+|---|---|
+| `Employee` | `offer_letter` |
+| `Consultant` / `Contractor` | `service_agreement` |
+
+Document fields are stored directly on the `offer` table (`doc_type`, `doc_file_name`, `doc_s3_key`, `doc_mime_type`, `doc_file_size`, `doc_generated_at`, `doc_generated_by`). No separate table.
+
+Requires `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` env vars (same as resume analysis).
+
+---
+
+### Endpoints
+
+#### Generate document
+
+```
+POST /offers/:offerId/document
+Authorization: Bearer <token>
+```
+
+- If a document already exists for this offer, returns the existing record without regenerating.
+- Generates AI content via OpenRouter, converts to PDF via pdfkit, uploads to S3.
+- S3 folder: `development/onboarding-docs/` (non-production) or `onboarding-docs/` (production).
+
+**Success response (`201`):**
+```json
+{
+  "success": true,
+  "message": "Document generated successfully",
+  "data": {
+    "offerId": 12,
+    "docType": "offer_letter",
+    "docFileName": "offer_12_1746441600000.pdf",
+    "docS3Key": "development/onboarding-docs/offer_12_1746441600000.pdf",
+    "docMimeType": "application/pdf",
+    "docFileSize": 48200,
+    "docGeneratedBy": 3,
+    "docGeneratedAt": "2026-05-05T08:00:00Z"
+  }
+}
+```
+
+**Error codes:**
+
+| HTTP | Code | Cause |
+|---|---|---|
+| `404` | `OFFER_NOT_FOUND` | No offer exists with the given ID |
+| `400` | `UNSUPPORTED_EMPLOYMENT_TYPE` | Employment type does not map to a document type |
+| `500` | `MISSING_API_KEY` | `OPENROUTER_API_KEY` is not configured |
+| `500` | `S3_NOT_CONFIGURED` | S3 bucket is not configured |
+| `502` | `OPENROUTER_UNREACHABLE` | OpenRouter API is unreachable |
+| `502` | `OPENROUTER_ERROR` | OpenRouter returned a non-200 response |
+| `500` | `DOCUMENT_GENERATION_ERROR` | Unexpected error during generation |
+
+---
+
+#### Force regenerate document
+
+```
+POST /offers/:offerId/document/regenerate
+Authorization: Bearer <token>
+```
+
+Overwrites any existing document. Runs the full generation pipeline regardless of whether a document already exists.
+
+**Success response (`200`):** Same shape as generate.
+
+---
+
+#### Get document metadata
+
+```
+GET /offers/:offerId/document
+Authorization: Bearer <token>
+```
+
+Returns document metadata if a document has been generated, or `null` if none exists yet.
+
+**Success response (`200`):**
+```json
+{
+  "success": true,
+  "message": "Document info retrieved",
+  "data": { ... }
+}
+```
+
+Returns `data: null` if no document has been generated.
+
+---
+
+#### Download document
+
+```
+GET /offers/:offerId/document/download
+Authorization: Bearer <token>
+```
+
+Streams the PDF directly from S3. Sets `Content-Disposition: attachment` so the browser downloads the file.
+
+**Response:** Binary PDF stream (`Content-Type: application/pdf`).
+
+| HTTP | Code | Cause |
+|---|---|---|
+| `404` | `DOCUMENT_NOT_FOUND` | No document exists for this offer |
+| `500` | `STREAM_ERROR` | Failed to stream from S3 |
+
+---
+
+### Test with curl
+
+```bash
+# Generate (or return existing)
+curl -X POST http://localhost:3000/offers/12/document \
+  -H "Authorization: Bearer <your_token>"
+
+# Force regenerate
+curl -X POST http://localhost:3000/offers/12/document/regenerate \
+  -H "Authorization: Bearer <your_token>"
+
+# Get metadata
+curl http://localhost:3000/offers/12/document \
+  -H "Authorization: Bearer <your_token>"
+
+# Download PDF
+curl http://localhost:3000/offers/12/document/download \
+  -H "Authorization: Bearer <your_token>" \
+  -o offer_letter.pdf
+```

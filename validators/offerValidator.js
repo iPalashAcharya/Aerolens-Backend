@@ -19,6 +19,11 @@ const offerSchemas = {
                 'string.pattern.base': 'Joining date must be YYYY-MM-DD',
                 'any.required': 'Joining date is required'
             }),
+        sign_before_date: Joi.string()
+            .pattern(/^\d{4}-\d{2}-\d{2}$/)
+            .optional()
+            .allow(null, '')
+            .messages({ 'string.pattern.base': 'Sign before date must be YYYY-MM-DD' }),
         offeredCTCAmount: Joi.number().min(1).optional().allow(null),
         currencyLookupId: Joi.number().integer().positive().optional().allow(null),
         compensationTypeLookupId: Joi.number().integer().positive().optional().allow(null),
@@ -26,10 +31,30 @@ const offerSchemas = {
         joiningBonus: Joi.number().min(0).optional().allow(null),
         offerLetterSent: Joi.boolean().optional().allow(null),
         serviceAgreementSent: Joi.boolean().optional().allow(null),
+        contractorAddress: Joi.string().trim().max(500).optional().allow(null, ''),
         ndaSent: Joi.boolean().required()
             .messages({ 'any.required': 'NDA sent is required' }),
         codeOfConductSent: Joi.boolean().required()
             .messages({ 'any.required': 'Code of conduct sent is required' })
+    }),
+    update: Joi.object({
+        jobProfileRequirementId:  Joi.number().integer().positive().optional(),
+        vendorId:                 Joi.number().integer().positive().optional().allow(null),
+        reportingManagerId:       Joi.number().integer().positive().optional(),
+        employmentTypeLookupId:   Joi.number().integer().positive().optional(),
+        workModelLookupId:        Joi.number().integer().positive().optional(),
+        joiningDate:              Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        sign_before_date:         Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).optional().allow(null, ''),
+        offeredCTCAmount:         Joi.number().min(1).optional().allow(null),
+        currencyLookupId:         Joi.number().integer().positive().optional().allow(null),
+        compensationTypeLookupId: Joi.number().integer().positive().optional().allow(null),
+        variablePay:              Joi.number().min(0).optional().allow(null),
+        joiningBonus:             Joi.number().min(0).optional().allow(null),
+        offerLetterSent:          Joi.boolean().optional().allow(null),
+        serviceAgreementSent:     Joi.boolean().optional().allow(null),
+        contractorAddress:        Joi.string().trim().max(500).optional().allow(null, ''),
+        ndaSent:                  Joi.boolean().optional(),
+        codeOfConductSent:        Joi.boolean().optional(),
     }),
     terminate: Joi.object({
         terminationDate: Joi.string()
@@ -104,6 +129,23 @@ const offerSchemas = {
 class OfferValidator {
     static validateCreate(req, res, next) {
         const { value, error } = offerSchemas.create.validate(req.body, {
+            abortEarly: false,
+            stripUnknown: true
+        });
+        if (error) {
+            throw new AppError('Validation failed', 400, 'VALIDATION_ERROR', {
+                validationErrors: error.details.map(detail => ({
+                    field: detail.path[0],
+                    message: detail.message
+                }))
+            });
+        }
+        req.body = value;
+        next();
+    }
+
+    static validateUpdate(req, res, next) {
+        const { value, error } = offerSchemas.update.validate(req.body, {
             abortEarly: false,
             stripUnknown: true
         });

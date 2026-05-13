@@ -1,5 +1,6 @@
 const AppError = require('../utils/appError');
 const auditLogService = require('./auditLogService');
+const { generateOnboardingDocument, generateOnboardingDocumentWithAttachments, getS3Stream, uploadConsultantImage } = require('./onboardingDocumentService');
 
 const TERMINAL_OFFER_STATUSES = ['ACCEPTED', 'REJECTED', 'TERMINATED'];
 
@@ -49,6 +50,36 @@ class OfferService {
         }
     }
 
+    async updateOffer(offerId, offerData, auditContext) {
+        const client = await this.db.getConnection();
+        try {
+            await client.beginTransaction();
+            const existing = await this.offerRepository.getOfferById(offerId, client);
+            if (!existing) throw new AppError('Offer not found', 404, 'OFFER_NOT_FOUND');
+            const updated = await this.offerRepository.updateOffer(offerId, offerData, client);
+            await auditLogService.logAction({
+                userId:       auditContext.userId,
+                action:       'UPDATE',
+                resource_type:'offer',
+                resource_id:  offerId,
+                oldValues:    existing,
+                newValues:    updated,
+                ipAddress:    auditContext.ipAddress,
+                userAgent:    auditContext.userAgent,
+                timestamp:    auditContext.timestamp,
+            }, client);
+            await client.commit();
+            return updated;
+        } catch (error) {
+            await client.rollback();
+            if (error instanceof AppError) throw error;
+            console.error('Error updating offer:', error.stack);
+            throw new AppError('Failed to update offer', 500, 'OFFER_UPDATE_ERROR', { operation: 'updateOffer', offerId });
+        } finally {
+            client.release();
+        }
+    }
+
     async getDeletedOffers() {
         const client = await this.db.getConnection();
         try {
@@ -79,6 +110,19 @@ class OfferService {
             if (error instanceof AppError) throw error;
             console.error('Error fetching offers:', error.stack);
             throw new AppError('Failed to fetch offers', 500, 'OFFER_FETCH_ERROR', { operation: 'getOffers' });
+        } finally {
+            client.release();
+        }
+    }
+
+    async getActiveOfferForCandidate(candidateId) {
+        const client = await this.db.getConnection();
+        try {
+            return await this.offerRepository.getActiveOfferWithDocByCandidate(candidateId, client);
+        } catch (error) {
+            if (error instanceof AppError) throw error;
+            console.error('Error fetching active offer for candidate:', error.stack);
+            throw new AppError('Failed to fetch active offer', 500, 'OFFER_FETCH_ERROR', { operation: 'getActiveOfferForCandidate' });
         } finally {
             client.release();
         }
@@ -360,6 +404,207 @@ class OfferService {
             if (error instanceof AppError) throw error;
             console.error('Error updating offer status:', error.stack);
             throw new AppError('Failed to update offer status', 500, 'OFFER_STATUS_UPDATE_ERROR', { operation: 'updateOfferStatus', offerId });
+        } finally {
+            client.release();
+        }
+    }
+
+    async generateDocument(offerId, generatedBy) {
+        const client = await this.db.getConnection();
+        try {
+            const offer = await this.offerRepository.getOfferDetails(offerId, client);
+            if (!offer) {
+                throw new AppError('Offer not found', 404, 'OFFER_NOT_FOUND');
+            }
+
+            // Return existing document without regenerating
+            const existing = await this.offerRepository.getDocument(offerId, client);
+            if (existing) return existing;
+
+            const docInfo = await generateOnboardingDocument(
+                { ...offer, offerId },
+                generatedBy
+            );
+
+            await client.beginTransaction();
+            await this.offerRepository.saveDocument(offerId, docInfo, client);
+            await client.commit();
+
+            return await this.offerRepository.getDocument(offerId, client);
+        } catch (error) {
+            await client.rollback();
+            if (error instanceof AppError) throw error;
+            console.error('Error generating onboarding document:', error.stack);
+            throw new AppError('Failed to generate document', 500, 'DOCUMENT_GENERATION_ERROR');
+        } finally {
+            client.release();
+        }
+    }
+
+    async regenerateDocument(offerId, generatedBy) {
+        const client = await this.db.getConnection();
+        try {
+            const offer = await this.offerRepository.getOfferDetails(offerId, client);
+            if (!offer) {
+                throw new AppError('Offer not found', 404, 'OFFER_NOT_FOUND');
+            }
+
+            const docInfo = await generateOnboardingDocument(
+                { ...offer, offerId },
+                generatedBy
+            );
+
+            await client.beginTransaction();
+            await this.offerRepository.saveDocument(offerId, docInfo, client);
+            await client.commit();
+
+            return await this.offerRepository.getDocument(offerId, client);
+        } catch (error) {
+            await client.rollback();
+            if (error instanceof AppError) throw error;
+            console.error('Error regenerating onboarding document:', error.stack);
+            throw new AppError('Failed to regenerate document', 500, 'DOCUMENT_GENERATION_ERROR');
+        } finally {
+            client.release();
+        }
+    }
+
+    async generateDocumentWithAttachments(offerId, generatedBy, attachments) {
+        const client = await this.db.getConnection();
+        try {
+            const offer = await this.offerRepository.getOfferDetails(offerId, client);
+            if (!offer) throw new AppError('Offer not found', 404, 'OFFER_NOT_FOUND');
+
+            const docInfo = await generateOnboardingDocumentWithAttachments(
+                { ...offer, offerId }, generatedBy, attachments
+            );
+
+            await client.beginTransaction();
+            await this.offerRepository.saveDocument(offerId, docInfo, client);
+            await client.commit();
+            return await this.offerRepository.getDocument(offerId, client);
+        } catch (error) {
+            await client.rollback();
+            if (error instanceof AppError) throw error;
+            console.error('Error generating document with attachments:', error.stack);
+            throw new AppError('Failed to generate document', 500, 'DOCUMENT_GENERATION_ERROR');
+        } finally {
+            client.release();
+        }
+    }
+
+    async regenerateDocumentWithAttachments(offerId, generatedBy, attachments) {
+        const client = await this.db.getConnection();
+        try {
+            const offer = await this.offerRepository.getOfferDetails(offerId, client);
+            if (!offer) throw new AppError('Offer not found', 404, 'OFFER_NOT_FOUND');
+
+            const docInfo = await generateOnboardingDocumentWithAttachments(
+                { ...offer, offerId }, generatedBy, attachments
+            );
+
+            await client.beginTransaction();
+            await this.offerRepository.saveDocument(offerId, docInfo, client);
+            await client.commit();
+            return await this.offerRepository.getDocument(offerId, client);
+        } catch (error) {
+            await client.rollback();
+            if (error instanceof AppError) throw error;
+            console.error('Error regenerating document with attachments:', error.stack);
+            throw new AppError('Failed to regenerate document', 500, 'DOCUMENT_GENERATION_ERROR');
+        } finally {
+            client.release();
+        }
+    }
+
+    async getDocument(offerId) {
+        const client = await this.db.getConnection();
+        try {
+            return await this.offerRepository.getDocument(offerId, client);
+        } catch (error) {
+            if (error instanceof AppError) throw error;
+            throw new AppError('Failed to fetch document', 500, 'DATABASE_ERROR');
+        } finally {
+            client.release();
+        }
+    }
+
+    async streamDocument(offerId, res) {
+        const client = await this.db.getConnection();
+        try {
+            const doc = await this.offerRepository.getDocument(offerId, client);
+            if (!doc) {
+                throw new AppError('No document found for this offer', 404, 'DOCUMENT_NOT_FOUND');
+            }
+            const stream = await getS3Stream(doc.docS3Key);
+            res.setHeader('Content-Type', doc.docMimeType || 'application/pdf');
+            res.setHeader(
+                'Content-Disposition',
+                `attachment; filename="${doc.docFileName}"`
+            );
+            for await (const chunk of stream) {
+                res.write(chunk);
+            }
+            res.end();
+        } catch (error) {
+            if (error instanceof AppError) throw error;
+            throw new AppError('Failed to stream document', 500, 'STREAM_ERROR');
+        } finally {
+            client.release();
+        }
+    }
+
+    async uploadConsultantImages(offerId, files) {
+        const client = await this.db.getConnection();
+        try {
+            const fieldToColumn = {
+                professionalPhoto: 'photo_s3_key',
+                aadhaarFront:      'aadhaar_front_s3_key',
+                aadhaarBack:       'aadhaar_back_s3_key',
+                panCard:           'pan_card_s3_key',
+            };
+            const keys = {};
+            for (const [field, column] of Object.entries(fieldToColumn)) {
+                const file = files[field]?.[0];
+                if (file) {
+                    const s3Key = await uploadConsultantImage(file.buffer, offerId, field, file.mimetype);
+                    keys[column] = s3Key;
+                }
+            }
+            if (Object.keys(keys).length > 0) {
+                await this.offerRepository.saveImageKeys(offerId, keys, client);
+            }
+            return { savedCount: Object.keys(keys).length };
+        } catch (error) {
+            if (error instanceof AppError) throw error;
+            throw new AppError('Failed to upload consultant images', 500, 'IMAGE_UPLOAD_ERROR');
+        } finally {
+            client.release();
+        }
+    }
+
+    async streamConsultantImage(offerId, field, res) {
+        const client = await this.db.getConnection();
+        try {
+            const keys = await this.offerRepository.getImageKeys(offerId, client);
+            if (!keys) throw new AppError('Offer not found', 404, 'OFFER_NOT_FOUND');
+            const fieldToKey = {
+                photo:         keys.photoS3Key,
+                aadhaar_front: keys.aadhaarFrontS3Key,
+                aadhaar_back:  keys.aadhaarBackS3Key,
+                pan_card:      keys.panCardS3Key,
+            };
+            const s3Key = fieldToKey[field];
+            if (!s3Key) throw new AppError('Image not found', 404, 'IMAGE_NOT_FOUND');
+            const mimeType = s3Key.endsWith('.jpg') ? 'image/jpeg' : 'image/png';
+            const stream   = await getS3Stream(s3Key);
+            res.setHeader('Content-Type', mimeType);
+            res.setHeader('Cache-Control', 'private, max-age=3600');
+            for await (const chunk of stream) res.write(chunk);
+            res.end();
+        } catch (error) {
+            if (error instanceof AppError) throw error;
+            throw new AppError('Failed to stream image', 500, 'STREAM_ERROR');
         } finally {
             client.release();
         }
