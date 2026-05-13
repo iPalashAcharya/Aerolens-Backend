@@ -1,6 +1,6 @@
 const AppError = require('../utils/appError');
 const auditLogService = require('./auditLogService');
-const { generateOnboardingDocument, generateOnboardingDocumentWithAttachments, getS3Stream } = require('./onboardingDocumentService');
+const { generateOnboardingDocument, generateOnboardingDocumentWithAttachments, getS3Stream, uploadConsultantImage } = require('./onboardingDocumentService');
 
 const TERMINAL_OFFER_STATUSES = ['ACCEPTED', 'REJECTED', 'TERMINATED'];
 
@@ -475,9 +475,6 @@ class OfferService {
             const offer = await this.offerRepository.getOfferDetails(offerId, client);
             if (!offer) throw new AppError('Offer not found', 404, 'OFFER_NOT_FOUND');
 
-            const existing = await this.offerRepository.getDocument(offerId, client);
-            if (existing) return existing;
-
             const docInfo = await generateOnboardingDocumentWithAttachments(
                 { ...offer, offerId }, generatedBy, attachments
             );
@@ -552,6 +549,62 @@ class OfferService {
         } catch (error) {
             if (error instanceof AppError) throw error;
             throw new AppError('Failed to stream document', 500, 'STREAM_ERROR');
+        } finally {
+            client.release();
+        }
+    }
+
+    async uploadConsultantImages(offerId, files) {
+        const client = await this.db.getConnection();
+        try {
+            const fieldToColumn = {
+                professionalPhoto: 'photo_s3_key',
+                aadhaarFront:      'aadhaar_front_s3_key',
+                aadhaarBack:       'aadhaar_back_s3_key',
+                panCard:           'pan_card_s3_key',
+            };
+            const keys = {};
+            for (const [field, column] of Object.entries(fieldToColumn)) {
+                const file = files[field]?.[0];
+                if (file) {
+                    const s3Key = await uploadConsultantImage(file.buffer, offerId, field, file.mimetype);
+                    keys[column] = s3Key;
+                }
+            }
+            if (Object.keys(keys).length > 0) {
+                await this.offerRepository.saveImageKeys(offerId, keys, client);
+            }
+            return { savedCount: Object.keys(keys).length };
+        } catch (error) {
+            if (error instanceof AppError) throw error;
+            throw new AppError('Failed to upload consultant images', 500, 'IMAGE_UPLOAD_ERROR');
+        } finally {
+            client.release();
+        }
+    }
+
+    async streamConsultantImage(offerId, field, res) {
+        const client = await this.db.getConnection();
+        try {
+            const keys = await this.offerRepository.getImageKeys(offerId, client);
+            if (!keys) throw new AppError('Offer not found', 404, 'OFFER_NOT_FOUND');
+            const fieldToKey = {
+                photo:         keys.photoS3Key,
+                aadhaar_front: keys.aadhaarFrontS3Key,
+                aadhaar_back:  keys.aadhaarBackS3Key,
+                pan_card:      keys.panCardS3Key,
+            };
+            const s3Key = fieldToKey[field];
+            if (!s3Key) throw new AppError('Image not found', 404, 'IMAGE_NOT_FOUND');
+            const mimeType = s3Key.endsWith('.jpg') ? 'image/jpeg' : 'image/png';
+            const stream   = await getS3Stream(s3Key);
+            res.setHeader('Content-Type', mimeType);
+            res.setHeader('Cache-Control', 'private, max-age=3600');
+            for await (const chunk of stream) res.write(chunk);
+            res.end();
+        } catch (error) {
+            if (error instanceof AppError) throw error;
+            throw new AppError('Failed to stream image', 500, 'STREAM_ERROR');
         } finally {
             client.release();
         }

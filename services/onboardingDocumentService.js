@@ -1,7 +1,7 @@
 'use strict';
 
 const path = require('path');
-const fs   = require('fs');
+const fs = require('fs');
 const PDFDocument = require('pdfkit');
 const { PutObjectCommand, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { s3Client, bucketName } = require('../config/s3');
@@ -13,6 +13,11 @@ const S3_DOC_FOLDER =
     process.env.NODE_ENV === 'production'
         ? 'onboarding-docs/'
         : 'development/onboarding-docs/';
+
+const S3_IMAGE_FOLDER =
+    process.env.NODE_ENV === 'production'
+        ? 'consultant-images/'
+        : 'development/consultant-images/';
 
 // ── Doc type ──────────────────────────────────────────────────────────────────
 
@@ -1050,20 +1055,14 @@ function buildServiceAgreementPdf(rawBody, offer, attachments = {}) {
             doc.moveDown(0.25);
         }, 20);
 
-        // ── Appendix B — Consultant only (Contractor has no invoicing table) ──
-        const isContractorType = (offer.employmentTypeName || '').toLowerCase().trim() === 'contractor';
-        if (isContractorType) {
-            // Skip Appendix B for contractors
-            // Jump straight to signature page below
-        }
-        // Needed for both Appendix B (consultant only) and signature page (all types)
-        const todayDMY = fmtDateDMY(new Date());
-        const startDMY = offer.joiningDate ? fmtDateDMY(new Date(offer.joiningDate)) : '___________';
-
-        if (!isContractorType) { newPage();
+        // ── Appendix B ───────────────────────────────────────────────────────
+        newPage();
 
         safeText('Appendix B', { bold: true, align: 'center', size: 12, gap: 0.3 });
         safeText('Invoicing & Payment Term', { bold: true, align: 'center', size: 11, gap: 0.6 });
+
+        const todayDMY  = fmtDateDMY(new Date());
+        const startDMY  = offer.joiningDate ? fmtDateDMY(new Date(offer.joiningDate)) : '___________';
         const ctcFormatted = offer.offeredCTCAmount
             ? `${fmtAmount(offer.offeredCTCAmount, (offer.currencyName || 'INR').trim())} + GST/${(offer.compensationTypeName || 'Monthly').trim()}`
             : 'As discussed';
@@ -1115,7 +1114,6 @@ function buildServiceAgreementPdf(rawBody, offer, attachments = {}) {
                .text(cellText, ML + col0W + 5, rowY + 6, { width: col1W - 10, lineGap: 1 });
             doc.y = rowY + h;
         });
-        } // end if (!isContractorType) — Appendix B
 
         // ── Signature page ───────────────────────────────────────────────────
         newPage();
@@ -1175,56 +1173,67 @@ function buildServiceAgreementPdf(rawBody, offer, attachments = {}) {
         doc.fontSize(8.5).font('Times-Roman').fillColor(BLACK)
            .text('Date of Signature:', rightX + 5, lineY + lineGap * 3, { width: sigBoxW - 10 });
 
-        // ── Attachment page — Consultant only (with uploaded images) ────────
+        // ── Attachment page (always included in service agreement) ──────────
         const { professionalPhoto, aadhaarFront, aadhaarBack, panCard } = attachments;
-        if (!isContractorType) {
+        {
             newPage();
-            // Reset PDFKit persistent lineGap state accumulated from body text —
-            // without this, lineGap:1 inherited from safeText() corrupts image placement
-            doc.lineGap(0);
-            doc.fillColor(BLACK);
 
-            // Helper: embed image buffer directly, fall back to label if missing
-            function placeImage(buf, x, y, w, h, label) {
-                if (buf) {
-                    doc.fillColor(BLACK);
-                    doc.image(buf, x + 2, y + 2,
-                        { fit: [w - 4, h - 4], align: 'center', valign: 'center' });
-                } else {
-                    doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
-                       .text(label, x, y + h / 2 - 5, { width: w, align: 'center', lineGap: 0 });
-                    doc.fillColor(BLACK);
-                }
-            }
-
-            // All y-positions are fixed from BODY_Y — not dependent on doc.y
+            // Professional Photo — centred at top
             const photoW = 130, photoH = 110;
             const photoX = ML + (CW - photoW) / 2;
-            const photoY = BODY_Y;
+            const photoY = doc.y;
             doc.rect(photoX, photoY, photoW, photoH).strokeColor(TBL_BORD).lineWidth(0.5).stroke();
-            placeImage(professionalPhoto, photoX, photoY, photoW, photoH, 'Professional Photo');
+            if (professionalPhoto) {
+                doc.image(professionalPhoto, photoX + 2, photoY + 2,
+                    { fit: [photoW - 4, photoH - 4], align: 'center', valign: 'center' });
+            } else {
+                doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
+                   .text('Professional Photo', photoX, photoY + photoH / 2 - 5, { width: photoW, align: 'center' });
+            }
             doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
-               .text('Professional Photo', photoX, photoY + photoH + 4,
-                     { width: photoW, align: 'center', lineGap: 0 });
+               .text('Professional Photo', photoX, photoY + photoH + 3, { width: photoW, align: 'center' });
 
+            doc.y = photoY + photoH + 18;
+
+            // Aadhaar Front + Back — side by side
             const idW = (CW - 10) / 2, idH = 120;
-            const aY  = photoY + photoH + 24;
+            const aY  = doc.y;
             doc.rect(ML,            aY, idW, idH).strokeColor(TBL_BORD).lineWidth(0.5).stroke();
             doc.rect(ML + idW + 10, aY, idW, idH).strokeColor(TBL_BORD).lineWidth(0.5).stroke();
-            placeImage(aadhaarFront, ML,           aY, idW, idH, 'Aadhaar Card Front');
-            placeImage(aadhaarBack,  ML + idW + 10, aY, idW, idH, 'Aadhaar Card Back');
+            if (aadhaarFront) {
+                doc.image(aadhaarFront, ML + 2, aY + 2,
+                    { fit: [idW - 4, idH - 4], align: 'center', valign: 'center' });
+            } else {
+                doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
+                   .text(' Aadhaar Card Front', ML, aY + idH / 2 - 5, { width: idW, align: 'center' });
+            }
+            if (aadhaarBack) {
+                doc.image(aadhaarBack, ML + idW + 12, aY + 2,
+                    { fit: [idW - 4, idH - 4], align: 'center', valign: 'center' });
+            } else {
+                doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
+                   .text('Aadhaar Card Back', ML + idW + 10, aY + idH / 2 - 5, { width: idW, align: 'center' });
+            }
             doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
-               .text('Aadhaar Card Front', ML,            aY + idH + 4, { width: idW, align: 'center', lineGap: 0 })
-               .text('Aadhaar Card Back',  ML + idW + 10, aY + idH + 4, { width: idW, align: 'center', lineGap: 0 });
+               .text(' Aadhaar Card Front', ML,            aY + idH + 3, { width: idW,  align: 'center' })
+               .text(' Aadhaar Card Back',  ML + idW + 10, aY + idH + 3, { width: idW,  align: 'center' });
 
+            doc.y = aY + idH + 18;
+
+            // Owner PAN Card — centred
             const panW = 160, panH = 110;
             const panX = ML + (CW - panW) / 2;
-            const panY = aY + idH + 24;
+            const panY = doc.y;
             doc.rect(panX, panY, panW, panH).strokeColor(TBL_BORD).lineWidth(0.5).stroke();
-            placeImage(panCard, panX, panY, panW, panH, 'Owner Pan Card');
+            if (panCard) {
+                doc.image(panCard, panX + 2, panY + 2,
+                    { fit: [panW - 4, panH - 4], align: 'center', valign: 'center' });
+            } else {
+                doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
+                   .text(' Owner Pan Card', panX, panY + panH / 2 - 5, { width: panW, align: 'center' });
+            }
             doc.fontSize(8).font('Times-Roman').fillColor(DGRAY)
-               .text('Owner Pan Card', panX, panY + panH + 4,
-                     { width: panW, align: 'center', lineGap: 0 });
+               .text(' Owner Pan Card', panX, panY + panH + 3, { width: panW, align: 'center' });
         }
 
         doc.end();
@@ -1233,13 +1242,13 @@ function buildServiceAgreementPdf(rawBody, offer, attachments = {}) {
 
 // ── S3 helpers ────────────────────────────────────────────────────────────────
 
-async function uploadToS3(buffer, s3Key) {
+async function uploadToS3(buffer, s3Key, contentType = 'application/pdf') {
     if (!bucketName) {
         throw new AppError('S3 bucket is not configured — document generation requires S3', 500, 'S3_NOT_CONFIGURED');
     }
     await s3Client.send(new PutObjectCommand({
         Bucket: bucketName, Key: s3Key, Body: buffer,
-        ContentType: 'application/pdf', ServerSideEncryption: 'AES256',
+        ContentType: contentType, ServerSideEncryption: 'AES256',
     }));
 }
 
@@ -1247,6 +1256,40 @@ async function getS3Stream(s3Key) {
     if (!bucketName) throw new AppError('S3 bucket is not configured', 500, 'S3_NOT_CONFIGURED');
     const response = await s3Client.send(new GetObjectCommand({ Bucket: bucketName, Key: s3Key }));
     return response.Body;
+}
+
+async function streamToBuffer(stream) {
+    const chunks = [];
+    for await (const chunk of stream) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    return Buffer.concat(chunks);
+}
+
+async function uploadConsultantImage(buffer, offerId, field, mimetype) {
+    const ext    = mimetype === 'image/jpeg' ? 'jpg' : 'png';
+    const s3Key  = `${S3_IMAGE_FOLDER}offer_${offerId}_${field}_${Date.now()}.${ext}`;
+    await uploadToS3(buffer, s3Key, mimetype);
+    return s3Key;
+}
+
+async function loadConsultantImages(offer) {
+    const fieldMap = {
+        professionalPhoto: offer.photoS3Key,
+        aadhaarFront:      offer.aadhaarFrontS3Key,
+        aadhaarBack:       offer.aadhaarBackS3Key,
+        panCard:           offer.panCardS3Key,
+    };
+    const attachments = {};
+    for (const [field, key] of Object.entries(fieldMap)) {
+        if (key) {
+            try {
+                const stream = await getS3Stream(key);
+                attachments[field] = await streamToBuffer(stream);
+            } catch {
+                // image unavailable — render empty box
+            }
+        }
+    }
+    return attachments;
 }
 
 // ── Main export ───────────────────────────────────────────────────────────────
@@ -1284,7 +1327,8 @@ async function generateOnboardingDocument(offerDetails, generatedBy) {
         } catch {
             // OpenRouter unavailable or model error — use pre-built body as-is
         }
-        pdfBuffer = await buildServiceAgreementPdf(finalBody, offerDetails);
+        const attachments = await loadConsultantImages(offerDetails);
+        pdfBuffer = await buildServiceAgreementPdf(finalBody, offerDetails, attachments);
     }
 
     await uploadToS3(pdfBuffer, s3Key);
@@ -1338,4 +1382,4 @@ async function generateOnboardingDocumentWithAttachments(offerDetails, generated
     };
 }
 
-module.exports = { generateOnboardingDocument, generateOnboardingDocumentWithAttachments, resolveDocType, getS3Stream };
+module.exports = { generateOnboardingDocument, generateOnboardingDocumentWithAttachments, resolveDocType, getS3Stream, uploadConsultantImage };

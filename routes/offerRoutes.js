@@ -21,7 +21,10 @@ const attachmentFields = upload.fields([
     { name: 'professionalPhoto', maxCount: 1 },
     { name: 'aadhaarFront',      maxCount: 1 },
     { name: 'aadhaarBack',       maxCount: 1 },
+    { name: 'aadharFront',       maxCount: 1 },
+    { name: 'aadharBack',        maxCount: 1 },
     { name: 'panCard',           maxCount: 1 },
+    { name: 'pancard',           maxCount: 1 },
 ]);
 
 const router = express.Router();
@@ -54,6 +57,10 @@ router.post('/:offerId/revise', OfferValidator.validateRevision, offerController
 router.post('/:offerId/status', OfferValidator.validateStatusUpdate, offerController.updateOfferStatus);
 
 router.post('/:candidateId', OfferValidator.validateCreate, offerController.createOffer);
+
+// Consultant identity document images (stored in S3, keys saved to offer table)
+router.post('/:offerId/consultant-images', attachmentFields, offerController.uploadConsultantImages);
+router.get('/:offerId/consultant-images/:field',              offerController.getConsultantImage);
 
 // Document generation — must be placed after specific routes to avoid :candidateId conflicts
 router.post('/:offerId/document/with-attachments',            attachmentFields, offerController.generateDocumentWithAttachments);

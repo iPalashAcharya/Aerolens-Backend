@@ -304,6 +304,10 @@ class OfferRepository {
                     o.offerStatus, o.offerVersion, o.createdBy, o.createdAt, o.updatedAt,
                     o.sign_before_date AS signBeforeDate,
                     o.contractor_address AS contractorAddress,
+                    o.photo_s3_key          AS photoS3Key,
+                    o.aadhaar_front_s3_key  AS aadhaarFrontS3Key,
+                    o.aadhaar_back_s3_key   AS aadhaarBackS3Key,
+                    o.pan_card_s3_key       AS panCardS3Key,
                     c.candidateName,
                     jp.jobRole,
                     let.value AS employmentTypeName,
@@ -541,7 +545,11 @@ class OfferRepository {
                     o.offerLetterSent, o.serviceAgreementSent, o.ndaSent, o.codeOfConductSent,
                     o.offerStatus,
                     DATE_FORMAT(o.sign_before_date, '%Y-%m-%d') AS signBeforeDate,
-                    o.contractor_address AS contractorAddress,
+                    o.contractor_address  AS contractorAddress,
+                    o.photo_s3_key         AS photoS3Key,
+                    o.aadhaar_front_s3_key AS aadhaarFrontS3Key,
+                    o.aadhaar_back_s3_key  AS aadhaarBackS3Key,
+                    o.pan_card_s3_key      AS panCardS3Key,
                     let.value AS employmentTypeName,
                     o.doc_type         AS docType,
                     o.doc_file_name    AS docFileName,
@@ -559,6 +567,36 @@ class OfferRepository {
             return rows[0] || null;
         } catch (error) {
             this._handleDatabaseError(error, 'getActiveOfferWithDocByCandidate');
+        }
+    }
+
+    async saveImageKeys(offerId, keys, client) {
+        const connection = client;
+        try {
+            const setClauses = Object.keys(keys).map((k) => `${k} = ?`).join(', ');
+            await connection.execute(
+                `UPDATE offer SET ${setClauses} WHERE offerId = ? AND isDeleted = 0`,
+                [...Object.values(keys), offerId]
+            );
+        } catch (error) {
+            this._handleDatabaseError(error, 'saveImageKeys');
+        }
+    }
+
+    async getImageKeys(offerId, client) {
+        const connection = client;
+        try {
+            const [rows] = await connection.execute(
+                `SELECT photo_s3_key         AS photoS3Key,
+                        aadhaar_front_s3_key AS aadhaarFrontS3Key,
+                        aadhaar_back_s3_key  AS aadhaarBackS3Key,
+                        pan_card_s3_key      AS panCardS3Key
+                 FROM offer WHERE offerId = ? AND isDeleted = 0`,
+                [offerId]
+            );
+            return rows[0] || null;
+        } catch (error) {
+            this._handleDatabaseError(error, 'getImageKeys');
         }
     }
 

@@ -126,6 +126,18 @@ class OfferController {
         return ApiResponse.success(res, doc, 'Document regenerated successfully');
     });
 
+    uploadConsultantImages = catchAsync(async (req, res) => {
+        const offerId = parseInt(req.params.offerId, 10);
+        const result  = await this.offerService.uploadConsultantImages(offerId, req.files || {});
+        return ApiResponse.success(res, result, 'Images uploaded successfully');
+    });
+
+    getConsultantImage = catchAsync(async (req, res) => {
+        const offerId = parseInt(req.params.offerId, 10);
+        const { field } = req.params;
+        await this.offerService.streamConsultantImage(offerId, field, res);
+    });
+
     generateDocumentWithAttachments = catchAsync(async (req, res) => {
         const offerId     = parseInt(req.params.offerId, 10);
         const generatedBy = req.auditContext.userId;
@@ -146,9 +158,18 @@ class OfferController {
         const files = req.files || {};
         return {
             professionalPhoto: files.professionalPhoto?.[0]?.buffer ?? null,
-            aadhaarFront:      files.aadhaarFront?.[0]?.buffer      ?? null,
-            aadhaarBack:       files.aadhaarBack?.[0]?.buffer       ?? null,
-            panCard:           files.panCard?.[0]?.buffer           ?? null,
+            aadhaarFront:
+                files.aadhaarFront?.[0]?.buffer ??
+                files.aadharFront?.[0]?.buffer ??
+                null,
+            aadhaarBack:
+                files.aadhaarBack?.[0]?.buffer ??
+                files.aadharBack?.[0]?.buffer ??
+                null,
+            panCard:
+                files.panCard?.[0]?.buffer ??
+                files.pancard?.[0]?.buffer ??
+                null,
         };
     }
 
