@@ -1055,14 +1055,19 @@ function buildServiceAgreementPdf(rawBody, offer, attachments = {}) {
             doc.moveDown(0.25);
         }, 20);
 
-        // ── Appendix B ───────────────────────────────────────────────────────
+        // Date values used in Appendix B and the signature page
+        const todayDMY = fmtDateDMY(new Date());
+        const startDMY = offer.joiningDate ? fmtDateDMY(new Date(offer.joiningDate)) : '___________';
+
+        // Contractor has no CTC fields and no attachment page — skip both
+        const isContractorType = (offer.employmentTypeName || '').toLowerCase().trim() === 'contractor';
+
+        // ── Appendix B — Consultant only ─────────────────────────────────────
+        if (!isContractorType) {
         newPage();
 
         safeText('Appendix B', { bold: true, align: 'center', size: 12, gap: 0.3 });
         safeText('Invoicing & Payment Term', { bold: true, align: 'center', size: 11, gap: 0.6 });
-
-        const todayDMY  = fmtDateDMY(new Date());
-        const startDMY  = offer.joiningDate ? fmtDateDMY(new Date(offer.joiningDate)) : '___________';
         const ctcFormatted = offer.offeredCTCAmount
             ? `${fmtAmount(offer.offeredCTCAmount, (offer.currencyName || 'INR').trim())} + GST/${(offer.compensationTypeName || 'Monthly').trim()}`
             : 'As discussed';
@@ -1114,6 +1119,7 @@ function buildServiceAgreementPdf(rawBody, offer, attachments = {}) {
                .text(cellText, ML + col0W + 5, rowY + 6, { width: col1W - 10, lineGap: 1 });
             doc.y = rowY + h;
         });
+        } // end if (!isContractorType) — Appendix B
 
         // ── Signature page ───────────────────────────────────────────────────
         newPage();
@@ -1173,9 +1179,9 @@ function buildServiceAgreementPdf(rawBody, offer, attachments = {}) {
         doc.fontSize(8.5).font('Times-Roman').fillColor(BLACK)
            .text('Date of Signature:', rightX + 5, lineY + lineGap * 3, { width: sigBoxW - 10 });
 
-        // ── Attachment page (always included in service agreement) ──────────
+        // ── Attachment page — Consultant only ────────────────────────────────
         const { professionalPhoto, aadhaarFront, aadhaarBack, panCard } = attachments;
-        {
+        if (!isContractorType) {
             newPage();
 
             // Professional Photo — centred at top
